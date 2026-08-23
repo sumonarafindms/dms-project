@@ -26,3 +26,9 @@ npm run dev
 ```
 
 For local database commands, ensure `DMS_DATABASE_URL` is available in the environment.
+
+## v0.3 Monthly Targets
+
+- `/targets` lets admins set monthly GA, C2C, SC, Total Recharge, SSO and LSO targets per employee.
+- SC achievement can be entered manually per employee/month.
+- Targets are stored with an employee + month unique key, so re-saving updates instead of duplicating.
