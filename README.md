@@ -1,25 +1,28 @@
-# Sales Reporting Web App Starter
+# DMS Sales Reporting System
 
-This starter turns the existing Excel workflow into a PostgreSQL-backed Next.js application.
+Next.js + TypeScript + PostgreSQL + Prisma application for DMS sales reporting.
 
-## Current foundation
-- PostgreSQL + Prisma schema
-- Employee -> many Retailers relationship
-- Monthly employee targets
-- Manual SC achievement
-- GA/C2C/C2S/OB daily record models
-- Import batch/error tracking
-- Monthly KPI calculation service
-- Dashboard API stub
-- Daily upload API stubs
-- Dashboard prototype page
+## Current features
 
-## Run locally
-1. Copy `.env.example` to `.env` and set `DATABASE_URL`.
-2. `npm install`
-3. `npx prisma generate`
-4. `npx prisma migrate dev --name init`
-5. `npm run dev`
+- Supervisor -> Employee -> Retailer master hierarchy
+- Employee Excel import
+- Retailer Excel import
+- Automatic mapping: `RS0 MSISDN` -> `I_TOP_UP_SR_NUMBER`
+- Unassigned retailer tracking
+- Monthly KPI data model for GA, C2C, SC, Total Recharge, SSO and LSO
+- Daily GA/C2C/C2S/OB data models and import endpoints ready for exact source mapping
 
-## Next implementation milestone
-Map the real Excel columns for GA, C2C, C2S, OB and the monthly target sheet, then connect parsers to the import endpoints.
+## Deployment
+
+Vercel must provide `DMS_DATABASE_URL`.
+
+The production build runs `prisma migrate deploy` before `next build`, so committed migrations are applied automatically during deployment.
+
+## Local development
+
+```bash
+npm install
+npm run dev
+```
+
+For local database commands, ensure `DMS_DATABASE_URL` is available in the environment.

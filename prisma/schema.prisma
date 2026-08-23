@@ -7,37 +7,56 @@ datasource db {
   url      = env("DMS_DATABASE_URL")
 }
 
+model Supervisor {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  active    Boolean    @default(true)
+  employees Employee[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
 model Employee {
-  id             String          @id @default(cuid())
-  phoneNumber    String          @unique
-  employeeCode   String?         @unique
-  name           String
-  supervisorName String?
-  bpName         String?
-  active         Boolean         @default(true)
-  retailers      Retailer[]
-  targets        MonthlyTarget[]
-  manualMetrics  ManualMetric[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id            String          @id @default(cuid())
+  rsoMsisdn     String          @unique
+  employeeCode  String?         @unique
+  name          String
+  supervisorId  String?
+  supervisor    Supervisor?     @relation(fields: [supervisorId], references: [id])
+  active        Boolean         @default(true)
+  retailers     Retailer[]
+  targets       MonthlyTarget[]
+  manualMetrics ManualMetric[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([supervisorId])
 }
 
 model Retailer {
-  id             String      @id @default(cuid())
-  retailerCode   String      @unique
-  retailerName   String?
-  itopupNumber   String?
-  employeeId     String
-  employee       Employee    @relation(fields: [employeeId], references: [id])
-  active         Boolean     @default(true)
-  gaRecords      GaRecord[]
-  c2cRecords     C2cRecord[]
-  c2sRecords     C2sRecord[]
-  obRecords      ObRecord[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  retailerCode     String      @unique
+  retailerName     String?
+  simSeller        String?
+  iTopUpSeller     String?
+  tranMobileNo     String?
+  iTopUpSrNumber   String?
+  iTopUpNumber     String?
+  category         String?
+  rsoCode          String?
+  route             String?
+  employeeId       String?
+  employee         Employee?   @relation(fields: [employeeId], references: [id])
+  active            Boolean     @default(true)
+  gaRecords         GaRecord[]
+  c2cRecords        C2cRecord[]
+  c2sRecords        C2sRecord[]
+  obRecords         ObRecord[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   @@index([employeeId])
+  @@index([iTopUpSrNumber])
 }
 
 model MonthlyTarget {
@@ -71,21 +90,21 @@ model ManualMetric {
 }
 
 model ImportBatch {
-  id          String      @id @default(cuid())
-  type        ImportType
-  fileName    String
+  id           String       @id @default(cuid())
+  type         ImportType
+  fileName     String
   businessDate DateTime?
-  uploadedAt  DateTime    @default(now())
-  totalRows   Int         @default(0)
-  successRows Int         @default(0)
-  failedRows  Int         @default(0)
-  hash        String?     @unique
-  status      ImportStatus @default(PROCESSING)
-  errors      ImportError[]
-  gaRecords   GaRecord[]
-  c2cRecords  C2cRecord[]
-  c2sRecords  C2sRecord[]
-  obRecords   ObRecord[]
+  uploadedAt   DateTime     @default(now())
+  totalRows    Int          @default(0)
+  successRows  Int          @default(0)
+  failedRows   Int          @default(0)
+  hash         String?      @unique
+  status       ImportStatus @default(PROCESSING)
+  errors       ImportError[]
+  gaRecords    GaRecord[]
+  c2cRecords   C2cRecord[]
+  c2sRecords   C2sRecord[]
+  obRecords    ObRecord[]
 }
 
 model ImportError {
@@ -99,63 +118,63 @@ model ImportError {
 }
 
 model GaRecord {
-  id         String      @id @default(cuid())
+  id         String       @id @default(cuid())
   retailerId String
-  retailer   Retailer    @relation(fields: [retailerId], references: [id])
+  retailer   Retailer     @relation(fields: [retailerId], references: [id])
   date       DateTime
-  gaCount    Int         @default(0)
-  ga150      Int         @default(0)
-  ga300      Int         @default(0)
+  gaCount    Int          @default(0)
+  ga150      Int          @default(0)
+  ga300      Int          @default(0)
   batchId    String?
   batch      ImportBatch? @relation(fields: [batchId], references: [id])
-  createdAt  DateTime    @default(now())
+  createdAt  DateTime     @default(now())
 
   @@unique([retailerId, date])
   @@index([date])
 }
 
 model C2cRecord {
-  id               String      @id @default(cuid())
+  id               String       @id @default(cuid())
   retailerId       String
-  retailer         Retailer    @relation(fields: [retailerId], references: [id])
+  retailer         Retailer     @relation(fields: [retailerId], references: [id])
   date             DateTime
-  transactionCount Int         @default(0)
-  amount           Decimal     @default(0) @db.Decimal(18,2)
+  transactionCount Int          @default(0)
+  amount           Decimal      @default(0) @db.Decimal(18,2)
   batchId          String?
-  batch             ImportBatch? @relation(fields: [batchId], references: [id])
-  createdAt        DateTime    @default(now())
+  batch            ImportBatch? @relation(fields: [batchId], references: [id])
+  createdAt        DateTime     @default(now())
 
   @@unique([retailerId, date])
   @@index([date])
 }
 
 model C2sRecord {
-  id               String      @id @default(cuid())
+  id               String       @id @default(cuid())
   retailerId       String
-  retailer         Retailer    @relation(fields: [retailerId], references: [id])
+  retailer         Retailer     @relation(fields: [retailerId], references: [id])
   date             DateTime
-  transactionCount Int         @default(0)
-  amount           Decimal     @default(0) @db.Decimal(18,2)
+  transactionCount Int          @default(0)
+  amount           Decimal      @default(0) @db.Decimal(18,2)
   enabled          Boolean?
   sellerStatus     String?
   batchId          String?
-  batch             ImportBatch? @relation(fields: [batchId], references: [id])
-  createdAt        DateTime    @default(now())
+  batch            ImportBatch? @relation(fields: [batchId], references: [id])
+  createdAt        DateTime     @default(now())
 
   @@unique([retailerId, date])
   @@index([date])
 }
 
 model ObRecord {
-  id               String      @id @default(cuid())
+  id               String       @id @default(cuid())
   retailerId       String
-  retailer         Retailer    @relation(fields: [retailerId], references: [id])
+  retailer         Retailer     @relation(fields: [retailerId], references: [id])
   date             DateTime
-  transactionCount Int         @default(0)
-  amount           Decimal     @default(0) @db.Decimal(18,2)
+  transactionCount Int          @default(0)
+  amount           Decimal      @default(0) @db.Decimal(18,2)
   batchId          String?
-  batch             ImportBatch? @relation(fields: [batchId], references: [id])
-  createdAt        DateTime    @default(now())
+  batch            ImportBatch? @relation(fields: [batchId], references: [id])
+  createdAt        DateTime     @default(now())
 
   @@unique([retailerId, date])
   @@index([date])
