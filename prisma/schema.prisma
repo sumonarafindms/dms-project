@@ -49,6 +49,7 @@ model Retailer {
   employee         Employee?   @relation(fields: [employeeId], references: [id])
   active            Boolean     @default(true)
   gaRecords         GaRecord[]
+  gaActivations     GaActivation[]
   c2cRecords        C2cRecord[]
   c2sRecords        C2sRecord[]
   obRecords         ObRecord[]
@@ -98,10 +99,12 @@ model ImportBatch {
   totalRows    Int          @default(0)
   successRows  Int          @default(0)
   failedRows   Int          @default(0)
+  duplicateRows Int         @default(0)
   hash         String?      @unique
   status       ImportStatus @default(PROCESSING)
   errors       ImportError[]
   gaRecords    GaRecord[]
+  gaActivations GaActivation[]
   c2cRecords   C2cRecord[]
   c2sRecords   C2sRecord[]
   obRecords    ObRecord[]
@@ -131,6 +134,24 @@ model GaRecord {
 
   @@unique([retailerId, date])
   @@index([date])
+}
+
+model GaActivation {
+  id             String       @id @default(cuid())
+  simNo          String       @unique
+  retailerId     String
+  retailer       Retailer     @relation(fields: [retailerId], references: [id])
+  activationDate DateTime
+  activationTime String?
+  sellingPrice   Decimal      @db.Decimal(10,2)
+  batchId        String?
+  batch          ImportBatch? @relation(fields: [batchId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([activationDate])
+  @@index([retailerId, activationDate])
+  @@index([batchId])
 }
 
 model C2cRecord {

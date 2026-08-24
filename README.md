@@ -1,34 +1,42 @@
-# DMS Sales Reporting System
+# DMS Sales Reporting Web App
 
-Next.js + TypeScript + PostgreSQL + Prisma application for DMS sales reporting.
+Current release: v0.5
 
-## Current features
+## Implemented
+- PostgreSQL + Prisma foundation
+- Supervisor → Employee → Retailer master hierarchy
+- Employee and Retailer Excel imports
+- Monthly Target entry
+- Manual SC Achievement entry
+- Daily `ActivationDetailsReport.xlsx` GA upload with selected business date
+- SIM-level GA deduplication using unique `SIM_NO`
+- Minimal GA storage: retailer, SIM serial, activation date/time, selling price
+- Retailer daily GA: Total / 150 / 300
+- Employee monthly GA Achievement
+- SSO Achievement using `SIM_SELLER = Y` and monthly GA >= 2
+- GA import history, duplicate-file protection, and corrected-SIM updates
 
-- Supervisor -> Employee -> Retailer master hierarchy
-- Employee Excel import
-- Retailer Excel import
-- Automatic mapping: `RS0 MSISDN` -> `I_TOP_UP_SR_NUMBER`
-- Unassigned retailer tracking
-- Monthly KPI data model for GA, C2C, SC, Total Recharge, SSO and LSO
-- Daily GA/C2C/C2S/OB data models and import endpoints ready for exact source mapping
+## GA business rules
+- `Total` = all unique SIM activations for the retailer
+- `150` = activations where `SELLING_PRICE = 170`
+- `300` = activations where `SELLING_PRICE != 170`
+- The selected upload date must match `ACTIVATION_DATE`
+- Uploaded Excel files are processed and discarded; the database does not store the source file
+
+## Main pages
+- `/master-data`
+- `/targets`
+- `/ga`
+- `/dashboard`
 
 ## Deployment
-
-Vercel must provide `DMS_DATABASE_URL`.
-
-The production build runs `prisma migrate deploy` before `next build`, so committed migrations are applied automatically during deployment.
-
-## Local development
+The application expects `DMS_DATABASE_URL` in the deployment environment.
 
 ```bash
 npm install
-npm run dev
+git add .
+git commit -m "Add daily activation GA import"
+git push
 ```
 
-For local database commands, ensure `DMS_DATABASE_URL` is available in the environment.
-
-## v0.3 Monthly Targets
-
-- `/targets` lets admins set monthly GA, C2C, SC, Total Recharge, SSO and LSO targets per employee.
-- SC achievement can be entered manually per employee/month.
-- Targets are stored with an employee + month unique key, so re-saving updates instead of duplicating.
+The Vercel production build runs `prisma migrate deploy` before `next build`, so the new GA activation migration is applied automatically.

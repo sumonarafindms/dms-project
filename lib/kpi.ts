@@ -4,10 +4,16 @@ import { monthBounds } from "@/lib/month";
 export async function getEmployeeMonthlyKpis(employeeId: string, month: string | Date) {
   const { start, end } = monthBounds(month);
 
-  const [ga, c2c, manual, ssoRows, lsoRows, target] = await Promise.all([
-    prisma.gaRecord.aggregate({
-      where: { retailer: { employeeId }, date: { gte: start, lt: end } },
-      _sum: { gaCount: true },
+  const [gaActivations, c2c, manual, lsoRows, target] = await Promise.all([
+    prisma.gaActivation.findMany({
+      where: {
+        retailer: { employeeId },
+        activationDate: { gte: start, lt: end },
+      },
+      select: {
+        retailerId: true,
+        retailer: { select: { simSeller: true } },
+      },
     }),
     prisma.c2cRecord.aggregate({
       where: { retailer: { employeeId }, date: { gte: start, lt: end } },
@@ -16,15 +22,6 @@ export async function getEmployeeMonthlyKpis(employeeId: string, month: string |
     prisma.manualMetric.findUnique({
       where: { employeeId_month: { employeeId, month: start } },
     }),
-    // SSO: one unique retailer counts as completed when monthly GA >= 2.
-    prisma.gaRecord.groupBy({
-      by: ["retailerId"],
-      where: { retailer: { employeeId }, date: { gte: start, lt: end } },
-      _sum: { gaCount: true },
-      having: { gaCount: { _sum: { gte: 2 } } },
-    }),
-    // LSO currently follows the stated rule using C2S: monthly amount >= 500 AND transactions >= 7.
-    // If the Excel workbook reveals extra eligibility conditions, add them here.
     prisma.c2sRecord.groupBy({
       by: ["retailerId"],
       where: { retailer: { employeeId }, date: { gte: start, lt: end } },
@@ -39,9 +36,20 @@ export async function getEmployeeMonthlyKpis(employeeId: string, month: string |
     }),
   ]);
 
-  const gaAchieved = ga._sum.gaCount ?? 0;
+  const ssoRetailers = new Map<string, { count: number; simSeller: boolean }>();
+  for (const row of gaActivations) {
+    const current = ssoRetailers.get(row.retailerId) || {
+      count: 0,
+      simSeller: (row.retailer.simSeller || "").trim().toUpperCase() === "Y",
+    };
+    current.count += 1;
+    ssoRetailers.set(row.retailerId, current);
+  }
+
+  const gaAchieved = gaActivations.length;
   const c2cAchieved = Number(c2c._sum.amount ?? 0);
   const scAchieved = Number(manual?.scAchieved ?? 0);
+  const ssoAchieved = [...ssoRetailers.values()].filter((r) => r.simSeller && r.count >= 2).length;
 
   return {
     month: start,
@@ -52,7 +60,7 @@ export async function getEmployeeMonthlyKpis(employeeId: string, month: string |
       c2c: c2cAchieved,
       sc: scAchieved,
       totalRecharge: c2cAchieved + scAchieved,
-      sso: ssoRows.length,
+      sso: ssoAchieved,
       lso: lsoRows.length,
     },
   };

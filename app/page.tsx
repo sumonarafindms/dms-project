@@ -6,6 +6,7 @@ export default function Home() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 16, marginTop: 24 }}>
         <a href="/master-data" style={card}>Master Data<br/><span style={small}>Supervisor → Employee → Retailer</span></a>
         <a href="/targets" style={card}>Monthly Targets<br/><span style={small}>Targets + manual SC achievement</span></a>
+        <a href="/ga" style={card}>GA & SSO<br/><span style={small}>Daily activation upload + GA/SSO</span></a>
         <a href="/dashboard" style={card}>Dashboard<br/><span style={small}>Target vs achievement KPIs</span></a>
       </div>
     </main>

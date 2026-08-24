@@ -1,9 +1,9 @@
 const kpis = [
-  ["GA", "Company target", "Auto from Input GA"],
+  ["GA", "Company target", "Auto from daily Activation Details"],
   ["C2C", "Company target", "Auto from Input C2C"],
   ["SC", "Company target", "Manual achievement entry"],
   ["Total Recharge", "Company target", "C2C + SC"],
-  ["SSO", "Company target", "Retailers with monthly GA >= 2"],
+  ["SSO", "Company target", "SIM sellers with monthly GA >= 2"],
   ["LSO", "Company target", "Retailers with C2S >= 500 and >= 7 transactions"],
 ];
 
