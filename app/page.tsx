@@ -7,6 +7,9 @@ export default function Home() {
         <a href="/master-data" style={card}>Master Data<br/><span style={small}>Supervisor → Employee → Retailer</span></a>
         <a href="/targets" style={card}>Monthly Targets<br/><span style={small}>Targets + manual SC achievement</span></a>
         <a href="/ga" style={card}>GA & SSO<br/><span style={small}>Daily activation upload + GA/SSO</span></a>
+        <a href="/c2c" style={card}>C2C Recharge<br/><span style={small}>MTD upload + date-wise balance</span></a>
+        <a href="/c2s" style={card}>C2S & LSO<br/><span style={small}>MTD retailer sales + LSO achievement</span></a>
+        <a href="/ob" style={card}>Opening Balance<br/><span style={small}>Latest retailer balance snapshot only</span></a>
         <a href="/dashboard" style={card}>Dashboard<br/><span style={small}>Target vs achievement KPIs</span></a>
       </div>
     </main>

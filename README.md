@@ -1,6 +1,6 @@
 # DMS Sales Reporting Web App
 
-Current release: v0.5
+Current release: v0.7
 
 ## Implemented
 - PostgreSQL + Prisma foundation
@@ -40,3 +40,11 @@ git push
 ```
 
 The Vercel production build runs `prisma migrate deploy` before `next build`, so the new GA activation migration is applied automatically.
+
+## v0.6 C2C
+
+The `/c2c` page imports the cumulative ITop Up Stock Lifting report, stores only non-zero retailer/date amounts, validates TOTAL_AMOUNT and TRANSACTION_COUNT, and calculates employee C2C + Total Recharge.
+
+## v0.7 C2S + LSO
+
+The `/c2s` page imports the cumulative `ITop_Up_Sales` report into the separate `C2sRecord` table. It stores only non-zero retailer/date sales, validates `TOTAL_AMOUNT` and `TRANSACTION_COUNT`, and calculates LSO by retailer for the selected month. Current LSO rule: monthly C2S amount >= 500 and transaction count >= 7.

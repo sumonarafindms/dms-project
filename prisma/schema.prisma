@@ -169,6 +169,7 @@ model C2cRecord {
   @@index([date])
 }
 
+
 model C2sRecord {
   id               String       @id @default(cuid())
   retailerId       String

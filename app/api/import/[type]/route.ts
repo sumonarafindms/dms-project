@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { importGaActivationWorkbook } from "@/lib/ga-import";
+import { importC2cWorkbook } from "@/lib/c2c-import";
+import { importC2sWorkbook } from "@/lib/c2s-import";
+import { importObWorkbook } from "@/lib/ob-import";
 
 const allowed = new Set(["GA", "C2C", "C2S", "OB"]);
 
@@ -25,6 +28,21 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
         Buffer.from(await file.arrayBuffer()),
         businessDate,
       );
+      return NextResponse.json(result);
+    }
+
+    if (normalizedType === "C2C") {
+      const result = await importC2cWorkbook(file.name, Buffer.from(await file.arrayBuffer()));
+      return NextResponse.json(result);
+    }
+
+    if (normalizedType === "C2S") {
+      const result = await importC2sWorkbook(file.name, Buffer.from(await file.arrayBuffer()));
+      return NextResponse.json(result);
+    }
+
+    if (normalizedType === "OB") {
+      const result = await importObWorkbook(file.name, Buffer.from(await file.arrayBuffer()));
       return NextResponse.json(result);
     }
 
