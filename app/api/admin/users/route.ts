@@ -12,7 +12,7 @@ export async function POST(req:Request){
  if(role==="RSO"&&!employeeId)return NextResponse.json({error:"Select the RSO employee for this login."},{status:400});
  if(role==="SUPERVISOR"&&!supervisorId)return NextResponse.json({error:"Select the supervisor for this login."},{status:400});
  if(role==="BP"&&!bpRetailerId)return NextResponse.json({error:"Select an active BP retailer for this login."},{status:400});
- if(role==="BP"){const assignment=await prisma.bpAssignment.findFirst({where:{retailerId:bpRetailerId,active:true}});if(!assignment)return NextResponse.json({error:"That retailer is not currently assigned as a BP."},{status:400})}
+ if(role==="BP"){const activeBpRetailerId=bpRetailerId as string;const assignment=await prisma.bpAssignment.findFirst({where:{retailerId:activeBpRetailerId,active:true}});if(!assignment)return NextResponse.json({error:"That retailer is not currently assigned as a BP."},{status:400})}
  try{const user=await prisma.user.create({data:{displayName,mobileNumber,credentialHash:await hashCredential(pin),role,employeeId:role==="RSO"?employeeId:null,supervisorId:role==="SUPERVISOR"?supervisorId:null,bpRetailerId:role==="BP"?bpRetailerId:null}});return NextResponse.json({ok:true,id:user.id})}
  catch(e:any){return NextResponse.json({error:e?.code==="P2002"?"This mobile number or role mapping is already assigned.":"Could not create user."},{status:400})}
 }

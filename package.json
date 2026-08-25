@@ -1,6 +1,6 @@
 {
   "name": "dms-project",
-  "version": "1.0.0-retailer-opportunity",
+  "version": "1.0.1-retailer-opportunity-fix",
   "private": true,
   "scripts": {
     "dev": "next dev",
