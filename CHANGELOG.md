@@ -231,3 +231,10 @@
 - Added an explicit `npm run migrate` command for controlled database migrations.
 - Added `npm run prisma:generate` for local/client generation when needed.
 - Database schema and existing migrations are unchanged.
+
+## v56 - Main URL Role Routing
+- The root URL now performs a server-side session check on every request.
+- Logged-in Admin users are sent directly to `/dashboard`.
+- Manager, Supervisor, Accounts, RSO and BP users are sent directly to their own role home.
+- Logged-out visitors are sent directly to `/login`.
+- The legacy root landing screen is no longer part of the main URL flow.
