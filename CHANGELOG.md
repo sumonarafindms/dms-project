@@ -217,3 +217,10 @@
 - Product code and selling price are checked together before a row is accepted as SIM SWAP.
 - Invalid swap-price rows are rejected into import errors instead of affecting GA or SIM SWAP counts.
 - Updated GA guidance and sample workbook to use selling price 350 for replacement SIM rows.
+
+## v54 - Login & Landing Repair
+- Root route now sends logged-out visitors directly to Login and logged-in users to their role home.
+- Rebuilt Login as a clean responsive premium authentication experience with authoritative styles.
+- Removed the First-time Admin setup link from the Login interface.
+- Guarded `/setup` on the server so it automatically redirects to Login once any DMS user exists.
+- Preserved the one-time setup API for truly empty databases.
