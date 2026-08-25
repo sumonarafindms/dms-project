@@ -238,3 +238,9 @@
 - Manager, Supervisor, Accounts, RSO and BP users are sent directly to their own role home.
 - Logged-out visitors are sent directly to `/login`.
 - The legacy root landing screen is no longer part of the main URL flow.
+
+## v57 - Force Login on Main Domain
+- The root URL `/` now always redirects to `/login`, regardless of any session state.
+- Added a root-only middleware redirect as an additional edge-level safeguard.
+- Users reach role dashboards only after a successful login redirect.
+- This removes the legacy landing/dashboard experience from first domain visits and Google/search entry.
