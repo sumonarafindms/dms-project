@@ -9,10 +9,10 @@ export type RetailerOpportunity={
   ssoComplete:boolean;lsoComplete:boolean;reasons:string[];priority:number;
 };
 
-export async function retailerOpportunities(monthInput:string){
+export async function retailerOpportunities(monthInput:string,employeeIds?:string[]){
   const month=normalizeMonth(monthInput); const {start,end}=monthBounds(`${month}-01`);
   const [retailers,ga,c2c,c2s,ob]=await Promise.all([
-    prisma.retailer.findMany({where:{active:true},select:{id:true,retailerCode:true,retailerName:true,simSeller:true,category:true,route:true,employeeId:true,employee:{select:{name:true,supervisor:{select:{name:true}}}}}}),
+    prisma.retailer.findMany({where:{active:true,...(employeeIds?{employeeId:{in:employeeIds}}:{})},select:{id:true,retailerCode:true,retailerName:true,simSeller:true,category:true,route:true,employeeId:true,employee:{select:{name:true,supervisor:{select:{name:true}}}}}}),
     prisma.gaActivation.groupBy({by:["retailerId"],where:{activationDate:{gte:start,lt:end}},_count:{_all:true}}),
     prisma.c2cRecord.groupBy({by:["retailerId"],where:{date:{gte:start,lt:end}},_sum:{amount:true}}),
     prisma.c2sRecord.groupBy({by:["retailerId"],where:{date:{gte:start,lt:end}},_sum:{amount:true,transactionCount:true}}),

@@ -1,0 +1,7 @@
+import {requireUser} from "../../../lib/auth";
+import {normalizeMonth} from "../../../lib/drilldown";
+import {retailerOpportunities} from "../../../lib/retailer-opportunities";
+import {prisma} from "../../../lib/prisma";
+import {PageHead,InfoBanner} from "../../components/RoleUI";
+import {RoleAttentionList} from "../../components/RoleAttention";
+export default async function Page({searchParams}:{searchParams:Promise<{month?:string}>}){const u=await requireUser(["SUPERVISOR"]);const s=await searchParams,month=normalizeMonth(s.month);const ids=u.supervisorId?(await prisma.employee.findMany({where:{supervisorId:u.supervisorId,active:true},select:{id:true}})).map(x=>x.id):[];const rows=(await retailerOpportunities(month,ids)).filter(x=>x.priority>0).sort((a,b)=>b.priority-a.priority||a.c2s-b.c2s);return <main className="page"><PageHead eyebrow="Supervisor" title="Team attention" subtitle="Only retailers under your assigned RSO team are shown." action={<form><input className="control" type="month" name="month" defaultValue={month}/><button className="btn btn-soft">Apply</button></form>}/><InfoBanner>Use this list for quick field follow-up. Each card shows the exact SSO/LSO gap.</InfoBanner><RoleAttentionList rows={rows} base="/supervisor/retailers"/></main>}

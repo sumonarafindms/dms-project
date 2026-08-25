@@ -1,0 +1,6 @@
+import {requireUser} from "../../../lib/auth";
+import {normalizeMonth} from "../../../lib/drilldown";
+import {retailerOpportunities} from "../../../lib/retailer-opportunities";
+import {PageHead,InfoBanner} from "../../components/RoleUI";
+import {RoleAttentionList} from "../../components/RoleAttention";
+export default async function Page({searchParams}:{searchParams:Promise<{month?:string}>}){await requireUser(["MANAGER"]);const s=await searchParams,month=normalizeMonth(s.month),rows=(await retailerOpportunities(month)).filter(x=>x.priority>0).sort((a,b)=>b.priority-a.priority||a.c2s-b.c2s);return <main className="page"><PageHead eyebrow="Manager" title="Attention center" subtitle="Prioritized retailer execution gaps across all teams." action={<form><input className="control" type="month" name="month" defaultValue={month}/><button className="btn btn-soft">Apply</button></form>}/><InfoBanner>Flags use the current rules only: SSO = SIM seller with 2+ GA; LSO = ৳500+ C2S and 7+ transactions.</InfoBanner><RoleAttentionList rows={rows} base="/manager/retailers"/></main>}

@@ -1,0 +1,6 @@
+import {requireUser} from "../../../lib/auth";
+import {normalizeMonth} from "../../../lib/drilldown";
+import {retailerOpportunities} from "../../../lib/retailer-opportunities";
+import {PageHead,InfoBanner} from "../../components/RoleUI";
+import {RoleAttentionList} from "../../components/RoleAttention";
+export default async function Page({searchParams}:{searchParams:Promise<{month?:string}>}){const u=await requireUser(["RSO"]);const s=await searchParams,month=normalizeMonth(s.month);const rows=u.employeeId?(await retailerOpportunities(month,[u.employeeId])).filter(x=>x.priority>0).sort((a,b)=>b.priority-a.priority||a.c2s-b.c2s):[];return <main className="page field-page"><PageHead eyebrow="My Retailers" title="Today's attention" subtitle="Focus first on retailers closest to completing SSO or LSO." action={<form><input className="control" type="month" name="month" defaultValue={month}/><button className="btn btn-soft">Apply</button></form>}/><InfoBanner>Tap a retailer to see its GA, C2S, opening balance and recent activity.</InfoBanner><RoleAttentionList rows={rows} base="/rso/retailers"/></main>}
