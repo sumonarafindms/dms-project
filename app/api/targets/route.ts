@@ -1,7 +1,8 @@
-import {apiUser} from "@/lib/auth";
+import {apiUser,apiPermission} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
+import {audit} from "@/lib/audit";
 
 function monthFromParam(value: string | null) {
   const fallback = new Date();
@@ -51,7 +52,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  const actor=await apiUser(["ADMIN","ACCOUNTS"]);if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiPermission("targets","update"))) return NextResponse.json({error:"You do not have permission to update targets."},{status:403});
   const body = await request.json();
   if (!body?.month || !/^\d{4}-\d{2}$/.test(body.month) || !Array.isArray(body.rows)) {
     return NextResponse.json({ error: "Invalid month or rows" }, { status: 400 });
@@ -91,5 +93,6 @@ export async function POST(request: NextRequest) {
     }
   });
 
+  await audit(actor,"UPDATE_TARGETS","targets",{detail:`Updated ${saved} RSO target row(s) for ${body.month}`,metadata:{month:body.month,saved}});
   return NextResponse.json({ saved, month: body.month });
 }

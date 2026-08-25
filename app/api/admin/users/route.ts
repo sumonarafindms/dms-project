@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {prisma} from "../../../../lib/prisma";
 import {getCurrentUser,hashCredential} from "../../../../lib/auth";
+import {audit} from "../../../../lib/audit";
 const roles=["MANAGER","SUPERVISOR","ACCOUNTS","RSO","BP"] as const;
 export async function POST(req:Request){
  const me=await getCurrentUser(); if(!me||me.role!=="ADMIN")return NextResponse.json({error:"Unauthorized"},{status:401});
@@ -13,12 +14,14 @@ export async function POST(req:Request){
  if(role==="SUPERVISOR"&&!supervisorId)return NextResponse.json({error:"Select the supervisor for this login."},{status:400});
  if(role==="BP"&&!bpRetailerId)return NextResponse.json({error:"Select an active BP retailer for this login."},{status:400});
  if(role==="BP"){const activeBpRetailerId=bpRetailerId as string;const assignment=await prisma.bpAssignment.findFirst({where:{retailerId:activeBpRetailerId,active:true}});if(!assignment)return NextResponse.json({error:"That retailer is not currently assigned as a BP."},{status:400})}
- try{const user=await prisma.user.create({data:{displayName,mobileNumber,credentialHash:await hashCredential(pin),role,employeeId:role==="RSO"?employeeId:null,supervisorId:role==="SUPERVISOR"?supervisorId:null,bpRetailerId:role==="BP"?bpRetailerId:null}});return NextResponse.json({ok:true,id:user.id})}
+ try{const user=await prisma.user.create({data:{displayName,mobileNumber,credentialHash:await hashCredential(pin),role,employeeId:role==="RSO"?employeeId:null,supervisorId:role==="SUPERVISOR"?supervisorId:null,bpRetailerId:role==="BP"?bpRetailerId:null}});await audit(me,"CREATE_USER","accounts",{targetType:"User",targetId:user.id,targetName:user.displayName,detail:`Created ${role} login`});return NextResponse.json({ok:true,id:user.id})}
  catch(e:any){return NextResponse.json({error:e?.code==="P2002"?"This mobile number or role mapping is already assigned.":"Could not create user."},{status:400})}
 }
 export async function PATCH(req:Request){
  const me=await getCurrentUser(); if(!me||me.role!=="ADMIN")return NextResponse.json({error:"Unauthorized"},{status:401});
  const b=await req.json(); const id=String(b.id||""); if(!id)return NextResponse.json({error:"User is required"},{status:400});
  const data:any={}; if(typeof b.active==="boolean")data.active=b.active; if(b.pin&&String(b.pin).length>=4)data.credentialHash=await hashCredential(String(b.pin));
- await prisma.user.update({where:{id},data}); return NextResponse.json({ok:true});
+ const target=await prisma.user.update({where:{id},data});
+ await audit(me,b.pin?"RESET_PIN":typeof b.active==="boolean"?(b.active?"ACTIVATE_USER":"DEACTIVATE_USER"):"UPDATE_USER","accounts",{targetType:"User",targetId:target.id,targetName:target.displayName});
+ return NextResponse.json({ok:true});
 }

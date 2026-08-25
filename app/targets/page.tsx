@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {useCan} from "../components/PermissionContext";
 
 type TargetRow = {
   employeeId: string;
@@ -28,6 +29,7 @@ const numericFields: Array<keyof Pick<TargetRow, "gaTarget" | "c2cTarget" | "scT
 ];
 
 export default function TargetsPage() {
+  const canUpdate=useCan("targets","update");
   const [month, setMonth] = useState(currentMonth());
   const [rows, setRows] = useState<TargetRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,7 @@ export default function TargetsPage() {
         <div style={styles.controls}>
           <label style={styles.label}>Month<input type="month" value={month} onChange={(event) => setMonth(event.target.value)} style={styles.input} /></label>
           <label style={{ ...styles.label, flex: 1 }}>Search<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Employee / RSO / Supervisor" style={styles.input} /></label>
-          <button onClick={save} disabled={loading || saving || !rows.length} style={styles.button}>{saving ? "Saving..." : "Save Targets"}</button>
+          {canUpdate&&<button onClick={save} disabled={loading || saving || !rows.length} style={styles.button}>{saving ? "Saving..." : "Save Targets"}</button>}
         </div>
         {message && <p style={{ marginBottom: 0 }}>{message}</p>}
       </section>
@@ -119,7 +121,7 @@ export default function TargetsPage() {
               const index = rows.findIndex((item) => item.employeeId === row.employeeId);
               return <tr key={row.employeeId}>
                 <td>{row.employeeCode ?? "-"}</td><td><strong>{row.name}</strong><div style={styles.small}>{row.rsoMsisdn}</div></td><td>{row.supervisor}</td><td style={{ textAlign: "right" }}>{row.retailerCount}</td>
-                {numericFields.map((field) => <td key={field}><input type="number" min="0" step={["c2cTarget", "scTarget", "totalRechargeTarget", "scAchieved"].includes(field) ? "0.01" : "1"} value={row[field]} onChange={(event) => update(index, field, event.target.value)} style={styles.numberInput} /></td>)}
+                {numericFields.map((field) => <td key={field}>{canUpdate?<input type="number" min="0" step={["c2cTarget", "scTarget", "totalRechargeTarget", "scAchieved"].includes(field) ? "0.01" : "1"} value={row[field]} onChange={(event) => update(index, field, event.target.value)} style={styles.numberInput} />:<strong>{Number(row[field]).toLocaleString()}</strong>}</td>)}
               </tr>;
             })}
             {!loading && !visible.length && <tr><td colSpan={11} style={{ textAlign: "center", padding: 24 }}>No employees found. Import Master Data first.</td></tr>}

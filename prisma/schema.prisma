@@ -15,6 +15,19 @@ model Supervisor {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   user      User?
+  managerAssignments ManagerSupervisor[]
+}
+
+model ManagerSupervisor {
+  id           String     @id @default(cuid())
+  managerId    String
+  manager      User       @relation("ManagerAssignments", fields: [managerId], references: [id], onDelete: Cascade)
+  supervisorId String     @unique
+  supervisor   Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([managerId, supervisorId])
+  @@index([managerId])
 }
 
 model Employee {
@@ -259,10 +272,51 @@ model User {
   bpRetailerId   String?      @unique
   bpRetailer     Retailer?    @relation("BpRetailerUser", fields: [bpRetailerId], references: [id])
   sessions       Session[]
+  managedSupervisors ManagerSupervisor[] @relation("ManagerAssignments")
+  permissions     UserPermission[]
+  auditLogs       AuditLog[] @relation("AuditActor")
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@index([role])
+}
+
+model UserPermission {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module    String
+  canView   Boolean  @default(false)
+  canAdd    Boolean  @default(false)
+  canEdit   Boolean  @default(false)
+  canUpdate Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, module])
+  @@index([userId])
+  @@index([module])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName  String
+  actorRole  String
+  action     String
+  module     String
+  targetType String?
+  targetId   String?
+  targetName String?
+  detail     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([module, createdAt])
+  @@index([action, createdAt])
 }
 
 model Session {

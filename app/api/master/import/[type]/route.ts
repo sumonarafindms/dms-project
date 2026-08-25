@@ -1,4 +1,4 @@
-import {apiUser} from "@/lib/auth";
+import {apiUser,apiPermission} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { importEmployees, importRetailers } from "@/lib/master-import";
 
@@ -9,6 +9,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
   try {
     const { type } = await context.params;
     const normalizedType = type.toLowerCase();
+    const permissionModule=normalizedType==="retailers"?"retailers":"employees";
+    if(!(await apiPermission(permissionModule,"add"))) return NextResponse.json({error:"You do not have permission to import this master data."},{status:403});
     if (!new Set(["employees", "retailers"]).has(normalizedType)) {
       return NextResponse.json({ error: "Unsupported master import type" }, { status: 400 });
     }

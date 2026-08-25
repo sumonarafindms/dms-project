@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {useCan} from "../components/PermissionContext";
 
 type EmployeeRow = {
   employeeId: string;
@@ -62,6 +63,7 @@ function prettyDate(value?: string | null) {
 }
 
 export default function GaPage() {
+  const canAdd=useCan("ga","add");
   const [month, setMonth] = useState(() => yesterday().slice(0, 7));
   const [dataDate, setDataDate] = useState(yesterday());
   const [rows, setRows] = useState<EmployeeRow[]>([]);
@@ -146,7 +148,7 @@ export default function GaPage() {
     <main style={{ padding: 28, maxWidth: 1500, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
         <div>
-          <a href="/" style={{ color: "#475467" }}>← Home</a>
+          <a href="/admin/upload" style={{ color: "#475467" }}>← Upload Center</a>
           <h1 style={{ marginBottom: 4 }}>Daily GA Upload & SSO</h1>
           <p style={{ marginTop: 0, color: "#667085" }}>
             Upload the previous day&apos;s Activation Details report. Each unique SIM_NO is one GA.
@@ -158,8 +160,8 @@ export default function GaPage() {
         </label>
       </div>
 
-      <section style={panel}>
-        <h2 style={{ marginTop: 0 }}>Upload Activation Details</h2>
+{canAdd&&      <section style={panel}>
+        <div style={uploadTitleRow}><h2 style={{ margin: 0 }}>Upload Activation Details</h2><a href="/api/samples/ga" style={sampleLink}>Download Sample File</a></div>
         <form onSubmit={upload} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "end" }}>
           <label>
             GA Data Date<br />
@@ -219,7 +221,7 @@ export default function GaPage() {
         )}
       </section>
 
-      <h2 style={{ marginBottom: 10, marginTop: 24 }}>Monthly Employee Performance</h2>
+}      <h2 style={{ marginBottom: 10, marginTop: 24 }}>Monthly Employee Performance</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
         <Stat name="GA Target" value={totals.target.toLocaleString()} />
         <Stat name="GA Achieved" value={totals.achieved.toLocaleString()} />
@@ -289,3 +291,7 @@ const inputStyle: React.CSSProperties = { padding: "9px 10px", border: "1px soli
 const button: React.CSSProperties = { padding: "10px 16px", borderRadius: 8, border: 0, background: "#101828", color: "white", fontWeight: 700, cursor: "pointer" };
 const ruleBox: React.CSSProperties = { marginTop: 16, padding: 13, background: "#f8fafc", border: "1px solid #e4e7ec", borderRadius: 10, color: "#475467", lineHeight: 1.6 };
 const tableStyle: React.CSSProperties = { width: "100%", borderCollapse: "collapse" };
+
+
+const uploadTitleRow:React.CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14};
+const sampleLink:React.CSSProperties={display:"inline-flex",alignItems:"center",minHeight:38,padding:"0 12px",borderRadius:9,border:"1px solid #d0d5dd",background:"#fff",color:"#344054",fontWeight:700,fontSize:12,textDecoration:"none"};

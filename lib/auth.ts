@@ -2,6 +2,8 @@ import {cookies} from "next/headers";
 import {redirect} from "next/navigation";
 import {randomBytes, scrypt as scryptCb, timingSafeEqual} from "crypto";
 import {prisma} from "./prisma";
+import {hasPermission} from "./permissions";
+import type {PermissionAction,PermissionModule} from "./permissions";
 
 const scrypt=(value:string,salt:string)=>new Promise<Buffer>((resolve,reject)=>scryptCb(value,salt,64,(err,key)=>err?reject(err):resolve(key as Buffer)));
 export const SESSION_COOKIE="dms_session";
@@ -53,3 +55,5 @@ export function homeForRole(role:string){
 export function labelForRole(role:string){return role.charAt(0)+role.slice(1).toLowerCase()}
 
 export async function apiUser(allowed?:string[]){const user=await getCurrentUser();if(!user)return null;if(allowed&&!allowed.includes(user.role))return null;return user}
+
+export async function apiPermission(module:PermissionModule,action:PermissionAction="view"){const user=await getCurrentUser();if(!user)return null;return await hasPermission(user.id,user.role,module,action)?user:null}

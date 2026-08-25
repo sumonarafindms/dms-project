@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {useCan} from "../components/PermissionContext";
 
 type Row = {
   employeeId: string; employeeCode?: string | null; name: string; rsoMsisdn: string; supervisor: string; retailerCount: number;
@@ -14,6 +15,7 @@ function todayYmd() { return new Date().toISOString().slice(0, 10); }
 function money(n: number) { return new Intl.NumberFormat("en-BD", { maximumFractionDigits: 2 }).format(n); }
 
 export default function C2cPage() {
+  const canAdd=useCan("c2c","add");
   const [month, setMonth] = useState(() => todayYmd().slice(0, 7));
   const [date, setDate] = useState(() => todayYmd());
   const [rows, setRows] = useState<Row[]>([]);
@@ -53,17 +55,17 @@ export default function C2cPage() {
 
   return <main style={{ padding: 28, maxWidth: 1500, margin: "0 auto" }}>
     <div style={{ display:"flex", justifyContent:"space-between", gap:16, flexWrap:"wrap", alignItems:"center" }}>
-      <div><a href="/" style={{color:"#475467"}}>← Home</a><h1 style={{marginBottom:4}}>C2C Recharge Balance</h1><p style={{marginTop:0,color:"#667085"}}>Upload the cumulative month-to-date Stock Lifting report. Date columns are stored separately, so repeated uploads never add the same day twice.</p></div>
+      <div><a href="/admin/upload" style={{color:"#475467"}}>← Upload Center</a><h1 style={{marginBottom:4}}>C2C Recharge Balance</h1><p style={{marginTop:0,color:"#667085"}}>Upload the cumulative month-to-date Stock Lifting report. Date columns are stored separately, so repeated uploads never add the same day twice.</p></div>
       <label>Monthly Performance<br/><input type="month" value={month} onChange={e=>setMonth(e.target.value)} style={inputStyle}/></label>
     </div>
 
-    <section style={panel}><h2 style={{marginTop:0}}>Upload C2C File</h2>
+{canAdd&&    <section style={panel}><div style={uploadTitleRow}><h2 style={{margin:0}}>Upload C2C File</h2><a href="/api/samples/c2c" style={sampleLink}>Download Sample File</a></div>
       <form onSubmit={upload} style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"end"}}><label>ITop_Up_StockLifting file<br/><input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required style={{marginTop:10}}/></label><button disabled={loading} style={button}>{loading?"Processing...":"Upload C2C"}</button></form>
       <div style={ruleBox}><b>How it works:</b> RETAILER_CODE maps the outlet. SRNUMBER is checked against the employee/RSO relationship. TRANSACTION_COUNT and TOTAL_AMOUNT are kept as the latest month-to-date retailer totals. Each header such as 01-Aug-2026 is stored as that retailer&apos;s amount for that exact date. Zero daily rows are not stored, which keeps the database small.</div>
       {message && <div style={{marginTop:12,padding:12,background:"#f2f4f7",borderRadius:8}}>{message}</div>}
     </section>
 
-    <h2 style={{marginBottom:10,marginTop:24}}>Monthly Employee Performance</h2>
+}    <h2 style={{marginBottom:10,marginTop:24}}>Monthly Employee Performance</h2>
     <div style={stats}><Stat name="C2C Target" value={money(totals.c2cT)}/><Stat name="C2C Achieved" value={money(totals.c2cA)}/><Stat name="C2C %" value={totals.c2cT?`${((totals.c2cA/totals.c2cT)*100).toFixed(1)}%`:"0%"}/><Stat name="SC Achieved" value={money(totals.sc)}/><Stat name="Total Recharge" value={money(totals.trA)} note="C2C + SC"/><Stat name="Transactions" value={totals.trx.toLocaleString()} note="Latest month-to-date count"/></div>
     <section style={panel}><div style={{overflowX:"auto"}}><table style={tableStyle}><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>Transactions</th><th>C2C Target</th><th>C2C Achieved</th><th>C2C %</th><th>SC</th><th>Total Recharge Target</th><th>Total Recharge Achieved</th><th>%</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td>{r.supervisor}</td><td><b>{r.name}</b><br/><small>{r.employeeCode||r.rsoMsisdn}</small></td><td>{r.retailerCount}</td><td>{r.transactionCount}</td><td>{money(r.c2cTarget)}</td><td><b>{money(r.c2cAchieved)}</b></td><td>{r.c2cPercent}%</td><td>{money(r.scAchieved)}</td><td>{money(r.totalRechargeTarget)}</td><td><b>{money(r.totalRechargeAchieved)}</b></td><td>{r.totalRechargePercent}%</td></tr>)}</tbody></table></div></section>
 
@@ -81,3 +83,7 @@ const inputStyle:React.CSSProperties={padding:"9px 10px",border:"1px solid #d0d5
 const button:React.CSSProperties={padding:"10px 16px",borderRadius:8,border:0,background:"#101828",color:"white",fontWeight:700,cursor:"pointer"};
 const ruleBox:React.CSSProperties={marginTop:16,padding:13,background:"#f8fafc",border:"1px solid #e4e7ec",borderRadius:10,color:"#475467",lineHeight:1.6};
 const tableStyle:React.CSSProperties={width:"100%",borderCollapse:"collapse"};
+
+
+const uploadTitleRow:React.CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14};
+const sampleLink:React.CSSProperties={display:"inline-flex",alignItems:"center",minHeight:38,padding:"0 12px",borderRadius:9,border:"1px solid #d0d5dd",background:"#fff",color:"#344054",fontWeight:700,fontSize:12,textDecoration:"none"};

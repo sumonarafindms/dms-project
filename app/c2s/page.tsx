@@ -1,5 +1,6 @@
 "use client";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {useCan} from "../components/PermissionContext";
 
 type Row={employeeId:string;employeeCode?:string|null;name:string;rsoMsisdn:string;supervisor:string;retailerCount:number;transactionCount:number;c2sAmount:number;lsoTarget:number;lsoAchieved:number;lsoPercent:number;reportEndDate?:string|null};
 type DailyRow={retailerCode:string;retailerName:string;employee:string;rsoMsisdn:string;supervisor:string;amount:number};
@@ -8,6 +9,7 @@ function todayYmd(){return new Date().toISOString().slice(0,10)}
 function money(n:number){return new Intl.NumberFormat("en-BD",{maximumFractionDigits:2}).format(n)}
 
 export default function C2sPage(){
+  const canAdd=useCan("c2s","add");
   const [month,setMonth]=useState(()=>todayYmd().slice(0,7)); const [date,setDate]=useState(()=>todayYmd());
   const [rows,setRows]=useState<Row[]>([]); const [dailyRows,setDailyRows]=useState<DailyRow[]>([]); const [history,setHistory]=useState<History[]>([]);
   const [loading,setLoading]=useState(false); const [message,setMessage]=useState("");
@@ -17,11 +19,11 @@ export default function C2sPage(){
   const totals=useMemo(()=>rows.reduce((a,r)=>({amount:a.amount+r.c2sAmount,trx:a.trx+r.transactionCount,lsoT:a.lsoT+r.lsoTarget,lsoA:a.lsoA+r.lsoAchieved}),{amount:0,trx:0,lsoT:0,lsoA:0}),[rows]);
   const dayTotal=useMemo(()=>dailyRows.reduce((s,r)=>s+r.amount,0),[dailyRows]);
   return <main style={{padding:28,maxWidth:1500,margin:"0 auto"}}>
-    <div style={{display:"flex",justifyContent:"space-between",gap:16,flexWrap:"wrap",alignItems:"center"}}><div><a href="/" style={{color:"#475467"}}>← Home</a><h1 style={{marginBottom:4}}>C2S Retailer Sales & LSO</h1><p style={{marginTop:0,color:"#667085"}}>Upload the cumulative month-to-date ITop Up Sales report. C2S stays in its own database table and drives LSO achievement.</p></div><label>Monthly Performance<br/><input type="month" value={month} onChange={e=>setMonth(e.target.value)} style={inputStyle}/></label></div>
-    <section style={panel}><h2 style={{marginTop:0}}>Upload C2S File</h2><form onSubmit={upload} style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"end"}}><label>ITop_Up_Sales file<br/><input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required style={{marginTop:10}}/></label><button disabled={loading} style={button}>{loading?"Processing...":"Upload C2S"}</button></form>
+    <div style={{display:"flex",justifyContent:"space-between",gap:16,flexWrap:"wrap",alignItems:"center"}}><div><a href="/admin/upload" style={{color:"#475467"}}>← Upload Center</a><h1 style={{marginBottom:4}}>C2S Retailer Sales & LSO</h1><p style={{marginTop:0,color:"#667085"}}>Upload the cumulative month-to-date ITop Up Sales report. C2S stays in its own database table and drives LSO achievement.</p></div><label>Monthly Performance<br/><input type="month" value={month} onChange={e=>setMonth(e.target.value)} style={inputStyle}/></label></div>
+{canAdd&&    <section style={panel}><div style={uploadTitleRow}><h2 style={{margin:0}}>Upload C2S File</h2><a href="/api/samples/c2s" style={sampleLink}>Download Sample File</a></div><form onSubmit={upload} style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"end"}}><label>ITop_Up_Sales file<br/><input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required style={{marginTop:10}}/></label><button disabled={loading} style={button}>{loading?"Processing...":"Upload C2S"}</button></form>
       <div style={ruleBox}><b>LSO rule:</b> A retailer completes LSO when its monthly C2S total is at least 500 and it has at least 7 transactions. RETAILER_CODE maps the outlet, SRNUMBER checks the RSO assignment, and row-1 date columns are stored separately. Since the report is cumulative, every upload replaces the covered month-to-date C2S window instead of adding it again.</div>{message&&<div style={{marginTop:12,padding:12,background:"#f2f4f7",borderRadius:8}}>{message}</div>}
     </section>
-    <h2 style={{marginBottom:10,marginTop:24}}>Monthly Employee LSO Performance</h2><div style={stats}><Stat name="C2S Sales" value={money(totals.amount)}/><Stat name="Transactions" value={totals.trx.toLocaleString()}/><Stat name="LSO Target" value={totals.lsoT.toLocaleString()}/><Stat name="LSO Achieved" value={totals.lsoA.toLocaleString()}/><Stat name="LSO %" value={totals.lsoT?`${((totals.lsoA/totals.lsoT)*100).toFixed(1)}%`:"0%"}/></div>
+}    <h2 style={{marginBottom:10,marginTop:24}}>Monthly Employee LSO Performance</h2><div style={stats}><Stat name="C2S Sales" value={money(totals.amount)}/><Stat name="Transactions" value={totals.trx.toLocaleString()}/><Stat name="LSO Target" value={totals.lsoT.toLocaleString()}/><Stat name="LSO Achieved" value={totals.lsoA.toLocaleString()}/><Stat name="LSO %" value={totals.lsoT?`${((totals.lsoA/totals.lsoT)*100).toFixed(1)}%`:"0%"}/></div>
     <section style={panel}><div style={{overflowX:"auto"}}><table style={tableStyle}><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>C2S Transactions</th><th>C2S Amount</th><th>LSO Target</th><th>LSO Achieved</th><th>LSO %</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td>{r.supervisor}</td><td><b>{r.name}</b><br/><small>{r.employeeCode||r.rsoMsisdn}</small></td><td>{r.retailerCount}</td><td>{r.transactionCount}</td><td>{money(r.c2sAmount)}</td><td>{r.lsoTarget}</td><td><b>{r.lsoAchieved}</b></td><td>{r.lsoPercent}%</td></tr>)}</tbody></table></div></section>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"end",flexWrap:"wrap",gap:12,marginTop:24}}><h2 style={{marginBottom:0}}>Date-wise C2S Sales</h2><label>View Date<br/><input type="date" value={date} onChange={e=>{setDate(e.target.value);if(e.target.value)setMonth(e.target.value.slice(0,7))}} style={inputStyle}/></label></div><div style={{...stats,marginTop:12}}><Stat name="Selected Day Sales" value={money(dayTotal)}/><Stat name="Retailers Selling" value={dailyRows.length.toLocaleString()}/></div>
     <section style={panel}>{dailyRows.length===0?<p style={{color:"#667085"}}>No C2S sales stored for {date}.</p>:<div style={{overflowX:"auto"}}><table style={tableStyle}><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer Code</th><th>Retailer Name</th><th>Sales Amount</th></tr></thead><tbody>{dailyRows.map(r=><tr key={r.retailerCode}><td>{r.supervisor}</td><td><b>{r.employee}</b><br/><small>{r.rsoMsisdn}</small></td><td><b>{r.retailerCode}</b></td><td>{r.retailerName}</td><td><b>{money(r.amount)}</b></td></tr>)}</tbody></table></div>}</section>
@@ -35,3 +37,7 @@ const inputStyle:React.CSSProperties={padding:"9px 10px",border:"1px solid #d0d5
 const button:React.CSSProperties={padding:"10px 16px",borderRadius:8,border:0,background:"#101828",color:"white",fontWeight:700,cursor:"pointer"};
 const ruleBox:React.CSSProperties={marginTop:16,padding:13,background:"#f8fafc",border:"1px solid #e4e7ec",borderRadius:10,color:"#475467",lineHeight:1.6};
 const tableStyle:React.CSSProperties={width:"100%",borderCollapse:"collapse"};
+
+
+const uploadTitleRow:React.CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14};
+const sampleLink:React.CSSProperties={display:"inline-flex",alignItems:"center",minHeight:38,padding:"0 12px",borderRadius:9,border:"1px solid #d0d5dd",background:"#fff",color:"#344054",fontWeight:700,fontSize:12,textDecoration:"none"};

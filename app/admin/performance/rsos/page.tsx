@@ -1,0 +1,11 @@
+import {requireUser} from "../../../../lib/auth";
+import {employeePerformance,pct} from "../../../../lib/performance";
+import {normalizeMonth} from "../../../../lib/drilldown";
+import {PerfHead,PerfSummary,PerfBar,EmptyPerf} from "../../../components/AdminPerformanceUI";
+import Link from "next/link";
+export default async function Page({searchParams}:{searchParams:Promise<{q?:string;month?:string}>}){
+ await requireUser(["ADMIN"]);const s=await searchParams,q=(s.q||"").toLowerCase(),month=normalizeMonth(s.month),all=await employeePerformance(`${month}-01`),rows=all.filter(r=>!q||`${r.name} ${r.employeeCode||""} ${r.rsoMsisdn} ${r.supervisor}`.toLowerCase().includes(q)).sort((a,b)=>pct(b.totalRechargeAchieved,b.totalRechargeTarget)-pct(a.totalRechargeAchieved,a.totalRechargeTarget));
+ const t=rows.reduce((a,x)=>a+x.totalRechargeTarget,0),a=rows.reduce((n,x)=>n+x.totalRechargeAchieved,0);
+ return <main className="page admin-performance"><PerfHead title="RSO Performance" subtitle="Every RSO, their assigned retailers and monthly execution." month={month} q={s.q||""} placeholder="RSO, code, mobile or supervisor"/><PerfSummary items={[{label:"RSOs",value:rows.length,sub:"Matching employees"},{label:"Retailers",value:rows.reduce((n,x)=>n+x.retailerCount,0),sub:"Assigned outlets"},{label:"Achievement",value:`৳${Math.round(a).toLocaleString()}`,sub:`${pct(a,t)}% of recharge target`},{label:"Remaining",value:`৳${Math.max(0,Math.round(t-a)).toLocaleString()}`,sub:"Recharge gap"}]}/>
+ <div className="perf-card-grid">{rows.map(r=><Link href={`/admin/rsos/${r.employeeId}?month=${month}`} className="card perf-person-card" key={r.employeeId}><div className="perf-person-top"><div className="perf-avatar">{r.name.slice(0,2).toUpperCase()}</div><div><strong>{r.name}</strong><span>{r.employeeCode||r.rsoMsisdn} · {r.supervisor} · {r.retailerCount} retailers</span></div><em>{pct(r.totalRechargeAchieved,r.totalRechargeTarget)}%</em></div><div className="perf-money"><div><span>GA</span><b>{r.gaAchieved}/{r.gaTarget}</b></div><div><span>SSO</span><b>{r.ssoAchieved}/{r.ssoTarget}</b></div><div><span>LSO</span><b>{r.lsoAchieved}/{r.lsoTarget}</b></div></div><PerfBar achieved={r.totalRechargeAchieved} target={r.totalRechargeTarget}/></Link>)}{!rows.length&&<EmptyPerf text="No RSO performance found"/>}</div></main>
+}

@@ -110,10 +110,23 @@ export async function importRetailers(buffer: Buffer, fileName: string) {
   const employees = await prisma.employee.findMany({ select: { id: true, rsoMsisdn: true } });
   const employeeByMsisdn = new Map(employees.map((employee) => [employee.rsoMsisdn, employee.id]));
 
+  const sourceCodes = rows.map(row => text(row["RETAILER_CODE"])).filter(Boolean);
+  const existingRows = await prisma.retailer.findMany({
+    where: { retailerCode: { in: sourceCodes } },
+    select: {
+      retailerCode:true,retailerName:true,simSeller:true,iTopUpSeller:true,tranMobileNo:true,
+      iTopUpSrNumber:true,iTopUpNumber:true,category:true,rsoCode:true,route:true,employeeId:true,
+    }
+  });
+  const existingByCode = new Map(existingRows.map(row => [row.retailerCode, row]));
+
   let successRows = 0;
   let failedRows = 0;
   let mappedRows = 0;
   let unassignedRows = 0;
+  let newRows = 0;
+  let updatedRows = 0;
+  let unchangedRows = 0;
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -128,37 +141,42 @@ export async function importRetailers(buffer: Buffer, fileName: string) {
 
     const iTopUpSrNumber = text(row["I_TOP_UP_SR_NUMBER"]);
     const employeeId = employeeByMsisdn.get(iTopUpSrNumber) ?? null;
-    if (employeeId) mappedRows++;
-    else unassignedRows++;
+    if (employeeId) mappedRows++; else unassignedRows++;
+
+    const next = {
+      retailerName: text(row["RETAILER_NAME"]) || null,
+      simSeller: text(row["SIM_SELLER"]) || null,
+      iTopUpSeller: text(row["I_TOP_UP_SELLER"]) || null,
+      tranMobileNo: text(row["TRANMOBILENO"]) || null,
+      iTopUpSrNumber: iTopUpSrNumber || null,
+      iTopUpNumber: text(row["I_TOP_UP_NUMBER"]) || null,
+      category: text(row["CATEGORY"]) || null,
+      rsoCode: text(row["RSOCODE"]) || null,
+      route: text(row["ROUTE"]) || null,
+      employeeId,
+      active: true,
+    };
+    const old = existingByCode.get(retailerCode);
+    if (!old) newRows++;
+    else {
+      const changed =
+        old.retailerName !== next.retailerName ||
+        old.simSeller !== next.simSeller ||
+        old.iTopUpSeller !== next.iTopUpSeller ||
+        old.tranMobileNo !== next.tranMobileNo ||
+        old.iTopUpSrNumber !== next.iTopUpSrNumber ||
+        old.iTopUpNumber !== next.iTopUpNumber ||
+        old.category !== next.category ||
+        old.rsoCode !== next.rsoCode ||
+        old.route !== next.route ||
+        old.employeeId !== next.employeeId;
+      changed ? updatedRows++ : unchangedRows++;
+    }
 
     await prisma.retailer.upsert({
       where: { retailerCode },
-      update: {
-        retailerName: text(row["RETAILER_NAME"]) || null,
-        simSeller: text(row["SIM_SELLER"]) || null,
-        iTopUpSeller: text(row["I_TOP_UP_SELLER"]) || null,
-        tranMobileNo: text(row["TRANMOBILENO"]) || null,
-        iTopUpSrNumber: iTopUpSrNumber || null,
-        iTopUpNumber: text(row["I_TOP_UP_NUMBER"]) || null,
-        category: text(row["CATEGORY"]) || null,
-        rsoCode: text(row["RSOCODE"]) || null,
-        route: text(row["ROUTE"]) || null,
-        employeeId,
-        active: true,
-      },
-      create: {
-        retailerCode,
-        retailerName: text(row["RETAILER_NAME"]) || null,
-        simSeller: text(row["SIM_SELLER"]) || null,
-        iTopUpSeller: text(row["I_TOP_UP_SELLER"]) || null,
-        tranMobileNo: text(row["TRANMOBILENO"]) || null,
-        iTopUpSrNumber: iTopUpSrNumber || null,
-        iTopUpNumber: text(row["I_TOP_UP_NUMBER"]) || null,
-        category: text(row["CATEGORY"]) || null,
-        rsoCode: text(row["RSOCODE"]) || null,
-        route: text(row["ROUTE"]) || null,
-        employeeId,
-      },
+      update: next,
+      create: { retailerCode, ...next },
     });
     successRows++;
   }
@@ -172,5 +190,8 @@ export async function importRetailers(buffer: Buffer, fileName: string) {
     },
   });
 
-  return { batchId: batch.id, sheetName, totalRows: rows.length, successRows, failedRows, mappedRows, unassignedRows };
+  return {
+    batchId: batch.id, sheetName, totalRows: rows.length, successRows, failedRows,
+    mappedRows, unassignedRows, newRows, updatedRows, unchangedRows,
+  };
 }
