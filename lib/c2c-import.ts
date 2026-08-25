@@ -53,17 +53,30 @@ const MONTHS: Record<string, number> = {
 };
 
 function parseHeaderDate(value: Cell): Date | null {
-  const raw = text(value);
-  const match = raw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-  if (!match) return null;
-  const monthIndex = MONTHS[match[2].toUpperCase()];
-  if (monthIndex === undefined) return null;
-  const day = Number(match[1]);
-  const year = Number(match[3]);
-  const result = utcDate(year, monthIndex, day);
-  return result.getUTCFullYear() === year && result.getUTCMonth() === monthIndex && result.getUTCDate() === day
-    ? result
-    : null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return utcDate(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) return utcDate(parsed.y, parsed.m - 1, parsed.d);
+  }
+  const raw = text(value).replace(/\s+/g, " ").trim();
+  const named = raw.match(/^(\d{1,2})[-\/\s]([A-Za-z]{3,9})[-\/\s](\d{2,4})(?:\s.*)?$/);
+  if (named) {
+    const monthIndex = MONTHS[named[2].slice(0,3).toUpperCase()];
+    if (monthIndex !== undefined) {
+      const day = Number(named[1]); let year = Number(named[3]); if (year < 100) year += 2000;
+      const result = utcDate(year, monthIndex, day);
+      if (result.getUTCFullYear() === year && result.getUTCMonth() === monthIndex && result.getUTCDate() === day) return result;
+    }
+  }
+  const numeric = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s.*)?$/);
+  if (numeric) {
+    const month = Number(numeric[1]) - 1, day = Number(numeric[2]), year = Number(numeric[3]);
+    const result = utcDate(year, month, day);
+    if (result.getUTCFullYear() === year && result.getUTCMonth() === month && result.getUTCDate() === day) return result;
+  }
+  return null;
 }
 
 function iso(date: Date) {
@@ -74,11 +87,23 @@ function monthStart(date: Date) {
   return utcDate(date.getUTCFullYear(), date.getUTCMonth(), 1);
 }
 
+function decodeReportText(bytes: Buffer): string {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return bytes.subarray(2).toString("utf16le");
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    const swapped = Buffer.allocUnsafe(bytes.length - 2);
+    for (let i = 2; i + 1 < bytes.length; i += 2) { swapped[i - 2] = bytes[i + 1]; swapped[i - 1] = bytes[i]; }
+    return swapped.toString("utf16le");
+  }
+  const sample = bytes.subarray(0, Math.min(bytes.length, 4096));
+  let nul = 0; for (const b of sample) if (b === 0) nul++;
+  if (sample.length && nul / sample.length > 0.15) return bytes.toString("utf16le").replace(/^\uFEFF/, "");
+  return bytes.toString("utf8").replace(/^\uFEFF/, "");
+}
 function parseTabText(bytes: Buffer): Matrix | null {
-  const sample = bytes.subarray(0, Math.min(bytes.length, 4096)).toString("utf8");
-  if (!sample.includes("\t") || !sample.includes("RETAILER_CODE")) return null;
-  const source = bytes.toString("utf8").replace(/^\uFEFF/, "");
-  return source.split(/\r?\n/).filter((line) => line.length > 0).map((line) => line.split("\t"));
+  const source = decodeReportText(bytes);
+  const firstChunk = source.slice(0, 12000);
+  if (!firstChunk.includes("\t") || !firstChunk.toUpperCase().includes("RETAILER_CODE")) return null;
+  return source.split(/\r?\n/).filter(line => line.trim().length > 0).map(line => line.split("\t"));
 }
 
 function readMatrix(bytes: Buffer): Matrix {
@@ -94,13 +119,25 @@ function readMatrix(bytes: Buffer): Matrix {
     defval: null,
   });
 }
+function findHeaderRow(matrix: Matrix, required: string[]) {
+  const max = Math.min(matrix.length, 30);
+  for (let r = 0; r < max; r++) {
+    const headers = (matrix[r] ?? []).map(header);
+    if (required.every(key => headers.includes(key))) return r;
+  }
+  return -1;
+}
+
 
 export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
   const matrix = readMatrix(bytes);
   if (matrix.length < 2) throw new Error("The C2C report is empty.");
 
-  const headers = (matrix[0] ?? []).map(header);
   const required = ["RETAILER_CODE", "RETAILER_ITOPUP_NO", "TRANSACTION_COUNT", "TOTAL_AMOUNT", "SRNUMBER"];
+  const headerRowIndex = findHeaderRow(matrix, required);
+  if (headerRowIndex < 0) throw new Error("Could not find the report header row containing RETAILER_CODE, TOTAL_AMOUNT and SRNUMBER.");
+  const headerRow = matrix[headerRowIndex] ?? [];
+  const headers = headerRow.map(header);
   const idx: Record<string, number> = {};
   for (const key of required) {
     const found = headers.indexOf(key);
@@ -109,11 +146,11 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
   }
 
   const dateColumns: DateColumn[] = [];
-  for (let i = 0; i < (matrix[0] ?? []).length; i++) {
-    const date = parseHeaderDate((matrix[0] ?? [])[i]);
-    if (date) dateColumns.push({ index: i, label: text((matrix[0] ?? [])[i]), date });
+  for (let i = 0; i < headerRow.length; i++) {
+    const date = parseHeaderDate(headerRow[i]);
+    if (date) dateColumns.push({ index: i, label: text(headerRow[i]), date });
   }
-  if (!dateColumns.length) throw new Error("No daily date columns such as 01-Aug-2026 were found in row 1.");
+  if (!dateColumns.length) throw new Error("No daily date columns were found in the detected report header. Supported examples: 01-Aug-2026, 01-Aug-26, 8/1/2026.");
 
   dateColumns.sort((a, b) => a.date.getTime() - b.date.getTime());
   const firstDate = dateColumns[0].date;
@@ -126,7 +163,7 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
   const sourceRows: ParsedRow[] = [];
   const preErrors: Array<{ rowNumber: number; message: string; rawData: object }> = [];
 
-  for (let i = 1; i < matrix.length; i++) {
+  for (let i = headerRowIndex + 1; i < matrix.length; i++) {
     const row = matrix[i] ?? [];
     if (!row.some((cell) => text(cell))) continue;
 

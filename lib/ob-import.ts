@@ -19,17 +19,49 @@ function digits(value: Cell) { return text(value).replace(/\D/g, ""); }
 function phoneKey(value: Cell) { return digits(value).replace(/^0+/, ""); }
 const MONTHS: Record<string, number> = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
 function parseDateHeader(value: Cell): Date | null {
-  const m = text(value).match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-  if (!m) return null;
-  const mi = MONTHS[m[2].toUpperCase()];
-  if (mi === undefined) return null;
-  return new Date(Date.UTC(Number(m[3]), mi, Number(m[1])));
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) return new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d));
+  }
+  const raw = text(value).replace(/\s+/g, " ").trim();
+  const named = raw.match(/^(\d{1,2})[-\/\s]([A-Za-z]{3,9})[-\/\s](\d{2,4})(?:\s.*)?$/);
+  if (named) {
+    const mi = MONTHS[named[2].slice(0,3).toUpperCase()];
+    if (mi !== undefined) {
+      let year = Number(named[3]); if (year < 100) year += 2000; const day = Number(named[1]);
+      const result = new Date(Date.UTC(year, mi, day));
+      if (result.getUTCFullYear() === year && result.getUTCMonth() === mi && result.getUTCDate() === day) return result;
+    }
+  }
+  const numeric = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s.*)?$/);
+  if (numeric) {
+    const month = Number(numeric[1]) - 1, day = Number(numeric[2]), year = Number(numeric[3]);
+    const result = new Date(Date.UTC(year, month, day));
+    if (result.getUTCFullYear() === year && result.getUTCMonth() === month && result.getUTCDate() === day) return result;
+  }
+  return null;
 }
 function iso(date: Date) { return date.toISOString().slice(0,10); }
+function decodeReportText(bytes: Buffer): string {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return bytes.subarray(2).toString("utf16le");
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    const swapped = Buffer.allocUnsafe(bytes.length - 2);
+    for (let i = 2; i + 1 < bytes.length; i += 2) { swapped[i - 2] = bytes[i + 1]; swapped[i - 1] = bytes[i]; }
+    return swapped.toString("utf16le");
+  }
+  const sample = bytes.subarray(0, Math.min(bytes.length, 4096));
+  let nul = 0; for (const b of sample) if (b === 0) nul++;
+  if (sample.length && nul / sample.length > 0.15) return bytes.toString("utf16le").replace(/^\uFEFF/, "");
+  return bytes.toString("utf8").replace(/^\uFEFF/, "");
+}
 function parseTabText(bytes: Buffer): Matrix | null {
-  const sample = bytes.subarray(0, Math.min(bytes.length, 4096)).toString("utf8");
-  if (!sample.includes("\t") || !sample.includes("RETAILER_CODE")) return null;
-  return bytes.toString("utf8").replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean).map(line => line.split("\t"));
+  const source = decodeReportText(bytes);
+  const firstChunk = source.slice(0, 12000);
+  if (!firstChunk.includes("\t") || !firstChunk.toUpperCase().includes("RETAILER_CODE")) return null;
+  return source.split(/\r?\n/).filter(line => line.trim().length > 0).map(line => line.split("\t"));
 }
 function readMatrix(bytes: Buffer): Matrix {
   const tab = parseTabText(bytes);
@@ -39,25 +71,37 @@ function readMatrix(bytes: Buffer): Matrix {
   if (!sheetName) throw new Error("No worksheet found in OB file.");
   return XLSX.utils.sheet_to_json<Cell[]>(workbook.Sheets[sheetName], { header:1, raw:true, defval:null });
 }
+function findHeaderRow(matrix: Matrix, required: string[]) {
+  const max = Math.min(matrix.length, 30);
+  for (let r = 0; r < max; r++) {
+    const headers = (matrix[r] ?? []).map(header);
+    if (required.every(key => headers.includes(key))) return r;
+  }
+  return -1;
+}
+
 
 export async function importObWorkbook(fileName: string, bytes: Buffer) {
   const matrix = readMatrix(bytes);
   if (matrix.length < 2) throw new Error("The Opening Balance report is empty.");
-  const headers = (matrix[0] ?? []).map(header);
   const required = ["RETAILER_CODE","RETAILER_ITOPUP_NO","TRANSACTION_COUNT","TOTAL_AMOUNT","SRNUMBER"];
+  const headerRowIndex = findHeaderRow(matrix, required);
+  if (headerRowIndex < 0) throw new Error("Could not find the OB report header row containing RETAILER_CODE, TOTAL_AMOUNT and SRNUMBER.");
+  const headerRow = matrix[headerRowIndex] ?? [];
+  const headers = headerRow.map(header);
   const idx: Record<string, number> = {};
   for (const key of required) {
     const i = headers.indexOf(key);
     if (i < 0) throw new Error(`Required column ${key} was not found in the OB report.`);
     idx[key] = i;
   }
-  const dateCols = (matrix[0] ?? []).map((v,i)=>({i,date:parseDateHeader(v),label:text(v)})).filter(x=>x.date) as Array<{i:number;date:Date;label:string}>;
-  if (dateCols.length !== 1) throw new Error("Opening Balance file must contain exactly one date column in row 1.");
+  const dateCols = headerRow.map((v,i)=>({i,date:parseDateHeader(v),label:text(v)})).filter(x=>x.date) as Array<{i:number;date:Date;label:string}>;
+  if (dateCols.length !== 1) throw new Error("Opening Balance file must contain exactly one recognizable snapshot date column in the detected header.");
   const snapshotDate = dateCols[0].date;
 
   const parsed: Array<{rowNumber:number;retailerCode:string;amount:number;transactionCount:number;srNumber:string}> = [];
   const errors: Array<{rowNumber:number;message:string;rawData:object}> = [];
-  for (let r=1;r<matrix.length;r++) {
+  for (let r=headerRowIndex+1;r<matrix.length;r++) {
     const row = matrix[r] ?? [];
     if (!row.some(c=>text(c))) continue;
     const retailerCode = text(row[idx.RETAILER_CODE]).toUpperCase();
