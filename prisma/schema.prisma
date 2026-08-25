@@ -14,6 +14,7 @@ model Supervisor {
   employees Employee[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  user      User?
 }
 
 model Employee {
@@ -29,6 +30,8 @@ model Employee {
   manualMetrics ManualMetric[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+  user          User?
+  bpAssignments BpAssignment[]
 
   @@index([supervisorId])
 }
@@ -53,6 +56,8 @@ model Retailer {
   c2cRecords        C2cRecord[]
   c2sRecords        C2sRecord[]
   obRecords         ObRecord[]
+  bpAssignments     BpAssignment[]
+  bpUser            User?           @relation("BpRetailerUser")
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
@@ -217,4 +222,66 @@ enum ImportStatus {
   COMPLETED
   COMPLETED_WITH_ERRORS
   FAILED
+}
+
+
+
+model BpAssignment {
+  id         String   @id @default(cuid())
+  retailerId String
+  retailer   Retailer @relation(fields: [retailerId], references: [id])
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  startDate  DateTime
+  endDate    DateTime?
+  active     Boolean  @default(true)
+  gaTarget   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([employeeId, active])
+  @@index([retailerId, active])
+  @@index([startDate])
+}
+
+model User {
+  id             String       @id @default(cuid())
+  displayName    String
+  mobileNumber   String?      @unique
+  username       String?      @unique
+  credentialHash String
+  role           UserRole
+  active         Boolean      @default(true)
+  employeeId     String?      @unique
+  employee       Employee?    @relation(fields: [employeeId], references: [id])
+  supervisorId   String?      @unique
+  supervisor     Supervisor?  @relation(fields: [supervisorId], references: [id])
+  bpRetailerId   String?      @unique
+  bpRetailer     Retailer?    @relation("BpRetailerUser", fields: [bpRetailerId], references: [id])
+  sessions       Session[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([role])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SUPERVISOR
+  ACCOUNTS
+  RSO
+  BP
 }

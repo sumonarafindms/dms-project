@@ -1,3 +1,4 @@
+import {apiUser} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
@@ -10,6 +11,7 @@ function parseDate(value: string | null) {
 }
 
 export async function GET(req: NextRequest) {
+  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   try {
     const monthText = req.nextUrl.searchParams.get("month") || new Date().toISOString().slice(0, 7) + "-01";
     const selectedDate = parseDate(req.nextUrl.searchParams.get("date"));

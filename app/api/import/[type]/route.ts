@@ -1,3 +1,4 @@
+import {apiUser} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { importGaActivationWorkbook } from "@/lib/ga-import";
 import { importC2cWorkbook } from "@/lib/c2c-import";
@@ -7,6 +8,7 @@ import { importObWorkbook } from "@/lib/ob-import";
 const allowed = new Set(["GA", "C2C", "C2S", "OB"]);
 
 export async function POST(req: NextRequest, context: { params: Promise<{ type: string }> }) {
+  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   try {
     const { type } = await context.params;
     const normalizedType = type.toUpperCase();

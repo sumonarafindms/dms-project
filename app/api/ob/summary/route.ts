@@ -1,7 +1,9 @@
+import {apiUser} from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
+  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   try {
     const [rows,batch] = await Promise.all([
       prisma.obRecord.findMany({

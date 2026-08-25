@@ -1,7 +1,9 @@
+import {apiUser} from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
+  if(!(await apiUser(["ADMIN"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   const [supervisors, employees, retailers, mappedRetailers, unassignedRetailers, employeeRows] = await Promise.all([
     prisma.supervisor.count({ where: { active: true } }),
     prisma.employee.count({ where: { active: true } }),

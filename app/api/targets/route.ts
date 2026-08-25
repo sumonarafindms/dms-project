@@ -1,3 +1,4 @@
+import {apiUser} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
@@ -11,6 +12,7 @@ function monthFromParam(value: string | null) {
 }
 
 export async function GET(request: NextRequest) {
+  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   const month = monthFromParam(request.nextUrl.searchParams.get("month"));
 
   const employees = await prisma.employee.findMany({
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   const body = await request.json();
   if (!body?.month || !/^\d{4}-\d{2}$/.test(body.month) || !Array.isArray(body.rows)) {
     return NextResponse.json({ error: "Invalid month or rows" }, { status: 400 });

@@ -1,9 +1,11 @@
+import {apiUser} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { importEmployees, importRetailers } from "@/lib/master-import";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest, context: { params: Promise<{ type: string }> }) {
+  if(!(await apiUser(["ADMIN"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   try {
     const { type } = await context.params;
     const normalizedType = type.toLowerCase();
