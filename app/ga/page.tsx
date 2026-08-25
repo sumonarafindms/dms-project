@@ -144,6 +144,35 @@ export default function GaPage() {
     { total: 0, ga150: 0, ga300: 0 },
   ), [retailerDaily]);
 
+  const uploadPanel = canAdd ? (
+    <section style={panel}>
+            <div style={uploadTitleRow}><h2 style={{ margin: 0 }}>Upload Activation Details</h2><a href="/api/samples/ga" style={sampleLink}>Download Sample File</a></div>
+            <form onSubmit={upload} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "end" }}>
+              <label>
+                GA Data Date<br />
+                <input
+                  name="businessDate"
+                  type="date"
+                  value={dataDate}
+                  onChange={(e) => changeDataDate(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+              </label>
+              <label>
+                ActivationDetailsReport.xlsx<br />
+                <input name="file" type="file" accept=".xlsx,.xlsm,.xls" required style={{ marginTop: 10 }} />
+              </label>
+              <button disabled={loading} style={button}>{loading ? "Processing..." : "Upload GA"}</button>
+            </form>
+    
+            <div style={ruleBox}>
+              <b>GA counting rule:</b> Total = all unique SIM activations for a retailer. <b>150</b> = SELLING_PRICE exactly 170. <b>300</b> = every other selling price. SIM_NO prevents double counting, and ACTIVATION_DATE must match the selected date.
+            </div>
+            {message && <div style={{ marginTop: 12, padding: 12, background: "#f2f4f7", borderRadius: 8 }}>{message}</div>}
+          </section>
+  ) : null;
+
   return (
     <main style={{ padding: 28, maxWidth: 1500, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
@@ -160,32 +189,7 @@ export default function GaPage() {
         </label>
       </div>
 
-{canAdd&&      <section style={panel}>
-        <div style={uploadTitleRow}><h2 style={{ margin: 0 }}>Upload Activation Details</h2><a href="/api/samples/ga" style={sampleLink}>Download Sample File</a></div>
-        <form onSubmit={upload} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "end" }}>
-          <label>
-            GA Data Date<br />
-            <input
-              name="businessDate"
-              type="date"
-              value={dataDate}
-              onChange={(e) => changeDataDate(e.target.value)}
-              required
-              style={inputStyle}
-            />
-          </label>
-          <label>
-            ActivationDetailsReport.xlsx<br />
-            <input name="file" type="file" accept=".xlsx,.xlsm,.xls" required style={{ marginTop: 10 }} />
-          </label>
-          <button disabled={loading} style={button}>{loading ? "Processing..." : "Upload GA"}</button>
-        </form>
-
-        <div style={ruleBox}>
-          <b>GA counting rule:</b> Total = all unique SIM activations for a retailer. <b>150</b> = SELLING_PRICE exactly 170. <b>300</b> = every other selling price. SIM_NO prevents double counting, and ACTIVATION_DATE must match the selected date.
-        </div>
-        {message && <div style={{ marginTop: 12, padding: 12, background: "#f2f4f7", borderRadius: 8 }}>{message}</div>}
-      </section>
+{uploadPanel}
 
       <h2 style={{ marginBottom: 10 }}>Selected Day: {dataDate}</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
@@ -221,7 +225,7 @@ export default function GaPage() {
         )}
       </section>
 
-}      <h2 style={{ marginBottom: 10, marginTop: 24 }}>Monthly Employee Performance</h2>
+      <h2 style={{ marginBottom: 10, marginTop: 24 }}>Monthly Employee Performance</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
         <Stat name="GA Target" value={totals.target.toLocaleString()} />
         <Stat name="GA Achieved" value={totals.achieved.toLocaleString()} />
