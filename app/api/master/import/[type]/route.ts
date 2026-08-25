@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest, context: { params: Promise<{ type: string }> }) {
-  if(!(await apiUser(["ADMIN"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiUser(["ADMIN","IT"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   try {
     const { type } = await context.params;
     const normalizedType = type.toLowerCase();

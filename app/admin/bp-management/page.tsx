@@ -4,7 +4,7 @@ import { PageHead } from "../../components/RoleUI";
 import BpManager from "./BpManager";
 
 export default async function BpManagement() {
-  await requireUser(["ADMIN"]);
+  await requireUser(["ADMIN","IT"]);
 
   const [employees, retailers, current, history] = await Promise.all([
     prisma.employee.findMany({

@@ -1,1 +1,1 @@
-import {requireUser} from "../../../../../lib/auth";import AdminEmployeeForm from "../../../../components/AdminEmployeeForm";export default async function Page(){await requireUser(["ADMIN"]);return <AdminEmployeeForm role="supervisors"/>}
+import {requireUser} from "../../../../../lib/auth";import AdminEmployeeForm from "../../../../components/AdminEmployeeForm";export default async function Page(){await requireUser(["ADMIN","IT"]);return <AdminEmployeeForm role="supervisors"/>}

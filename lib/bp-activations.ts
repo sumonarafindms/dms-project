@@ -29,7 +29,7 @@ export type BpAssignmentListRow = {
 
 
 export function assignmentAccessWhere(user:BpViewer): Prisma.BpAssignmentWhereInput{
-  if(user.role==="ADMIN") return {};
+  if(user.role==="ADMIN"||user.role==="IT") return {};
   if(user.role==="MANAGER") return {employee:{supervisorId:{in:user.managerSupervisorIds||[]}}};
   if(user.role==="SUPERVISOR") return {employee:{supervisorId:user.supervisorId||"__none__"}};
   if(user.role==="RSO") return {employeeId:user.employeeId||"__none__"};

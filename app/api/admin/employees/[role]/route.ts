@@ -7,7 +7,7 @@ import {dhakaTodayYmd} from "../../../../../lib/business-time";
 const clean=(v:unknown)=>String(v??"").trim();
 const nullable=(v:unknown)=>{const x=clean(v);return x||null};
 function day(v:unknown){const s=clean(v);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const d=new Date(`${s}T00:00:00.000Z`);return Number.isNaN(d.getTime())?null:d}
-async function admin(){const u=await getCurrentUser();return u?.role==="ADMIN"?u:null}
+async function admin(){const u=await getCurrentUser();return u&&["ADMIN","IT"].includes(u.role)?u:null}
 
 export async function POST(req:Request,{params}:{params:Promise<{role:string}>}){
  if(!(await admin()))return NextResponse.json({error:"Unauthorized"},{status:401});

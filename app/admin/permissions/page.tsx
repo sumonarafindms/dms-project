@@ -3,7 +3,7 @@ import {requireUser} from "../../../lib/auth";
 import {prisma} from "../../../lib/prisma";
 import PermissionBulkManager from "../../components/PermissionBulkManager";
 export default async function Page(){
- await requireUser(["ADMIN"]);
+ await requireUser(["ADMIN","IT"]);
  const users=await prisma.user.findMany({where:{role:{not:"ADMIN"}},orderBy:[{role:"asc"},{displayName:"asc"}],include:{_count:{select:{permissions:true}}}});
  const custom=users.filter(u=>u._count.permissions>0).length,defaults=users.length-custom;
  return <main className="page admin-permissions premium-permissions"><section className="permissions-v3-hero"><div><div className="admin-kicker">ACCESS CONTROL</div><h1>Permissions Center</h1><p className="permissions-sub">Control individual access, apply safe role presets or copy an existing setup.</p></div><div className="permissions-v3-state"><span>CUSTOMIZED ACCESS</span><strong>{custom}</strong><small>{defaults} users on role default</small></div></section>

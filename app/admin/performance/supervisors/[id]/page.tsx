@@ -10,7 +10,7 @@ import {Breadcrumb,PerfSummary,PerfBar} from "../../../../components/AdminPerfor
 import {FilterForm} from "../../../../components/DrillUI";
 
 export default async function Page({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{month?:string;from?:string;to?:string}>}){
- await requireUser(["ADMIN"]);const {id}=await params,s=await searchParams,month=normalizeMonth(s.from?.slice(0,7)||s.month),{start,end}=monthBounds(`${month}-01`);
+ await requireUser(["ADMIN","IT"]);const {id}=await params,s=await searchParams,month=normalizeMonth(s.from?.slice(0,7)||s.month),{start,end}=monthBounds(`${month}-01`);
  const rs=parseYmd(s.from)||start,to=parseYmd(s.to),re=to?new Date(to.getTime()+86400000):end;
  const sup=await prisma.supervisor.findUnique({where:{id},select:{id:true,name:true,employees:{where:{active:true},select:{id:true}}}});if(!sup)notFound();
  const ids=sup.employees.map(x=>x.id),rows=await employeePerformance(`${month}-01`,ids,s.from,s.to);

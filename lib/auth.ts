@@ -52,7 +52,7 @@ export async function requireUser(allowed?:string[]){
   return user;
 }
 export function homeForRole(role:string){
-  return ({ADMIN:"/dashboard",MANAGER:"/manager",SUPERVISOR:"/supervisor",ACCOUNTS:"/accounts",RSO:"/rso",BP:"/bp"} as Record<string,string>)[role]||"/login";
+  return ({ADMIN:"/dashboard",IT:"/dashboard",MANAGER:"/manager",SUPERVISOR:"/supervisor",ACCOUNTS:"/accounts",RSO:"/rso",BP:"/bp"} as Record<string,string>)[role]||"/login";
 }
 export function labelForRole(role:string){return role.charAt(0)+role.slice(1).toLowerCase()}
 

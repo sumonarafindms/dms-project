@@ -4,7 +4,7 @@ import {getCurrentUser} from "../../../../../lib/auth";
 import {permissionModules,presetPermissions} from "../../../../../lib/permissions";
 import {audit} from "../../../../../lib/audit";
 
-async function admin(){const u=await getCurrentUser();return u?.role==="ADMIN"?u:null}
+async function admin(){const u=await getCurrentUser();return u&&["ADMIN","IT"].includes(u.role)?u:null}
 
 async function saveRows(userId:string,rows:any[]){
  const allowed=new Set(permissionModules.map(m=>m.key));
@@ -41,7 +41,7 @@ export async function POST(req:Request){
    prisma.user.findUnique({where:{id:sourceId},include:{permissions:true}}),
    prisma.user.findMany({where:{id:{in:targetIds},role:{not:"ADMIN"}},select:{id:true,role:true}})
   ]);
-  if(!source||source.role==="ADMIN")return NextResponse.json({error:"Source user not found."},{status:404});
+  if(!source||["ADMIN","IT"].includes(source.role))return NextResponse.json({error:"Source user not found."},{status:404});
   if(!targets.length)return NextResponse.json({error:"Select at least one target user."},{status:400});
   const sourceRows=source.permissions.length
    ? source.permissions.map(p=>({module:p.module,view:p.canView,add:p.canAdd,edit:p.canEdit,update:p.canUpdate}))

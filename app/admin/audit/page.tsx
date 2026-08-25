@@ -5,7 +5,7 @@ import {prisma} from "../../../lib/prisma";
 const fmt=(d:Date)=>new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:true,timeZone:"Asia/Dhaka"}).format(d);
 function dhakaDayStartUtc(){const shifted=new Date(Date.now()+6*3600000);return new Date(Date.UTC(shifted.getUTCFullYear(),shifted.getUTCMonth(),shifted.getUTCDate())-6*3600000)}
 export default async function Page({searchParams}:{searchParams:Promise<{q?:string;module?:string;action?:string}>}){
- await requireUser(["ADMIN"]);const sp=await searchParams,q=(sp.q||"").trim(),module=(sp.module||"").trim(),action=(sp.action||"").trim();
+ await requireUser(["ADMIN","IT"]);const sp=await searchParams,q=(sp.q||"").trim(),module=(sp.module||"").trim(),action=(sp.action||"").trim();
  const where:any={};
  if(module)where.module=module;if(action)where.action=action;
  if(q)where.OR=[{actorName:{contains:q,mode:"insensitive"}},{targetName:{contains:q,mode:"insensitive"}},{detail:{contains:q,mode:"insensitive"}},{action:{contains:q,mode:"insensitive"}}];

@@ -3,7 +3,7 @@ import {prisma} from "../../../lib/prisma";
 import {EmployeeHubCard} from "../../components/AdminEmployeesUI";
 
 export default async function Page(){
- await requireUser(["ADMIN"]);
+ await requireUser(["ADMIN","IT"]);
  const [managers,supervisors,rsos,bps,logins]=await Promise.all([
   prisma.user.count({where:{role:"MANAGER"}}),prisma.supervisor.count({}),prisma.employee.count({}),prisma.bpAssignment.count({where:{active:true}}),prisma.user.count({where:{active:true}})
  ]);

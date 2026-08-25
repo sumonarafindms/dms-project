@@ -57,7 +57,7 @@ export function presetPermissions(role:string,preset:string){
 }
 
 export async function permissionsFor(userId:string,role:string){
- if(role==="ADMIN")return Object.fromEntries(permissionModules.map(m=>[m.key,{view:true,add:true,edit:true,update:true}]));
+ if(role==="ADMIN"||role==="IT")return Object.fromEntries(permissionModules.map(m=>[m.key,{view:true,add:true,edit:true,update:true}]));
  const custom=await prisma.userPermission.findMany({where:{userId}});
  const result:any={};
  for(const m of permissionModules){
@@ -68,7 +68,7 @@ export async function permissionsFor(userId:string,role:string){
  return result;
 }
 export async function hasPermission(userId:string,role:string,module:PermissionModule,action:PermissionAction="view"){
- if(role==="ADMIN")return true;
+ if(role==="ADMIN"||role==="IT")return true;
  const p=await prisma.userPermission.findUnique({where:{userId_module:{userId,module}}});
  if(p)return action==="view"?p.canView:action==="add"?p.canAdd:action==="edit"?p.canEdit:p.canUpdate;
  const d=roleDefaults[role]?.[module];return Boolean(d?.[action]);

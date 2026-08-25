@@ -37,7 +37,8 @@ export async function POST(req:Request){
     if(throttle?.lockedUntil&&throttle.lockedUntil<=now)await prisma.loginThrottle.delete({where:{key}}).catch(()=>{});
 
     const user=await prisma.user.findFirst({where:admin?{OR:[{username:identifier},{mobileNumber:identifier}]}:{mobileNumber:{in:mobileVariants(identifier)}}});
-    const valid=Boolean(user&&user.active&&(!admin||user.role==="ADMIN")&&await verifyCredential(credential,user.credentialHash));
+    const roleAllowed=Boolean(user&&(admin?user.role==="ADMIN":user.role!=="ADMIN"));
+    const valid=Boolean(user&&user.active&&roleAllowed&&await verifyCredential(credential,user.credentialHash));
     if(!valid){
       const current=throttle?.lockedUntil&&throttle.lockedUntil<=now?0:(throttle?.failedCount||0);
       const failedCount=current+1,lockedUntil=failedCount>=MAX_FAILURES?new Date(Date.now()+LOCK_MINUTES*60000):null;

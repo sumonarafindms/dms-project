@@ -11,7 +11,7 @@ const uploads=[
  {key:"targets",title:"Target Upload",sub:"Monthly RSO & BP targets",href:"/targets",sample:"/api/samples/targets",icon:"target",note:"Month-based targets · editable after import",tone:"rose"},
 ];
 export default async function Page(){
- await requireUser(["ADMIN"]);
+ await requireUser(["ADMIN","IT"]);
  return <main className="page admin-upload-hub premium-upload-hub">
   <section className="upload-command">
    <div className="upload-command-copy"><div className="admin-kicker">DATA OPERATIONS</div><h1 className="upload-hub-title">Upload Center</h1><p className="upload-hub-sub">A single workspace for operational imports, master data and monthly targets.</p><div className="upload-command-badges"><span>Excel Ready</span><span>Validation Enabled</span><span>Duplicate Safe</span></div></div>

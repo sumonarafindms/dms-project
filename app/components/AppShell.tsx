@@ -44,6 +44,7 @@ const configs:Record<string,RoleConfig>={
   {href:"/rso/bp/activations",label:"BP Activations",icon:"sim",module:"bp"}],bottom:[]},
  bp:{name:"BP",title:"SIM sales",initials:"BP",home:"/bp",nav:[
   {href:"/bp",label:"Home",icon:"home",module:"dashboard"},{href:"/bp/sales",label:"Sales",icon:"sim",module:"ga"}],bottom:[]},
+ it:{name:"DMS IT",title:"IT Administration",initials:"IT",home:"/dashboard",nav:adminNav,bottom:[adminNav[0],adminNav[2],adminNav[4],adminNav[5],adminNav[11]]},
 };
 for(const key of ["manager","supervisor","accounts","rso","bp"]) configs[key].bottom=configs[key].nav.slice(0,4);
 configs.manager.bottom=configs.manager.nav;
@@ -58,9 +59,9 @@ function allowed(item:NavItem,permissions:ClientPermissionMap,admin:boolean){
  return !item.module||Boolean(permissions[item.module]?.view)
 }
 export default function AppShell({children,user,permissions}:{children:React.ReactNode;user:{displayName:string;role:string}|null;permissions:ClientPermissionMap}){
- const path=usePathname(); if(path==="/login"||path==="/setup") return <PermissionProvider permissions={permissions}>{children}</PermissionProvider>;
+ const path=usePathname(); if(path==="/login"||path==="/setup"||path==="/sacool") return <PermissionProvider permissions={permissions}>{children}</PermissionProvider>;
  const roleKey=user?.role.toLowerCase()||path.split("/").filter(Boolean)[0]||"admin",role=user?configs[roleKey]||roleFor(path):roleFor(path),profileName=user?.displayName||role.name;
- const isAdmin=(user?.role||"").toUpperCase()==="ADMIN"||path==="/dashboard"||path.startsWith("/admin/");
+ const roleName=(user?.role||"").toUpperCase();const isAdmin=roleName==="ADMIN"||roleName==="IT"||path==="/dashboard"||path.startsWith("/admin/");
  const visibleNav=role.nav.filter(i=>allowed(i,permissions,isAdmin));
  const visibleBottom=role.bottom.filter(i=>allowed(i,permissions,isAdmin));
  return <PermissionProvider permissions={permissions}><div className={`app-root ${isAdmin?"admin-app":`${roleKey}-app`}`}>

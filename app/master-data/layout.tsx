@@ -1,2 +1,2 @@
 import {requireUser} from "../../lib/auth";
-export default async function Layout({children}:{children:React.ReactNode}){await requireUser(["ADMIN"]);return <>{children}</>}
+export default async function Layout({children}:{children:React.ReactNode}){await requireUser(["ADMIN","IT"]);return <>{children}</>}

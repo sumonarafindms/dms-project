@@ -390,6 +390,7 @@ model Session {
 
 enum UserRole {
   ADMIN
+  IT
   MANAGER
   SUPERVISOR
   ACCOUNTS

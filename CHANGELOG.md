@@ -244,3 +244,12 @@
 - Added a root-only middleware redirect as an additional edge-level safeguard.
 - Users reach role dashboards only after a successful login redirect.
 - This removes the legacy landing/dashboard experience from first domain visits and Google/search entry.
+
+## v58 - IT Role & Private Admin Login
+- Added a new `IT` user role with the same application permissions and Admin workspace access as Admin for now.
+- IT accounts use the normal Team Login with mobile number and PIN.
+- Removed the Admin option entirely from the public Team Login page.
+- Added a separate administrator-only login page at `/sacool`.
+- Normal Team Login explicitly rejects ADMIN accounts even if an Admin has a mobile number.
+- Admin access continues to require Admin credentials and the dedicated `/sacool` flow.
+- Added the PostgreSQL enum migration for the new IT role.

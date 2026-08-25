@@ -8,7 +8,7 @@ import {PerfHead,PerfSummary,PerfBar,EmptyPerf} from "../../../components/AdminP
 import Link from "next/link";
 
 export default async function Page({searchParams}:{searchParams:Promise<{q?:string;month?:string;from?:string;to?:string}>}){
- await requireUser(["ADMIN"]);const s=await searchParams,q=(s.q||"").trim().toLowerCase(),month=normalizeMonth(s.from?.slice(0,7)||s.month),rows=await employeePerformance(`${month}-01`,undefined,s.from,s.to),{start,end}=monthBounds(`${month}-01`),rs=parseYmd(s.from)||start,to=parseYmd(s.to),re=to?new Date(to.getTime()+86400000):end;
+ await requireUser(["ADMIN","IT"]);const s=await searchParams,q=(s.q||"").trim().toLowerCase(),month=normalizeMonth(s.from?.slice(0,7)||s.month),rows=await employeePerformance(`${month}-01`,undefined,s.from,s.to),{start,end}=monthBounds(`${month}-01`),rs=parseYmd(s.from)||start,to=parseYmd(s.to),re=to?new Date(to.getTime()+86400000):end;
  const bp=await prisma.bpAssignment.findMany({where:{startDate:{lt:re},OR:[{endDate:null},{endDate:{gte:rs}}]},include:{employee:{select:{supervisorId:true}}}});
  const map=new Map<string,{id:string;name:string;rsos:number;bps:Set<string>;target:number;achieved:number;gaT:number;gaA:number;retailers:number}>();
  const sups=await prisma.supervisor.findMany({where:{active:true},select:{id:true,name:true}});

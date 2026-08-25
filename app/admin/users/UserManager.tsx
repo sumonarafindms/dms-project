@@ -13,7 +13,7 @@ export default function UserManager({users,employees,supervisors,bps}:{users:U[]
   <section className="users-v3-create">
    <div className="users-v3-card-head"><div><span>NEW LOGIN</span><h2>Create authorized account</h2><p>Mobile + PIN access linked to the correct DMS role.</p></div><b>{role}</b></div>
    <form className="user-v3-form" onSubmit={create}>
-    <label><span>ROLE</span><select value={role} onChange={e=>setRole(e.target.value)}>{["MANAGER","SUPERVISOR","ACCOUNTS","RSO","BP"].map(x=><option key={x}>{x}</option>)}</select></label>
+    <label><span>ROLE</span><select value={role} onChange={e=>setRole(e.target.value)}>{["IT","MANAGER","SUPERVISOR","ACCOUNTS","RSO","BP"].map(x=><option key={x}>{x}</option>)}</select></label>
     <label><span>DISPLAY NAME</span><input name="displayName" required/></label>
     <label><span>MOBILE NUMBER</span><input name="mobileNumber" required inputMode="tel"/></label>
     <label><span>PIN</span><input name="pin" required minLength={4} inputMode="numeric" type="password"/></label>
