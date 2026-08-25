@@ -10,3 +10,7 @@
 - Added editable RSO and BP monthly targets after import.
 - Added BpMonthlyTarget model so BP target history remains month-specific.
 - Project root now keeps one CHANGELOG.md instead of separate version-note markdown files.
+
+## v27.1
+- Fixed undefined `rangeEnd` reference in BP activation detail build.
+- BP detail now correctly uses the selected month `end` boundary.
