@@ -83,7 +83,7 @@ export async function bpAssignmentDetail(user:BpViewer,id:string,monthInput?:str
   const effectiveStart=assignment.startDate>start?assignment.startDate:start;
   const assignmentEnd=assignment.endDate?new Date(assignment.endDate.getTime()+86400000):end;
   const effectiveEnd=assignmentEnd<end?assignmentEnd:end;
-  const where={retailerId:assignment.retailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd},...(q?{simNo:{contains:q,mode:"insensitive" as const as const}}:{})};
+  const where: Prisma.GaActivationWhereInput={retailerId:assignment.retailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd},...(q?{simNo:{contains:q,mode:"insensitive"}}:{})};
   const [rows,total]=await Promise.all([
     prisma.gaActivation.findMany({where,orderBy:[{activationDate:"desc"},{activationTime:"desc"}],take:500,select:{simNo:true,sellingPrice:true,activationDate:true,activationTime:true}}),
     prisma.gaActivation.count({where}),
