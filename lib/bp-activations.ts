@@ -5,6 +5,27 @@ import {normalizeMonth} from "./drilldown";
 
 export type BpViewer={role:string;employeeId?:string|null;supervisorId?:string|null;bpRetailerId?:string|null};
 
+export type BpAssignmentListRow = {
+  id: string;
+  active: boolean;
+  retailerId: string;
+  employeeId: string;
+  gaTarget: number;
+  startDate: Date;
+  endDate: Date | null;
+  monthGa: number;
+  retailer: {
+    retailerCode: string;
+    retailerName: string | null;
+  };
+  employee: {
+    name: string;
+    employeeCode: string | null;
+    supervisor: { name: string } | null;
+  };
+};
+
+
 export function assignmentAccessWhere(user:BpViewer): Prisma.BpAssignmentWhereInput{
   if(user.role==="MANAGER"||user.role==="ADMIN") return {};
   if(user.role==="SUPERVISOR") return {employee:{supervisorId:user.supervisorId||"__none__"}};
@@ -13,7 +34,7 @@ export function assignmentAccessWhere(user:BpViewer): Prisma.BpAssignmentWhereIn
   return {id:"__none__"};
 }
 
-export async function listBpAssignments(user:BpViewer,monthInput?:string,qInput?:string){
+export async function listBpAssignments(user:BpViewer,monthInput?:string,qInput?:string): Promise<{month:string;assignments:BpAssignmentListRow[]}>{
   const month=normalizeMonth(monthInput),q=(qInput||"").trim(),{start,end}=monthBounds(`${month}-01`);
   const access=assignmentAccessWhere(user);
   const assignments=await prisma.bpAssignment.findMany({
@@ -31,12 +52,23 @@ export async function listBpAssignments(user:BpViewer,monthInput?:string,qInput?
     orderBy:[{active:"desc"},{startDate:"desc"}],
     take:500,
   });
-  const withCounts=await Promise.all(assignments.map(async a=>{
+  const withCounts: BpAssignmentListRow[] = await Promise.all(assignments.map(async a=>{
     const effectiveStart=a.startDate>start?a.startDate:start;
     const assignmentEnd=a.endDate?new Date(a.endDate.getTime()+86400000):end;
     const effectiveEnd=assignmentEnd<end?assignmentEnd:end;
     const monthGa=effectiveStart<effectiveEnd?await prisma.gaActivation.count({where:{retailerId:a.retailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}}}):0;
-    return {...a,monthGa};
+    return {
+      id:a.id,
+      active:a.active,
+      retailerId:a.retailerId,
+      employeeId:a.employeeId,
+      gaTarget:a.gaTarget,
+      startDate:a.startDate,
+      endDate:a.endDate,
+      monthGa,
+      retailer:a.retailer,
+      employee:a.employee,
+    };
   }));
   return {month,assignments:withCounts};
 }
