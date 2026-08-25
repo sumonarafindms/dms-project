@@ -8,6 +8,7 @@ const uploads=[
  {key:"c2s",title:"C2S Upload",sub:"Month-to-date retailer sales",href:"/c2s",sample:"/api/samples/c2s",icon:"chart",note:"Drives LSO calculation"},
  {key:"ob",title:"Opening Balance",sub:"Latest retailer balance snapshot",href:"/ob",sample:"/api/samples/ob",icon:"balance",note:"Latest snapshot only · old OB replaced"},
  {key:"retailers",title:"Retailer List",sub:"Add or update retailer master",href:"/admin/upload/retailers",sample:"/api/samples/retailers",icon:"shop",note:"RETAILER_CODE upsert · RSO auto mapping"},
+ {key:"targets",title:"Target Upload",sub:"Monthly RSO & BP target setup",href:"/targets",sample:"/api/samples/targets",icon:"target",note:"Select month · RSO_NUMBER / BP_CODE · editable after import"},
 ];
 export default async function Page(){
  await requireUser(["ADMIN"]);

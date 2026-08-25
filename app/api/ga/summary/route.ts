@@ -17,6 +17,9 @@ export async function GET(req: NextRequest) {
     const month = req.nextUrl.searchParams.get("month") || new Date().toISOString().slice(0, 7) + "-01";
     const requestedDate = req.nextUrl.searchParams.get("date");
     const { start, end } = monthBounds(month);
+    const fromDate=dateOnly(req.nextUrl.searchParams.get("from")||"")||start;
+    const toDateRaw=dateOnly(req.nextUrl.searchParams.get("to")||"");
+    const rangeEnd=toDateRaw?new Date(toDateRaw.getTime()+86400000):end;
 
     const dailyStart = requestedDate ? dateOnly(requestedDate) : null;
     const dailyEnd = dailyStart ? new Date(dailyStart.getTime() + 24 * 60 * 60 * 1000) : null;
@@ -32,7 +35,7 @@ export async function GET(req: NextRequest) {
         },
       }),
       prisma.gaActivation.findMany({
-        where: { activationDate: { gte: start, lt: end } },
+        where: { activationDate: { gte: fromDate, lt: rangeEnd } },
         select: {
           retailerId: true,
           sellingPrice: true,
@@ -168,6 +171,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       month: start,
+      range:{from:fromDate.toISOString().slice(0,10),to:new Date(rangeEnd.getTime()-86400000).toISOString().slice(0,10)},
       selectedDate: dailyStart?.toISOString().slice(0, 10) || null,
       rows,
       retailerDaily,

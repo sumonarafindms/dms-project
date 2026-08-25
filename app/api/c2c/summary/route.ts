@@ -16,6 +16,9 @@ export async function GET(req: NextRequest) {
     const monthText = req.nextUrl.searchParams.get("month") || new Date().toISOString().slice(0, 7) + "-01";
     const selectedDate = parseDate(req.nextUrl.searchParams.get("date"));
     const { start, end } = monthBounds(monthText);
+    const fromDate=parseDate(req.nextUrl.searchParams.get("from"))||start;
+    const toRaw=parseDate(req.nextUrl.searchParams.get("to"));
+    const rangeEnd=toRaw?new Date(toRaw.getTime()+86400000):end;
     const dayEnd = selectedDate ? new Date(selectedDate.getTime() + 86400000) : null;
 
     const [employees, dailyRows, history, latestMonthRows] = await Promise.all([
@@ -54,7 +57,7 @@ export async function GET(req: NextRequest) {
         select: { id: true, fileName: true, uploadedAt: true, businessDate: true, totalRows: true, successRows: true, failedRows: true, status: true },
       }),
       prisma.c2cRecord.findMany({
-        where: { date: { gte: start, lt: end } },
+        where: { date: { gte: fromDate, lt: rangeEnd } },
         select: { transactionCount: true, amount: true, date: true, retailer: { select: { employeeId: true } } },
       }),
     ]);
@@ -105,7 +108,7 @@ export async function GET(req: NextRequest) {
       amount: Number(row.amount),
     }));
 
-    return NextResponse.json({ rows, dailyRows: day, importHistory: history, month: start.toISOString().slice(0, 10) });
+    return NextResponse.json({ rows, dailyRows: day, importHistory: history, month: start.toISOString().slice(0, 10),range:{from:fromDate.toISOString().slice(0,10),to:new Date(rangeEnd.getTime()-86400000).toISOString().slice(0,10)} });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to load C2C summary" }, { status: 500 });

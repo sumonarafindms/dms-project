@@ -16,6 +16,9 @@ export async function GET(req: NextRequest) {
     const monthText = req.nextUrl.searchParams.get("month") || new Date().toISOString().slice(0,7)+"-01";
     const selectedDate = parseDate(req.nextUrl.searchParams.get("date"));
     const {start,end} = monthBounds(monthText);
+    const fromDate=parseDate(req.nextUrl.searchParams.get("from"))||start;
+    const toRaw=parseDate(req.nextUrl.searchParams.get("to"));
+    const rangeEnd=toRaw?new Date(toRaw.getTime()+86400000):end;
     const dayEnd = selectedDate ? new Date(selectedDate.getTime()+86400000) : null;
 
     const [employees,dailyRows,history,monthRows] = await Promise.all([
@@ -30,7 +33,7 @@ export async function GET(req: NextRequest) {
       }) : Promise.resolve([]),
       prisma.importBatch.findMany({ where:{type:"C2S"}, orderBy:{uploadedAt:"desc"}, take:10,
         select:{id:true,fileName:true,uploadedAt:true,businessDate:true,totalRows:true,successRows:true,failedRows:true,status:true} }),
-      prisma.c2sRecord.findMany({ where:{date:{gte:start,lt:end}}, select:{transactionCount:true,amount:true,date:true,retailer:{select:{id:true,employeeId:true}}} }),
+      prisma.c2sRecord.findMany({ where:{date:{gte:fromDate,lt:rangeEnd}}, select:{transactionCount:true,amount:true,date:true,retailer:{select:{id:true,employeeId:true}}} }),
     ]);
 
     const byRetailer = new Map<string,{employeeId:string|null;amount:number;transactions:number}>();
@@ -65,7 +68,7 @@ export async function GET(req: NextRequest) {
     });
 
     const day = dailyRows.map(row=>({ retailerCode:row.retailer.retailerCode,retailerName:row.retailer.retailerName||"",employee:row.retailer.employee?.name||"Unassigned",rsoMsisdn:row.retailer.employee?.rsoMsisdn||"",supervisor:row.retailer.employee?.supervisor?.name||"Unassigned",amount:Number(row.amount) }));
-    return NextResponse.json({rows,dailyRows:day,importHistory:history,month:start.toISOString().slice(0,10)});
+    return NextResponse.json({rows,dailyRows:day,importHistory:history,month:start.toISOString().slice(0,10),range:{from:fromDate.toISOString().slice(0,10),to:new Date(rangeEnd.getTime()-86400000).toISOString().slice(0,10)}});
   } catch (error) {
     console.error(error);
     return NextResponse.json({error:error instanceof Error?error.message:"Failed to load C2S summary"},{status:500});

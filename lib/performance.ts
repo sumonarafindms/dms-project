@@ -2,14 +2,16 @@ import {prisma} from "./prisma";
 import {monthBounds} from "./month";
 
 export type EmployeePerformance={employeeId:string;name:string;rsoMsisdn:string;employeeCode:string|null;supervisor:string;retailerCount:number;gaTarget:number;gaAchieved:number;ga150:number;ga300:number;ssoTarget:number;ssoAchieved:number;c2cTarget:number;c2cAchieved:number;scTarget:number;scAchieved:number;totalRechargeTarget:number;totalRechargeAchieved:number;lsoTarget:number;lsoAchieved:number;c2sAmount:number;c2sTransactions:number};
-export async function employeePerformance(month:string,employeeIds?:string[]){
+export async function employeePerformance(month:string,employeeIds?:string[],fromInput?:string,toInput?:string){
  const {start,end}=monthBounds(month);
+ const parse=(v?:string)=>v&&/^\d{4}-\d{2}-\d{2}$/.test(v)?new Date(`${v}T00:00:00.000Z`):null;
+ const rangeStart=parse(fromInput)||start,to=parse(toInput),rangeEnd=to?new Date(to.getTime()+86400000):end;
  const where:any={active:true}; if(employeeIds)where.id={in:employeeIds};
  const [employees,ga,c2c,c2s]=await Promise.all([
   prisma.employee.findMany({where,include:{supervisor:true,_count:{select:{retailers:true}},targets:{where:{month:start},take:1},manualMetrics:{where:{month:start},take:1}}}),
-  prisma.gaActivation.findMany({where:{activationDate:{gte:start,lt:end},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{retailerId:true,sellingPrice:true,retailer:{select:{employeeId:true,simSeller:true}}}}),
-  prisma.c2cRecord.findMany({where:{date:{gte:start,lt:end},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{amount:true,transactionCount:true,retailer:{select:{employeeId:true}}}}),
-  prisma.c2sRecord.findMany({where:{date:{gte:start,lt:end},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{amount:true,transactionCount:true,retailer:{select:{id:true,employeeId:true}}}}),
+  prisma.gaActivation.findMany({where:{activationDate:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{retailerId:true,sellingPrice:true,retailer:{select:{employeeId:true,simSeller:true}}}}),
+  prisma.c2cRecord.findMany({where:{date:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{amount:true,transactionCount:true,retailer:{select:{employeeId:true}}}}),
+  prisma.c2sRecord.findMany({where:{date:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{amount:true,transactionCount:true,retailer:{select:{id:true,employeeId:true}}}}),
  ]);
  const gaBy=new Map<string,{t:number,a150:number,a300:number}>(), retailerGa=new Map<string,{eid:string,count:number,eligible:boolean}>();
  for(const x of ga){const eid=x.retailer.employeeId;if(!eid)continue;const g=gaBy.get(eid)||{t:0,a150:0,a300:0};g.t++;Number(x.sellingPrice)===170?g.a150++:g.a300++;gaBy.set(eid,g);const r=retailerGa.get(x.retailerId)||{eid,count:0,eligible:(x.retailer.simSeller||"").trim().toUpperCase()==="Y"};r.count++;retailerGa.set(x.retailerId,r)}

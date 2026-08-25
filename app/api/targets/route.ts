@@ -16,19 +16,28 @@ export async function GET(request: NextRequest) {
   if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   const month = monthFromParam(request.nextUrl.searchParams.get("month"));
 
-  const employees = await prisma.employee.findMany({
-    where: { active: true },
-    include: {
-      supervisor: true,
-      targets: { where: { month } },
-      manualMetrics: { where: { month } },
-      _count: { select: { retailers: true } },
-    },
-    orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
-  });
+  const {end}=monthBounds(month.toISOString());
+  const [employees,bpAssignments] = await Promise.all([
+    prisma.employee.findMany({
+      where: { active: true },
+      include: {
+        supervisor: true,
+        targets: { where: { month } },
+        manualMetrics: { where: { month } },
+        _count: { select: { retailers: true } },
+      },
+      orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
+    }),
+    prisma.bpAssignment.findMany({
+      where:{startDate:{lt:end},OR:[{endDate:null},{endDate:{gte:month}}]},
+      include:{retailer:{select:{retailerCode:true,retailerName:true}},employee:{select:{name:true,rsoMsisdn:true}},monthlyTargets:{where:{month},take:1}},
+      orderBy:{createdAt:"asc"},
+    })
+  ]);
 
   return NextResponse.json({
     month: month.toISOString().slice(0, 7),
+    bpRows:bpAssignments.map(a=>({assignmentId:a.id,bpCode:a.retailer.retailerCode,bpName:a.retailer.retailerName||"",rsoName:a.employee.name,rsoMsisdn:a.employee.rsoMsisdn,gaTarget:a.monthlyTargets[0]?.gaTarget??a.gaTarget})),
     rows: employees.map((employee) => {
       const target = employee.targets[0];
       const manual = employee.manualMetrics[0];
@@ -90,6 +99,14 @@ export async function POST(request: NextRequest) {
         create: { employeeId, month, scAchieved },
       });
       saved += 1;
+    }
+    if(Array.isArray(body.bpRows)){
+      for(const row of body.bpRows){
+        const assignmentId=String(row.assignmentId||"");if(!assignmentId)continue;
+        const exists=await tx.bpAssignment.findUnique({where:{id:assignmentId},select:{id:true}});
+        if(!exists)continue;
+        await tx.bpMonthlyTarget.upsert({where:{assignmentId_month:{assignmentId,month}},update:{gaTarget:Math.max(0,Math.trunc(Number(row.gaTarget)||0))},create:{assignmentId,month,gaTarget:Math.max(0,Math.trunc(Number(row.gaTarget)||0))}});
+      }
     }
   });
 

@@ -251,10 +251,24 @@ model BpAssignment {
   gaTarget   Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  monthlyTargets BpMonthlyTarget[]
 
   @@index([employeeId, active])
   @@index([retailerId, active])
   @@index([startDate])
+}
+
+model BpMonthlyTarget {
+  id           String       @id @default(cuid())
+  assignmentId String
+  assignment   BpAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  month        DateTime
+  gaTarget     Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([assignmentId, month])
+  @@index([month])
 }
 
 model User {

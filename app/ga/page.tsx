@@ -66,6 +66,8 @@ export default function GaPage() {
   const canAdd=useCan("ga","add");
   const [month, setMonth] = useState(() => yesterday().slice(0, 7));
   const [dataDate, setDataDate] = useState(yesterday());
+  const [fromDate,setFromDate]=useState(()=>`${yesterday().slice(0,7)}-01`);
+  const [toDate,setToDate]=useState(yesterday());
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [retailerDaily, setRetailerDaily] = useState<RetailerDailyRow[]>([]);
   const [history, setHistory] = useState<History[]>([]);
@@ -73,7 +75,7 @@ export default function GaPage() {
   const [message, setMessage] = useState("");
 
   async function load() {
-    const params = new URLSearchParams({ month: `${month}-01`, date: dataDate });
+    const params = new URLSearchParams({ month: `${month}-01`, date: dataDate, from:fromDate, to:toDate });
     const res = await fetch(`/api/ga/summary?${params.toString()}`, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok) {
@@ -87,12 +89,13 @@ export default function GaPage() {
 
   useEffect(() => {
     load();
-  }, [month, dataDate]);
+  }, [month, dataDate,fromDate,toDate]);
 
   function changeDataDate(value: string) {
     setDataDate(value);
     if (value?.length >= 7) setMonth(value.slice(0, 7));
   }
+  function changeFrom(value:string){setFromDate(value);if(value?.length>=7)setMonth(value.slice(0,7));if(toDate<value)setToDate(value)}
 
   async function upload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -145,7 +148,7 @@ export default function GaPage() {
   ), [retailerDaily]);
 
   const uploadPanel = canAdd ? (
-    <section style={panel}>
+    <section className="card modern-upload-panel">
             <div style={uploadTitleRow}><h2 style={{ margin: 0 }}>Upload Activation Details</h2><a href="/api/samples/ga" style={sampleLink}>Download Sample File</a></div>
             <form onSubmit={upload} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "end" }}>
               <label>
@@ -174,8 +177,8 @@ export default function GaPage() {
   ) : null;
 
   return (
-    <main style={{ padding: 28, maxWidth: 1500, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+    <main className="page modern-upload-page">
+      <div className="modern-upload-head">
         <div>
           <a href="/admin/upload" style={{ color: "#475467" }}>← Upload Center</a>
           <h1 style={{ marginBottom: 4 }}>Daily GA Upload & SSO</h1>
@@ -183,10 +186,7 @@ export default function GaPage() {
             Upload the previous day&apos;s Activation Details report. Each unique SIM_NO is one GA.
           </p>
         </div>
-        <label>
-          Monthly Performance<br />
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={inputStyle} />
-        </label>
+        <div className="date-range-filter"><label>From<input type="date" value={fromDate} onChange={e=>changeFrom(e.target.value)}/></label><label>To<input type="date" value={toDate} min={fromDate} onChange={e=>setToDate(e.target.value)}/></label></div>
       </div>
 
 {uploadPanel}

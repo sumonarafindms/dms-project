@@ -18,6 +18,8 @@ export default function C2cPage() {
   const canAdd=useCan("c2c","add");
   const [month, setMonth] = useState(() => todayYmd().slice(0, 7));
   const [date, setDate] = useState(() => todayYmd());
+  const [fromDate,setFromDate]=useState(()=>`${todayYmd().slice(0,7)}-01`);
+  const [toDate,setToDate]=useState(()=>todayYmd());
   const [rows, setRows] = useState<Row[]>([]);
   const [dailyRows, setDailyRows] = useState<DailyRow[]>([]);
   const [history, setHistory] = useState<History[]>([]);
@@ -25,13 +27,13 @@ export default function C2cPage() {
   const [message, setMessage] = useState("");
 
   async function load() {
-    const p = new URLSearchParams({ month: `${month}-01`, date });
+    const p = new URLSearchParams({ month: `${month}-01`, date,from:fromDate,to:toDate });
     const res = await fetch(`/api/c2c/summary?${p}`, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok) return setMessage(data.error || "Failed to load C2C data");
     setRows(data.rows || []); setDailyRows(data.dailyRows || []); setHistory(data.importHistory || []);
   }
-  useEffect(() => { load(); }, [month, date]);
+  useEffect(() => { load(); }, [month, date,fromDate,toDate]);
 
   async function upload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -53,13 +55,13 @@ export default function C2cPage() {
   const totals = useMemo(() => rows.reduce((a, r) => ({ c2cT: a.c2cT+r.c2cTarget, c2cA: a.c2cA+r.c2cAchieved, sc: a.sc+r.scAchieved, trT: a.trT+r.totalRechargeTarget, trA: a.trA+r.totalRechargeAchieved, trx: a.trx+r.transactionCount }), { c2cT:0,c2cA:0,sc:0,trT:0,trA:0,trx:0 }), [rows]);
   const dayTotal = useMemo(() => dailyRows.reduce((s, r) => s+r.amount, 0), [dailyRows]);
 
-  return <main style={{ padding: 28, maxWidth: 1500, margin: "0 auto" }}>
-    <div style={{ display:"flex", justifyContent:"space-between", gap:16, flexWrap:"wrap", alignItems:"center" }}>
+  return <main className="page modern-upload-page">
+    <div className="modern-upload-head">
       <div><a href="/admin/upload" style={{color:"#475467"}}>← Upload Center</a><h1 style={{marginBottom:4}}>C2C Recharge Balance</h1><p style={{marginTop:0,color:"#667085"}}>Upload the cumulative month-to-date Stock Lifting report. Date columns are stored separately, so repeated uploads never add the same day twice.</p></div>
-      <label>Monthly Performance<br/><input type="month" value={month} onChange={e=>setMonth(e.target.value)} style={inputStyle}/></label>
+      <div className="date-range-filter"><label>From<input type="date" value={fromDate} onChange={e=>{setFromDate(e.target.value);setMonth(e.target.value.slice(0,7));if(toDate<e.target.value)setToDate(e.target.value)}}/></label><label>To<input type="date" min={fromDate} value={toDate} onChange={e=>setToDate(e.target.value)}/></label></div>
     </div>
 
-{canAdd&&    <section style={panel}><div style={uploadTitleRow}><h2 style={{margin:0}}>Upload C2C File</h2><a href="/api/samples/c2c" style={sampleLink}>Download Sample File</a></div>
+{canAdd&&    <section className="card modern-upload-panel"><div style={uploadTitleRow}><h2 style={{margin:0}}>Upload C2C File</h2><a href="/api/samples/c2c" style={sampleLink}>Download Sample File</a></div>
       <form onSubmit={upload} style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"end"}}><label>ITop_Up_StockLifting file<br/><input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required style={{marginTop:10}}/></label><button disabled={loading} style={button}>{loading?"Processing...":"Upload C2C"}</button></form>
       <div style={ruleBox}><b>How it works:</b> RETAILER_CODE maps the outlet. SRNUMBER is checked against the employee/RSO relationship. TRANSACTION_COUNT and TOTAL_AMOUNT are kept as the latest month-to-date retailer totals. Each header such as 01-Aug-2026 is stored as that retailer&apos;s amount for that exact date. Zero daily rows are not stored, which keeps the database small.</div>
       {message && <div style={{marginTop:12,padding:12,background:"#f2f4f7",borderRadius:8}}>{message}</div>}
