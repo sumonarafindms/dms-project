@@ -14,3 +14,6 @@
 ## v27.1
 - Fixed undefined `rangeEnd` reference in BP activation detail build.
 - BP detail now correctly uses the selected month `end` boundary.
+
+## v27.2
+- Repacked BP detail boundary fix with an explicit source marker to ensure Git detects the corrected file.
