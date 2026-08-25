@@ -1,10 +1,11 @@
+import {Prisma} from "@prisma/client";
 import {prisma} from "./prisma";
 import {monthBounds} from "./month";
 import {normalizeMonth} from "./drilldown";
 
 export type BpViewer={role:string;employeeId?:string|null;supervisorId?:string|null;bpRetailerId?:string|null};
 
-export function assignmentAccessWhere(user:BpViewer){
+export function assignmentAccessWhere(user:BpViewer): Prisma.BpAssignmentWhereInput{
   if(user.role==="MANAGER"||user.role==="ADMIN") return {};
   if(user.role==="SUPERVISOR") return {employee:{supervisorId:user.supervisorId||"__none__"}};
   if(user.role==="RSO") return {employeeId:user.employeeId||"__none__"};
