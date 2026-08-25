@@ -224,3 +224,10 @@
 - Removed the First-time Admin setup link from the Login interface.
 - Guarded `/setup` on the server so it automatically redirects to Login once any DMS user exists.
 - Preserved the one-time setup API for truly empty databases.
+
+## v55 - Vercel Build Lock Fix
+- Removed `prisma migrate deploy` from the npm build script so Vercel deployments no longer compete for PostgreSQL advisory migration locks.
+- `npm run build` now runs only `next build`.
+- Added an explicit `npm run migrate` command for controlled database migrations.
+- Added `npm run prisma:generate` for local/client generation when needed.
+- Database schema and existing migrations are unchanged.
