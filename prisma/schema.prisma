@@ -68,6 +68,8 @@ model Retailer {
   gaActivations     GaActivation[]
   c2cRecords        C2cRecord[]
   c2sRecords        C2sRecord[]
+  c2cMonthlySummaries C2cMonthlySummary[]
+  c2sMonthlySummaries C2sMonthlySummary[]
   obRecords         ObRecord[]
   bpAssignments     BpAssignment[]
   bpUser            User?           @relation("BpRetailerUser")
@@ -162,6 +164,7 @@ model GaActivation {
   activationDate DateTime
   activationTime String?
   sellingPrice   Decimal      @db.Decimal(10,2)
+  productCode    String?
   batchId        String?
   batch          ImportBatch? @relation(fields: [batchId], references: [id])
   createdAt      DateTime     @default(now())
@@ -169,7 +172,38 @@ model GaActivation {
 
   @@index([activationDate])
   @@index([retailerId, activationDate])
+  @@index([productCode])
   @@index([batchId])
+}
+
+model C2cMonthlySummary {
+  id               String   @id @default(cuid())
+  retailerId       String
+  retailer         Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  month            DateTime
+  transactionCount Int      @default(0)
+  totalAmount      Decimal  @default(0) @db.Decimal(18,2)
+  reportEndDate    DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([retailerId, month])
+  @@index([month])
+}
+
+model C2sMonthlySummary {
+  id               String   @id @default(cuid())
+  retailerId       String
+  retailer         Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  month            DateTime
+  transactionCount Int      @default(0)
+  totalAmount      Decimal  @default(0) @db.Decimal(18,2)
+  reportEndDate    DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([retailerId, month])
+  @@index([month])
 }
 
 model C2cRecord {
@@ -331,6 +365,15 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([module, createdAt])
   @@index([action, createdAt])
+}
+
+model LoginThrottle {
+  key         String    @id
+  failedCount Int       @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([updatedAt])
 }
 
 model Session {

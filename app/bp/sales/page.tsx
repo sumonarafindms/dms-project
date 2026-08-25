@@ -1,23 +1,35 @@
-import {requireUser} from "../../../lib/auth";
+import {requirePagePermission} from "../../../lib/auth";
 import {prisma} from "../../../lib/prisma";
 import {monthBounds} from "../../../lib/month";
 import {normalizeMonth} from "../../../lib/drilldown";
-import {PageHead,ProgressCard} from "../../components/RoleUI";
+import {parseYmd,monthStartsInRange} from "../../../lib/date-range";
+import {PageHead} from "../../components/RoleUI";
 import {FilterForm} from "../../components/DrillUI";
-export default async function Page({searchParams}:{searchParams:Promise<{month?:string;q?:string}>}){
- const u=await requireUser(["BP"]);if(!u.bpRetailerId)return <main className="page field-page"><PageHead eyebrow="BP" title="BP code not assigned" subtitle="Ask Admin to link this login to an active BP retailer."/></main>;
- const s=await searchParams,month=normalizeMonth(s.month),q=(s.q||"").trim(),{start,end}=monthBounds(`${month}-01`);
+import {Icon} from "../../components/icons";
+
+export default async function Page({searchParams}:{searchParams:Promise<{month?:string;q?:string;from?:string;to?:string}>}){
+ const u=await requirePagePermission(["BP"],"ga");
+ if(!u.bpRetailerId)return <main className="page bp-v8-page"><PageHead eyebrow="BP" title="BP code not assigned" subtitle="Ask Admin to link this login to an active BP retailer."/></main>;
+ const s=await searchParams,month=normalizeMonth(s.from?.slice(0,7)||s.month),q=(s.q||"").trim(),{start,end}=monthBounds(`${month}-01`),rs=parseYmd(s.from)||start,to=parseYmd(s.to),re=to?new Date(to.getTime()+86400000):end;
  const [retailer,a]=await Promise.all([
   prisma.retailer.findUnique({where:{id:u.bpRetailerId},select:{retailerCode:true,retailerName:true}}),
-  prisma.bpAssignment.findFirst({where:{retailerId:u.bpRetailerId,active:true},select:{gaTarget:true,startDate:true,endDate:true}})
+  prisma.bpAssignment.findFirst({where:{retailerId:u.bpRetailerId,active:true},include:{monthlyTargets:{where:{month:{gte:new Date(Date.UTC(rs.getUTCFullYear(),rs.getUTCMonth(),1)),lt:new Date(Date.UTC(re.getUTCFullYear(),re.getUTCMonth()+1,1))}}}}})
  ]);
- if(!a)return <main className="page field-page"><PageHead eyebrow="BP" title="No active BP assignment" subtitle="Ask Admin to assign your BP retailer code."/></main>;
- const effectiveStart=a.startDate>start?a.startDate:start;const aEnd=a.endDate?new Date(a.endDate.getTime()+86400000):end;const effectiveEnd=aEnd<end?aEnd:end;
+ if(!a)return <main className="page bp-v8-page"><PageHead eyebrow="BP" title="No active BP assignment" subtitle="Ask Admin to assign your BP retailer code."/></main>;
+ const effectiveStart=a.startDate>rs?a.startDate:rs,aEnd=a.endDate?new Date(a.endDate.getTime()+86400000):re,effectiveEnd=aEnd<re?aEnd:re;
  const where={retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd},...(q?{simNo:{contains:q,mode:"insensitive" as const}}:{})};
  const [rows,total]=await Promise.all([
   prisma.gaActivation.findMany({where,orderBy:[{activationDate:"desc"},{activationTime:"desc"}],take:300,select:{simNo:true,sellingPrice:true,activationDate:true,activationTime:true}}),
   prisma.gaActivation.count({where:{retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}}})
  ]);
- const target=a.gaTarget||0;
- return <main className="page field-page"><PageHead eyebrow="BP" title="Activation details" subtitle={`${retailer?.retailerCode||""} · ${retailer?.retailerName||"Your BP retailer"}`}/><div className="progress-grid"><ProgressCard title="Monthly GA" value={total} target={target}/></div><div className="info-banner"><div className="info-dot"/><div>Only activations from your current BP assignment period are counted.</div></div><FilterForm q={q} month={month} placeholder="Search SIM serial"/><section className="section"><div className="section-head"><h2 className="section-title">GA history</h2><span className="section-link">{rows.length} shown</span></div><div className="card panel activity-list">{rows.length?rows.map(x=><div className="activity-row" key={x.simNo}><div><div className="activity-date">SIM {x.simNo}</div><div className="activity-meta">{x.activationDate.toISOString().slice(0,10)}{x.activationTime?` · ${x.activationTime}`:""}</div></div><div className="activity-value">৳{Number(x.sellingPrice)}<div className="mini-label">{Number(x.sellingPrice)===170?"150":"300"}</div></div></div>):<div className="empty">No GA found for this filter.</div>}</div></section></main>
+ const targetByMonth=new Map(a.monthlyTargets.map(x=>[x.month.toISOString().slice(0,7),x.gaTarget])),target=monthStartsInRange(effectiveStart,effectiveEnd).reduce((n,m)=>n+(targetByMonth.get(m.toISOString().slice(0,7))??a.gaTarget??0),0),progress=target?Math.min(100,Math.round(total/target*100)):0,remaining=Math.max(0,target-total),ga150=rows.filter(x=>Number(x.sellingPrice)===170).length,ga300=rows.filter(x=>Number(x.sellingPrice)!==170).length;
+ return <main className="page bp-v8-page bp-sales-v8">
+  <section className="bp-v8-sales-hero"><div><div className="bp-v8-kicker">MY SIM SALES</div><h1>Activation Details</h1><p>{retailer?.retailerCode||""} · {retailer?.retailerName||"Your BP retailer"}</p></div><div className="bp-v8-sales-score"><small>GA</small><strong>{total}</strong><span>{target?`of ${target}`:"selected range"}</span></div></section>
+  <div className="bp-v8-sales-progress"><div><span>Target progress</span><strong>{target?`${progress}%`:"Live"}</strong></div><div className="bp-v8-progress light"><i style={{width:`${progress}%`}}/></div><footer><span>{total} completed</span><span>{target?`${remaining} remaining`:"Target not set"}</span></footer></div>
+  <div className="bp-v8-sales-stats"><div><span>150 GA</span><strong>{ga150}</strong><small>Selling price ৳170</small></div><div><span>300 GA</span><strong>{ga300}</strong><small>Other GA sales</small></div><div><span>SHOWN</span><strong>{rows.length}</strong><small>Latest records</small></div></div>
+  <div className="bp-v8-filter-wrap"><FilterForm q={q} month={month} from={s.from} to={s.to} dateRange placeholder="Search SIM serial"/></div>
+  <section className="bp-v8-section"><div className="bp-v8-section-head"><div><span>SALES HISTORY</span><h2>SIM activations</h2><p>Only records inside your BP assignment and selected date range.</p></div><b>{rows.length} shown</b></div><div className="bp-v8-sales-list">
+   {rows.length?rows.map(x=><div className="bp-v8-sale-row" key={x.simNo}><span className="bp-v8-sim-icon"><Icon name="sim"/></span><div><strong>SIM {x.simNo}</strong><small>{x.activationDate.toISOString().slice(0,10)}{x.activationTime?` · ${x.activationTime}`:""}</small></div><div className="bp-v8-price"><strong>৳{Number(x.sellingPrice)}</strong><small>{Number(x.sellingPrice)===170?"150 GA":"300 GA"}</small></div></div>):<div className="bp-v8-empty"><span>0</span><div><strong>No GA found</strong><small>Change the date range or SIM search.</small></div></div>}
+  </div></section>
+ </main>
 }

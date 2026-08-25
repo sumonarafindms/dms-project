@@ -1,9 +1,11 @@
-import {apiUser} from "@/lib/auth";
+import {apiUser,apiPermission} from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {apiError} from "@/lib/http-errors";
 
 export async function GET() {
   if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiPermission("ob","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   try {
     const [rows,batch] = await Promise.all([
       prisma.obRecord.findMany({
@@ -22,6 +24,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({error:error instanceof Error?error.message:"Failed to load Opening Balance"},{status:500});
+    const e=apiError(error,"Failed to load Opening Balance."); return NextResponse.json({error:e.error},{status:e.status});
   }
 }

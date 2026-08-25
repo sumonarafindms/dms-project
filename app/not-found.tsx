@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function NotFound(){return <main className="system-state-v13"><div className="system-state-card"><div className="system-state-icon">404</div><div className="system-state-kicker">PAGE NOT FOUND</div><h1>This DMS page doesn't exist.</h1><p>The link may be outdated, or your role may use a different workspace.</p><div className="system-state-actions"><Link href="/">Go to home</Link><Link className="secondary" href="/login">Sign in</Link></div></div></main>}

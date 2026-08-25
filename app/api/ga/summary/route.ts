@@ -1,7 +1,11 @@
-import {apiUser} from "@/lib/auth";
+import {apiUser,apiPermission} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
+import {monthStartsInRange,monthStartUtc} from "@/lib/date-range";
+import {dhakaMonth} from "@/lib/business-time";
+import {apiError} from "@/lib/http-errors";
+import {isSimSwapProduct,isGa170Product,isGa300Product} from "@/lib/ga-product";
 
 function dateOnly(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -13,13 +17,16 @@ function dateOnly(value: string) {
 
 export async function GET(req: NextRequest) {
   if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiPermission("ga","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   try {
-    const month = req.nextUrl.searchParams.get("month") || new Date().toISOString().slice(0, 7) + "-01";
+    const month = req.nextUrl.searchParams.get("month") || dhakaMonth()+"-01";
     const requestedDate = req.nextUrl.searchParams.get("date");
     const { start, end } = monthBounds(month);
     const fromDate=dateOnly(req.nextUrl.searchParams.get("from")||"")||start;
     const toDateRaw=dateOnly(req.nextUrl.searchParams.get("to")||"");
     const rangeEnd=toDateRaw?new Date(toDateRaw.getTime()+86400000):end;
+    if(rangeEnd<=fromDate) return NextResponse.json({error:"End date must be on or after start date."},{status:400});
+    const targetMonths=monthStartsInRange(fromDate,rangeEnd),targetStart=targetMonths[0]||monthStartUtc(fromDate),targetEnd=new Date(Date.UTC((targetMonths.at(-1)||targetStart).getUTCFullYear(),(targetMonths.at(-1)||targetStart).getUTCMonth()+1,1));
 
     const dailyStart = requestedDate ? dateOnly(requestedDate) : null;
     const dailyEnd = dailyStart ? new Date(dailyStart.getTime() + 24 * 60 * 60 * 1000) : null;
@@ -31,7 +38,7 @@ export async function GET(req: NextRequest) {
         include: {
           supervisor: { select: { name: true } },
           _count: { select: { retailers: true } },
-          targets: { where: { month: start }, take: 1 },
+          targets: { where: { month: {gte:targetStart,lt:targetEnd} } },
         },
       }),
       prisma.gaActivation.findMany({
@@ -39,6 +46,8 @@ export async function GET(req: NextRequest) {
         select: {
           retailerId: true,
           sellingPrice: true,
+          productCode: true,
+          activationDate: true,
           retailer: {
             select: {
               employeeId: true,
@@ -53,6 +62,7 @@ export async function GET(req: NextRequest) {
             select: {
               retailerId: true,
               sellingPrice: true,
+              productCode: true,
               retailer: {
                 select: {
                   retailerCode: true,
@@ -88,26 +98,32 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const employeeAgg = new Map<string, { total: number; ga150: number; ga300: number }>();
+    const employeeAgg = new Map<string, { total: number; ga150: number; ga300: number; simSwap:number }>();
     const retailerMonthlyCount = new Map<string, { employeeId: string; count: number; simSeller: boolean }>();
 
     for (const activation of monthlyActivations) {
       const employeeId = activation.retailer.employeeId;
       if (!employeeId) continue;
       const price = Number(activation.sellingPrice);
-      const current = employeeAgg.get(employeeId) || { total: 0, ga150: 0, ga300: 0 };
+      const current = employeeAgg.get(employeeId) || { total: 0, ga150: 0, ga300: 0, simSwap:0 };
+      if(isSimSwapProduct(activation.productCode)){
+        current.simSwap += 1;
+        employeeAgg.set(employeeId,current);
+        continue;
+      }
       current.total += 1;
-      if (price === 170) current.ga150 += 1;
-      else current.ga300 += 1;
+      if (isGa170Product(activation.productCode) || (!activation.productCode && price === 170)) current.ga150 += 1;
+      else if (isGa300Product(activation.productCode) || !activation.productCode) current.ga300 += 1;
       employeeAgg.set(employeeId, current);
 
-      const retailer = retailerMonthlyCount.get(activation.retailerId) || {
+      const retailerKey=`${activation.retailerId}|${activation.activationDate.toISOString().slice(0,7)}`;
+      const retailer = retailerMonthlyCount.get(retailerKey) || {
         employeeId,
         count: 0,
         simSeller: (activation.retailer.simSeller || "").trim().toUpperCase() === "Y",
       };
       retailer.count += 1;
-      retailerMonthlyCount.set(activation.retailerId, retailer);
+      retailerMonthlyCount.set(retailerKey, retailer);
     }
 
     const ssoByEmployee = new Map<string, number>();
@@ -117,8 +133,8 @@ export async function GET(req: NextRequest) {
     }
 
     const rows = employees.map((employee) => {
-      const ga = employeeAgg.get(employee.id) || { total: 0, ga150: 0, ga300: 0 };
-      const target = employee.targets[0];
+      const ga = employeeAgg.get(employee.id) || { total: 0, ga150: 0, ga300: 0, simSwap:0 };
+      const target = employee.targets.reduce((a,x)=>({ga:a.ga+x.gaTarget,sso:a.sso+x.ssoTarget}),{ga:0,sso:0});
       return {
         employeeId: employee.id,
         employeeCode: employee.employeeCode,
@@ -128,11 +144,12 @@ export async function GET(req: NextRequest) {
         retailerCount: employee._count.retailers,
         ga150: ga.ga150,
         ga300: ga.ga300,
+        simSwap: ga.simSwap,
         gaAchieved: ga.total,
-        gaTarget: target?.gaTarget ?? 0,
-        gaPercent: target?.gaTarget ? Number(((ga.total / target.gaTarget) * 100).toFixed(1)) : 0,
+        gaTarget: target.ga,
+        gaPercent: target.ga ? Number(((ga.total / target.ga) * 100).toFixed(1)) : 0,
         ssoAchieved: ssoByEmployee.get(employee.id) ?? 0,
-        ssoTarget: target?.ssoTarget ?? 0,
+        ssoTarget: target.sso,
       };
     });
 
@@ -145,6 +162,7 @@ export async function GET(req: NextRequest) {
       total: number;
       ga150: number;
       ga300: number;
+      simSwap: number;
     }>();
 
     for (const activation of dailyActivations) {
@@ -158,10 +176,14 @@ export async function GET(req: NextRequest) {
         total: 0,
         ga150: 0,
         ga300: 0,
+        simSwap: 0,
       };
-      current.total += 1;
-      if (Number(activation.sellingPrice) === 170) current.ga150 += 1;
-      else current.ga300 += 1;
+      if(isSimSwapProduct(activation.productCode)) current.simSwap += 1;
+      else {
+        current.total += 1;
+        if (isGa170Product(activation.productCode) || (!activation.productCode && Number(activation.sellingPrice) === 170)) current.ga150 += 1;
+        else if (isGa300Product(activation.productCode) || !activation.productCode) current.ga300 += 1;
+      }
       dailyMap.set(activation.retailerId, current);
     }
 
@@ -179,9 +201,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load GA summary" },
-      { status: 500 },
-    );
+    const e=apiError(error,"Failed to load GA summary.");
+    return NextResponse.json({error:e.error},{status:e.status});
   }
 }

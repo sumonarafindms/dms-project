@@ -46,8 +46,12 @@ const configs:Record<string,RoleConfig>={
   {href:"/bp",label:"Home",icon:"home",module:"dashboard"},{href:"/bp/sales",label:"Sales",icon:"sim",module:"ga"}],bottom:[]},
 };
 for(const key of ["manager","supervisor","accounts","rso","bp"]) configs[key].bottom=configs[key].nav.slice(0,4);
+configs.manager.bottom=configs.manager.nav;
+configs.supervisor.bottom=configs.supervisor.nav;
+configs.rso.bottom=configs.rso.nav;
+configs.accounts.bottom=configs.accounts.nav;
 function roleFor(path:string){const first=path.split("/").filter(Boolean)[0]||"";return configs[first]||configs.admin}
-function active(path:string,href:string){return path===href||(href!=="/"&&path.startsWith(href+"/"))}
+function active(path:string,href:string){const homes=new Set(["/dashboard","/manager","/supervisor","/accounts","/rso","/bp"]);if(homes.has(href))return path===href;return path===href||(href!=="/"&&path.startsWith(href+"/"))}
 function allowed(item:NavItem,permissions:ClientPermissionMap,admin:boolean){
  if(admin)return true;
  if(item.href==="/accounts/operations")return ["ga","c2c","c2s","ob","targets"].some(m=>permissions[m]?.view);
@@ -55,22 +59,36 @@ function allowed(item:NavItem,permissions:ClientPermissionMap,admin:boolean){
 }
 export default function AppShell({children,user,permissions}:{children:React.ReactNode;user:{displayName:string;role:string}|null;permissions:ClientPermissionMap}){
  const path=usePathname(); if(path==="/login"||path==="/setup") return <PermissionProvider permissions={permissions}>{children}</PermissionProvider>;
- const role=user?configs[user.role.toLowerCase()]||roleFor(path):roleFor(path),profileName=user?.displayName||role.name;
+ const roleKey=user?.role.toLowerCase()||path.split("/").filter(Boolean)[0]||"admin",role=user?configs[roleKey]||roleFor(path):roleFor(path),profileName=user?.displayName||role.name;
  const isAdmin=(user?.role||"").toUpperCase()==="ADMIN"||path==="/dashboard"||path.startsWith("/admin/");
  const visibleNav=role.nav.filter(i=>allowed(i,permissions,isAdmin));
  const visibleBottom=role.bottom.filter(i=>allowed(i,permissions,isAdmin));
- return <PermissionProvider permissions={permissions}><div className={`app-root ${isAdmin?"admin-app":""}`}>
+ return <PermissionProvider permissions={permissions}><div className={`app-root ${isAdmin?"admin-app":`${roleKey}-app`}`}>
   <aside className="desktop-sidebar"><div className="sidebar-brand"><Brand href={role.home}/></div><div className="sidebar-section">{role.title}</div>{isAdmin?<AdminNav path={path} permissions={permissions}/>:visibleNav.map(i=><NavLink key={i.href} item={i} path={path}/>)}<div className="sidebar-spacer"/><button className="sidebar-link sidebar-button" onClick={async()=>{await fetch("/api/auth/logout",{method:"POST"});location.href="/login"}}><Icon name="logout"/>Sign out</button><div className="sidebar-profile"><div className="avatar">{role.initials}</div><div><div className="profile-name">{profileName}</div><div className="profile-role">{role.title}</div></div></div></aside>
-  <div className="app-main"><header className="mobile-topbar"><Brand href={role.home}/><Link href={role.home} className="avatar avatar-link">{role.initials}</Link></header>{children}</div>
+  <div className="app-main"><header className="mobile-topbar"><div className="mobile-context"><Brand href={role.home}/><span>{currentLabel(path,visibleNav,role.home)}</span></div><Link href={role.home} className="avatar avatar-link">{role.initials}</Link></header>{children}</div>
   {visibleBottom.length>0&&<nav className="bottom-nav role-bottom" style={{gridTemplateColumns:`repeat(${visibleBottom.length},1fr)`}}>{visibleBottom.map(i=><Link key={i.href} href={i.href} className={`bottom-link ${active(path,i.href)?"active":""}`}><Icon name={i.icon}/><span>{i.label}</span></Link>)}</nav>}
  </div></PermissionProvider>
 }
 function AdminNav({path,permissions}:{path:string;permissions:ClientPermissionMap}){
  const groups=[
-  {label:"Overview",items:[adminNav[0]]},{label:"Performance",items:adminNav.slice(1,5)},
-  {label:"Upload",items:adminNav.slice(5,11)},{label:"Management",items:adminNav.slice(11,16)},
+  {label:"Overview",icon:"home",items:[adminNav[0]]},
+  {label:"Performance",icon:"chart",items:adminNav.slice(1,5)},
+  {label:"Data Operations",icon:"upload",items:adminNav.slice(5,11)},
+  {label:"Management",icon:"users",items:adminNav.slice(11,16)},
  ];
- return <>{groups.map(g=>{const items=g.items.filter(i=>allowed(i,permissions,true));return items.length?<div className="admin-nav-group" key={g.label}><div className="admin-nav-label">{g.label}</div>{items.map(i=><NavLink key={i.href} item={i} path={path}/>)}</div>:null})}</>
+ return <nav className="admin-sidebar-nav">{groups.map(g=>{
+  const items=g.items.filter(i=>allowed(i,permissions,true));if(!items.length)return null;
+  const groupActive=items.some(i=>active(path,i.href));
+  return <details className={`admin-nav-group ${groupActive?"group-active":""}`} open={groupActive||g.label==="Overview"} key={g.label}>
+   <summary><span><Icon name={g.icon}/>{g.label}</span><b>⌄</b></summary>
+   <div className="admin-nav-items">{items.map(i=><NavLink key={i.href} item={i} path={path}/>)}</div>
+  </details>
+ })}</nav>
+}
+function currentLabel(path:string,nav:NavItem[],home:string){
+ if(path===home)return "Overview";
+ const exact=[...nav].sort((a,b)=>b.href.length-a.href.length).find(i=>active(path,i.href));
+ return exact?.label||"DMS";
 }
 function Brand({href}:{href:string}){return <Link href={href} className="brand"><div className="brand-mark">D</div><div><div className="brand-title">DMS</div><div className="brand-sub">Distribution Management</div></div></Link>}
 function NavLink({item,path}:{item:NavItem;path:string}){return <Link href={item.href} className={`sidebar-link ${active(path,item.href)?"active":""}`}><Icon name={item.icon}/>{item.label}</Link>}

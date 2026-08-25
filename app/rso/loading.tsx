@@ -1,0 +1,1 @@
+export default function Loading(){return <main className="page rso-v7-page rso-loading-v7"><div className="rso-loading-hero"><span/><b/><i/><em/></div><div className="rso-loading-grid">{[1,2,3,4].map(x=><div key={x}><span/><b/><i/></div>)}</div><div className="rso-loading-actions">{[1,2,3].map(x=><div key={x}><span/><p><b/><i/></p><em/></div>)}</div></main>}

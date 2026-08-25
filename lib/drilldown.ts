@@ -1,24 +1,32 @@
 import {prisma} from "./prisma";
 import {monthBounds} from "./month";
+import {parseYmd,monthStartsInRange,monthStartUtc} from "./date-range";
+import {dhakaMonth} from "./business-time";
 
 export function normalizeMonth(value?:string){
- const v=(value||new Date().toISOString().slice(0,7)).slice(0,7);
- return /^\d{4}-\d{2}$/.test(v)?v:new Date().toISOString().slice(0,7);
+ const v=(value||dhakaMonth()).slice(0,7);
+ return /^\d{4}-\d{2}$/.test(v)?v:dhakaMonth();
 }
-export async function retailerMonthDetail(retailerId:string,month:string){
- const {start,end}=monthBounds(`${normalizeMonth(month)}-01`);
- const [retailer,ga,c2c,c2s,ob,bp]=await Promise.all([
+export async function retailerMonthDetail(retailerId:string,month:string,fromInput?:string,toInput?:string){
+ const {start,end}=monthBounds(`${normalizeMonth(fromInput?.slice(0,7)||month)}-01`),rs=parseYmd(fromInput)||start,to=parseYmd(toInput),re=to?new Date(to.getTime()+86400000):end;
+ const months=monthStartsInRange(rs,re),targetStart=months[0]||monthStartUtc(rs),last=months.at(-1)||targetStart,targetEnd=new Date(Date.UTC(last.getUTCFullYear(),last.getUTCMonth()+1,1));
+ const [retailer,ga,c2c,c2s,c2cMonthly,c2sMonthly,ob,bp]=await Promise.all([
   prisma.retailer.findUnique({where:{id:retailerId},include:{employee:{include:{supervisor:true}}}}),
-  prisma.gaActivation.findMany({where:{retailerId,activationDate:{gte:start,lt:end}},orderBy:[{activationDate:"desc"},{activationTime:"desc"}],select:{simNo:true,sellingPrice:true,activationDate:true,activationTime:true}}),
-  prisma.c2cRecord.findMany({where:{retailerId,date:{gte:start,lt:end}},orderBy:{date:"desc"},select:{date:true,amount:true,transactionCount:true}}),
-  prisma.c2sRecord.findMany({where:{retailerId,date:{gte:start,lt:end}},orderBy:{date:"desc"},select:{date:true,amount:true,transactionCount:true}}),
+  prisma.gaActivation.findMany({where:{retailerId,activationDate:{gte:rs,lt:re}},orderBy:[{activationDate:"desc"},{activationTime:"desc"}],select:{simNo:true,sellingPrice:true,activationDate:true,activationTime:true}}),
+  prisma.c2cRecord.findMany({where:{retailerId,date:{gte:rs,lt:re}},orderBy:{date:"desc"},select:{date:true,amount:true}}),
+  prisma.c2sRecord.findMany({where:{retailerId,date:{gte:rs,lt:re}},orderBy:{date:"desc"},select:{date:true,amount:true}}),
+  prisma.c2cMonthlySummary.findMany({where:{retailerId,month:{gte:targetStart,lt:targetEnd}},select:{transactionCount:true}}),
+  prisma.c2sMonthlySummary.findMany({where:{retailerId,month:{gte:targetStart,lt:targetEnd}},select:{month:true,totalAmount:true,transactionCount:true}}),
   prisma.obRecord.findFirst({where:{retailerId},orderBy:{date:"desc"},select:{date:true,amount:true}}),
   prisma.bpAssignment.findFirst({where:{retailerId,active:true},select:{gaTarget:true,startDate:true,employee:{select:{name:true}}}}),
  ]);
  if(!retailer)return null;
  const ga150=ga.filter(x=>Number(x.sellingPrice)===170).length,ga300=ga.length-ga150;
- const c2cAmount=c2c.reduce((a,x)=>a+Number(x.amount),0),c2cTrx=c2c.reduce((a,x)=>a+x.transactionCount,0);
- const c2sAmount=c2s.reduce((a,x)=>a+Number(x.amount),0),c2sTrx=c2s.reduce((a,x)=>a+x.transactionCount,0);
+ const c2cAmount=c2c.reduce((a,x)=>a+Number(x.amount),0),c2cTrx=c2cMonthly.reduce((a,x)=>a+x.transactionCount,0);
+ const c2sAmount=c2s.reduce((a,x)=>a+Number(x.amount),0),c2sTrx=c2sMonthly.reduce((a,x)=>a+x.transactionCount,0);
+ const gaByMonth=new Map<string,number>();for(const x of ga){const k=x.activationDate.toISOString().slice(0,7);gaByMonth.set(k,(gaByMonth.get(k)||0)+1)}
  const simSeller=(retailer.simSeller||"").trim().toUpperCase()==="Y";
- return {retailer,ga,ga150,ga300,c2c,c2cAmount,c2cTrx,c2s,c2sAmount,c2sTrx,ob,bp,ssoComplete:simSeller&&ga.length>=2,lsoComplete:c2sAmount>=500&&c2sTrx>=7};
+ const ssoComplete=simSeller&&[...gaByMonth.values()].some(n=>n>=2);
+ const lsoComplete=c2sMonthly.some(x=>Number(x.totalAmount)>=500&&x.transactionCount>=7);
+ return {retailer,ga,ga150,ga300,c2c,c2cAmount,c2cTrx,c2s,c2sAmount,c2sTrx,ob,bp,ssoComplete,lsoComplete};
 }

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {useCan} from "../components/PermissionContext";
+import {dhakaYesterdayYmd} from "../../lib/business-time";
 
 type EmployeeRow = {
   employeeId: string;
@@ -12,6 +13,7 @@ type EmployeeRow = {
   retailerCount: number;
   ga150: number;
   ga300: number;
+  simSwap: number;
   gaAchieved: number;
   gaTarget: number;
   gaPercent: number;
@@ -28,6 +30,7 @@ type RetailerDailyRow = {
   total: number;
   ga150: number;
   ga300: number;
+  simSwap: number;
 };
 
 type History = {
@@ -42,18 +45,7 @@ type History = {
   status: string;
 };
 
-function ymdLocal(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function yesterday() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return ymdLocal(d);
-}
+function yesterday(){return dhakaYesterdayYmd()}
 
 function prettyDate(value?: string | null) {
   if (!value) return "-";
@@ -63,6 +55,7 @@ function prettyDate(value?: string | null) {
 }
 
 export default function GaPage() {
+  const canView=useCan("ga","view");
   const canAdd=useCan("ga","add");
   const [month, setMonth] = useState(() => yesterday().slice(0, 7));
   const [dataDate, setDataDate] = useState(yesterday());
@@ -136,166 +129,97 @@ export default function GaPage() {
       achieved: a.achieved + r.gaAchieved,
       ga150: a.ga150 + r.ga150,
       ga300: a.ga300 + r.ga300,
+      simSwap: a.simSwap + r.simSwap,
       ssoT: a.ssoT + r.ssoTarget,
       ssoA: a.ssoA + r.ssoAchieved,
     }),
-    { target: 0, achieved: 0, ga150: 0, ga300: 0, ssoT: 0, ssoA: 0 },
+    { target: 0, achieved: 0, ga150: 0, ga300: 0, simSwap:0, ssoT: 0, ssoA: 0 },
   ), [rows]);
 
   const dayTotals = useMemo(() => retailerDaily.reduce(
-    (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300 }),
-    { total: 0, ga150: 0, ga300: 0 },
+    (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300, simSwap:a.simSwap+r.simSwap }),
+    { total: 0, ga150: 0, ga300: 0, simSwap:0 },
   ), [retailerDaily]);
 
   const uploadPanel = canAdd ? (
-    <section className="card modern-upload-panel">
-            <div style={uploadTitleRow}><h2 style={{ margin: 0 }}>Upload Activation Details</h2><a href="/api/samples/ga" style={sampleLink}>Download Sample File</a></div>
-            <form onSubmit={upload} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "end" }}>
-              <label>
-                GA Data Date<br />
-                <input
-                  name="businessDate"
-                  type="date"
-                  value={dataDate}
-                  onChange={(e) => changeDataDate(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-              </label>
-              <label>
-                ActivationDetailsReport.xlsx<br />
-                <input name="file" type="file" accept=".xlsx,.xlsm,.xls" required style={{ marginTop: 10 }} />
-              </label>
-              <button disabled={loading} style={button}>{loading ? "Processing..." : "Upload GA"}</button>
-            </form>
-    
-            <div style={ruleBox}>
-              <b>GA counting rule:</b> Total = all unique SIM activations for a retailer. <b>150</b> = SELLING_PRICE exactly 170. <b>300</b> = every other selling price. SIM_NO prevents double counting, and ACTIVATION_DATE must match the selected date.
-            </div>
-            {message && <div style={{ marginTop: 12, padding: 12, background: "#f2f4f7", borderRadius: 8 }}>{message}</div>}
-          </section>
+    <section className="ga-upload-card">
+      <div className="ga-upload-card-head">
+        <div><span className="ga-section-icon">⇧</span><div><span className="ga-upload-overline">IMPORT WORKSPACE</span><h2>Upload Activation Details</h2><p>Import the selected day&apos;s activation workbook.</p></div></div>
+        <a href="/api/samples/ga" className="ga-sample-btn">⇩ Download Sample File</a>
+      </div>
+      <div className="ga-upload-flow"><span><b>1</b> Select date</span><i>→</i><span><b>2</b> Choose file</span><i>→</i><span><b>3</b> Validate SIM</span><i>→</i><span><b>4</b> Save</span></div><form onSubmit={upload} className="ga-upload-form">
+        <label><span>GA Data Date</span><input name="businessDate" type="date" value={dataDate} onChange={(e)=>changeDataDate(e.target.value)} required/></label>
+        <label className="ga-file-field"><span>ActivationDetailsReport.xlsx</span><small>Excel · max 20 MB</small><input name="file" type="file" accept=".xlsx,.xlsm,.xls" required/></label>
+        <button disabled={loading} className="ga-upload-btn">{loading?"Processing...":"⇧  Upload GA"}</button>
+      </form>
+      <div className="ga-rule-box"><span className="ga-info-dot">i</span><div><b>GA counting rule:</b> PRODUCT_CODE <b>MMST / MMSTs</b> = 300 SIM, <b>MMSTC</b> = 170 SIM. <b>SIMWAP / EV-SWAP</b> must also have <b>SELLING_PRICE 350</b>. They are counted only under <b>SIM SWAP</b> and are excluded from GA achievement, GA target progress and SSO. SIM_NO still prevents duplicate import.</div></div>
+      {message&&<div className="ga-message">{message}</div>}
+    </section>
   ) : null;
 
+  if(!canView)return null;
   return (
-    <main className="page modern-upload-page">
-      <div className="modern-upload-head">
-        <div>
-          <a href="/admin/upload" style={{ color: "#475467" }}>← Upload Center</a>
-          <h1 style={{ marginBottom: 4 }}>Daily GA Upload & SSO</h1>
-          <p style={{ marginTop: 0, color: "#667085" }}>
-            Upload the previous day&apos;s Activation Details report. Each unique SIM_NO is one GA.
-          </p>
+    <main className="page ga-premium-page">
+      <header className="ga-page-head">
+        <div className="ga-head-copy">
+          <a href="/admin/upload" className="ga-back-link">← Upload Center</a>
+          <div className="ga-title-line"><h1>Daily GA Upload &amp; SSO</h1><span className="ga-title-badge">GA</span></div>
+          <p>Upload the Activation Details report. Standard SIM sales count toward GA; replacement SIMs are tracked separately as SIM SWAP.</p>
         </div>
-        <div className="date-range-filter"><label>From<input type="date" value={fromDate} onChange={e=>changeFrom(e.target.value)}/></label><label>To<input type="date" value={toDate} min={fromDate} onChange={e=>setToDate(e.target.value)}/></label></div>
-      </div>
+        <div className="ga-date-card">
+          <label><span>FROM</span><input type="date" value={fromDate} onChange={e=>changeFrom(e.target.value)}/></label>
+          <label><span>TO</span><input type="date" value={toDate} min={fromDate} onChange={e=>setToDate(e.target.value)}/></label>
+        </div>
+      </header>
 
-{uploadPanel}
+      {uploadPanel}
 
-      <h2 style={{ marginBottom: 10 }}>Selected Day: {dataDate}</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
-        <Stat name="Total" value={dayTotals.total.toLocaleString()} note="All SIM activations" />
-        <Stat name="150" value={dayTotals.ga150.toLocaleString()} note="Selling price = 170" />
-        <Stat name="300" value={dayTotals.ga300.toLocaleString()} note="Selling price ≠ 170" />
-        <Stat name="Active Retailers" value={retailerDaily.length.toLocaleString()} note="Retailers with GA that day" />
-      </div>
-
-      <section style={panel}>
-        <h2 style={{ marginTop: 0 }}>Retailer GA</h2>
-        {retailerDaily.length === 0 ? (
-          <p style={{ color: "#667085" }}>No GA data stored for {dataDate}.</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={tableStyle}>
-              <thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer Code</th><th>Retailer Name</th><th>Total</th><th>150</th><th>300</th></tr></thead>
-              <tbody>
-                {retailerDaily.map((r) => (
-                  <tr key={r.retailerCode}>
-                    <td>{r.supervisor}</td>
-                    <td><b>{r.employee}</b><br /><small>{r.rsoMsisdn}</small></td>
-                    <td><b>{r.retailerCode}</b></td>
-                    <td>{r.retailerName}</td>
-                    <td><b>{r.total}</b></td>
-                    <td>{r.ga150}</td>
-                    <td>{r.ga300}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <h2 style={{ marginBottom: 10, marginTop: 24 }}>Monthly Employee Performance</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
-        <Stat name="GA Target" value={totals.target.toLocaleString()} />
-        <Stat name="GA Achieved" value={totals.achieved.toLocaleString()} />
-        <Stat name="150" value={totals.ga150.toLocaleString()} />
-        <Stat name="300" value={totals.ga300.toLocaleString()} />
-        <Stat name="GA %" value={totals.target ? `${((totals.achieved / totals.target) * 100).toFixed(1)}%` : "0%"} />
-        <Stat name="SSO" value={`${totals.ssoA.toLocaleString()} / ${totals.ssoT.toLocaleString()}`} />
-      </div>
-
-      <section style={panel}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={tableStyle}>
-            <thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>150</th><th>300</th><th>GA Target</th><th>GA Achieved</th><th>GA %</th><th>SSO Target</th><th>SSO Achieved</th></tr></thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.employeeId}>
-                  <td>{r.supervisor}</td>
-                  <td><b>{r.name}</b><br /><small>{r.employeeCode || r.rsoMsisdn}</small></td>
-                  <td>{r.retailerCount}</td>
-                  <td>{r.ga150}</td>
-                  <td>{r.ga300}</td>
-                  <td>{r.gaTarget}</td>
-                  <td><b>{r.gaAchieved}</b></td>
-                  <td>{r.gaPercent}%</td>
-                  <td>{r.ssoTarget}</td>
-                  <td><b>{r.ssoAchieved}</b></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="ga-section">
+        <div className="ga-section-title"><span className="ga-section-icon">▣</span><div><h2>Selected Day: {prettyDate(dataDate)}</h2><p>Daily activation snapshot</p></div></div>
+        <div className="ga-day-metrics">
+          <Metric tone="blue" icon="⌁" name="Total" value={dayTotals.total.toLocaleString()} note="All SIM activations"/>
+          <Metric tone="green" icon="150" name="150" value={dayTotals.ga150.toLocaleString()} note="Selling price = 170"/>
+          <Metric tone="orange" icon="300" name="300" value={dayTotals.ga300.toLocaleString()} note="MMST / MMSTs"/>
+          <Metric tone="rose" icon="↻" name="SIM SWAP" value={dayTotals.simSwap.toLocaleString()} note="SIMWAP / EV-SWAP · price 350 · excluded from GA"/>
+          <Metric tone="purple" icon="●" name="Active Retailers" value={retailerDaily.length.toLocaleString()} note="Retailers with GA that day"/>
         </div>
       </section>
 
-      <section style={{ ...panel, marginTop: 18 }}>
-        <h2 style={{ marginTop: 0 }}>Recent GA Imports</h2>
-        {history.length === 0 ? <p style={{ color: "#667085" }}>No GA file imported yet.</p> : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={tableStyle}>
-              <thead><tr><th>Data Date</th><th>File</th><th>Uploaded</th><th>Saved / Total</th><th>Duplicates</th><th>Failed</th><th>Status</th></tr></thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.id}>
-                    <td>{prettyDate(h.businessDate)}</td>
-                    <td>{h.fileName}</td>
-                    <td>{new Date(h.uploadedAt).toLocaleString()}</td>
-                    <td>{h.successRows}/{h.totalRows}</td>
-                    <td>{h.duplicateRows}</td>
-                    <td>{h.failedRows}</td>
-                    <td>{h.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <section className="ga-data-card">
+        <div className="ga-card-head"><div className="ga-section-title"><span className="ga-section-icon">▤</span><div><h2>Retailer GA</h2><p>Retailer-wise activation for the selected day</p></div></div><span className="ga-count-pill">{retailerDaily.length} retailers</span></div>
+        {retailerDaily.length===0?<div className="ga-empty"><span>▤</span><strong>No retailer GA yet</strong><p>No GA data stored for {prettyDate(dataDate)}.</p></div>:
+        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer</th><th>Total GA</th><th>150</th><th>300</th><th>SIM SWAP</th></tr></thead><tbody>{retailerDaily.map(r=><tr key={r.retailerCode}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.employee)}</span><div><b>{r.employee}</b><small>{r.rsoMsisdn}</small></div></div></td><td><b>{r.retailerCode}</b><small className="ga-subline">{r.retailerName}</small></td><td><strong className="ga-number blue">{r.total}</strong></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td><td><span className="ga-number swap">{r.simSwap}</span></td></tr>)}</tbody></PremiumTable>}
+      </section>
+
+      <section className="ga-section ga-performance-section">
+        <div className="ga-section-title"><span className="ga-section-icon">↗</span><div><h2>Monthly Employee Performance</h2><p>Target achievement and SSO progress</p></div></div>
+        <div className="ga-performance-metrics">
+          <Metric tone="blue" name="GA Target" value={totals.target.toLocaleString()} note="Monthly target"/>
+          <Metric tone="green" name="GA Achieved" value={totals.achieved.toLocaleString()} note="Completed GA"/>
+          <Metric tone="cyan" name="150" value={totals.ga150.toLocaleString()} note="Price = 170"/>
+          <Metric tone="orange" name="300" value={totals.ga300.toLocaleString()} note="MMST / MMSTs"/>
+          <Metric tone="rose" name="SIM SWAP" value={totals.simSwap.toLocaleString()} note="Replacement only · not achievement"/>
+          <Metric tone="purple" name="GA %" value={totals.target?`${((totals.achieved/totals.target)*100).toFixed(1)}%`:"0%"} note="Achievement rate"/>
+          <Metric tone="rose" name="SSO" value={`${totals.ssoA.toLocaleString()} / ${totals.ssoT.toLocaleString()}`} note="Achieved / target"/>
+        </div>
+      </section>
+
+      <section className="ga-data-card">
+        <div className="ga-card-head"><div><h2>Employee Performance</h2><p>Monthly RSO performance overview</p></div><span className="ga-count-pill">{rows.length} employees</span></div>
+        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>150</th><th>300</th><th>SIM SWAP</th><th>GA Target</th><th>GA Achieved</th><th>GA Progress</th><th>SSO</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.name)}</span><div><b>{r.name}</b><small>{r.employeeCode||r.rsoMsisdn}</small></div></div></td><td><span className="ga-neutral-pill">{r.retailerCount}</span></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td><td><span className="ga-number swap">{r.simSwap}</span></td><td>{r.gaTarget}</td><td><strong className="ga-number blue">{r.gaAchieved}</strong></td><td><div className="ga-progress-cell"><div><span style={{width:`${Math.min(100,r.gaPercent)}%`}}/></div><b>{r.gaPercent}%</b></div></td><td><div className="ga-sso-cell"><b>{r.ssoAchieved}</b><span>/ {r.ssoTarget}</span></div></td></tr>)}</tbody></PremiumTable>
+      </section>
+
+      <section className="ga-data-card ga-history-card">
+        <div className="ga-card-head"><div><h2>Recent GA Imports</h2><p>Latest activation files and import results</p></div><span className="ga-count-pill">{history.length} imports</span></div>
+        {history.length===0?<div className="ga-empty"><span>⇧</span><strong>No imports yet</strong><p>Your recent GA uploads will appear here.</p></div>:
+        <PremiumTable><thead><tr><th>Data Date</th><th>File</th><th>Uploaded</th><th>Saved / Total</th><th>Duplicates</th><th>Failed</th><th>Status</th></tr></thead><tbody>{history.map(h=><tr key={h.id}><td><b>{prettyDate(h.businessDate)}</b></td><td>{h.fileName}</td><td>{new Date(h.uploadedAt).toLocaleString()}</td><td><strong className="ga-number blue">{h.successRows}/{h.totalRows}</strong></td><td>{h.duplicateRows}</td><td>{h.failedRows}</td><td><span className={`ga-status ${h.status.toLowerCase()}`}>{h.status}</span></td></tr>)}</tbody></PremiumTable>}
       </section>
     </main>
   );
 }
 
-function Stat({ name, value, note }: { name: string; value: string; note?: string }) {
-  return <div style={{ ...panel, margin: 0 }}><div style={{ color: "#667085", fontSize: 13 }}>{name}</div><div style={{ fontSize: 28, fontWeight: 800, marginTop: 7 }}>{value}</div>{note && <div style={{ color: "#98a2b3", fontSize: 12, marginTop: 3 }}>{note}</div>}</div>;
+function initials(value:string){return (value||"?").trim().split(/\s+/).slice(0,2).map(v=>v[0]).join("").toUpperCase()}
+function Metric({tone,icon,name,value,note}:{tone:string;icon?:string;name:string;value:string;note?:string}){
+ return <article className={`ga-metric tone-${tone}`}><span className="ga-metric-icon">{icon||"•"}</span><div><span className="ga-metric-label">{name}</span><strong>{value}</strong>{note&&<small>{note}</small>}</div></article>
 }
-
-const panel: React.CSSProperties = { background: "white", border: "1px solid #e4e7ec", borderRadius: 14, padding: 18 };
-const inputStyle: React.CSSProperties = { padding: "9px 10px", border: "1px solid #d0d5dd", borderRadius: 8, marginTop: 4 };
-const button: React.CSSProperties = { padding: "10px 16px", borderRadius: 8, border: 0, background: "#101828", color: "white", fontWeight: 700, cursor: "pointer" };
-const ruleBox: React.CSSProperties = { marginTop: 16, padding: 13, background: "#f8fafc", border: "1px solid #e4e7ec", borderRadius: 10, color: "#475467", lineHeight: 1.6 };
-const tableStyle: React.CSSProperties = { width: "100%", borderCollapse: "collapse" };
-
-
-const uploadTitleRow:React.CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14};
-const sampleLink:React.CSSProperties={display:"inline-flex",alignItems:"center",minHeight:38,padding:"0 12px",borderRadius:9,border:"1px solid #d0d5dd",background:"#fff",color:"#344054",fontWeight:700,fontSize:12,textDecoration:"none"};
+function PremiumTable({children}:{children:React.ReactNode}){return <div className="ga-table-shell"><div className="ga-table-scroll"><table className="ga-premium-table">{children}</table></div></div>}

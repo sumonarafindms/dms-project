@@ -19,7 +19,7 @@ export type PermissionAction="view"|"add"|"edit"|"update";
 export const roleDefaults:Record<string,Partial<Record<PermissionModule,{view:boolean;add:boolean;edit:boolean;update:boolean}>>>={
  MANAGER:{dashboard:{view:true,add:false,edit:false,update:false},performance:{view:true,add:false,edit:false,update:false},attention:{view:true,add:false,edit:false,update:false},employees:{view:true,add:false,edit:false,update:false},retailers:{view:true,add:false,edit:false,update:false},bp:{view:true,add:false,edit:false,update:false}},
  SUPERVISOR:{dashboard:{view:true,add:false,edit:false,update:false},performance:{view:true,add:false,edit:false,update:false},attention:{view:true,add:false,edit:false,update:false},employees:{view:true,add:false,edit:false,update:false},retailers:{view:true,add:false,edit:false,update:false},bp:{view:true,add:false,edit:false,update:false}},
- ACCOUNTS:{dashboard:{view:true,add:false,edit:false,update:false},employees:{view:true,add:false,edit:false,update:false},retailers:{view:true,add:true,edit:true,update:true},targets:{view:true,add:true,edit:true,update:true},ga:{view:true,add:true,edit:true,update:true},c2c:{view:true,add:true,edit:true,update:true},c2s:{view:true,add:true,edit:true,update:true},ob:{view:true,add:true,edit:true,update:true},bp:{view:true,add:true,edit:true,update:true}},
+ ACCOUNTS:{dashboard:{view:true,add:false,edit:false,update:false},attention:{view:true,add:false,edit:false,update:false},employees:{view:true,add:false,edit:false,update:false},retailers:{view:true,add:true,edit:true,update:true},targets:{view:true,add:true,edit:true,update:true},ga:{view:true,add:true,edit:true,update:true},c2c:{view:true,add:true,edit:true,update:true},c2s:{view:true,add:true,edit:true,update:true},ob:{view:true,add:true,edit:true,update:true},bp:{view:true,add:true,edit:true,update:true}},
  RSO:{dashboard:{view:true,add:false,edit:false,update:false},attention:{view:true,add:false,edit:false,update:false},retailers:{view:true,add:false,edit:false,update:false},bp:{view:true,add:false,edit:false,update:false}},
  BP:{dashboard:{view:true,add:false,edit:false,update:false},ga:{view:true,add:false,edit:false,update:false},bp:{view:true,add:false,edit:false,update:false}},
 };
@@ -41,14 +41,17 @@ export function presetPermissions(role:string,preset:string){
     return permissionModules.map(m=>({module:m.key,...(roleDefaults[role]?.[m.key]||none)}));
   }
   if(preset==="VIEW_ONLY"){
-    return permissionModules.map(m=>({module:m.key,...view}));
+    return permissionModules.map(m=>({module:m.key,...(roleDefaults[role]?.[m.key]?.view?view:none)}));
   }
   if(preset==="DATA_OPERATOR"){
     const writable=new Set<PermissionModule>(["retailers","targets","ga","c2c","c2s","ob","bp"]);
-    return permissionModules.map(m=>({module:m.key,...(writable.has(m.key)?manage:view)}));
+    return permissionModules.map(m=>{
+      const allowed=Boolean(roleDefaults[role]?.[m.key]?.view);
+      return {module:m.key,...(!allowed?none:writable.has(m.key)?manage:view)};
+    });
   }
   if(preset==="FULL_NON_ADMIN"){
-    return permissionModules.map(m=>({module:m.key,...manage}));
+    return permissionModules.map(m=>({module:m.key,...(roleDefaults[role]?.[m.key]?.view?manage:none)}));
   }
   return permissionModules.map(m=>({module:m.key,...none}));
 }

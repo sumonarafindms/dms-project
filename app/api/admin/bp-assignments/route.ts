@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {prisma} from "../../../../lib/prisma";
 import {getCurrentUser} from "../../../../lib/auth";
+import {dhakaTodayYmd} from "../../../../lib/business-time";
 function parseDay(value:unknown){const s=String(value||"");if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const d=new Date(`${s}T00:00:00.000Z`);return Number.isNaN(d.getTime())?null:d}
 export async function POST(req:Request){
  const me=await getCurrentUser();if(!me||me.role!=="ADMIN")return NextResponse.json({error:"Unauthorized"},{status:401});
@@ -21,4 +22,4 @@ export async function POST(req:Request){
   return NextResponse.json({ok:true,id:result.assignment.id,code:retailer.retailerCode,transferredLogin:result.transferredLogin});
  }catch(e:any){return NextResponse.json({error:e?.message||"Could not assign BP."},{status:400})}
 }
-export async function PATCH(req:Request){const me=await getCurrentUser();if(!me||me.role!=="ADMIN")return NextResponse.json({error:"Unauthorized"},{status:401});const b=await req.json();const id=String(b.id||"");if(!id)return NextResponse.json({error:"Assignment is required"},{status:400});const a=await prisma.bpAssignment.findUnique({where:{id}});if(!a)return NextResponse.json({error:"Assignment not found"},{status:404});const endDate=parseDay(b.endDate)||new Date();await prisma.$transaction(async tx=>{await tx.bpAssignment.update({where:{id},data:{active:false,endDate}});await tx.user.updateMany({where:{role:"BP",bpRetailerId:a.retailerId},data:{bpRetailerId:null}})});return NextResponse.json({ok:true})}
+export async function PATCH(req:Request){const me=await getCurrentUser();if(!me||me.role!=="ADMIN")return NextResponse.json({error:"Unauthorized"},{status:401});const b=await req.json();const id=String(b.id||"");if(!id)return NextResponse.json({error:"Assignment is required"},{status:400});const a=await prisma.bpAssignment.findUnique({where:{id}});if(!a)return NextResponse.json({error:"Assignment not found"},{status:404});const endDate=parseDay(b.endDate)||new Date(`${dhakaTodayYmd()}T00:00:00.000Z`);await prisma.$transaction(async tx=>{await tx.bpAssignment.update({where:{id},data:{active:false,endDate}});await tx.user.updateMany({where:{role:"BP",bpRetailerId:a.retailerId},data:{bpRetailerId:null}})});return NextResponse.json({ok:true})}

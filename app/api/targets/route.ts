@@ -14,6 +14,7 @@ function monthFromParam(value: string | null) {
 
 export async function GET(request: NextRequest) {
   if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiPermission("targets","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   const month = monthFromParam(request.nextUrl.searchParams.get("month"));
 
   const {end}=monthBounds(month.toISOString());

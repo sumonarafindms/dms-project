@@ -1,0 +1,1 @@
+export default function Loading(){return <main className="page bp-v8-page bp-loading-v8"><div className="bp-loading-hero"><span/><b/><i/><em/></div><div className="bp-loading-cards">{[1,2,3].map(x=><div key={x}><span/><b/><i/></div>)}</div><div className="bp-loading-list">{[1,2,3].map(x=><div key={x}><span/><p><b/><i/></p><em/></div>)}</div></main>}

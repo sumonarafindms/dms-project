@@ -1,12 +1,13 @@
 "use client";
 import {FormEvent,useMemo,useState} from "react";
 import {useRouter} from "next/navigation";
+import {dhakaTodayYmd} from "../../../lib/business-time";
 type Emp={id:string;name:string;rsoMsisdn:string;supervisor:string};
 type Retailer={id:string;code:string;name:string;employeeId:string;employee:string;rsoMsisdn:string};
 type Current={id:string;employeeId:string;employee:string;supervisor:string;retailerId:string;code:string;name:string;startDate:string;gaTarget:number;login:string;mobile:string};
 type Hist={id:string;employee:string;code:string;name:string;startDate:string;endDate:string};
 export default function BpManager({employees,retailers,current,history}:{employees:Emp[];retailers:Retailer[];current:Current[];history:Hist[]}){
- const router=useRouter();const [employeeId,setEmployeeId]=useState("");const [q,setQ]=useState("");const [retailerId,setRetailerId]=useState("");const [msg,setMsg]=useState("");const today=new Date().toISOString().slice(0,10);
+ const router=useRouter();const [employeeId,setEmployeeId]=useState("");const [q,setQ]=useState("");const [retailerId,setRetailerId]=useState("");const [msg,setMsg]=useState("");const today=dhakaTodayYmd();
  const selectedEmployee=employees.find(e=>e.id===employeeId);
  const filtered=useMemo(()=>{const s=q.trim().toLowerCase();return retailers.filter(r=>(!employeeId||r.employeeId===employeeId)&&(!s||`${r.code} ${r.name} ${r.employee}`.toLowerCase().includes(s))).slice(0,80)},[q,employeeId,retailers]);
  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setMsg("");const f=new FormData(e.currentTarget);const body=Object.fromEntries(f);const r=await fetch("/api/admin/bp-assignments",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)return setMsg(d.error||"Could not assign BP");setMsg(d.transferredLogin?`BP assigned. Existing BP login moved to ${d.code}.`:`BP assigned to ${d.code}.`);setRetailerId("");setQ("");router.refresh()}

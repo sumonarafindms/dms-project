@@ -2,6 +2,7 @@ import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {phoneKey} from "./phone";
 
 type Cell = string | number | boolean | Date | null | undefined;
 type Matrix = Cell[][];
@@ -29,7 +30,6 @@ function numberValue(value: Cell): number | null {
   return Number.isFinite(n) ? n : null;
 }
 function digits(value: Cell) { return text(value).replace(/\D/g, ""); }
-function phoneKey(value: Cell) { return digits(value).replace(/^0+/, ""); }
 function utcDate(year: number, monthIndex: number, day: number) { return new Date(Date.UTC(year, monthIndex, day)); }
 const MONTHS: Record<string, number> = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
 function parseHeaderDate(value: Cell): Date | null {
@@ -155,9 +155,6 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
     if (Math.abs(dailyTotal-totalAmount) > 0.01) {
       preErrors.push({ rowNumber:i+1, message:`Daily amount sum (${dailyTotal}) does not match TOTAL_AMOUNT (${totalAmount})`, rawData:{retailerCode} }); continue;
     }
-    if (daily.length !== transactionCount) {
-      preErrors.push({ rowNumber:i+1, message:`Non-zero date count (${daily.length}) does not match TRANSACTION_COUNT (${transactionCount})`, rawData:{retailerCode} }); continue;
-    }
     sourceRows.push({ rowNumber:i+1, retailerCode, retailerItopupNo:digits(row[idx.RETAILER_ITOPUP_NO]), transactionCount, totalAmount, srNumber:digits(row[idx.SRNUMBER]), daily });
   }
   if (!sourceRows.length) throw new Error("No valid retailer rows were found in the C2S report.");
@@ -188,15 +185,26 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
 
   try {
     const endExclusive = new Date(reportEndDate.getTime()+86400000);
-    // C2S upload is a complete month-to-date snapshot. Replace the covered date window,
-    // then store only non-zero retailer/day rows to keep the database compact.
-    await prisma.c2sRecord.deleteMany({ where:{ date:{gte:firstDate,lt:endExclusive} } });
-
+    // Daily columns contain amount only; TRANSACTION_COUNT is a month-to-date total.
+    // Store daily amounts separately and keep the exact monthly transaction total in C2sMonthlySummary.
+    const mappedRetailerIds=[...new Set(mapped.map(row=>row.retailerId))];
     const dailyData: Prisma.C2sRecordCreateManyInput[] = [];
     for (const row of mapped) {
-      for (const day of row.daily) dailyData.push({ retailerId:row.retailerId, date:day.date, transactionCount:1, amount:new Prisma.Decimal(day.amount), batchId:batch.id });
+      for (const day of row.daily) dailyData.push({ retailerId:row.retailerId, date:day.date, transactionCount:0, amount:new Prisma.Decimal(day.amount), batchId:batch.id });
     }
-    for (let i=0;i<dailyData.length;i+=1000) await prisma.c2sRecord.createMany({data:dailyData.slice(i,i+1000)});
+    if(mappedRetailerIds.length){
+      await prisma.$transaction(async tx=>{
+        await tx.c2sRecord.deleteMany({ where:{ retailerId:{in:mappedRetailerIds},date:{gte:firstDate,lt:endExclusive} } });
+        for(let i=0;i<dailyData.length;i+=1000) await tx.c2sRecord.createMany({data:dailyData.slice(i,i+1000)});
+        for(const row of mapped){
+          await tx.c2sMonthlySummary.upsert({
+            where:{retailerId_month:{retailerId:row.retailerId,month}},
+            update:{transactionCount:row.transactionCount,totalAmount:new Prisma.Decimal(row.totalAmount),reportEndDate},
+            create:{retailerId:row.retailerId,month,transactionCount:row.transactionCount,totalAmount:new Prisma.Decimal(row.totalAmount),reportEndDate},
+          });
+        }
+      });
+    }
 
     if (errors.length) await prisma.importError.createMany({ data:errors.map(e=>({batchId:batch.id,rowNumber:e.rowNumber,message:e.message,rawData:e.rawData})) });
     const failedRows = errors.length;

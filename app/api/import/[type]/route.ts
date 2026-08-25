@@ -5,6 +5,11 @@ import { importC2cWorkbook } from "@/lib/c2c-import";
 import { importC2sWorkbook } from "@/lib/c2s-import";
 import { importObWorkbook } from "@/lib/ob-import";
 import {audit} from "@/lib/audit";
+import {validateUploadFile} from "@/lib/upload-safety";
+import {apiError} from "@/lib/http-errors";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const allowed = new Set(["GA", "C2C", "C2S", "OB"]);
 
@@ -25,6 +30,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Excel file is required" }, { status: 400 });
     }
+    const fileError=validateUploadFile(file,[".xlsx",".xls",".xlsm",".txt"]);
+    if(fileError)return NextResponse.json({error:fileError},{status:400});
 
     if (normalizedType === "GA") {
       const businessDate = String(form.get("businessDate") || "");
@@ -63,9 +70,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Import failed" },
-      { status: 500 },
-    );
+    const e=apiError(error,"Import failed. Check the file format and try again.");
+    return NextResponse.json({error:e.error},{status:e.status});
   }
 }

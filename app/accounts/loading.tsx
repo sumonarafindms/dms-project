@@ -1,0 +1,1 @@
+export default function Loading(){return <main className="page accounts-v12-page accounts-loading-v12"><div className="accounts-loading-hero"><span/><b/><i/></div><div className="accounts-loading-stats">{[1,2,3,4].map(x=><div key={x}><span/><b/><i/></div>)}</div><div className="accounts-loading-list">{[1,2,3,4].map(x=><div key={x}><span/><p><b/><i/></p><em/></div>)}</div></main>}

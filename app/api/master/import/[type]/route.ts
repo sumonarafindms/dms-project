@@ -1,8 +1,11 @@
 import {apiUser,apiPermission} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { importEmployees, importRetailers } from "@/lib/master-import";
+import {validateUploadFile} from "@/lib/upload-safety";
+import {apiError} from "@/lib/http-errors";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest, context: { params: Promise<{ type: string }> }) {
   if(!(await apiUser(["ADMIN"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
@@ -20,6 +23,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Excel file is required" }, { status: 400 });
     }
+    const fileError=validateUploadFile(file,[".xlsx",".xls",".xlsm"]);
+    if(fileError)return NextResponse.json({error:fileError},{status:400});
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const result = normalizedType === "employees"
@@ -29,9 +34,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
     return NextResponse.json({ ok: true, type: normalizedType, fileName: file.name, ...result });
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Import failed" },
-      { status: 500 },
-    );
+    const e=apiError(error,"Master import failed. Check the workbook and try again.");
+    return NextResponse.json({error:e.error},{status:e.status});
   }
 }

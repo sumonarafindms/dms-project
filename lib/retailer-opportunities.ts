@@ -1,6 +1,8 @@
 import {prisma} from "./prisma";
 import {monthBounds} from "./month";
+import {monthStartsInRange,monthStartUtc} from "./date-range";
 import {normalizeMonth} from "./drilldown";
+import {isSimSwapProduct} from "./ga-product";
 
 export type RetailerOpportunity={
   id:string;retailerCode:string;retailerName:string;simSeller:boolean;category:string;route:string;
@@ -13,31 +15,55 @@ export async function retailerOpportunities(monthInput:string,employeeIds?:strin
   const month=normalizeMonth(monthInput); const {start,end}=monthBounds(`${month}-01`);
   const parse=(v?:string)=>v&&/^\d{4}-\d{2}-\d{2}$/.test(v)?new Date(`${v}T00:00:00.000Z`):null;
   const rangeStart=parse(fromInput)||start,to=parse(toInput),rangeEnd=to?new Date(to.getTime()+86400000):end;
-  const [retailers,ga,c2c,c2s,ob]=await Promise.all([
-    prisma.retailer.findMany({where:{active:true,...(employeeIds?{employeeId:{in:employeeIds}}:{})},select:{id:true,retailerCode:true,retailerName:true,simSeller:true,category:true,route:true,employeeId:true,employee:{select:{name:true,supervisor:{select:{name:true}}}}}}),
-    prisma.gaActivation.groupBy({by:["retailerId"],where:{activationDate:{gte:rangeStart,lt:rangeEnd}},_count:{_all:true}}),
-    prisma.c2cRecord.groupBy({by:["retailerId"],where:{date:{gte:rangeStart,lt:rangeEnd}},_sum:{amount:true}}),
-    prisma.c2sRecord.groupBy({by:["retailerId"],where:{date:{gte:rangeStart,lt:rangeEnd}},_sum:{amount:true,transactionCount:true}}),
-    prisma.obRecord.findMany({select:{retailerId:true,amount:true}}),
+  const months=monthStartsInRange(rangeStart,rangeEnd),targetStart=months[0]||monthStartUtc(rangeStart),last=months.at(-1)||targetStart,targetEnd=new Date(Date.UTC(last.getUTCFullYear(),last.getUTCMonth()+1,1));
+  const scope=employeeIds?{employeeId:{in:employeeIds}}:{};
+  const [retailers,ga,c2c,c2s,c2sMonthly,ob]=await Promise.all([
+    prisma.retailer.findMany({where:{active:true,...scope},select:{id:true,retailerCode:true,retailerName:true,simSeller:true,category:true,route:true,employeeId:true,employee:{select:{name:true,supervisor:{select:{name:true}}}}}}),
+    prisma.gaActivation.groupBy({by:["retailerId","activationDate","productCode"],where:{activationDate:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},_count:{_all:true}}),
+    prisma.c2cRecord.groupBy({by:["retailerId"],where:{date:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},_sum:{amount:true}}),
+    prisma.c2sRecord.groupBy({by:["retailerId"],where:{date:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},_sum:{amount:true}}),
+    prisma.c2sMonthlySummary.findMany({where:{month:{gte:targetStart,lt:targetEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{retailerId:true,month:true,totalAmount:true,transactionCount:true}}),
+    prisma.obRecord.findMany({where:employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{},select:{retailerId:true,amount:true}}),
   ]);
-  const gaMap=new Map(ga.map(x=>[x.retailerId,x._count._all]));
+
+  const gaByMonth=new Map<string,number>(),gaTotal=new Map<string,number>();
+  for(const x of ga){
+    if(isSimSwapProduct(x.productCode))continue;
+    const count=x._count._all,mk=x.activationDate.toISOString().slice(0,7),key=`${x.retailerId}|${mk}`;
+    gaByMonth.set(key,(gaByMonth.get(key)||0)+count);gaTotal.set(x.retailerId,(gaTotal.get(x.retailerId)||0)+count);
+  }
   const c2cMap=new Map(c2c.map(x=>[x.retailerId,Number(x._sum.amount||0)]));
-  const c2sMap=new Map(c2s.map(x=>[x.retailerId,{amount:Number(x._sum.amount||0),trx:Number(x._sum.transactionCount||0)}]));
+  const c2sMap=new Map(c2s.map(x=>[x.retailerId,Number(x._sum.amount||0)]));
+  const monthlyByRetailer=new Map<string,Array<{month:string;amount:number;trx:number}>>();
+  for(const x of c2sMonthly){
+    const arr=monthlyByRetailer.get(x.retailerId)||[];
+    arr.push({month:x.month.toISOString().slice(0,7),amount:Number(x.totalAmount),trx:x.transactionCount});
+    monthlyByRetailer.set(x.retailerId,arr);
+  }
   const obMap=new Map(ob.map(x=>[x.retailerId,Number(x.amount)]));
+  const monthKeys=months.map(x=>x.toISOString().slice(0,7));
+
   return retailers.map(r=>{
-    const gaCount=gaMap.get(r.id)||0,c2cAmount=c2cMap.get(r.id)||0,cs=c2sMap.get(r.id)||{amount:0,trx:0};
+    const gaCount=gaTotal.get(r.id)||0,c2cAmount=c2cMap.get(r.id)||0,c2sAmount=c2sMap.get(r.id)||0,monthly=monthlyByRetailer.get(r.id)||[];
     const simSeller=(r.simSeller||"").trim().toUpperCase()==="Y";
-    const ssoComplete=simSeller&&gaCount>=2,lsoComplete=cs.amount>=500&&cs.trx>=7;
+    const bestGa=monthKeys.reduce((n,m)=>Math.max(n,gaByMonth.get(`${r.id}|${m}`)||0),0);
+    const ssoComplete=simSeller&&monthKeys.some(m=>(gaByMonth.get(`${r.id}|${m}`)||0)>=2);
+    const lsoComplete=monthly.some(x=>x.amount>=500&&x.trx>=7);
+    const bestLso=monthly.reduce((best,x)=>{
+      const score=Math.min(1,x.amount/500)+Math.min(1,x.trx/7);
+      return score>best.score?{amount:x.amount,trx:x.trx,score}:best;
+    },{amount:0,trx:0,score:-1});
+    const c2sTransactions=monthly.reduce((n,x)=>n+x.trx,0);
     const reasons:string[]=[];
-    if(simSeller&&!ssoComplete)reasons.push(`SSO needs ${Math.max(0,2-gaCount)} GA`);
+    if(simSeller&&!ssoComplete)reasons.push(`SSO needs ${Math.max(0,2-bestGa)} GA in one month`);
     if(!lsoComplete){
-      if(cs.amount<500&&cs.trx<7)reasons.push(`LSO needs ৳${Math.ceil(500-cs.amount)} + ${7-cs.trx} trx`);
-      else if(cs.amount<500)reasons.push(`LSO needs ৳${Math.ceil(500-cs.amount)}`);
-      else reasons.push(`LSO needs ${7-cs.trx} trx`);
+      if(bestLso.amount<500&&bestLso.trx<7)reasons.push(`LSO needs ৳${Math.ceil(500-bestLso.amount)} + ${Math.max(0,7-bestLso.trx)} trx in one month`);
+      else if(bestLso.amount<500)reasons.push(`LSO needs ৳${Math.ceil(500-bestLso.amount)} in one month`);
+      else reasons.push(`LSO needs ${Math.max(0,7-bestLso.trx)} trx in one month`);
     }
-    if(cs.amount===0)reasons.push("No C2S in selected range");
+    if(c2sAmount===0)reasons.push("No C2S in selected range");
     if(simSeller&&gaCount===0)reasons.push("No GA in selected range");
-    const priority=(simSeller&&!ssoComplete?2:0)+(!lsoComplete?2:0)+(cs.amount===0?1:0)+(simSeller&&gaCount===0?1:0);
-    return {id:r.id,retailerCode:r.retailerCode,retailerName:r.retailerName||"Unnamed retailer",simSeller,category:r.category||"—",route:r.route||"—",employeeId:r.employeeId,employeeName:r.employee?.name||"Unassigned",supervisor:r.employee?.supervisor?.name||"Unassigned",ga:gaCount,c2c:c2cAmount,c2s:cs.amount,c2sTransactions:cs.trx,openingBalance:obMap.has(r.id)?obMap.get(r.id)!:null,ssoComplete,lsoComplete,reasons,priority} satisfies RetailerOpportunity;
+    const priority=(simSeller&&!ssoComplete?2:0)+(!lsoComplete?2:0)+(c2sAmount===0?1:0)+(simSeller&&gaCount===0?1:0);
+    return {id:r.id,retailerCode:r.retailerCode,retailerName:r.retailerName||"Unnamed retailer",simSeller,category:r.category||"—",route:r.route||"—",employeeId:r.employeeId,employeeName:r.employee?.name||"Unassigned",supervisor:r.employee?.supervisor?.name||"Unassigned",ga:gaCount,c2c:c2cAmount,c2s:c2sAmount,c2sTransactions,openingBalance:obMap.has(r.id)?obMap.get(r.id)!:null,ssoComplete,lsoComplete,reasons,priority} satisfies RetailerOpportunity;
   });
 }

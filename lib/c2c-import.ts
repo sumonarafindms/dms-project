@@ -2,6 +2,7 @@ import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {phoneKey} from "./phone";
 
 type Cell = string | number | boolean | Date | null | undefined;
 type Matrix = Cell[][];
@@ -39,9 +40,6 @@ function digits(value: Cell) {
   return text(value).replace(/\D/g, "");
 }
 
-function phoneKey(value: Cell) {
-  return digits(value).replace(/^0+/, "");
-}
 
 function utcDate(year: number, monthIndex: number, day: number) {
   return new Date(Date.UTC(year, monthIndex, day));
@@ -204,14 +202,6 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
       });
       continue;
     }
-    if (daily.length !== transactionCount) {
-      preErrors.push({
-        rowNumber: i + 1,
-        message: `Non-zero date count (${daily.length}) does not match TRANSACTION_COUNT (${transactionCount})`,
-        rawData: { retailerCode },
-      });
-      continue;
-    }
 
     sourceRows.push({
       rowNumber: i + 1,
@@ -291,36 +281,34 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
     const retailerIds = mapped.map((r) => r.retailerId);
     const endExclusive = new Date(reportEndDate.getTime() + 24 * 60 * 60 * 1000);
 
-    // The file is month-to-date and is treated as source of truth through reportEndDate.
-    // We replace only the covered retailer/date range, then store non-zero daily amounts.
+    // Daily columns contain amount only; TRANSACTION_COUNT is a month-to-date total.
+    // Store daily amounts separately and keep the exact monthly transaction total in C2cMonthlySummary.
     if (retailerIds.length) {
-      await prisma.$transaction([
-        prisma.c2cRecord.deleteMany({
-          where: {
-            retailerId: { in: retailerIds },
-            date: { gte: firstDate, lt: endExclusive },
-          },
-        }),
-      ]);
-
       const dailyData: Prisma.C2cRecordCreateManyInput[] = [];
-
       for (const row of mapped) {
         for (const day of row.daily) {
           dailyData.push({
             retailerId: row.retailerId,
             date: day.date,
-            transactionCount: 1,
+            transactionCount: 0,
             amount: new Prisma.Decimal(day.amount),
             batchId: batch.id,
           });
         }
       }
-
-      // Keep write batches modest for serverless PostgreSQL connections.
-      for (let i = 0; i < dailyData.length; i += 1000) {
-        await prisma.c2cRecord.createMany({ data: dailyData.slice(i, i + 1000) });
-      }
+      await prisma.$transaction(async tx => {
+        await tx.c2cRecord.deleteMany({
+          where: { retailerId: { in: retailerIds }, date: { gte: firstDate, lt: endExclusive } },
+        });
+        for (let i=0;i<dailyData.length;i+=1000) await tx.c2cRecord.createMany({data:dailyData.slice(i,i+1000)});
+        for (const row of mapped) {
+          await tx.c2cMonthlySummary.upsert({
+            where:{retailerId_month:{retailerId:row.retailerId,month}},
+            update:{transactionCount:row.transactionCount,totalAmount:new Prisma.Decimal(row.totalAmount),reportEndDate},
+            create:{retailerId:row.retailerId,month,transactionCount:row.transactionCount,totalAmount:new Prisma.Decimal(row.totalAmount),reportEndDate},
+          });
+        }
+      });
     }
 
     if (errors.length) {

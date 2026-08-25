@@ -9,10 +9,10 @@ export function AttentionHero({count,href,label="Needs attention"}:{count:number
   </Link>
 }
 
-export function RoleAttentionList({rows,base,limit}:{rows:RetailerOpportunity[];base:string;limit?:number}){
+export function RoleAttentionList({rows,base,limit,query=""}:{rows:RetailerOpportunity[];base:string;limit?:number;query?:string}){
  const shown=typeof limit==="number"?rows.slice(0,limit):rows;
  if(!shown.length)return <div className="card empty-state"><div className="empty-state-icon">✓</div><strong>No attention items</strong><span>Current retailer execution rules are complete for this scope.</span></div>;
- return <div className="attention-list">{shown.map(r=><Link key={r.id} href={`${base}/${r.id}`} className="card attention-item">
+ return <div className="attention-list">{shown.map(r=><Link key={r.id} href={`${base}/${r.id}${query}`} className="card attention-item">
    <div className="attention-main"><div className="attention-title">{r.retailerName}</div><div className="attention-meta">{r.retailerCode} · {r.employeeName} · {r.route}</div><div className="attention-reasons">{r.reasons.slice(0,2).map(x=><span key={x}>{x}</span>)}</div></div>
    <div className="attention-side"><span className={`priority-badge p${Math.min(5,r.priority)}`}>P{r.priority}</span><small>GA {r.ga} · {r.c2sTransactions} trx</small></div>
   </Link>)}</div>

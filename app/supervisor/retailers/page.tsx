@@ -1,2 +1,16 @@
-import {requireUser} from "../../../lib/auth";import {prisma} from "../../../lib/prisma";import {PageHead} from "../../components/RoleUI";import {FilterForm,LinkedList} from "../../components/DrillUI";import {normalizeMonth} from "../../../lib/drilldown";
-export default async function Page({searchParams}:{searchParams:Promise<{q?:string;month?:string}>}){const u=await requireUser(["SUPERVISOR"]),s=await searchParams,q=(s.q||"").trim(),month=normalizeMonth(s.month);const rows=await prisma.retailer.findMany({where:{active:true,employee:{supervisorId:u.supervisorId||""},...(q?{OR:[{retailerCode:{contains:q,mode:"insensitive" as const}},{retailerName:{contains:q,mode:"insensitive" as const}},{employee:{name:{contains:q,mode:"insensitive" as const}}},{route:{contains:q,mode:"insensitive" as const}}]}:{})},include:{employee:{select:{name:true}}},orderBy:{retailerCode:"asc"},take:500});return <main className="page"><PageHead eyebrow="Supervisor" title="My retailers" subtitle="Search retailers across only the RSOs under your supervision."/><FilterForm q={q} month={month} placeholder="Retailer, RSO or route"/><LinkedList title={`Retailers (${rows.length})`} items={rows.map(r=>({href:`/supervisor/retailers/${r.id}?month=${month}`,name:r.retailerName||r.retailerCode,meta:`${r.retailerCode} · ${r.employee?.name||"Unassigned"}${(r.simSeller||"").toUpperCase()==="Y"?" · SIM Seller":""}`,right:r.category||"View",status:r.route||undefined}))}/></main>}
+import {requirePagePermission} from "../../../lib/auth";
+import {prisma} from "../../../lib/prisma";
+import {normalizeMonth} from "../../../lib/drilldown";
+import {retailerOpportunities} from "../../../lib/retailer-opportunities";
+import {RetailerSearchView} from "../../components/RetailerOpportunityViews";
+import {SupervisorSection} from "../../components/SupervisorUI";
+
+export default async function Page({searchParams}:{searchParams:Promise<{q?:string;month?:string;from?:string;to?:string}>}){
+ const u=await requirePagePermission(["SUPERVISOR"],"retailers"),s=await searchParams,month=normalizeMonth(s.from?.slice(0,7)||s.month);
+ const ids=u.supervisorId?(await prisma.employee.findMany({where:{supervisorId:u.supervisorId,active:true},select:{id:true}})).map(x=>x.id):[];
+ const rows=await retailerOpportunities(month,ids,s.from,s.to),sim=rows.filter(x=>x.simSeller).length,flagged=rows.filter(x=>x.priority>0).length;
+ return <main className="page supervisor-v6-page supervisor-retailers-v6">
+  <section className="supervisor-v6-subhero retailers"><div><div className="supervisor-v6-kicker">OUTLET NETWORK</div><h1>My Retailers</h1><p>Search every active retailer under your RSO team and review execution status from one mobile-friendly list.</p></div><div className="supervisor-v6-substat"><span>RETAILERS</span><strong>{rows.length}</strong><small>{sim} SIM sellers · {flagged} flagged</small></div></section>
+  <section className="supervisor-v6-section"><SupervisorSection eyebrow="RETAILER DIRECTORY" title="Search & review" sub="GA, C2S, SSO and LSO status are shown for the selected dates."/><RetailerSearchView rows={rows} month={month} q={s.q||""} from={s.from} to={s.to} base="/supervisor/retailers"/></section>
+ </main>
+}

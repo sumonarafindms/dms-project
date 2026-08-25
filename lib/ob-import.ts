@@ -2,6 +2,7 @@ import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {phoneKey} from "./phone";
 
 type Cell = string | number | boolean | Date | null | undefined;
 type Matrix = Cell[][];
@@ -16,7 +17,6 @@ function numberValue(value: Cell): number | null {
   return Number.isFinite(n) ? n : null;
 }
 function digits(value: Cell) { return text(value).replace(/\D/g, ""); }
-function phoneKey(value: Cell) { return digits(value).replace(/^0+/, ""); }
 const MONTHS: Record<string, number> = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
 function parseDateHeader(value: Cell): Date | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -133,6 +133,12 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
     if (phoneKey(retailer.employee?.rsoMsisdn ?? "") && phoneKey(row.srNumber) && phoneKey(retailer.employee?.rsoMsisdn ?? "") !== phoneKey(row.srNumber)) assignmentWarnings++;
     mapped.push({retailerId:retailer.id,amount:row.amount,transactionCount:row.transactionCount});
   }
+
+  if (errors.length) {
+    const preview=errors.slice(0,5).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
+    throw new Error(`OB import stopped: ${errors.length} invalid/unmapped row(s). Fix the file before replacing the current snapshot. ${preview}`);
+  }
+  if (!mapped.length) throw new Error("OB import stopped: no mapped retailer rows are available.");
 
   const hash = crypto.createHash("sha256").update(bytes).digest("hex");
   const batch = await prisma.importBatch.create({ data:{type:ImportType.OB,fileName,hash,businessDate:snapshotDate,totalRows:parsed.length,status:ImportStatus.PROCESSING} });

@@ -2,12 +2,14 @@ import {Prisma} from "@prisma/client";
 import {prisma} from "./prisma";
 import {monthBounds} from "./month";
 import type {EmployeePerformance} from "./performance";
+import {dhakaTodayYmd} from "./business-time";
+import {SIM_SWAP_PRODUCT_CODES} from "./ga-product";
 
 export type PaceStatus="Ahead"|"On track"|"Behind"|"No target";
 export function monthPace(month:string, now=new Date()){
   const {start,end}=monthBounds(month);
   const totalDays=Math.round((end.getTime()-start.getTime())/86400000);
-  const todayUtc=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
+  const todayUtc=new Date(`${dhakaTodayYmd(now)}T00:00:00.000Z`);
   if(todayUtc<start)return 0;
   if(todayUtc>=end)return 100;
   const elapsed=Math.max(1,Math.min(totalDays,Math.floor((todayUtc.getTime()-start.getTime())/86400000)+1));
@@ -33,7 +35,7 @@ export function rankRows(rows:EmployeePerformance[],expected:number){
   }).sort((a,b)=>b.score-a.score);
 }
 export async function latestDailySnapshot(employeeIds?:string[]){
-  const gaFilter:Prisma.GaActivationWhereInput=employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{};
+  const gaFilter:Prisma.GaActivationWhereInput={productCode:{notIn:[...SIM_SWAP_PRODUCT_CODES]},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})};
   const c2cFilter:Prisma.C2cRecordWhereInput=employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{};
   const [latestGa,latestC2c]=await Promise.all([
     prisma.gaActivation.findFirst({where:gaFilter,orderBy:{activationDate:"desc"},select:{activationDate:true}}),

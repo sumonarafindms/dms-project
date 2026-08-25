@@ -20,8 +20,11 @@ export async function POST(req:Request){
 export async function PATCH(req:Request){
  const me=await getCurrentUser(); if(!me||me.role!=="ADMIN")return NextResponse.json({error:"Unauthorized"},{status:401});
  const b=await req.json(); const id=String(b.id||""); if(!id)return NextResponse.json({error:"User is required"},{status:400});
- const data:any={}; if(typeof b.active==="boolean")data.active=b.active; if(b.pin&&String(b.pin).length>=4)data.credentialHash=await hashCredential(String(b.pin));
+ const data:any={}; if(typeof b.active==="boolean")data.active=b.active;
+ if(b.pin&&String(b.pin).length<4)return NextResponse.json({error:"PIN must contain at least 4 characters."},{status:400});
+ if(b.pin)data.credentialHash=await hashCredential(String(b.pin));
  const target=await prisma.user.update({where:{id},data});
+ if(b.pin||b.active===false)await prisma.session.deleteMany({where:{userId:id}});
  await audit(me,b.pin?"RESET_PIN":typeof b.active==="boolean"?(b.active?"ACTIVATE_USER":"DEACTIVATE_USER"):"UPDATE_USER","accounts",{targetType:"User",targetId:target.id,targetName:target.displayName});
  return NextResponse.json({ok:true});
 }

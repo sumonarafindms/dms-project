@@ -1,7 +1,10 @@
-import {apiUser} from "@/lib/auth";
+import {apiUser,apiPermission} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
+import {monthStartsInRange,monthStartUtc} from "@/lib/date-range";
+import {dhakaMonth} from "@/lib/business-time";
+import {apiError} from "@/lib/http-errors";
 
 function parseDate(value: string | null) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -12,19 +15,22 @@ function parseDate(value: string | null) {
 
 export async function GET(req: NextRequest) {
   if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiPermission("c2s","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   try {
-    const monthText = req.nextUrl.searchParams.get("month") || new Date().toISOString().slice(0,7)+"-01";
+    const monthText = req.nextUrl.searchParams.get("month") || dhakaMonth()+"-01";
     const selectedDate = parseDate(req.nextUrl.searchParams.get("date"));
     const {start,end} = monthBounds(monthText);
     const fromDate=parseDate(req.nextUrl.searchParams.get("from"))||start;
     const toRaw=parseDate(req.nextUrl.searchParams.get("to"));
     const rangeEnd=toRaw?new Date(toRaw.getTime()+86400000):end;
+    if(rangeEnd<=fromDate) return NextResponse.json({error:"End date must be on or after start date."},{status:400});
+    const targetMonths=monthStartsInRange(fromDate,rangeEnd),targetStart=targetMonths[0]||monthStartUtc(fromDate),targetEnd=new Date(Date.UTC((targetMonths.at(-1)||targetStart).getUTCFullYear(),(targetMonths.at(-1)||targetStart).getUTCMonth()+1,1));
     const dayEnd = selectedDate ? new Date(selectedDate.getTime()+86400000) : null;
 
-    const [employees,dailyRows,history,monthRows] = await Promise.all([
+    const [employees,dailyRows,history,monthRows,monthlySummaries] = await Promise.all([
       prisma.employee.findMany({
         where:{active:true}, orderBy:[{supervisor:{name:"asc"}},{name:"asc"}],
-        include:{ supervisor:{select:{name:true}}, _count:{select:{retailers:true}}, targets:{where:{month:start},take:1} },
+        include:{ supervisor:{select:{name:true}}, _count:{select:{retailers:true}}, targets:{where:{month:{gte:targetStart,lt:targetEnd}}} },
       }),
       selectedDate && dayEnd ? prisma.c2sRecord.findMany({
         where:{date:{gte:selectedDate,lt:dayEnd},amount:{gt:0}},
@@ -33,31 +39,30 @@ export async function GET(req: NextRequest) {
       }) : Promise.resolve([]),
       prisma.importBatch.findMany({ where:{type:"C2S"}, orderBy:{uploadedAt:"desc"}, take:10,
         select:{id:true,fileName:true,uploadedAt:true,businessDate:true,totalRows:true,successRows:true,failedRows:true,status:true} }),
-      prisma.c2sRecord.findMany({ where:{date:{gte:fromDate,lt:rangeEnd}}, select:{transactionCount:true,amount:true,date:true,retailer:{select:{id:true,employeeId:true}}} }),
+      prisma.c2sRecord.findMany({ where:{date:{gte:fromDate,lt:rangeEnd}}, select:{amount:true,date:true,retailer:{select:{id:true,employeeId:true}}} }),
+      prisma.c2sMonthlySummary.findMany({where:{month:{gte:targetStart,lt:targetEnd}},select:{month:true,totalAmount:true,transactionCount:true,reportEndDate:true,retailer:{select:{id:true,employeeId:true}}}}),
     ]);
 
-    const byRetailer = new Map<string,{employeeId:string|null;amount:number;transactions:number}>();
-    const reportEndByEmployee = new Map<string,Date>();
+    const amountByEmployee = new Map<string,number>();
     for (const row of monthRows) {
-      const rid = row.retailer.id;
-      const cur = byRetailer.get(rid) || {employeeId:row.retailer.employeeId,amount:0,transactions:0};
-      cur.amount += Number(row.amount); cur.transactions += row.transactionCount; byRetailer.set(rid,cur);
-      const eid = row.retailer.employeeId;
-      if (eid) { const old=reportEndByEmployee.get(eid); if(!old || row.date>old) reportEndByEmployee.set(eid,row.date); }
+      const eid=row.retailer.employeeId;if(!eid)continue;
+      amountByEmployee.set(eid,(amountByEmployee.get(eid)||0)+Number(row.amount));
     }
-
+    const reportEndByEmployee = new Map<string,Date>();
     const byEmployee = new Map<string,{amount:number;transactions:number;lso:number}>();
-    for (const r of byRetailer.values()) {
-      if (!r.employeeId) continue;
-      const cur = byEmployee.get(r.employeeId) || {amount:0,transactions:0,lso:0};
-      cur.amount += r.amount; cur.transactions += r.transactions;
-      if (r.amount >= 500 && r.transactions >= 7) cur.lso += 1;
-      byEmployee.set(r.employeeId,cur);
+    for(const summary of monthlySummaries){
+      const eid=summary.retailer.employeeId;if(!eid)continue;
+      const cur=byEmployee.get(eid)||{amount:amountByEmployee.get(eid)||0,transactions:0,lso:0};
+      cur.transactions+=summary.transactionCount;
+      if(Number(summary.totalAmount)>=500&&summary.transactionCount>=7)cur.lso++;
+      byEmployee.set(eid,cur);
+      const old=reportEndByEmployee.get(eid);if(!old||summary.reportEndDate>old)reportEndByEmployee.set(eid,summary.reportEndDate);
     }
+    for(const [eid,amount] of amountByEmployee)if(!byEmployee.has(eid))byEmployee.set(eid,{amount,transactions:0,lso:0});
 
     const rows = employees.map(employee=>{
       const perf = byEmployee.get(employee.id) || {amount:0,transactions:0,lso:0};
-      const target = employee.targets[0]; const lsoTarget = Number(target?.lsoTarget ?? 0);
+const lsoTarget = employee.targets.reduce((n,x)=>n+Number(x.lsoTarget||0),0);
       return {
         employeeId:employee.id, employeeCode:employee.employeeCode, name:employee.name, rsoMsisdn:employee.rsoMsisdn,
         supervisor:employee.supervisor?.name ?? "Unassigned", retailerCount:employee._count.retailers,
@@ -71,6 +76,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({rows,dailyRows:day,importHistory:history,month:start.toISOString().slice(0,10),range:{from:fromDate.toISOString().slice(0,10),to:new Date(rangeEnd.getTime()-86400000).toISOString().slice(0,10)}});
   } catch (error) {
     console.error(error);
-    return NextResponse.json({error:error instanceof Error?error.message:"Failed to load C2S summary"},{status:500});
+    const e=apiError(error,"Failed to load C2S summary."); return NextResponse.json({error:e.error},{status:e.status});
   }
 }

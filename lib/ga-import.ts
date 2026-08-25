@@ -2,6 +2,7 @@ import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {isSimSwapProduct,SIM_SWAP_SELLING_PRICE} from "@/lib/ga-product";
 
 type Cell = string | number | boolean | Date | null | undefined;
 
@@ -10,6 +11,7 @@ type ParsedActivation = {
   retailerCode: string;
   simNo: string;
   sellingPrice: number;
+  productCode: string;
   activationDate: Date;
   activationTime: string | null;
 };
@@ -127,7 +129,7 @@ export async function importGaActivationWorkbook(
   if (rows.length < 2) throw new Error("The activation file is empty.");
 
   const headers = (rows[0] ?? []).map(normalizeHeader);
-  const required = ["RETAILER_CODE", "SIM_NO", "SELLING_PRICE", "ACTIVATION_DATE", "ACTIVATION_TIME"];
+  const required = ["RETAILER_CODE", "SIM_NO", "PRODUCT_CODE", "SELLING_PRICE", "ACTIVATION_DATE", "ACTIVATION_TIME"];
   const index: Record<string, number> = {};
   for (const header of required) {
     const col = headers.indexOf(header);
@@ -147,6 +149,7 @@ export async function importGaActivationWorkbook(
 
     const retailerCode = asText(row[index.RETAILER_CODE]).toUpperCase();
     const simNo = normalizeSimNo(row[index.SIM_NO]);
+    const productCode = asText(row[index.PRODUCT_CODE]).toUpperCase();
     const sellingPrice = asNumber(row[index.SELLING_PRICE]);
     const activationDate = parseDate(row[index.ACTIVATION_DATE]);
     const activationTime = normalizeTime(row[index.ACTIVATION_TIME]);
@@ -159,8 +162,20 @@ export async function importGaActivationWorkbook(
       preErrors.push({ rowNumber: i + 1, message: "SIM_NO is blank", rawData: { retailerCode } });
       continue;
     }
+    if (!productCode) {
+      preErrors.push({ rowNumber: i + 1, message: "PRODUCT_CODE is blank", rawData: { retailerCode, simNo } });
+      continue;
+    }
     if (sellingPrice === null || sellingPrice < 0) {
       preErrors.push({ rowNumber: i + 1, message: "SELLING_PRICE is invalid", rawData: { retailerCode, simNo } });
+      continue;
+    }
+    if (isSimSwapProduct(productCode) && sellingPrice !== SIM_SWAP_SELLING_PRICE) {
+      preErrors.push({
+        rowNumber: i + 1,
+        message: `${productCode} must have SELLING_PRICE ${SIM_SWAP_SELLING_PRICE} for SIM SWAP verification`,
+        rawData: { retailerCode, simNo, productCode, sellingPrice },
+      });
       continue;
     }
     if (!activationDate) {
@@ -169,7 +184,7 @@ export async function importGaActivationWorkbook(
     }
 
     datesFound.add(isoDate(activationDate));
-    parsedRows.push({ rowNumber: i + 1, retailerCode, simNo, sellingPrice, activationDate, activationTime });
+    parsedRows.push({ rowNumber: i + 1, retailerCode, simNo, productCode, sellingPrice, activationDate, activationTime });
   }
 
   if (!sourceRows) throw new Error("No activation rows were found in the uploaded file.");
@@ -216,6 +231,7 @@ export async function importGaActivationWorkbook(
       activationDate: true,
       activationTime: true,
       sellingPrice: true,
+      productCode: true,
     },
   });
   const existingMap = new Map(existing.map((row) => [row.simNo, row]));
@@ -268,6 +284,7 @@ export async function importGaActivationWorkbook(
           activationDate: row.activationDate,
           activationTime: row.activationTime,
           sellingPrice: new Prisma.Decimal(row.sellingPrice),
+          productCode: row.productCode,
           batchId: batch.id,
         },
       }));
@@ -277,7 +294,8 @@ export async function importGaActivationWorkbook(
     const unchanged = old.retailerId === retailerId
       && isoDate(old.activationDate) === isoDate(row.activationDate)
       && (old.activationTime ?? "") === (row.activationTime ?? "")
-      && Number(old.sellingPrice) === row.sellingPrice;
+      && Number(old.sellingPrice) === row.sellingPrice
+      && (old.productCode ?? "") === row.productCode;
 
     if (unchanged) {
       duplicateRows++;
@@ -292,6 +310,7 @@ export async function importGaActivationWorkbook(
         activationDate: row.activationDate,
         activationTime: row.activationTime,
         sellingPrice: new Prisma.Decimal(row.sellingPrice),
+        productCode: row.productCode,
         batchId: batch.id,
       },
     }));

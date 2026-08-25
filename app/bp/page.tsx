@@ -1,21 +1,39 @@
-import {requireUser} from "../../lib/auth";
+import {requirePagePermission} from "../../lib/auth";
 import {prisma} from "../../lib/prisma";
 import {monthBounds} from "../../lib/month";
-import {PageHead,Metric,QuickAction} from "../components/RoleUI";
+import {PageHead} from "../components/RoleUI";
+import {BpHero,BpInfo,BpAction} from "../components/BpUI";
+import {dhakaMonth,dhakaTodayYmd} from "../../lib/business-time";
+import {Icon} from "../components/icons";
+
 export default async function BP(){
- const u=await requireUser(["BP"]);if(!u.bpRetailerId)return <main className="page field-page"><PageHead eyebrow="BP" title="BP code not assigned" subtitle="Ask Admin to link this login to an active BP retailer code."/></main>;
- const monthText=new Date().toISOString().slice(0,7)+"-01";const {start,end}=monthBounds(monthText);const today=new Date();const dayStart=new Date(Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),today.getUTCDate()));const dayEnd=new Date(dayStart.getTime()+86400000);
+ const u=await requirePagePermission(["BP"],"dashboard");
+ if(!u.bpRetailerId)return <main className="page bp-v8-page"><PageHead eyebrow="BP" title="BP code not assigned" subtitle="Ask Admin to link this login to an active BP retailer code."/></main>;
+ const monthText=dhakaMonth()+"-01",{start,end}=monthBounds(monthText),dayStart=new Date(`${dhakaTodayYmd()}T00:00:00.000Z`),dayEnd=new Date(dayStart.getTime()+86400000);
  const [retailer,assignment]=await Promise.all([
   prisma.retailer.findUnique({where:{id:u.bpRetailerId},select:{retailerCode:true,retailerName:true,employee:{select:{name:true,rsoMsisdn:true,supervisor:{select:{name:true}}}}}}),
-  prisma.bpAssignment.findFirst({where:{retailerId:u.bpRetailerId,active:true},select:{gaTarget:true,startDate:true,endDate:true,employee:{select:{name:true}}}}),
+  prisma.bpAssignment.findFirst({where:{retailerId:u.bpRetailerId,active:true},include:{monthlyTargets:{where:{month:start},take:1},employee:{select:{name:true}}}})
  ]);
- if(!retailer)return <main className="page field-page"><PageHead eyebrow="BP" title="Retailer not found" subtitle="The BP retailer mapping needs to be updated."/></main>;
- if(!assignment)return <main className="page field-page"><PageHead eyebrow="BP" title="No active BP assignment" subtitle="Ask Admin to assign this retailer as an active BP."/></main>;
- const effectiveStart=assignment.startDate>start?assignment.startDate:start;const assignmentEnd=assignment.endDate?new Date(assignment.endDate.getTime()+86400000):end;const effectiveEnd=assignmentEnd<end?assignmentEnd:end;const todayStart=dayStart>effectiveStart?dayStart:effectiveStart;const todayEnd=dayEnd<effectiveEnd?dayEnd:effectiveEnd;
- const [monthlyGa,todayGa]=await Promise.all([
+ if(!retailer)return <main className="page bp-v8-page"><PageHead eyebrow="BP" title="Retailer not found" subtitle="The BP retailer mapping needs to be updated."/></main>;
+ if(!assignment)return <main className="page bp-v8-page"><PageHead eyebrow="BP" title="No active BP assignment" subtitle="Ask Admin to assign this retailer as an active BP."/></main>;
+ const effectiveStart=assignment.startDate>start?assignment.startDate:start,assignmentEnd=assignment.endDate?new Date(assignment.endDate.getTime()+86400000):end,effectiveEnd=assignmentEnd<end?assignmentEnd:end,todayStart=dayStart>effectiveStart?dayStart:effectiveStart,todayEnd=dayEnd<effectiveEnd?dayEnd:effectiveEnd;
+ const [monthlyGa,todayGa,recent]=await Promise.all([
   prisma.gaActivation.count({where:{retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}}}),
   todayStart<todayEnd?prisma.gaActivation.count({where:{retailerId:u.bpRetailerId,activationDate:{gte:todayStart,lt:todayEnd}}}):Promise.resolve(0),
+  prisma.gaActivation.findMany({where:{retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}},orderBy:[{activationDate:"desc"},{activationTime:"desc"}],take:5,select:{simNo:true,sellingPrice:true,activationDate:true,activationTime:true}})
  ]);
- const target=assignment.gaTarget||0,remaining=Math.max(0,target-monthlyGa),progress=target?Math.min(100,Math.round(monthlyGa/target*100)):0;
- return <main className="page field-page bp-page"><PageHead eyebrow="SIM Sales" title={`Hello, ${u.displayName}`} subtitle={`${retailer.retailerCode} · ${retailer.retailerName||"BP retailer"}${retailer.employee?` · RSO ${retailer.employee.name}`:""}`}/><div className="bp-primary card"><div className="bp-label">GA Completed</div><div className="bp-number">{monthlyGa}</div><div className="bp-target">{target?`of ${target} monthly target`:`Monthly target not set`}</div><div className="progress bp-progress"><span style={{width:`${progress}%`}}/></div><div className="bp-progress-foot"><strong>{target?`${progress}%`:"Live"}</strong><span>{target?`${remaining} remaining`:"Set target from BP Management"}</span></div></div><div className="role-metric-grid compact"><Metric label="Today GA" value={todayGa} sub="Current day" icon="sim"/><Metric label="Remaining" value={target?remaining:"—"} sub="Monthly" icon="target"/><Metric label="RSO" value={retailer.employee?.name||"—"} sub={retailer.employee?.rsoMsisdn||"Not assigned"} icon="users"/></div><section className="section"><div className="quick-grid field-actions"><QuickAction href="/bp/sales" label="Activation Details" icon="sim"/></div></section></main>
+ const target=assignment.monthlyTargets[0]?.gaTarget??assignment.gaTarget??0,remaining=Math.max(0,target-monthlyGa);
+ return <main className="page bp-v8-page">
+  <BpHero name={u.displayName} code={retailer.retailerCode} retailer={retailer.retailerName||"BP retailer"} today={todayGa} monthly={monthlyGa} target={target}/>
+  <div className="bp-v8-info-grid">
+   <BpInfo label="REMAINING" value={target?remaining:"—"} sub="Monthly GA" icon="target"/>
+   <BpInfo label="MY RSO" value={retailer.employee?.name||"—"} sub={retailer.employee?.rsoMsisdn||"Not assigned"} icon="users"/>
+   <BpInfo label="SUPERVISOR" value={retailer.employee?.supervisor?.name||"—"} sub="Reporting team" icon="users"/>
+  </div>
+  <section className="bp-v8-section"><div className="bp-v8-section-head"><div><span>QUICK ACTION</span><h2>Sales activity</h2></div></div><BpAction href="/bp/sales" title="Activation Details" sub="Search SIM serials and review your sales history"/></section>
+  <section className="bp-v8-section"><div className="bp-v8-section-head"><div><span>LATEST SALES</span><h2>Recent activations</h2></div><a href="/bp/sales">View all ›</a></div><div className="bp-v8-recent">
+   {recent.map(x=><div key={x.simNo}><span className="bp-v8-sim-icon"><Icon name="sim"/></span><div><strong>SIM {x.simNo}</strong><small>{x.activationDate.toISOString().slice(0,10)}{x.activationTime?` · ${x.activationTime}`:""}</small></div><div className="bp-v8-price"><strong>৳{Number(x.sellingPrice)}</strong><small>{Number(x.sellingPrice)===170?"150":"300"}</small></div></div>)}
+   {!recent.length&&<div className="bp-v8-empty"><span>0</span><div><strong>No activations yet</strong><small>Your latest SIM sales will appear here.</small></div></div>}
+  </div></section>
+ </main>
 }

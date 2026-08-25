@@ -1,0 +1,2 @@
+"use client";
+export default function StatusToast({message,tone="info"}:{message:string;tone?:"info"|"success"|"error"}){if(!message)return null;return <div className={`status-toast-v4 ${tone}`} role="status"><span>{tone==="error"?"!":tone==="success"?"✓":"i"}</span><p>{message}</p></div>}

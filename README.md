@@ -28,3 +28,10 @@ Mobile-first Distribution Management System built with Next.js, TypeScript, Pris
 The Vercel build command runs `prisma migrate deploy` before `next build`, so committed migrations are applied during deployment.
 
 Do not commit local `.env*`, `.git`, `.vercel`, or `node_modules`.
+
+## v34 deployment note
+The database connection variable is `APP_DATABASE_URL`.
+
+v34 includes new migrations for monthly C2C/C2S transaction summaries and login throttling. The normal production build command runs `prisma migrate deploy` before `next build`.
+
+After the first v34 deployment, upload the current cumulative C2C and C2S files once. This populates the new exact monthly `TRANSACTION_COUNT` summaries. Old daily C2C/C2S amount records are preserved, but old fabricated per-day transaction counts are no longer used for LSO calculations.
