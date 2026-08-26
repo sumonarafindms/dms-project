@@ -23,25 +23,22 @@ export default function Dashboard(){
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
 
- useEffect(()=>{let stop=false;(async()=>{
-  setLoading(true);setError("");
-  try{
-   const q=`month=${month}-01`;
-   const [ga,c2c,c2s,targets]=await Promise.all([
-    fetch(`/api/ga/summary?${q}`,{cache:"no-store"}).then(r=>r.json()),
-    fetch(`/api/c2c/summary?${q}`,{cache:"no-store"}).then(r=>r.json()),
-    fetch(`/api/c2s/summary?${q}`,{cache:"no-store"}).then(r=>r.json()),
-    fetch(`/api/targets?month=${month}`,{cache:"no-store"}).then(r=>r.json()),
-   ]);
-   const map=new Map<string,Row>();
-   for(const t of targets.rows||[])map.set(t.employeeId,{...t,gaAchieved:0,ssoAchieved:0,c2cAchieved:0,totalRechargeAchieved:Number(t.scAchieved||0),lsoAchieved:0});
-   for(const r of ga.rows||[]){const x=map.get(r.employeeId);if(x){x.gaAchieved=r.gaAchieved;x.ssoAchieved=r.ssoAchieved}}
-   for(const r of c2c.rows||[]){const x=map.get(r.employeeId);if(x){x.c2cAchieved=r.c2cAchieved;x.totalRechargeAchieved=r.totalRechargeAchieved}}
-   for(const r of c2s.rows||[]){const x=map.get(r.employeeId);if(x)x.lsoAchieved=r.lsoAchieved}
-   if(!stop)setRows([...map.values()]);
-  }catch(e){if(!stop)setError(e instanceof Error?e.message:"Could not load dashboard")}
-  finally{if(!stop)setLoading(false)}
- })();return()=>{stop=true}},[month]);
+ useEffect(()=>{
+  const controller=new AbortController();
+  let active=true;
+  (async()=>{
+   setLoading(true);setError("");
+   try{
+    const res=await fetch(`/api/dashboard/summary?month=${month}&_=${Date.now()}`,{cache:"no-store",signal:controller.signal});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||"Could not load dashboard");
+    if(active)setRows(data.rows||[]);
+   }catch(e){
+    if(active&&!(e instanceof DOMException&&e.name==="AbortError"))setError(e instanceof Error?e.message:"Could not load dashboard");
+   }finally{if(active)setLoading(false)}
+  })();
+  return()=>{active=false;controller.abort()}
+ },[month]);
 
  const totals=useMemo(()=>rows.reduce((a,r)=>({
   gaT:a.gaT+r.gaTarget,gaA:a.gaA+r.gaAchieved,
@@ -88,6 +85,7 @@ export default function Dashboard(){
  const targetCoverage=rows.length?Math.round(targetReady/rows.length*100):0;
  const avgRetailers=rows.length?Math.round(totals.ret/rows.length):0;
  const supervisorOnTrack=supervisors.filter(s=>pct(s.achieved,s.target)>=70).length;
+ const firstLoad=loading&&rows.length===0;
  const gaProgress=pct(totals.gaA,totals.gaT);
  const rechargeProgress=pct(totals.trA,totals.trT);
  const ssoProgress=pct(totals.ssoA,totals.ssoT);
@@ -103,19 +101,19 @@ export default function Dashboard(){
    </div>
    <div className="dash97-top-actions">
     <label className="dash97-month"><span>REPORTING MONTH</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
-    <Link href="/admin/upload" className="dash97-primary"><Icon name="upload"/>Upload Center</Link>
+    {loading?<span className="dash98-refresh"><i/>Refreshing</span>:<span className="dash98-live"><i/>Live</span>}<Link href="/admin/upload" className="dash97-primary"><Icon name="upload"/>Upload Center</Link>
    </div>
   </header>
 
   {error&&<div className="dash97-alert"><b>!</b><div><strong>Dashboard could not refresh</strong><span>{error}</span></div></div>}
 
   <section className="dash97-kpis" aria-label="Key performance indicators">
-   <CleanKpi label="GA Activation" value={loading?"…":fmt(totals.gaA)} progress={gaProgress} note={`of ${fmt(totals.gaT)} target`} icon="sim"/>
-   <CleanKpi label="Total Recharge" value={loading?"…":`৳${fmt(totals.trA)}`} progress={rechargeProgress} note={`of ৳${fmt(totals.trT)} target`} icon="chart" tone="teal"/>
-   <CleanKpi label="Field Force" value={loading?"…":fmt(rows.length)} progress={rows.length?Math.round(onTrack/rows.length*100):0} note={`${onTrack} on track · ${fmt(totals.ret)} retailers`} icon="users"/>
+   <CleanKpi label="GA Activation" value={firstLoad?"…":fmt(totals.gaA)} progress={gaProgress} note={`of ${fmt(totals.gaT)} target`} icon="sim"/>
+   <CleanKpi label="Total Recharge" value={firstLoad?"…":`৳${fmt(totals.trA)}`} progress={rechargeProgress} note={`of ৳${fmt(totals.trT)} target`} icon="chart" tone="teal"/>
+   <CleanKpi label="Field Force" value={firstLoad?"…":fmt(rows.length)} progress={rows.length?Math.round(onTrack/rows.length*100):0} note={`${onTrack} on track · ${fmt(totals.ret)} retailers`} icon="users"/>
    <article className="dash97-kpi critical">
     <div className="dash97-critical-icon"><Icon name="target"/></div>
-    <div><span>NEEDS ATTENTION</span><strong>{loading?"…":behind}</strong><small>RSO below 50 composite score</small></div>
+    <div><span>NEEDS ATTENTION</span><strong>{firstLoad?"…":behind}</strong><small>RSO below 50 composite score</small></div>
    </article>
   </section>
 

@@ -557,3 +557,13 @@
 - Uses only live DMS values already available to the dashboard; no mock/fake metrics were introduced.
 - Added a warm off-white, restrained green/teal dashboard palette with compact enterprise spacing.
 - Added mobile horizontal KPI cards and responsive single-column dashboard sections.
+
+## v98 - Dashboard Speed & GA Swap Fix
+- Dashboard now loads from one lightweight summary endpoint instead of four heavy summary endpoints.
+- Existing dashboard values remain visible while the selected month refreshes; a small inline refresh status replaces disruptive loading behavior.
+- Sidebar bottom "Opening page" indicator was removed and replaced by a slim top navigation progress bar.
+- SIMWAP and EV-SWAP are hard-excluded from dashboard GA, Total GA, GA Achieved, target progress and SSO.
+- GA summary UI no longer shows SIM SWAP KPI totals or employee-level SIM SWAP totals.
+- SIM SWAP is shown only beside Total GA in the retailer daily table.
+- Product normalization now recognizes EV-SWAP/EV SWAP/EV_SWAP/EVSWAP and SIMWAP/SIM-WAP variants.
+- Dashboard typography, card sizing and panel height behavior were refined to reduce tiny text and empty space.

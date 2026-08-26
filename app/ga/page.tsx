@@ -14,7 +14,6 @@ type EmployeeRow = {
   retailerCount: number;
   ga150: number;
   ga300: number;
-  simSwap: number;
   gaAchieved: number;
   gaTarget: number;
   gaPercent: number;
@@ -140,16 +139,15 @@ export default function GaPage() {
       achieved: a.achieved + r.gaAchieved,
       ga150: a.ga150 + r.ga150,
       ga300: a.ga300 + r.ga300,
-      simSwap: a.simSwap + r.simSwap,
       ssoT: a.ssoT + r.ssoTarget,
       ssoA: a.ssoA + r.ssoAchieved,
     }),
-    { target: 0, achieved: 0, ga150: 0, ga300: 0, simSwap:0, ssoT: 0, ssoA: 0 },
+    { target: 0, achieved: 0, ga150: 0, ga300: 0, ssoT: 0, ssoA: 0 },
   ), [rows]);
 
   const dayTotals = useMemo(() => retailerDaily.reduce(
-    (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300, simSwap:a.simSwap+r.simSwap }),
-    { total: 0, ga150: 0, ga300: 0, simSwap:0 },
+    (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300 }),
+    { total: 0, ga150: 0, ga300: 0 },
   ), [retailerDaily]);
 
   const uploadPanel = canAdd ? (
@@ -189,28 +187,26 @@ export default function GaPage() {
       <section className="ga-section">
         <div className="ga-section-title"><span className="ga-section-icon">▣</span><div><h2>Selected Day: {prettyDate(dataDate)}</h2><p>Daily activation snapshot</p></div></div>
         <div className="ga-day-metrics">
-          <Metric tone="blue" icon="⌁" name="Total" value={dayTotals.total.toLocaleString()} note="All SIM activations"/>
-          <Metric tone="green" icon="150" name="150" value={dayTotals.ga150.toLocaleString()} note="Selling price = 170"/>
+          <Metric tone="blue" icon="⌁" name="Total GA" value={dayTotals.total.toLocaleString()} note="Excludes SIMWAP & EV-SWAP"/>
+          <Metric tone="green" icon="150" name="150" value={dayTotals.ga150.toLocaleString()} note="MMSTC · selling price 170"/>
           <Metric tone="orange" icon="300" name="300" value={dayTotals.ga300.toLocaleString()} note="MMST / MMSTs"/>
-          <Metric tone="rose" icon="↻" name="SIM SWAP" value={dayTotals.simSwap.toLocaleString()} note="SIMWAP 350 / EV-SWAP 100 · excluded from GA"/>
-          <Metric tone="purple" icon="●" name="Active Retailers" value={retailerDaily.length.toLocaleString()} note="Retailers with GA that day"/>
+          <Metric tone="purple" icon="●" name="Active Retailers" value={retailerDaily.length.toLocaleString()} note="Retailers with standard GA"/>
         </div>
       </section>
 
       <section className="ga-data-card">
         <div className="ga-card-head"><div className="ga-section-title"><span className="ga-section-icon">▤</span><div><h2>Retailer GA</h2><p>Retailer-wise activation for the selected day</p></div></div><span className="ga-count-pill">{retailerDaily.length} retailers</span></div>
         {retailerDaily.length===0?<div className="ga-empty"><span>▤</span><strong>No retailer GA yet</strong><p>No GA data stored for {prettyDate(dataDate)}.</p></div>:
-        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer</th><th>Total GA</th><th>150</th><th>300</th><th>SIM SWAP</th></tr></thead><tbody>{retailerDaily.map(r=><tr key={r.retailerCode}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.employee)}</span><div><b>{r.employee}</b><small>{r.rsoMsisdn}</small></div></div></td><td><b>{r.retailerCode}</b><small className="ga-subline">{r.retailerName}</small></td><td><strong className="ga-number blue">{r.total}</strong></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td><td><span className="ga-number swap">{r.simSwap}</span></td></tr>)}</tbody></PremiumTable>}
+        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer</th><th>Total GA</th><th>SIM SWAP</th><th>150</th><th>300</th></tr></thead><tbody>{retailerDaily.map(r=><tr key={r.retailerCode}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.employee)}</span><div><b>{r.employee}</b><small>{r.rsoMsisdn}</small></div></div></td><td><b>{r.retailerCode}</b><small className="ga-subline">{r.retailerName}</small></td><td><strong className="ga-number blue">{r.total}</strong><small className="ga-subline">Standard GA only</small></td><td><span className="ga-swap-badge-v98" title="SIMWAP + EV-SWAP; excluded from Total GA">{r.simSwap}</span></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td></tr>)}</tbody></PremiumTable>}
       </section>
 
       <section className="ga-section ga-performance-section">
-        <div className="ga-section-title"><span className="ga-section-icon">↗</span><div><h2>Monthly Employee Performance</h2><p>Target achievement and SSO progress</p></div></div>
+        <div className="ga-section-title"><span className="ga-section-icon">↗</span><div><h2>Monthly Employee Performance</h2><p>Standard GA only. SIMWAP / EV-SWAP are excluded from every employee and target total.</p></div></div>
         <div className="ga-performance-metrics">
           <Metric tone="blue" name="GA Target" value={totals.target.toLocaleString()} note="Monthly target"/>
           <Metric tone="green" name="GA Achieved" value={totals.achieved.toLocaleString()} note="Completed GA"/>
           <Metric tone="cyan" name="150" value={totals.ga150.toLocaleString()} note="Price = 170"/>
           <Metric tone="orange" name="300" value={totals.ga300.toLocaleString()} note="MMST / MMSTs"/>
-          <Metric tone="rose" name="SIM SWAP" value={totals.simSwap.toLocaleString()} note="Replacement only · not achievement"/>
           <Metric tone="purple" name="GA %" value={totals.target?`${((totals.achieved/totals.target)*100).toFixed(1)}%`:"0%"} note="Achievement rate"/>
           <Metric tone="rose" name="SSO" value={`${totals.ssoA.toLocaleString()} / ${totals.ssoT.toLocaleString()}`} note="Achieved / target"/>
         </div>
@@ -218,7 +214,7 @@ export default function GaPage() {
 
       <section className="ga-data-card">
         <div className="ga-card-head"><div><h2>Employee Performance</h2><p>Monthly RSO performance overview</p></div><span className="ga-count-pill">{rows.length} employees</span></div>
-        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>150</th><th>300</th><th>SIM SWAP</th><th>GA Target</th><th>GA Achieved</th><th>GA Progress</th><th>SSO</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.name)}</span><div><b>{r.name}</b><small>{r.employeeCode||r.rsoMsisdn}</small></div></div></td><td><span className="ga-neutral-pill">{r.retailerCount}</span></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td><td><span className="ga-number swap">{r.simSwap}</span></td><td>{r.gaTarget}</td><td><strong className="ga-number blue">{r.gaAchieved}</strong></td><td><div className="ga-progress-cell"><div><span style={{width:`${Math.min(100,r.gaPercent)}%`}}/></div><b>{r.gaPercent}%</b></div></td><td><div className="ga-sso-cell"><b>{r.ssoAchieved}</b><span>/ {r.ssoTarget}</span></div></td></tr>)}</tbody></PremiumTable>
+        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>150</th><th>300</th><th>GA Target</th><th>GA Achieved</th><th>GA Progress</th><th>SSO</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.name)}</span><div><b>{r.name}</b><small>{r.employeeCode||r.rsoMsisdn}</small></div></div></td><td><span className="ga-neutral-pill">{r.retailerCount}</span></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td><td>{r.gaTarget}</td><td><strong className="ga-number blue">{r.gaAchieved}</strong></td><td><div className="ga-progress-cell"><div><span style={{width:`${Math.min(100,r.gaPercent)}%`}}/></div><b>{r.gaPercent}%</b></div></td><td><div className="ga-sso-cell"><b>{r.ssoAchieved}</b><span>/ {r.ssoTarget}</span></div></td></tr>)}</tbody></PremiumTable>
       </section>
 
       <section className="ga-data-card ga-history-card">

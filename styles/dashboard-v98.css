@@ -1,0 +1,232 @@
+/* v98 — dashboard readability/speed feedback + GA swap visibility */
+
+@media(min-width:1024px){
+  .admin-dashboard-v97{
+    max-width:1380px!important;
+    padding:30px 32px 54px!important;
+  }
+
+  .dash97-top{
+    min-height:96px!important;
+  }
+
+  .dash97-top h1{
+    font-size:31px!important;
+  }
+
+  .dash97-top p{
+    font-size:11px!important;
+  }
+
+  .dash97-kicker{
+    font-size:9px!important;
+  }
+
+  .dash97-kpis{
+    gap:14px!important;
+    margin-top:22px!important;
+  }
+
+  .dash97-kpi{
+    min-height:124px!important;
+    padding:17px!important;
+    border-radius:16px!important;
+    box-shadow:0 8px 24px rgba(20,23,31,.035)!important;
+  }
+
+  .dash97-kpi>div:last-child>span{
+    font-size:8.5px!important;
+  }
+
+  .dash97-kpi>div:last-child>strong{
+    font-size:23px!important;
+  }
+
+  .dash97-kpi>div:last-child>small{
+    font-size:9px!important;
+  }
+
+  .dash97-ring{
+    width:60px!important;
+    height:60px!important;
+    flex-basis:60px!important;
+  }
+
+  .dash97-ring b{
+    font-size:9px!important;
+  }
+
+  .dash97-main-grid,
+  .dash97-lower-grid,
+  .dash97-footer-grid{
+    align-items:start!important;
+  }
+
+  .dash97-section-head h2{
+    font-size:16px!important;
+  }
+
+  .dash97-section-head p{
+    font-size:9.5px!important;
+  }
+
+  .dash97-section-head>a{
+    font-size:9px!important;
+  }
+
+  .dash97-report{
+    min-height:88px!important;
+    padding:14px!important;
+  }
+
+  .dash97-report strong{
+    font-size:11px!important;
+  }
+
+  .dash97-report small{
+    font-size:8.5px!important;
+  }
+
+  .dash97-panel{
+    padding:18px!important;
+    border-radius:16px!important;
+    box-shadow:0 7px 22px rgba(20,23,31,.035)!important;
+  }
+
+  .dash97-team-row{
+    min-height:62px!important;
+  }
+
+  .dash97-team-copy strong,
+  .dash97-watch-row strong{
+    font-size:10px!important;
+  }
+
+  .dash97-team-copy small,
+  .dash97-watch-row small{
+    font-size:8px!important;
+  }
+
+  /* Do not create giant blank matching-height panels. */
+  .dash97-performance,
+  .dash97-watch,
+  .dash97-footer-grid>.dash97-panel{
+    height:auto!important;
+    min-height:0!important;
+  }
+}
+
+.dash98-refresh,
+.dash98-live{
+  min-height:30px;
+  padding:0 9px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border-radius:999px;
+  font-size:8px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.dash98-refresh{
+  background:#fbf0dc;
+  color:#9b6509;
+  border:1px solid #ecd9b8;
+}
+
+.dash98-live{
+  background:#e4f2ec;
+  color:#075038;
+  border:1px solid #c9e2d7;
+}
+
+.dash98-refresh i,
+.dash98-live i{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:currentColor;
+}
+
+.dash98-refresh i{
+  animation:dash98-pulse .8s ease-in-out infinite alternate;
+}
+
+@keyframes dash98-pulse{
+  to{opacity:.25}
+}
+
+.ga-swap-badge-v98{
+  min-width:32px;
+  min-height:25px;
+  padding:0 8px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:#fff3e8;
+  border:1px solid #f1d7bf;
+  color:#a85a16;
+  font-size:9px;
+  font-weight:850;
+}
+
+.ga-day-metrics{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+}
+
+.ga-performance-metrics{
+  grid-template-columns:repeat(6,minmax(0,1fr))!important;
+}
+
+@media(max-width:1100px){
+  .ga-day-metrics,
+  .ga-performance-metrics{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+
+@media(max-width:767px){
+  .dash98-refresh,
+  .dash98-live{
+    order:3;
+    justify-self:start;
+  }
+
+  .ga-day-metrics,
+  .ga-performance-metrics{
+    grid-template-columns:1fr!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .dash98-refresh i{animation:none}
+}
+
+.nav-progress-v98{
+  position:fixed;
+  top:0;
+  left:220px;
+  right:0;
+  z-index:180;
+  height:2px;
+  overflow:hidden;
+  background:transparent;
+  pointer-events:none;
+}
+.nav-progress-v98::before{
+  content:"";
+  display:block;
+  width:38%;
+  height:100%;
+  background:linear-gradient(90deg,#0b6e4f,#0e7c86);
+  animation:nav98-slide .9s ease-in-out infinite;
+}
+@keyframes nav98-slide{
+  from{transform:translateX(-120%)}
+  to{transform:translateX(360%)}
+}
+@media(min-width:1600px){.nav-progress-v98{left:228px}}
+@media(max-width:1023px){.nav-progress-v98{left:0}}
+@media(prefers-reduced-motion:reduce){.nav-progress-v98::before{animation:none;width:100%}}

@@ -11,6 +11,16 @@ describe("GA SIM swap product rules",()=>{
   it("keeps SIMWAP selling price 350",()=>{
     expect(expectedSimSwapPrice("SIMWAP")).toBe(350);
     expect(hasExpectedSimSwapPrice("SIMWAP",350)).toBe(true);
+  });
+
+  it("recognizes swap code formatting variants so they cannot enter Total GA",()=>{
+    expect(isSimSwapProduct("EV-SWAP")).toBe(true);
+    expect(isSimSwapProduct("ev swap")).toBe(true);
+    expect(isSimSwapProduct("EV_SWAP")).toBe(true);
+    expect(isSimSwapProduct("EVSWAP")).toBe(true);
     expect(isSimSwapProduct("SIMWAP")).toBe(true);
+    expect(isSimSwapProduct("SIM-WAP")).toBe(true);
+    expect(isSimSwapProduct("MMST")).toBe(false);
+    expect(isSimSwapProduct("MMSTC")).toBe(false);
   });
 });
