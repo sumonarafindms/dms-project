@@ -2,6 +2,7 @@ import Link from "next/link";
 import {requireUser} from "../../../lib/auth";
 import {prisma} from "../../../lib/prisma";
 import {Icon} from "../../components/icons";
+import {withDatabaseRetry} from "../../../lib/db-retry";
 
 function RoleCard({href,icon,label,count,description,tone}:{href:string;icon:string;label:string;count:number;description:string;tone:string}){
  return <Link href={href} className={`ecc-v82-role ${tone}`}>
@@ -13,14 +14,24 @@ function RoleCard({href,icon,label,count,description,tone}:{href:string;icon:str
 
 export default async function Page(){
  await requireUser(["ADMIN","IT"]);
- const [managers,supervisors,rsos,bps,logins,itUsers]=await Promise.all([
-  prisma.user.count({where:{role:"MANAGER"}}),
-  prisma.supervisor.count({}),
-  prisma.employee.count({}),
-  prisma.bpAssignment.count({where:{active:true}}),
-  prisma.user.count({where:{active:true}}),
-  prisma.user.count({where:{role:"IT",active:true}})
- ]);
+ let counts:{managers:number;supervisors:number;rsos:number;bps:number;logins:number;itUsers:number}|null=null;
+ try{
+  counts=await withDatabaseRetry(async()=>{
+   const [managers,supervisors,rsos,bps,logins,itUsers]=await Promise.all([
+    prisma.user.count({where:{role:"MANAGER"}}),
+    prisma.supervisor.count({}),
+    prisma.employee.count({}),
+    prisma.bpAssignment.count({where:{active:true}}),
+    prisma.user.count({where:{active:true}}),
+    prisma.user.count({where:{role:"IT",active:true}})
+   ]);
+   return {managers,supervisors,rsos,bps,logins,itUsers};
+  });
+ }catch(error){
+  console.error("Employee Control Center load failed",error);
+ }
+ if(!counts)return <main className="page ecc-v82"><section className="employee-retry-v91"><span>DATA CONNECTION</span><h1>Employee data is taking longer than expected</h1><p>The page retried the database connection automatically. No employee, login or assignment data was changed.</p><div><Link className="btn admin-primary" href="/admin/employees">Try again</Link><Link className="btn btn-ghost" href="/dashboard">Back to dashboard</Link></div></section></main>;
+ const {managers,supervisors,rsos,bps,logins,itUsers}=counts;
 
  return <main className="page ecc-v82">
   <section className="ecc-v82-hero">

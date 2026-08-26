@@ -20,11 +20,52 @@ export async function POST(req:Request){
 export async function PATCH(req:Request){
  const me=await getCurrentUser(); if(!me||!["ADMIN","IT"].includes(me.role))return NextResponse.json({error:"Unauthorized"},{status:401});
  const b=await req.json(); const id=String(b.id||""); if(!id)return NextResponse.json({error:"User is required"},{status:400});
- const data:any={}; if(typeof b.active==="boolean")data.active=b.active;
- if(b.pin&&String(b.pin).length<4)return NextResponse.json({error:"PIN must contain at least 4 characters."},{status:400});
- if(b.pin)data.credentialHash=await hashCredential(String(b.pin));
- const target=await prisma.user.update({where:{id},data});
- if(b.pin||b.active===false)await prisma.session.deleteMany({where:{userId:id}});
- await audit(me,b.pin?"RESET_PIN":typeof b.active==="boolean"?(b.active?"ACTIVATE_USER":"DEACTIVATE_USER"):"UPDATE_USER","accounts",{targetType:"User",targetId:target.id,targetName:target.displayName});
- return NextResponse.json({ok:true});
+
+ const existing=await prisma.user.findUnique({where:{id}});
+ if(!existing)return NextResponse.json({error:"Account not found."},{status:404});
+
+ const data:any={};
+ if(typeof b.active==="boolean")data.active=b.active;
+
+ const editingDetails=typeof b.displayName==="string"||typeof b.mobileNumber==="string"||typeof b.role==="string";
+ if(editingDetails){
+  const role=String(b.role||existing.role) as typeof roles[number];
+  if(!roles.includes(role))return NextResponse.json({error:"Invalid role"},{status:400});
+  const displayName=String(b.displayName??existing.displayName).trim();
+  const mobileNumber=String(b.mobileNumber??existing.mobileNumber??"").trim();
+  if(!displayName||!mobileNumber)return NextResponse.json({error:"Display name and mobile number are required."},{status:400});
+
+  const employeeId=b.employeeId?String(b.employeeId):null;
+  const supervisorId=b.supervisorId?String(b.supervisorId):null;
+  const bpRetailerId=b.bpRetailerId?String(b.bpRetailerId):null;
+  if(role==="RSO"&&!employeeId)return NextResponse.json({error:"Select the RSO employee for this login."},{status:400});
+  if(role==="SUPERVISOR"&&!supervisorId)return NextResponse.json({error:"Select the supervisor for this login."},{status:400});
+  if(role==="BP"&&!bpRetailerId)return NextResponse.json({error:"Select an active BP retailer for this login."},{status:400});
+  if(role==="BP"){
+   const assignment=await prisma.bpAssignment.findFirst({where:{retailerId:bpRetailerId as string,active:true}});
+   if(!assignment)return NextResponse.json({error:"That retailer is not currently assigned as a BP."},{status:400});
+  }
+
+  data.displayName=displayName;
+  data.mobileNumber=mobileNumber;
+  data.role=role;
+  data.employeeId=role==="RSO"?employeeId:null;
+  data.supervisorId=role==="SUPERVISOR"?supervisorId:null;
+  data.bpRetailerId=role==="BP"?bpRetailerId:null;
+ }
+
+ const pin=typeof b.pin==="string"?b.pin.trim():"";
+ if(pin&&pin.length<4)return NextResponse.json({error:"PIN must contain at least 4 characters."},{status:400});
+ if(pin)data.credentialHash=await hashCredential(pin);
+
+ try{
+  const target=await prisma.user.update({where:{id},data});
+  const securityChanged=Boolean(pin)||editingDetails||b.active===false;
+  if(securityChanged)await prisma.session.deleteMany({where:{userId:id}});
+  const action=pin?"RESET_PIN":editingDetails?"UPDATE_USER":typeof b.active==="boolean"?(b.active?"ACTIVATE_USER":"DEACTIVATE_USER"):"UPDATE_USER";
+  await audit(me,action,"accounts",{targetType:"User",targetId:target.id,targetName:target.displayName,detail:editingDetails?`Updated ${target.role} login details`:undefined});
+  return NextResponse.json({ok:true});
+ }catch(e:any){
+  return NextResponse.json({error:e?.code==="P2002"?"This mobile number or role mapping is already assigned to another account.":"Could not update user."},{status:400});
+ }
 }

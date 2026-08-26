@@ -501,3 +501,28 @@
 - Redesigned tables as modern enterprise data grids with stronger headers, row rhythm and hover states.
 - Improved performance cards, detail/profile metadata, KPI readability and activity panels.
 - No fake chart data, API changes, database changes or business-logic changes.
+
+## v91 - Account Editing & Stability
+- Added Edit / PIN controls for created login accounts.
+- Admin/IT can update display name, mobile number, role mapping and optionally set a new PIN.
+- Security-sensitive account edits revoke existing sessions.
+- Employee Control Center now retries transient database connection failures before rendering.
+- If retries still fail, Employee Control Center shows an in-page recovery state instead of the global error screen.
+- Repaired executive dashboard heading, reporting-month selector and Upload Center action alignment.
+
+## v92 - Professional Interaction Polish
+- Refined Login Accounts into a clearer enterprise account directory.
+- Improved edit/status actions, form density, responsive layout and mobile account management.
+- Polished Employee Control Center cards, hierarchy and recovery messaging.
+- Added consistent focus states, hover states, scrollbars, empty states and loading skeletons.
+- Improved table density, numeric alignment and detail/profile clarity.
+- No API, auth, permissions, database or business-rule changes.
+
+## v93 - Layout System Update
+- Standardized desktop page canvas, gutters and section rhythm.
+- Rebalanced sidebar/content proportions for laptop, desktop and large monitors.
+- Unified page-header composition across admin screens.
+- Reworked dashboard, performance, employees, login accounts, uploads, tables and detail pages into consistent modern grids.
+- Added sticky account-creation panel on desktop.
+- Improved tablet and mobile stacking rules.
+- Business logic, APIs, permissions, auth and database behavior unchanged.
