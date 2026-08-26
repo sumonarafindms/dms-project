@@ -444,3 +444,12 @@
 - Replaced broken/raw role links with five responsive role cards for Manager, Supervisor, RSO, BP and IT.
 - Rebuilt hierarchy and access-management panels with explicit responsive layouts.
 - Kept database counts, routes, ADMIN/IT access and existing business logic unchanged.
+
+## v84 - Dashboard Readability Redesign
+- Rebalanced the admin dashboard for desktop and large-screen readability.
+- Reduced admin sidebar width and constrained the dashboard canvas.
+- Reduced the oversized execution hero and improved top action balance.
+- Changed Business KPI presentation from a squeezed six-column row to a spacious 3 x 2 grid.
+- Changed Executive Intelligence to a readable 2 x 2 grid.
+- Increased important text, table, card, and helper-text sizing.
+- Kept calculations, routes, permissions, APIs and database behavior unchanged.
