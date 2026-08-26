@@ -453,3 +453,27 @@
 - Changed Executive Intelligence to a readable 2 x 2 grid.
 - Increased important text, table, card, and helper-text sizing.
 - Kept calculations, routes, permissions, APIs and database behavior unchanged.
+
+## v85 - Interface Repair
+- Fixed oversized desktop sidebar/blank-column behavior at 100% browser zoom.
+- Re-centered the admin dashboard canvas and prevented ultra-wide stretching.
+- Improved laptop and large-monitor breakpoints.
+- Reduced visual density while preserving readable KPI and intelligence layouts.
+- Added subtle surface, hover and spacing improvements.
+- Business logic, APIs, auth, permissions and database behavior unchanged.
+
+## v86 - Admin Shell Visual QA
+- Harmonized all admin pages to the same centered desktop canvas used by the repaired dashboard.
+- Refined sidebar states, spacing, profile card and sign-out treatment.
+- Standardized admin cards, tables, action sizes and section rhythm.
+- Improved tablet KPI layouts and mobile top/bottom navigation.
+- Added consistent focus-visible and reduced-motion handling.
+- Business logic, APIs, auth, permissions and database behavior unchanged.
+
+## v87 - Aurora Slate Full Interface Theme
+- Reworked the complete application visual identity with a teal/slate palette.
+- Converted desktop sidebar to a dark premium navigation surface.
+- Updated dashboard, cards, tables, forms, buttons, badges and links.
+- Restyled login, hidden admin login, upload center, employee control center and detail/profile surfaces.
+- Updated mobile navigation and responsive surfaces to match the new identity.
+- Kept all business logic, calculations, APIs, permissions, authentication and database behavior unchanged.

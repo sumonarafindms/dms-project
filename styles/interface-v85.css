@@ -1,0 +1,247 @@
+/* v85 — shell + dashboard 100% zoom repair
+   Presentation only. No business logic changes. */
+
+/* Desktop shell: keep sidebar compact and content naturally centered */
+@media (min-width: 1024px) {
+  .admin-app {
+    grid-template-columns: 214px minmax(0, 1fr) !important;
+    background:
+      radial-gradient(circle at 70% -10%, rgba(99,102,241,.05), transparent 34%),
+      #f6f8fc !important;
+  }
+
+  .admin-app .desktop-sidebar {
+    width: 214px !important;
+    min-width: 214px !important;
+    padding: 16px 10px 14px !important;
+    background: linear-gradient(180deg,#ffffff 0%,#fbfcff 100%) !important;
+    border-right: 1px solid #e7eaf0 !important;
+    box-shadow: 8px 0 26px rgba(15,23,42,.025) !important;
+  }
+
+  .admin-app .sidebar-brand {
+    padding: 2px 8px 14px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .admin-app .sidebar-section {
+    padding: 10px 8px 5px !important;
+    margin-top: 4px !important;
+    font-size: 8px !important;
+  }
+
+  .admin-app .sidebar-link {
+    min-height: 38px !important;
+    padding: 0 9px !important;
+    margin: 1px 0 !important;
+    font-size: 9.5px !important;
+    border-radius: 10px !important;
+  }
+
+  .admin-app .sidebar-link svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .admin-app .sidebar-spacer {
+    min-height: 18px !important;
+  }
+
+  .admin-app .sidebar-profile {
+    margin-top: 10px !important;
+    padding: 10px 8px 4px !important;
+  }
+
+  .admin-app .sidebar-profile .avatar {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .admin-app .profile-name {
+    font-size: 9px !important;
+  }
+
+  .admin-app .profile-role {
+    font-size: 7px !important;
+  }
+
+  .admin-app .app-main {
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow-x: clip !important;
+  }
+
+  /* Dashboard canvas stays centered instead of drifting right on wide displays */
+  .admin-dashboard.admin-v2 {
+    width: min(100%, 1320px) !important;
+    max-width: 1320px !important;
+    margin: 0 auto !important;
+    padding: 28px 26px 56px !important;
+  }
+
+  .admin-dashboard .admin-v2-head {
+    margin-bottom: 18px !important;
+  }
+
+  .admin-dashboard .admin-v2-heading h1 {
+    font-size: 34px !important;
+  }
+
+  .admin-dashboard .admin-v2-heading p {
+    font-size: 12px !important;
+  }
+
+  .admin-dashboard .admin-v2-command-grid {
+    grid-template-columns: minmax(0,1fr) 286px !important;
+    gap: 14px !important;
+  }
+
+  .admin-dashboard .admin-v2-hero {
+    min-height: 238px !important;
+    padding: 20px 22px !important;
+  }
+
+  .admin-dashboard .admin-v2-focus-card {
+    min-height: 76px !important;
+  }
+
+  .admin-dashboard .admin-v2-health {
+    min-height: 66px !important;
+  }
+
+  .admin-dashboard .admin-v2-section {
+    margin-top: 18px !important;
+  }
+
+  .admin-dashboard .admin-v2-kpis {
+    grid-template-columns: repeat(3,minmax(0,1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .admin-dashboard .admin-v2-kpi {
+    min-height: 148px !important;
+    padding: 15px 16px !important;
+  }
+
+  .admin-dashboard .admin-v2-kpi-value {
+    font-size: 24px !important;
+  }
+
+  .admin-dashboard .admin-exec-v49-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .admin-dashboard .admin-exec-v49-card {
+    min-height: 154px !important;
+    padding: 16px !important;
+  }
+
+  .admin-dashboard .admin-exec-v49-card > strong {
+    font-size: 21px !important;
+    margin-top: 15px !important;
+  }
+
+  .admin-dashboard .admin-v2-main-grid {
+    grid-template-columns: minmax(0,1.5fr) minmax(300px,.7fr) !important;
+    gap: 14px !important;
+  }
+}
+
+/* Common laptop widths */
+@media (min-width: 1024px) and (max-width: 1365px) {
+  .admin-app {
+    grid-template-columns: 202px minmax(0,1fr) !important;
+  }
+
+  .admin-app .desktop-sidebar {
+    width: 202px !important;
+    min-width: 202px !important;
+  }
+
+  .admin-dashboard.admin-v2 {
+    max-width: 1180px !important;
+    padding: 24px 20px 48px !important;
+  }
+
+  .admin-dashboard .admin-v2-command-grid {
+    grid-template-columns: minmax(0,1fr) 250px !important;
+  }
+
+  .admin-dashboard .admin-v2-kpis {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+}
+
+/* Very wide monitors: do not stretch cards endlessly */
+@media (min-width: 1600px) {
+  .admin-dashboard.admin-v2 {
+    max-width: 1340px !important;
+  }
+}
+
+/* Improve general visual quality of dashboard surfaces */
+.admin-dashboard .admin-v2-section,
+.admin-dashboard .admin-exec-v49 {
+  position: relative !important;
+}
+
+.admin-dashboard .admin-v2-section > .card,
+.admin-dashboard .admin-v2-main,
+.admin-dashboard .admin-v2-side {
+  border-color: #e7eaf0 !important;
+}
+
+.admin-dashboard .admin-v2-kpi,
+.admin-dashboard .admin-exec-v49-card,
+.admin-dashboard .admin-v2-focus-card,
+.admin-dashboard .admin-v2-health {
+  box-shadow: 0 8px 24px rgba(15,23,42,.045) !important;
+}
+
+.admin-dashboard .admin-v2-kpi:hover,
+.admin-dashboard .admin-exec-v49-card:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 12px 30px rgba(15,23,42,.065) !important;
+}
+
+.admin-dashboard .admin-v2-section-head {
+  background: transparent !important;
+}
+
+.admin-dashboard .admin-v2-section-head h2 {
+  color: #172033 !important;
+}
+
+.admin-dashboard .admin-v2-section-head p,
+.admin-dashboard .admin-v2-kpi-meta,
+.admin-dashboard .admin-exec-v49-card > p {
+  color: #667085 !important;
+}
+
+/* Mobile/tablet remains compact and readable */
+@media (max-width: 1023px) {
+  .admin-dashboard.admin-v2 {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-dashboard.admin-v2 {
+    padding: 16px 12px 34px !important;
+  }
+
+  .admin-dashboard .admin-v2-kpis {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-dashboard .admin-exec-v49-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-dashboard .admin-v2-kpi,
+  .admin-dashboard .admin-exec-v49-card {
+    min-height: auto !important;
+  }
+}
