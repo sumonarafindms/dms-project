@@ -131,11 +131,11 @@ export async function importGaActivationWorkbook(
   const headers = (rows[0] ?? []).map(normalizeHeader);
   const required = ["RETAILER_CODE", "SIM_NO", "PRODUCT_CODE", "SELLING_PRICE", "ACTIVATION_DATE", "ACTIVATION_TIME"];
   const index: Record<string, number> = {};
-  for (const header of required) {
-    const col = headers.indexOf(header);
-    if (col < 0) throw new Error(`Required column ${header} was not found in the uploaded file.`);
-    index[header] = col;
+  const missingHeaders=required.filter(header=>!headers.includes(header));
+  if(missingHeaders.length){
+    throw new Error(`Required heading${missingHeaders.length>1?"s":""} missing: ${missingHeaders.join(", ")}. Found headings: ${headers.filter(Boolean).join(", ")||"none"}.`);
   }
+  for (const header of required) index[header]=headers.indexOf(header);
 
   const parsedRows: ParsedActivation[] = [];
   const preErrors: Array<{ rowNumber: number; message: string; rawData: object }> = [];
@@ -188,6 +188,10 @@ export async function importGaActivationWorkbook(
   }
 
   if (!sourceRows) throw new Error("No activation rows were found in the uploaded file.");
+  if (preErrors.length) {
+    const preview=preErrors.slice(0,8).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
+    throw new Error(`Data validation failed: ${preErrors.length} invalid row(s). ${preview}${preErrors.length>8?" …":""}`);
+  }
   if (!parsedRows.length) throw new Error("No valid activation rows were found in the uploaded file.");
 
   const selectedIso = isoDate(selectedDate);
@@ -220,6 +224,10 @@ export async function importGaActivationWorkbook(
     select: { id: true, retailerCode: true },
   });
   const retailerMap = new Map(retailers.map((r) => [r.retailerCode.toUpperCase(), r.id]));
+  const missingRetailers=[...new Set(parsedRows.filter(row=>!retailerMap.has(row.retailerCode)).map(row=>row.retailerCode))];
+  if(missingRetailers.length){
+    throw new Error(`Data validation failed: retailer code${missingRetailers.length>1?"s":""} not found in Retailer Master: ${missingRetailers.slice(0,12).join(", ")}${missingRetailers.length>12?" …":""}`);
+  }
 
   const simNumbers = [...new Set(parsedRows.map((row) => row.simNo))];
   const existing = await prisma.gaActivation.findMany({

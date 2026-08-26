@@ -2,7 +2,7 @@ import {apiUser,apiPermission} from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { importEmployees, importRetailers } from "@/lib/master-import";
 import {validateUploadFile} from "@/lib/upload-safety";
-import {apiError} from "@/lib/http-errors";
+import {importValidationError} from "@/lib/http-errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
     return NextResponse.json({ ok: true, type: normalizedType, fileName: file.name, ...result });
   } catch (error) {
     console.error(error);
-    const e=apiError(error,"Master import failed. Check the workbook and try again.");
+    const e=importValidationError(error,"The master workbook could not be validated.");
     return NextResponse.json({error:e.error},{status:e.status});
   }
 }

@@ -6,7 +6,7 @@ import { importC2sWorkbook } from "@/lib/c2s-import";
 import { importObWorkbook } from "@/lib/ob-import";
 import {audit} from "@/lib/audit";
 import {validateUploadFile} from "@/lib/upload-safety";
-import {apiError} from "@/lib/http-errors";
+import {importValidationError} from "@/lib/http-errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,7 +14,7 @@ export const maxDuration = 60;
 const allowed = new Set(["GA", "C2C", "C2S", "OB"]);
 
 export async function POST(req: NextRequest, context: { params: Promise<{ type: string }> }) {
-  const actor=await apiUser(["ADMIN","ACCOUNTS"]);if(!actor) return NextResponse.json({error:"Unauthorized"},{status:401});
+  const actor=await apiUser(["ADMIN","IT","ACCOUNTS"]);if(!actor) return NextResponse.json({error:"Unauthorized"},{status:401});
   try {
     const { type } = await context.params;
     const normalizedType = type.toUpperCase();
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
     });
   } catch (error) {
     console.error(error);
-    const e=apiError(error,"Import failed. Check the file format and try again.");
+    const e=importValidationError(error,"The uploaded file could not be validated.");
     return NextResponse.json({error:e.error},{status:e.status});
   }
 }

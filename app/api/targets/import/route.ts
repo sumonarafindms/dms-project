@@ -6,7 +6,6 @@ import {monthBounds} from "@/lib/month";
 import {audit} from "@/lib/audit";
 import {phoneKey} from "@/lib/phone";
 import {validateUploadFile} from "@/lib/upload-safety";
-import {apiError} from "@/lib/http-errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,9 +16,8 @@ const int=(v:number)=>Math.max(0,Math.trunc(v));
 const head=(v:unknown)=>text(v).toUpperCase().replace(/\s+/g,"_");
 type TargetState={gaTarget:number;c2cTarget:number;scTarget:number;totalRechargeTarget:number;ssoTarget:number;lsoTarget:number;explicitRecharge:boolean};
 
-
 export async function POST(req:Request){
- const actor=await apiUser(["ADMIN","ACCOUNTS"]);if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});
+ const actor=await apiUser(["ADMIN","IT","ACCOUNTS"]);if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});
  if(!(await apiPermission("targets","update")))return NextResponse.json({error:"You do not have permission to update targets."},{status:403});
  try{
   const form=await req.formData(),file=form.get("file"),monthText=text(form.get("month"));
@@ -33,8 +31,11 @@ export async function POST(req:Request){
   if(!matrix.length)return NextResponse.json({error:"Target file is empty."},{status:400});
   const headers=(matrix[0]||[]).map(head),rows=matrix.slice(1).filter(r=>r.some((v:any)=>text(v))),idx=(name:string)=>headers.indexOf(name);
   const iRso=idx("RSO_NUMBER"),iBp=idx("BP_CODE"),iType=idx("TARGET_TYPE"),iTarget=idx("TARGET");
-  if(iRso<0&&iBp<0)return NextResponse.json({error:"Target file needs RSO_NUMBER and/or BP_CODE."},{status:400});
-  if(iType<0||iTarget<0)return NextResponse.json({error:"Target file needs TARGET_TYPE and TARGET columns."},{status:400});
+  const missing:string[]=[];
+  if(iRso<0&&iBp<0)missing.push("RSO_NUMBER or BP_CODE");
+  if(iType<0)missing.push("TARGET_TYPE");
+  if(iTarget<0)missing.push("TARGET");
+  if(missing.length)return NextResponse.json({error:`Required heading${missing.length>1?"s":""} missing: ${missing.join(", ")}. Found headings: ${headers.filter(Boolean).join(", ")||"none"}.`},{status:400});
 
   const [employees,existingTargets,bpAssignments]=await Promise.all([
    prisma.employee.findMany({where:{active:true},select:{id:true,rsoMsisdn:true,employeeCode:true}}),
@@ -71,6 +72,9 @@ export async function POST(req:Request){
    }catch(e){if(errors.length<30)errors.push(`Row ${n+2}: ${e instanceof Error?e.message:"Invalid row"}`)}
   }
 
+  if(errors.length){
+    return NextResponse.json({error:`Target data validation failed: ${errors.length} invalid row(s). ${errors.slice(0,8).join("; ")}${errors.length>8?" …":""}`,errors,totalRows:rows.length,validRows,failed:errors.length},{status:400});
+  }
   for(const employeeId of touched){const s=targetByEmployee.get(employeeId)!;if(!s.explicitRecharge)s.totalRechargeTarget=s.c2cTarget+s.scTarget}
 
   await prisma.$transaction(async tx=>{
@@ -85,5 +89,5 @@ export async function POST(req:Request){
   const updated=touched.size+bpTargets.size,failed=rows.length-validRows;
   await audit(actor,"IMPORT_TARGETS","targets",{targetType:"File",targetName:file.name,detail:`Imported ${updated} target record(s) for ${monthText}`,metadata:{month:monthText,updated,failed,validRows}});
   return NextResponse.json({ok:true,month:monthText,totalRows:rows.length,validRows,updated,failed,errors});
- }catch(e){console.error(e);return NextResponse.json({error:e instanceof Error?e.message:"Target import failed"},{status:500})}
+ }catch(e){console.error(e);return NextResponse.json({error:e instanceof Error?e.message:"Target import failed"},{status:400})}
 }

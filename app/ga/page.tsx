@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {useCan} from "../components/PermissionContext";
 import {dhakaYesterdayYmd} from "../../lib/business-time";
+import {TableScrollHint} from "../components/TableScrollHint";
 
 type EmployeeRow = {
   employeeId: string;

@@ -6,3 +6,9 @@ export function apiError(error:unknown,fallback:string){
  if(isDatabaseUnavailable(error))return {status:503,error:"Database is temporarily unavailable. Please try again shortly."};
  return {status:500,error:fallback};
 }
+
+export function importValidationError(error:unknown,fallback:string){
+ if(isDatabaseUnavailable(error))return {status:503,error:"Database is temporarily unavailable. Please try again shortly."};
+ if(error instanceof Error&&error.message.trim())return {status:400,error:error.message.trim()};
+ return {status:400,error:fallback};
+}

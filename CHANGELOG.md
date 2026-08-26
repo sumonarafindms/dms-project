@@ -253,3 +253,187 @@
 - Normal Team Login explicitly rejects ADMIN accounts even if an Admin has a mobile number.
 - Admin access continues to require Admin credentials and the dedicated `/sacool` flow.
 - Added the PostgreSQL enum migration for the new IT role.
+
+## v59 - Employee Control Center IT Card Repair
+- Added IT user count to the Employee Control Center hero.
+- Added IT as a fifth premium EmployeeHubCard using the existing card component and design system.
+- Kept IT outside the field reporting hierarchy while linking it to Login Accounts management.
+- Added responsive five-card desktop layout and tablet fallback without introducing raw/un-styled role markup.
+
+## v60 - Mobile Responsive Premium Pass
+- Rebuilt Performance pages around a mobile-first layout instead of shrinking the desktop interface.
+- Compact mobile search/date filters into a predictable search + two-date + apply layout.
+- Prevented page-width overflow and clipped text on narrow phones.
+- Reworked KPI summary cards and RSO performance cards for readable mobile density.
+- Fixed the fixed bottom navigation so all items remain inside the viewport.
+- Made wide tables independently horizontally scrollable without widening the entire page.
+- Added dedicated small-phone and tablet responsive behavior.
+
+## v61 - Premium Upload Center & Validate-Before-Write Imports
+- Reworked Upload Center into premium Operational Feeds and Control Data sections.
+- Added visible header/data/mapping validation stages to every upload module.
+- Import APIs now return the exact validation problem instead of the generic "Import failed" fallback.
+- GA reports all missing required headings together and stops before database writes when row data or retailer mappings are invalid.
+- C2C and C2S locate the best header candidate and list exact missing headings; invalid/unmapped rows now stop the import before operational data is written.
+- OB retains strict full-file validation and now surfaces its exact validation error to the UI.
+- Retailer/Employee master imports report exact missing headings and stop before writes when row validation fails.
+- Target import reports exact missing headings and validates the full file before applying any target updates.
+- IT retains Admin-style upload access.
+
+## v62 - Global Premium UI / UX Pass
+- Added a global premium visual layer across all role pages without changing business logic.
+- Standardized card radii, shadows, spacing, form focus states, buttons and typography hierarchy.
+- Upgraded all shared HTML tables with sticky gradient headers, zebra rows, hover feedback, numeric alignment-friendly typography and responsive horizontal scrolling.
+- Improved mobile/tablet table density so wide operational data remains usable without widening the whole page.
+- Expanded the reusable SVG icon library with calendar, file, check, alert, filter, arrow, edit, download and shield icons for richer page-level UI.
+- Preserved all v61 upload validation behavior, IT access, Sacool and existing operational rules.
+
+## v63 - Live Dynamic Search
+- Server-rendered performance and drill-down search fields now auto-filter after a short typing debounce.
+- Search by name, code, mobile, supervisor, retailer or SIM without pressing Search/Apply.
+- Date and month filters auto-apply immediately after selection.
+- Activity Log text/module/action filters are live.
+- Existing client-side Employees, Users and Targets searches remain instant.
+
+## v64 - Premium Table & Mobile Data Experience
+- Upgraded table styling across the application with sticky gradient headers, hover focus, first-column emphasis and cleaner numeric presentation.
+- Added a reusable mobile table scroll hint.
+- Heavy operational tables now show a swipe hint on mobile and preserve the first column while horizontally scrolling.
+- Improved mobile table density, empty states, search-field sizing and data-card spacing.
+- Preserved v63 live dynamic search and v61 validation logic.
+
+## v65 - Unified Premium Visual System
+- Added a consistent premium visual language across dashboards, detail pages, upload modules, cards, forms and navigation.
+- Improved card depth, metric hierarchy, page spacing, hover states and action-card interaction.
+- Standardized success/warning/error status pill styling.
+- Enhanced upload/drop areas and form focus treatment.
+- Added a reusable PremiumBadge component and applied icon-led badges to operational headers.
+- Added subtle loading shimmer styling and improved mobile/desktop spacing consistency.
+- Preserved v64 responsive tables, v63 live search and v61 validate-before-write imports.
+
+## v66 - Premium Forms & Feedback
+- Added reusable PremiumFeedback and PremiumFormSection components.
+- Operational upload messages now use clear success/error/info feedback cards instead of plain text.
+- Target and Retailer import feedback now uses the same status system.
+- Improved form hover/focus/disabled states, textarea behavior and mobile single-column form layout.
+- Enhanced sticky action bars, back links, keyboard focus visibility and touch interaction.
+- Added subtle page entrance motion with reduced-motion support.
+- Preserved v65 visual system, v64 table UX, v63 live search and v61 validate-before-write imports.
+
+## v67 - Contrast & Readability
+- Corrected low-contrast text across dark profile/hero areas and light/pastel cards.
+- Retailer profile hero now uses white primary text, brighter metadata and readable secondary labels.
+- KPI values, warning/status panels, recent activity cards and table content now have explicit foreground colors.
+- Improved sidebar, button, input, placeholder, badge and empty-state readability.
+- Added defensive contrast rules so inherited colors do not disappear into matching backgrounds.
+- Preserved all v66/v65/v64/v63 functionality and import validation.
+
+## v68 - Premium Detail & Profile Pages
+- Refined Retailer/profile hero composition, metadata cards, KPI cards, status panels and recent activity sections.
+- Improved detail page spacing, depth, color hierarchy and responsive behavior.
+- Added a reusable PremiumDetailStat component for future Manager/Supervisor/RSO detail-page metrics.
+- Retailer profile now scales to 2-column KPI/meta layouts on tablet/mobile and single-column recent activity panels on phones.
+- Preserved v67 contrast corrections, v66 feedback, v64 tables and v63 live search.
+
+## v69 - Premium Navigation & Page Orientation
+- Refined desktop sidebar spacing, section labels, active states, icons, hover behavior and role/user blocks.
+- Added clearer active-item indicators and improved section hierarchy.
+- Upgraded mobile bottom navigation with glass treatment, active underline and improved small-phone fit.
+- Standardized breadcrumb/back-link treatment for stronger page orientation.
+- Added reusable NavContext component for contextual navigation labels.
+- Preserved v68 detail profiles, v67 contrast, v66 forms, v64 tables and v63 live search.
+
+## v70 - Premium Dashboard & Analytics Presentation
+- Refined KPI cards across Admin, Manager, Supervisor, RSO and Accounts dashboards.
+- Improved ranking/team cards, action cards and section containers for faster data scanning.
+- Added reusable PremiumProgress component for target-vs-achievement visualization.
+- Standardized dashboard section headings and responsive metric density.
+- Improved mobile KPI grids and quick-action layouts.
+- Preserved v69 navigation, v68 detail profiles, v67 contrast, v64 tables and v63 live search.
+
+## v71 - Premium Data Tables & Filters
+- Upgraded operational tables with stronger headers, row hierarchy, hover states, sticky headings and cleaner density.
+- Improved horizontal scrolling and table shells for mobile/tablet.
+- Refined search/filter panels, inputs, selects and live-search presentation.
+- Added standardized result-count styling and compact table action controls.
+- Added reusable PremiumDataHeader component for table/list pages.
+- Preserved v70 dashboards, v69 navigation, v68 profiles, live search and import validation.
+
+## v72 - Premium Interaction States
+- Added reusable PremiumEmpty, PremiumLoading and PremiumDangerNote components.
+- Standardized loading spinners, disabled/busy buttons and destructive action styling.
+- Reworked operational empty states to use the shared premium empty-state system.
+- Improved interaction feedback for clicks, uploads, save states and data-empty views.
+- Added mobile-aware toast-zone helper for future notifications.
+- Preserved v71 data tables, v70 dashboards, v69 navigation, live search and import validation.
+
+## v73 - Accessibility & Responsive Density
+- Improved typography scaling, line-height and text wrapping across pages.
+- Increased critical form readability and mobile input sizes to prevent iOS zoom.
+- Added coarse-pointer touch-target improvements, reduced-motion support and high-contrast mode.
+- Added overflow/clipping safeguards for dense responsive layouts.
+- Added print-friendly dashboard/table behavior.
+- Added reusable SkipLink component for keyboard navigation.
+- Preserved v72 interaction states, v71 tables, v70 dashboards and all existing business logic.
+
+## v74 - Premium Micro-interactions & Help UX
+- Standardized hover, active and press behavior across cards, quick actions, upload modules and list rows.
+- Improved equal-height action/card grids and shared icon sizing.
+- Added reusable PremiumHint component with keyboard-accessible tooltip/help popovers.
+- Refined badges, dividers, helper copy and subtle section accents.
+- Added mobile-safe tooltip behavior and reduced-motion support.
+- Preserved v73 accessibility, v72 interaction states, v71 tables, live search and import validation.
+
+## v75 - Premium Forms & Action Hierarchy
+- Standardized inputs, selects, textareas, checkboxes and form-label presentation.
+- Strengthened primary, secondary and destructive button hierarchy.
+- Improved save/action bars and mobile full-width action behavior.
+- Added reusable PremiumFieldGroup and ActionToolbar components.
+- Added inline validation-ready success/error styles and required-field markers.
+- Preserved v74 micro-interactions, v73 accessibility, v71 tables and all existing business logic.
+
+## v76 - Premium Authentication Experience
+- Refined the public team login with stronger brand hierarchy, readable dark-panel contrast and premium role cards.
+- Upgraded login form spacing, focus states, error/help feedback and mobile behavior.
+- Added dedicated responsive treatment for small phones and iOS input zoom prevention.
+- Polished the hidden /sacool administrator login surface without exposing admin login on the public team page.
+- Preserved IT role, authentication logic, redirects and all existing business functionality.
+
+## v77 - Premium Page Headers & Toolbars
+- Added reusable PremiumPageHeader component for consistent title, subtitle, icon, metadata and action layouts.
+- Normalized existing page headers, top actions and toolbar spacing across operational/admin pages.
+- Improved mobile action stacking so buttons, filters and page actions no longer wrap awkwardly.
+- Refined tablet and extra-wide desktop header behavior.
+- Preserved v76 authentication styling, v75 form hierarchy, v74 micro-interactions and all business logic.
+
+## v78 - Premium Dialogs & Notifications
+- Added reusable PremiumDialog for confirmation, warning and destructive actions.
+- Added reusable PremiumToast for success, error, warning and informational notifications.
+- Added premium danger-zone styling for critical settings/actions.
+- Improved busy/confirmation action hierarchy and mobile bottom-sheet dialog behavior.
+- Added reduced-motion support for dialogs and notifications.
+- Preserved v77 page headers, v76 login, v75 forms, live search, import validation and all business logic.
+
+## v79 - Major Interface & Layout Refinement
+- Reworked the global visual shell with cleaner page rhythm, premium card surfaces and stronger content hierarchy.
+- Improved dashboard grids, KPI alignment, list/directory surfaces and section grouping.
+- Refined page hero surfaces, form grouping, upload layouts and table placement.
+- Added dedicated tablet and mobile layout rules instead of relying only on desktop shrinking.
+- Added reusable PremiumLayoutGrid for main-content + contextual-aside layouts.
+- Preserved all existing authentication, import, SIM SWAP, role, search and business logic.
+
+## v80 - Premium Visual Polish
+- Unified the global color system for text, cards, chips, badges, avatars and status states.
+- Added subtle accent lines and improved section separation for stronger visual hierarchy.
+- Refined neutral card hover states, avatar/icon tiles and toolbar surfaces.
+- Added dedicated laptop, large-screen, mobile and extra-small-phone density tuning.
+- Added reusable PremiumDivider and StatusBadge components.
+- Preserved all prior UI, live search, import validation, authentication, role and business logic.
+
+## v81 - Premium Page Composition
+- Standardized page, section, card, KPI and action-grid composition across the application.
+- Added responsive auto-fit KPI grids and consistent action-card layouts.
+- Improved upload, target, permission, employee and profile section grouping.
+- Added reusable PageStack and PageGrid components.
+- Added tablet/mobile-specific grid behavior so dense pages collapse predictably.
+- Preserved v80 visual polish, live search, import validation, IT access and all business logic.

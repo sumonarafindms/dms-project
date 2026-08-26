@@ -3,6 +3,7 @@ import {FormEvent,useState} from "react";
 import {useRouter} from "next/navigation";
 import ConfirmActionButton from "../../components/ConfirmActionButton";
 import StatusToast from "../../components/StatusToast";
+import {TableScrollHint} from "../../components/TableScrollHint";
 type Opt={id:string;name:string;meta?:string};type U={id:string;displayName:string;mobileNumber:string|null;role:string;active:boolean;link:string};
 export default function UserManager({users,employees,supervisors,bps}:{users:U[];employees:Opt[];supervisors:Opt[];bps:Opt[]}){
  const router=useRouter(),[role,setRole]=useState("RSO"),[msg,setMsg]=useState(""),[msgTone,setMsgTone]=useState<"success"|"error">("success"),[q,setQ]=useState("");

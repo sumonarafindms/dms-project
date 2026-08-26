@@ -102,7 +102,12 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
 
   const required = ["RETAILER_CODE", "RETAILER_ITOPUP_NO", "TRANSACTION_COUNT", "TOTAL_AMOUNT", "SRNUMBER"];
   const headerRowIndex = findHeaderRow(matrix, required);
-  if (headerRowIndex < 0) throw new Error("Could not find the report header row containing RETAILER_CODE, TOTAL_AMOUNT and SRNUMBER.");
+  if (headerRowIndex < 0) {
+    const candidates=matrix.slice(0,30).map((row,rowIndex)=>{const hs=(row??[]).map(header).filter(Boolean);const matched=required.filter(key=>hs.includes(key));return {rowIndex,hs,matched}}).sort((a,b)=>b.matched.length-a.matched.length);
+    const best=candidates[0]||{rowIndex:0,hs:[],matched:[]};
+    const missing=required.filter(key=>!best.hs.includes(key));
+    throw new Error(`Required headings missing: ${missing.join(", ")}. Best header candidate was row ${best.rowIndex+1} and contained: ${best.hs.join(", ")||"no recognizable headings"}.`);
+  }
   const headerRow = matrix[headerRowIndex] ?? [];
   const headers = headerRow.map(header);
   const idx: Record<string, number> = {};
@@ -181,6 +186,12 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
     const sourceRso = phoneKey(row.srNumber);
     if (masterRso && sourceRso && masterRso !== sourceRso) assignmentWarnings++;
     mapped.push({...row,retailerId:retailer.id});
+  }
+
+  if (errors.length) {
+    const preview=errors.slice(0,8).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
+    await prisma.importBatch.delete({where:{id:batch.id}}).catch(()=>undefined);
+    throw new Error(`C2S data validation failed: ${errors.length} invalid or unmapped row(s). ${preview}${errors.length>8?" …":""}`);
   }
 
   try {

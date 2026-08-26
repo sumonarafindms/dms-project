@@ -86,7 +86,12 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
   if (matrix.length < 2) throw new Error("The Opening Balance report is empty.");
   const required = ["RETAILER_CODE","RETAILER_ITOPUP_NO","TRANSACTION_COUNT","TOTAL_AMOUNT","SRNUMBER"];
   const headerRowIndex = findHeaderRow(matrix, required);
-  if (headerRowIndex < 0) throw new Error("Could not find the OB report header row containing RETAILER_CODE, TOTAL_AMOUNT and SRNUMBER.");
+  if (headerRowIndex < 0) {
+    const candidates=matrix.slice(0,30).map((row,rowIndex)=>{const hs=(row??[]).map(header).filter(Boolean);const matched=required.filter(key=>hs.includes(key));return {rowIndex,hs,matched}}).sort((a,b)=>b.matched.length-a.matched.length);
+    const best=candidates[0]||{rowIndex:0,hs:[],matched:[]};
+    const missing=required.filter(key=>!best.hs.includes(key));
+    throw new Error(`Required headings missing: ${missing.join(", ")}. Best header candidate was row ${best.rowIndex+1} and contained: ${best.hs.join(", ")||"no recognizable headings"}.`);
+  }
   const headerRow = matrix[headerRowIndex] ?? [];
   const headers = headerRow.map(header);
   const idx: Record<string, number> = {};

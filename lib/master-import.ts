@@ -26,17 +26,21 @@ function rowsFromWorkbook(buffer: Buffer, requiredHeaders: string[], preferredSh
     ? [preferredSheet, ...workbook.SheetNames.filter((n) => n !== preferredSheet)]
     : workbook.SheetNames;
 
+  let best:{sheetName:string;keys:Set<string>;score:number}|null=null;
   for (const name of names) {
     const sheet = workbook.Sheets[name];
     if (!sheet) continue;
     const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet, { defval: "", raw: true });
     if (!rows.length) continue;
     const keys = new Set(Object.keys(normalizedRow(rows[0])));
+    const score=normalizedRequired.filter(header=>keys.has(header)).length;
+    if(!best||score>best.score)best={sheetName:name,keys,score};
     if (normalizedRequired.every((header) => keys.has(header))) {
       return { sheetName: name, rows: rows.map(normalizedRow) };
     }
   }
-  throw new Error(`Could not find a sheet containing: ${requiredHeaders.join(", ")}`);
+  const missing=normalizedRequired.filter(header=>!best?.keys.has(header));
+  throw new Error(`Required headings missing: ${missing.join(", ")}. ${best?`Best matching sheet: ${best.sheetName}. Found headings: ${[...best.keys].join(", ")}.`:"No readable worksheet with data was found."}`);
 }
 
 export async function importEmployees(buffer: Buffer, fileName: string) {
@@ -59,6 +63,12 @@ export async function importEmployees(buffer: Buffer, fileName: string) {
     if(!byPhone&&byCode){errors.push({batchId:batch.id,rowNumber:i+2,message:"RSO Code is already assigned to another MSISDN",rawData:row as object});continue}
     seenPhone.add(pkey);if(employeeCode)seenCode.add(employeeCode);
     valid.push({rsoMsisdn,employeeCode,name,supervisorName});
+  }
+
+  if(errors.length){
+    const preview=errors.slice(0,8).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
+    await prisma.importBatch.delete({where:{id:batch.id}}).catch(()=>undefined);
+    throw new Error(`Employee data validation failed: ${errors.length} invalid row(s). ${preview}${errors.length>8?" …":""}`);
   }
 
   const supervisorNames=[...new Set(valid.map(x=>x.supervisorName).filter(Boolean))];
@@ -116,9 +126,13 @@ export async function importRetailers(buffer: Buffer, fileName: string) {
     ops.push(prisma.retailer.upsert({where:{retailerCode},update:next,create:{retailerCode,...next}}));
   }
 
+  if(errors.length){
+    const preview=errors.slice(0,8).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
+    await prisma.importBatch.delete({where:{id:batch.id}}).catch(()=>undefined);
+    throw new Error(`Retailer data validation failed: ${errors.length} invalid row(s). ${preview}${errors.length>8?" …":""}`);
+  }
   for(let i=0;i<ops.length;i+=100)await prisma.$transaction(ops.slice(i,i+100));
-  if(errors.length)await prisma.importError.createMany({data:errors});
-  const successRows=ops.length,failedRows=errors.length;
+  const successRows=ops.length,failedRows=0;
   await prisma.importBatch.update({where:{id:batch.id},data:{successRows,failedRows,status:failedRows?"COMPLETED_WITH_ERRORS":"COMPLETED"}});
   return {batchId:batch.id,sheetName,totalRows:rows.length,successRows,failedRows,mappedRows,unassignedRows,newRows,updatedRows,unchangedRows};
 }
