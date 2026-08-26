@@ -437,3 +437,10 @@
 - Added reusable PageStack and PageGrid components.
 - Added tablet/mobile-specific grid behavior so dense pages collapse predictably.
 - Preserved v80 visual polish, live search, import validation, IT access and all business logic.
+
+## v82 - Employee Control Center Render Repair
+- Rebuilt the Employee Control Center with page-scoped CSS to eliminate global-style collisions.
+- Restored high-contrast hero typography and authorized-user summary.
+- Replaced broken/raw role links with five responsive role cards for Manager, Supervisor, RSO, BP and IT.
+- Rebuilt hierarchy and access-management panels with explicit responsive layouts.
+- Kept database counts, routes, ADMIN/IT access and existing business logic unchanged.
