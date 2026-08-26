@@ -22,14 +22,9 @@ export async function getEmployeeMonthlyKpis(employeeId: string, month: string |
     prisma.manualMetric.findUnique({
       where: { employeeId_month: { employeeId, month: start } },
     }),
-    prisma.c2sRecord.groupBy({
-      by: ["retailerId"],
-      where: { retailer: { employeeId }, date: { gte: start, lt: end } },
-      _sum: { amount: true, transactionCount: true },
-      having: {
-        amount: { _sum: { gte: 500 } },
-        transactionCount: { _sum: { gte: 7 } },
-      },
+    prisma.c2sMonthlySummary.findMany({
+      where:{retailer:{employeeId},month:start,totalAmount:{gte:500},transactionCount:{gte:7}},
+      select:{retailerId:true},
     }),
     prisma.monthlyTarget.findUnique({
       where: { employeeId_month: { employeeId, month: start } },

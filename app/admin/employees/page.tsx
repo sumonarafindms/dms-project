@@ -1,189 +1,70 @@
 import Link from "next/link";
-import { requireUser } from "../../../lib/auth";
-import { prisma } from "../../../lib/prisma";
+import {requireUser} from "../../../lib/auth";
+import {prisma} from "../../../lib/prisma";
+import {Icon} from "../../components/icons";
 
-export default async function Employees() {
-  await requireUser(["ADMIN", "IT"]);
+function RoleCard({href,icon,label,count,description,tone}:{href:string;icon:string;label:string;count:number;description:string;tone:string}){
+ return <Link href={href} className={`ecc-v82-role ${tone}`}>
+  <span className="ecc-v82-icon"><Icon name={icon}/></span>
+  <span className="ecc-v82-role-copy"><strong>{label}</strong><small>{description}</small></span>
+  <b>{count}</b><span className="ecc-v82-arrow">›</span>
+ </Link>
+}
 
-  const [managers, supervisors, rsos, bps, logins, itUsers] =
-    await Promise.all([
-      prisma.user.count({
-        where: { role: "MANAGER", active: true },
-      }),
+export default async function Page(){
+ await requireUser(["ADMIN","IT"]);
+ const [managers,supervisors,rsos,bps,logins,itUsers]=await Promise.all([
+  prisma.user.count({where:{role:"MANAGER"}}),
+  prisma.supervisor.count({}),
+  prisma.employee.count({}),
+  prisma.bpAssignment.count({where:{active:true}}),
+  prisma.user.count({where:{active:true}}),
+  prisma.user.count({where:{role:"IT",active:true}})
+ ]);
 
-      prisma.supervisor.count({
-        where: { active: true },
-      }),
+ return <main className="page ecc-v82">
+  <section className="ecc-v82-hero">
+   <div className="ecc-v82-hero-copy">
+    <span className="ecc-v82-kicker">PEOPLE &amp; ACCESS</span>
+    <h1>Employee Control Center</h1>
+    <p>Manage workforce structure, field ownership, assignments and login access from one workspace.</p>
+    <div className="ecc-v82-chips">
+     <span>{managers} Managers</span><span>{supervisors} Supervisors</span>
+     <span>{rsos} RSOs</span><span>{bps} Active BPs</span><span>{itUsers} IT Users</span>
+    </div>
+   </div>
+   <div className="ecc-v82-auth">
+    <span>AUTHORIZED USERS</span><strong>{logins}</strong><small>Active login accounts</small>
+   </div>
+  </section>
 
-      prisma.employee.count({
-        where: { active: true },
-      }),
+  <section className="ecc-v82-roles" aria-label="Employee roles">
+   <RoleCard href="/admin/employees/managers" icon="users" label="Managers" count={managers} description="Monitoring & overview" tone="blue"/>
+   <RoleCard href="/admin/employees/supervisors" icon="users" label="Supervisors" count={supervisors} description="Team ownership" tone="violet"/>
+   <RoleCard href="/admin/employees/rsos" icon="chart" label="RSOs" count={rsos} description="Field employees" tone="green"/>
+   <RoleCard href="/admin/employees/bps" icon="sim" label="BPs" count={bps} description="SIM sales assignments" tone="amber"/>
+   <RoleCard href="/admin/users" icon="users" label="IT" count={itUsers} description="System administration" tone="cyan"/>
+  </section>
 
-      prisma.bpAssignment.count({
-        where: { active: true },
-      }),
+  <section className="ecc-v82-lower">
+   <div className="ecc-v82-hierarchy">
+    <div className="ecc-v82-section-label">ORGANIZATION STRUCTURE</div>
+    <h2>Field reporting hierarchy</h2>
+    <div className="ecc-v82-flow">
+     <span>Manager</span><b>→</b><span>Supervisor</span><b>→</b><span>RSO</span><b>→</b><span>BP / Retailer</span>
+    </div>
+    <p>Assignments follow this reporting chain. IT is a system-access role and stays outside the field hierarchy.</p>
+   </div>
 
-      prisma.user.count({
-        where: { active: true },
-      }),
-
-      prisma.user.count({
-        where: { role: "IT", active: true },
-      }),
-    ]);
-
-  return (
-    <main className="page admin-employees">
-      <section className="people-command people-v3-command">
-        <div>
-          <div className="admin-kicker">PEOPLE & ACCESS</div>
-
-          <h1>Employee Control Center</h1>
-
-          <p className="employees-sub">
-            Manage workforce structure, field ownership,
-            assignments and login access from one workspace.
-          </p>
-
-          <div className="people-v3-chips">
-            <span>{managers} Managers</span>
-            <span>{supervisors} Supervisors</span>
-            <span>{rsos} RSOs</span>
-            <span>{bps} Active BPs</span>
-            <span>{itUsers} IT Users</span>
-          </div>
-        </div>
-
-        <div className="people-command-stat">
-          <small>AUTHORIZED USERS</small>
-          <strong>{logins}</strong>
-          <span>Active login accounts</span>
-        </div>
-      </section>
-
-      <div className="employee-role-grid">
-        <Link
-          href="/admin/employees/managers"
-          className="employee-role-card manager"
-        >
-          <div className="employee-role-icon">MG</div>
-
-          <div>
-            <strong>Managers</strong>
-            <small>Monitoring & overview</small>
-          </div>
-
-          <b>{managers}</b>
-          <span>›</span>
-        </Link>
-
-        <Link
-          href="/admin/employees/supervisors"
-          className="employee-role-card supervisor"
-        >
-          <div className="employee-role-icon">SP</div>
-
-          <div>
-            <strong>Supervisors</strong>
-            <small>Team ownership</small>
-          </div>
-
-          <b>{supervisors}</b>
-          <span>›</span>
-        </Link>
-
-        <Link
-          href="/admin/employees/rsos"
-          className="employee-role-card rso"
-        >
-          <div className="employee-role-icon">RS</div>
-
-          <div>
-            <strong>RSOs</strong>
-            <small>Field employees</small>
-          </div>
-
-          <b>{rsos}</b>
-          <span>›</span>
-        </Link>
-
-        <Link
-          href="/admin/employees/bps"
-          className="employee-role-card bp"
-        >
-          <div className="employee-role-icon">BP</div>
-
-          <div>
-            <strong>BPs</strong>
-            <small>SIM sales assignments</small>
-          </div>
-
-          <b>{bps}</b>
-          <span>›</span>
-        </Link>
-
-        <Link
-          href="/admin/users"
-          className="employee-role-card it"
-        >
-          <div className="employee-role-icon">IT</div>
-
-          <div>
-            <strong>IT</strong>
-            <small>System administration access</small>
-          </div>
-
-          <b>{itUsers}</b>
-          <span>›</span>
-        </Link>
-      </div>
-
-      <div className="employee-management-grid">
-        <section className="card employee-hierarchy premium-hierarchy">
-          <div className="employee-hierarchy-title">
-            Organization hierarchy
-          </div>
-
-          <div className="hierarchy-flow premium-flow">
-            <span>Manager</span>
-            <b>→</b>
-            <span>Supervisor</span>
-            <b>→</b>
-            <span>RSO</span>
-            <b>→</b>
-            <span>BP / Retailer</span>
-          </div>
-
-          <p>
-            IT is a system-access role and is not part of the
-            field reporting hierarchy.
-          </p>
-        </section>
-
-        <aside className="card employee-access-card">
-          <span>ACCESS MANAGEMENT</span>
-
-          <strong>
-            Control login accounts and module-level permissions.
-          </strong>
-
-          <div className="employee-hub-actions">
-            <Link
-              className="btn admin-primary"
-              href="/admin/permissions"
-            >
-              Manage Permissions
-            </Link>
-
-            <Link
-              className="btn btn-ghost"
-              href="/admin/users"
-            >
-              Login Accounts
-            </Link>
-          </div>
-        </aside>
-      </div>
-    </main>
-  );
+   <aside className="ecc-v82-access">
+    <span className="ecc-v82-section-label">ACCESS MANAGEMENT</span>
+    <h2>Control accounts and permissions</h2>
+    <p>Manage authorized users and define module-level access from one place.</p>
+    <div className="ecc-v82-actions">
+     <Link className="ecc-v82-primary" href="/admin/permissions"><Icon name="users"/>Manage Permissions</Link>
+     <Link className="ecc-v82-secondary" href="/admin/users">Login Accounts</Link>
+    </div>
+   </aside>
+  </section>
+ </main>
 }

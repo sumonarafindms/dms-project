@@ -8,6 +8,7 @@ type Summary = {
   retailers: number;
   mappedRetailers: number;
   unassignedRetailers: number;
+  pagination?: {page:number;pageSize:number;total:number;totalPages:number;hasNext:boolean;hasPrevious:boolean};
   employeeRows: Array<{
     id: string;
     employeeCode: string | null;
@@ -53,7 +54,10 @@ function UploadBox({ type, title, hint, onDone }: { type: "employees" | "retaile
     <section style={styles.panel}>
       <h2 style={{ marginTop: 0 }}>{title}</h2>
       <p style={styles.muted}>{hint}</p>
-      <input type="file" accept=".xlsx,.xls,.xlsm" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      <label>
+        <span className="sr-only">Choose {title} import file</span>
+        <input type="file" accept=".xlsx,.xls,.xlsm" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      </label>
       <div style={{ marginTop: 14 }}>
         <button onClick={upload} disabled={!file || busy} style={styles.button}>
           {busy ? "Importing..." : `Import ${title}`}
@@ -67,15 +71,16 @@ function UploadBox({ type, title, hint, onDone }: { type: "employees" | "retaile
 export default function MasterDataPage() {
   const [summary, setSummary] = useState<Summary>(emptySummary);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
-  async function refresh() {
+  async function refresh(nextPage=page) {
     setLoading(true);
-    const response = await fetch("/api/master/summary", { cache: "no-store" });
+    const response = await fetch(`/api/master/summary?page=${nextPage}&pageSize=50`, { cache: "no-store" });
     if (response.ok) setSummary(await response.json());
     setLoading(false);
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { void refresh(page); }, [page]);
 
   return (
     <main style={styles.main}>
@@ -125,6 +130,11 @@ export default function MasterDataPage() {
             {!loading && !summary.employeeRows.length && <tr><td colSpan={5} style={{ padding: 20, textAlign: "center" }}>Import Employees first, then Retailers.</td></tr>}
           </tbody>
         </table>
+        {(summary.pagination?.totalPages||1)>1 && <div className="pagination-v83" aria-label="Employee mapping pages">
+          <button type="button" disabled={!summary.pagination?.hasPrevious} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</button>
+          <span>Page {summary.pagination?.page||1} of {summary.pagination?.totalPages||1}</span>
+          <button type="button" disabled={!summary.pagination?.hasNext} onClick={()=>setPage(p=>p+1)}>Next</button>
+        </div>}
       </section>
     </main>
   );

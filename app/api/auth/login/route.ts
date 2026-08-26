@@ -5,8 +5,8 @@ import {createSession,homeForRole,verifyCredential} from "../../../../lib/auth";
 import {audit} from "../../../../lib/audit";
 import {phoneKey} from "../../../../lib/phone";
 import {apiError} from "../../../../lib/http-errors";
+import {nextLoginFailure} from "../../../../lib/login-policy";
 
-const MAX_FAILURES=5,LOCK_MINUTES=15;
 function mobileVariants(identifier:string){
   const raw=identifier.trim(),key=phoneKey(raw);
   if(!key)return [raw];
@@ -41,7 +41,7 @@ export async function POST(req:Request){
     const valid=Boolean(user&&user.active&&roleAllowed&&await verifyCredential(credential,user.credentialHash));
     if(!valid){
       const current=throttle?.lockedUntil&&throttle.lockedUntil<=now?0:(throttle?.failedCount||0);
-      const failedCount=current+1,lockedUntil=failedCount>=MAX_FAILURES?new Date(Date.now()+LOCK_MINUTES*60000):null;
+      const {failedCount,lockedUntil}=nextLoginFailure(current);
       await prisma.loginThrottle.upsert({where:{key},update:{failedCount,lockedUntil},create:{key,failedCount,lockedUntil}});
       return NextResponse.json({error:lockedUntil?"Too many failed attempts. Try again later.":"Invalid login credentials."},{status:lockedUntil?429:401});
     }

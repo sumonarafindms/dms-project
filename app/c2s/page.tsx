@@ -1,14 +1,18 @@
 "use client";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {useCan} from "../components/PermissionContext";
+import {OpsHeader,OpsUpload,OpsSectionTitle,OpsMetric,OpsDataCard,OpsTable,PersonCell,ProgressCell,EmptyState,StatusPill} from "../components/OperationsPremiumUI";
+import {dhakaTodayYmd} from "../../lib/business-time";
+import {TableScrollHint} from "../components/TableScrollHint";
 
 type Row={employeeId:string;employeeCode?:string|null;name:string;rsoMsisdn:string;supervisor:string;retailerCount:number;transactionCount:number;c2sAmount:number;lsoTarget:number;lsoAchieved:number;lsoPercent:number;reportEndDate?:string|null};
 type DailyRow={retailerCode:string;retailerName:string;employee:string;rsoMsisdn:string;supervisor:string;amount:number};
 type History={id:string;fileName:string;uploadedAt:string;businessDate?:string|null;totalRows:number;successRows:number;failedRows:number;status:string};
-function todayYmd(){return new Date().toISOString().slice(0,10)}
+function todayYmd(){return dhakaTodayYmd()}
 function money(n:number){return new Intl.NumberFormat("en-BD",{maximumFractionDigits:2}).format(n)}
 
 export default function C2sPage(){
+  const canView=useCan("c2s","view");
   const canAdd=useCan("c2s","add");
   const [month,setMonth]=useState(()=>todayYmd().slice(0,7)); const [date,setDate]=useState(()=>todayYmd());
   const [fromDate,setFromDate]=useState(()=>`${todayYmd().slice(0,7)}-01`);const [toDate,setToDate]=useState(()=>todayYmd());
@@ -19,26 +23,32 @@ export default function C2sPage(){
   async function upload(e:FormEvent<HTMLFormElement>){e.preventDefault();const input=e.currentTarget.elements.namedItem("file") as HTMLInputElement;if(!input.files?.[0])return;setLoading(true);setMessage("Reading month-to-date C2S report and rebuilding date-wise retailer sales...");const body=new FormData();body.append("file",input.files[0]);const res=await fetch("/api/import/C2S",{method:"POST",body});const data=await res.json();setLoading(false);if(!res.ok)return setMessage(data.error||"C2S import failed");if(data.duplicate)setMessage("This exact C2S file was already imported. Nothing was counted twice.");else{setMessage(`C2S updated ${data.reportStartDate} → ${data.reportEndDate}. ${data.successRows} retailers mapped, ${data.failedRows} failed, ${data.dailyRecordsStored} non-zero retailer/day sales stored.${data.assignmentWarnings?` ${data.assignmentWarnings} RSO assignment mismatch warning(s).`:""}`);if(data.reportEndDate){setDate(data.reportEndDate);setMonth(data.reportEndDate.slice(0,7))}}input.value="";await load()}
   const totals=useMemo(()=>rows.reduce((a,r)=>({amount:a.amount+r.c2sAmount,trx:a.trx+r.transactionCount,lsoT:a.lsoT+r.lsoTarget,lsoA:a.lsoA+r.lsoAchieved}),{amount:0,trx:0,lsoT:0,lsoA:0}),[rows]);
   const dayTotal=useMemo(()=>dailyRows.reduce((s,r)=>s+r.amount,0),[dailyRows]);
-  return <main className="page modern-upload-page">
-    <div className="modern-upload-head"><div><a href="/admin/upload" style={{color:"#475467"}}>← Upload Center</a><h1 style={{marginBottom:4}}>C2S Retailer Sales & LSO</h1><p style={{marginTop:0,color:"#667085"}}>Upload the cumulative month-to-date ITop Up Sales report. C2S stays in its own database table and drives LSO achievement.</p></div><div className="date-range-filter"><label>From<input type="date" value={fromDate} onChange={e=>{setFromDate(e.target.value);setMonth(e.target.value.slice(0,7));if(toDate<e.target.value)setToDate(e.target.value)}}/></label><label>To<input type="date" min={fromDate} value={toDate} onChange={e=>setToDate(e.target.value)}/></label></div></div>
-{canAdd&&    <section className="card modern-upload-panel"><div style={uploadTitleRow}><h2 style={{margin:0}}>Upload C2S File</h2><a href="/api/samples/c2s" style={sampleLink}>Download Sample File</a></div><form onSubmit={upload} style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"end"}}><label>ITop_Up_Sales file<br/><input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required style={{marginTop:10}}/></label><button disabled={loading} style={button}>{loading?"Processing...":"Upload C2S"}</button></form>
-      <div style={ruleBox}><b>LSO rule:</b> A retailer completes LSO when its monthly C2S total is at least 500 and it has at least 7 transactions. RETAILER_CODE maps the outlet, SRNUMBER checks the RSO assignment, and row-1 date columns are stored separately. Since the report is cumulative, every upload replaces the covered month-to-date C2S window instead of adding it again.</div>{message&&<div style={{marginTop:12,padding:12,background:"#f2f4f7",borderRadius:8}}>{message}</div>}
+  if(!canView)return null;
+  return <main className="page ops-premium-page">
+    <OpsHeader badge="C2S" title="C2S Retailer Sales & LSO" subtitle="Track retailer sales, daily performance and LSO achievement from one premium operations workspace." from={fromDate} to={toDate} onFrom={v=>{setFromDate(v);setMonth(v.slice(0,7));if(toDate<v)setToDate(v)}} onTo={setToDate}/>
+
+    {canAdd&&<OpsUpload title="Upload C2S File" subtitle="Import the cumulative ITop Up Sales workbook." sample="/api/samples/c2s" message={message} rule={<><b>LSO rule:</b> A retailer completes LSO when monthly C2S reaches at least 500 with at least 7 transactions. Cumulative uploads rebuild the covered date window without double counting.</>}>
+      <form onSubmit={upload} className="ops-upload-form"><label className="ops-file-field"><span>ITop_Up_Sales file</span><small>Excel / TXT · max 20 MB</small><input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required/></label><button disabled={loading} className="ops-upload-btn">{loading?"Processing...":"⇧  Upload C2S"}</button></form>
+    </OpsUpload>}
+
+    <section className="ops-section"><OpsSectionTitle title="Employee LSO Performance" subtitle="Retail sales and LSO execution across the selected range." icon="↗"/>
+      <div className="ops-metrics-grid five"><OpsMetric tone="blue" label="C2S Sales" value={money(totals.amount)} note="Retail sales amount"/><OpsMetric tone="cyan" label="Monthly Transactions" value={totals.trx.toLocaleString()} note="Exact TRANSACTION_COUNT from source"/><OpsMetric tone="orange" label="LSO Target" value={totals.lsoT.toLocaleString()} note="Monthly target"/><OpsMetric tone="green" label="LSO Achieved" value={totals.lsoA.toLocaleString()} note="Completed outlets"/><OpsMetric tone="purple" label="LSO %" value={totals.lsoT?`${((totals.lsoA/totals.lsoT)*100).toFixed(1)}%`:"0%"} note="Achievement rate"/></div>
     </section>
-}    <h2 style={{marginBottom:10,marginTop:24}}>Monthly Employee LSO Performance</h2><div style={stats}><Stat name="C2S Sales" value={money(totals.amount)}/><Stat name="Transactions" value={totals.trx.toLocaleString()}/><Stat name="LSO Target" value={totals.lsoT.toLocaleString()}/><Stat name="LSO Achieved" value={totals.lsoA.toLocaleString()}/><Stat name="LSO %" value={totals.lsoT?`${((totals.lsoA/totals.lsoT)*100).toFixed(1)}%`:"0%"}/></div>
-    <section style={panel}><div style={{overflowX:"auto"}}><table style={tableStyle}><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>C2S Transactions</th><th>C2S Amount</th><th>LSO Target</th><th>LSO Achieved</th><th>LSO %</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td>{r.supervisor}</td><td><b>{r.name}</b><br/><small>{r.employeeCode||r.rsoMsisdn}</small></td><td>{r.retailerCount}</td><td>{r.transactionCount}</td><td>{money(r.c2sAmount)}</td><td>{r.lsoTarget}</td><td><b>{r.lsoAchieved}</b></td><td>{r.lsoPercent}%</td></tr>)}</tbody></table></div></section>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"end",flexWrap:"wrap",gap:12,marginTop:24}}><h2 style={{marginBottom:0}}>Date-wise C2S Sales</h2><label>View Date<br/><input type="date" value={date} onChange={e=>{setDate(e.target.value);if(e.target.value)setMonth(e.target.value.slice(0,7))}} style={inputStyle}/></label></div><div style={{...stats,marginTop:12}}><Stat name="Selected Day Sales" value={money(dayTotal)}/><Stat name="Retailers Selling" value={dailyRows.length.toLocaleString()}/></div>
-    <section style={panel}>{dailyRows.length===0?<p style={{color:"#667085"}}>No C2S sales stored for {date}.</p>:<div style={{overflowX:"auto"}}><table style={tableStyle}><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer Code</th><th>Retailer Name</th><th>Sales Amount</th></tr></thead><tbody>{dailyRows.map(r=><tr key={r.retailerCode}><td>{r.supervisor}</td><td><b>{r.employee}</b><br/><small>{r.rsoMsisdn}</small></td><td><b>{r.retailerCode}</b></td><td>{r.retailerName}</td><td><b>{money(r.amount)}</b></td></tr>)}</tbody></table></div>}</section>
-    <section style={{...panel,marginTop:18}}><h2 style={{marginTop:0}}>Recent C2S Imports</h2>{history.length===0?<p style={{color:"#667085"}}>No C2S file imported yet.</p>:<div style={{overflowX:"auto"}}><table style={tableStyle}><thead><tr><th>Report End</th><th>File</th><th>Uploaded</th><th>Mapped / Total</th><th>Failed</th><th>Status</th></tr></thead><tbody>{history.map(h=><tr key={h.id}><td>{h.businessDate?new Date(h.businessDate).toLocaleDateString():"-"}</td><td>{h.fileName}</td><td>{new Date(h.uploadedAt).toLocaleString()}</td><td>{h.successRows}/{h.totalRows}</td><td>{h.failedRows}</td><td>{h.status}</td></tr>)}</tbody></table></div>}</section>
+
+    <OpsDataCard title="RSO LSO Performance" subtitle="Employee-level C2S sales and LSO completion." count={`${rows.length} employees`}>
+      {rows.length?<OpsTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>Transactions</th><th>C2S Amount</th><th>LSO Target</th><th>LSO Achieved</th><th>LSO Progress</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td><PersonCell name={r.supervisor} sub="Supervisor"/></td><td><PersonCell name={r.name} sub={r.employeeCode||r.rsoMsisdn}/></td><td><span className="ops-neutral-pill">{r.retailerCount}</span></td><td>{r.transactionCount}</td><td><strong className="ops-number blue">৳{money(r.c2sAmount)}</strong></td><td>{r.lsoTarget}</td><td><strong className="ops-number green">{r.lsoAchieved}</strong></td><td><ProgressCell value={r.lsoPercent}/></td></tr>)}</tbody></OpsTable>:<EmptyState title="No C2S performance yet" subtitle="Upload C2S data to populate employee LSO performance."/>}
+    </OpsDataCard>
+
+    <section className="ops-section"><OpsSectionTitle title={`Date-wise C2S · ${new Date(date+"T00:00:00").toLocaleDateString()}`} subtitle="Retailers with customer sales on the selected day." icon="▣" right={<label className="ops-inline-date"><span>VIEW DATE</span><input type="date" value={date} onChange={e=>{setDate(e.target.value);if(e.target.value)setMonth(e.target.value.slice(0,7))}}/></label>}/>
+      <div className="ops-metrics-grid two"><OpsMetric tone="green" label="Selected Day Sales" value={money(dayTotal)} note="Customer sales amount"/><OpsMetric tone="purple" label="Retailers Selling" value={dailyRows.length.toLocaleString()} note="Active selling outlets"/></div>
+    </section>
+
+    <OpsDataCard title="Retailer C2S Sales" subtitle="Retailer-level sales for the selected date." count={`${dailyRows.length} retailers`}>
+      {dailyRows.length?<OpsTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer</th><th>Sales Amount</th></tr></thead><tbody>{dailyRows.map(r=><tr key={r.retailerCode}><td><PersonCell name={r.supervisor}/></td><td><PersonCell name={r.employee} sub={r.rsoMsisdn}/></td><td><b>{r.retailerCode}</b><small className="ops-subline">{r.retailerName}</small></td><td><strong className="ops-number green">৳{money(r.amount)}</strong></td></tr>)}</tbody></OpsTable>:<EmptyState title="No sales on this date" subtitle={`No C2S sales stored for ${date}.`}/>}
+    </OpsDataCard>
+
+    <OpsDataCard title="Recent C2S Imports" subtitle="Latest uploaded retailer-sales reports." count={`${history.length} imports`}>
+      {history.length?<OpsTable><thead><tr><th>Report End</th><th>File</th><th>Uploaded</th><th>Mapped / Total</th><th>Failed</th><th>Status</th></tr></thead><tbody>{history.map(h=><tr key={h.id}><td><b>{h.businessDate?new Date(h.businessDate).toLocaleDateString():"-"}</b></td><td>{h.fileName}</td><td>{new Date(h.uploadedAt).toLocaleString()}</td><td><strong className="ops-number blue">{h.successRows}/{h.totalRows}</strong></td><td>{h.failedRows}</td><td><StatusPill value={h.status}/></td></tr>)}</tbody></OpsTable>:<EmptyState title="No C2S imports yet" subtitle="Your recent C2S files will appear here." icon="⇧"/>}
+    </OpsDataCard>
   </main>
 }
-function Stat({name,value,note}:{name:string;value:string;note?:string}){return <div style={{...panel,margin:0}}><div style={{color:"#667085",fontSize:13}}>{name}</div><div style={{fontSize:26,fontWeight:800,marginTop:7}}>{value}</div>{note&&<div style={{color:"#98a2b3",fontSize:12,marginTop:3}}>{note}</div>}</div>}
-const panel:React.CSSProperties={background:"white",border:"1px solid #e4e7ec",borderRadius:14,padding:18};
-const stats:React.CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:14,marginBottom:18};
-const inputStyle:React.CSSProperties={padding:"9px 10px",border:"1px solid #d0d5dd",borderRadius:8,marginTop:4};
-const button:React.CSSProperties={padding:"10px 16px",borderRadius:8,border:0,background:"#101828",color:"white",fontWeight:700,cursor:"pointer"};
-const ruleBox:React.CSSProperties={marginTop:16,padding:13,background:"#f8fafc",border:"1px solid #e4e7ec",borderRadius:10,color:"#475467",lineHeight:1.6};
-const tableStyle:React.CSSProperties={width:"100%",borderCollapse:"collapse"};
-
-
-const uploadTitleRow:React.CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14};
-const sampleLink:React.CSSProperties={display:"inline-flex",alignItems:"center",minHeight:38,padding:"0 12px",borderRadius:9,border:"1px solid #d0d5dd",background:"#fff",color:"#344054",fontWeight:700,fontSize:12,textDecoration:"none"};

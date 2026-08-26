@@ -1,2 +1,7 @@
-import {requireUser} from "../../../lib/auth";import {employeePerformance,pct} from "../../../lib/performance";import {PageHead} from "../../components/RoleUI";import {FilterForm,LinkedList} from "../../components/DrillUI";import {normalizeMonth} from "../../../lib/drilldown";
-export default async function Page({searchParams}:{searchParams:Promise<{q?:string;month?:string}>}){await requireUser(["ADMIN"]);const s=await searchParams,q=(s.q||"").toLowerCase(),month=normalizeMonth(s.month),rows=(await employeePerformance(`${month}-01`)).filter(r=>!q||`${r.name} ${r.employeeCode||""} ${r.rsoMsisdn} ${r.supervisor}`.toLowerCase().includes(q));return <main className="page"><PageHead eyebrow="Admin" title="Performance drill-down" subtitle="Search any RSO and open detailed retailer execution for the selected month."/><FilterForm q={s.q||""} month={month} placeholder="RSO, code, mobile or supervisor"/><LinkedList title={`RSOs (${rows.length})`} items={rows.sort((a,b)=>pct(b.totalRechargeAchieved,b.totalRechargeTarget)-pct(a.totalRechargeAchieved,a.totalRechargeTarget)).map(r=>({href:`/admin/rsos/${r.employeeId}?month=${month}`,name:r.name,meta:`${r.employeeCode||r.rsoMsisdn} · ${r.supervisor} · ${r.retailerCount} retailers`,right:`${pct(r.totalRechargeAchieved,r.totalRechargeTarget)}%`,status:`GA ${r.gaAchieved} · LSO ${r.lsoAchieved}`}))}/></main>}
+import {redirect} from "next/navigation";
+import {requirePagePermission} from "../../../lib/auth";
+
+export default async function Page(){
+ await requirePagePermission(["ADMIN","IT"],"performance");
+ redirect("/admin/performance/rsos");
+}

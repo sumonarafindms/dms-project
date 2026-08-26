@@ -1,0 +1,5 @@
+:root{
+  --bg:#f6f7fb;--surface:#fff;--surface-2:#f8fafc;--text:#172033;--muted:#667085;--line:#e8ebf0;
+  --brand:#165dff;--brand-2:#0f4bd8;--brand-soft:#eef4ff;--success:#12a66a;--warning:#f59e0b;--danger:#e5484d;
+  --shadow:0 8px 30px rgba(16,24,40,.07);--radius:18px;--radius-sm:12px;
+}
