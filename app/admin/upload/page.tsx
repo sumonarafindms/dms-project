@@ -1,11 +1,14 @@
 import Link from "next/link";
 import {requireUser} from "../../../lib/auth";
 import {Icon} from "../../components/icons";
+import {ImportHealthGrid} from "../../components/ImportHealth";
+import {prisma} from "../../../lib/prisma";
+import {ImportType} from "@prisma/client";
 
 const operational=[
- {key:"ga",title:"GA Upload",sub:"Daily SIM activation report",href:"/ga",sample:"/api/samples/ga",icon:"sim",note:"PRODUCT_CODE + date validation · duplicate-safe SIM import",tone:"blue",tag:"DAILY"},
- {key:"c2c",title:"C2C Upload",sub:"Stock lifting report",href:"/c2c",sample:"/api/samples/c2c",icon:"wallet",note:"Header discovery · cumulative date-wise balance upsert",tone:"violet",tag:"MTD"},
- {key:"c2s",title:"C2S Upload",sub:"Retailer sales report",href:"/c2s",sample:"/api/samples/c2s",icon:"chart",note:"Header discovery · retailer sales + LSO calculation",tone:"cyan",tag:"MTD"},
+ {key:"ga",title:"GA Upload",sub:"Multi-date SIM activation report",href:"/ga",sample:"/api/samples/ga",icon:"sim",note:"Each row saves by ACTIVATION_DATE · SIM_NO duplicate-safe · EV-SWAP price 100",tone:"blue",tag:"MULTI-DATE"},
+ {key:"c2c",title:"C2C Upload",sub:"Stock lifting report",href:"/c2c",sample:"/api/samples/c2c",icon:"wallet",note:"Cumulative MTD snapshot · uploaded month replaces stale stored C2C values",tone:"violet",tag:"MTD"},
+ {key:"c2s",title:"C2S Upload",sub:"Retailer sales report",href:"/c2s",sample:"/api/samples/c2s",icon:"chart",note:"Cumulative MTD snapshot · uploaded month replaces stale sales before LSO calculation",tone:"cyan",tag:"MTD"},
  {key:"ob",title:"Opening Balance",sub:"Latest balance snapshot",href:"/ob",sample:"/api/samples/ob",icon:"balance",note:"Validated single-date snapshot · safe replacement",tone:"green",tag:"SNAPSHOT"},
 ];
 const control=[
@@ -25,10 +28,29 @@ function ModuleCard({x,index}:{x:(typeof operational)[number]|(typeof control)[n
 
 export default async function Page(){
  await requireUser(["ADMIN","IT"]);
+ const latest=await prisma.importBatch.findMany({
+  where:{type:{in:[ImportType.GA,ImportType.C2C,ImportType.C2S,ImportType.OB]}},
+  orderBy:{uploadedAt:"desc"},
+  select:{type:true,fileName:true,uploadedAt:true,businessDate:true,successRows:true,failedRows:true,duplicateRows:true,status:true},
+  take:40,
+ });
+ const latestByType=new Map<string,(typeof latest)[number]>();
+ for(const batch of latest)if(!latestByType.has(batch.type))latestByType.set(batch.type,batch);
+ const health=[
+  {type:"GA",label:"Activation feed",...latestByType.get(ImportType.GA)},
+  {type:"C2C",label:"Stock lifting",...latestByType.get(ImportType.C2C)},
+  {type:"C2S",label:"Retailer sales",...latestByType.get(ImportType.C2S)},
+  {type:"OB",label:"Opening balance",...latestByType.get(ImportType.OB)},
+ ];
  return <main className="page admin-upload-hub premium-upload-hub upload-v61">
   <section className="upload-command upload-v61-command">
    <div className="upload-command-copy"><div className="admin-kicker">DATA OPERATIONS</div><h1 className="upload-hub-title">Upload Center</h1><p className="upload-hub-sub">A controlled import workspace that checks workbook structure first, validates source data second, then writes verified records to DMS.</p><div className="upload-command-badges"><span>Header Check</span><span>Row Validation</span><span>Duplicate Safe</span><span>Database Protected</span></div></div>
    <div className="upload-command-visual"><div className="upload-orbit"><span><Icon name="upload"/></span><b>6</b><small>Validated Modules</small></div></div>
+  </section>
+
+  <section className="import-health-section-v96">
+   <div className="upload-v61-group-head"><div><span>DATA FRESHNESS</span><h2>Latest operational imports</h2><p>Confirm the newest source file reached DMS before reviewing performance.</p></div><b>Live status</b></div>
+   <ImportHealthGrid items={health}/>
   </section>
 
   <div className="upload-guidance premium-guidance upload-v61-guidance"><span className="upload-guidance-icon"><Icon name="upload"/></span><div><strong>Upload any supported report confidently</strong><p>DMS first looks for the required headings. If a heading is missing, you will see its exact name. When headings pass, row values, dates, retailer mapping and module-specific rules are verified before import.</p></div><Link href="/api/samples/ga" className="btn btn-ghost">View Sample</Link></div>

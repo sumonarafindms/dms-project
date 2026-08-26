@@ -4,7 +4,6 @@ import {useEffect,useMemo,useState} from "react";
 import type {CSSProperties} from "react";
 import {Icon} from "../components/icons";
 import {dhakaMonth} from "../../lib/business-time";
-import {RankedBarChart,ComparisonChart} from "../components/AnalyticsCharts";
 
 type Row={
  employeeId:string;employeeCode?:string|null;name:string;supervisor:string;retailerCount:number;
@@ -89,172 +88,142 @@ export default function Dashboard(){
  const targetCoverage=rows.length?Math.round(targetReady/rows.length*100):0;
  const avgRetailers=rows.length?Math.round(totals.ret/rows.length):0;
  const supervisorOnTrack=supervisors.filter(s=>pct(s.achieved,s.target)>=70).length;
+ const gaProgress=pct(totals.gaA,totals.gaT);
+ const rechargeProgress=pct(totals.trA,totals.trT);
+ const ssoProgress=pct(totals.ssoA,totals.ssoT);
+ const lsoProgress=pct(totals.lsoA,totals.lsoT);
+ const attention=[...scored].filter(r=>r.score<70).sort((a,b)=>a.score-b.score).slice(0,4);
 
- return <main className="page admin-dashboard admin-v2">
-  <section className="admin-v2-head">
-   <div className="admin-v2-heading">
-    <div className="admin-kicker">EXECUTIVE COMMAND CENTER</div>
-    <h1>Distribution Performance</h1>
-    <p>Monitor network execution, target pace, team health and operational priorities from one decision-ready view.</p>
+ return <main className="page admin-dashboard-v97">
+  <header className="dash97-top">
+   <div>
+    <span className="dash97-kicker">DISTRIBUTION OVERVIEW</span>
+    <h1>Performance Dashboard</h1>
+    <p>{month} · Month-to-date operational snapshot</p>
    </div>
-   <div className="admin-v2-head-actions">
-    <label className="admin-v2-month"><span>REPORTING MONTH</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
-    <Link href="/admin/upload" className="btn admin-primary"><Icon name="upload"/>Upload Center</Link>
+   <div className="dash97-top-actions">
+    <label className="dash97-month"><span>REPORTING MONTH</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
+    <Link href="/admin/upload" className="dash97-primary"><Icon name="upload"/>Upload Center</Link>
    </div>
-  </section>
+  </header>
 
-  {error&&<div className="admin-v2-alert"><span>!</span><div><strong>Dashboard could not refresh</strong><small>{error}</small></div></div>}
+  {error&&<div className="dash97-alert"><b>!</b><div><strong>Dashboard could not refresh</strong><span>{error}</span></div></div>}
 
-  <section className="admin-v2-command-grid">
-   <article className="admin-v2-hero">
-    <div className="admin-v2-hero-glow one"/><div className="admin-v2-hero-glow two"/>
-    <div className="admin-v2-hero-top"><div><span>MONTHLY EXECUTION SCORE</span><small>{month}</small></div><b><i/> Live</b></div>
-    <div className="admin-v2-hero-main">
-     <div className="admin-v2-score"><strong>{loading?"…":overall}</strong><span>%</span><small>Overall progress</small></div>
-     <div className="admin-v2-ring" style={{"--p":`${clamp(overall)*3.6}deg`} as CSSProperties}><div><b>{overall}%</b><small>Target</small></div></div>
-    </div>
-    <div className="admin-v2-hero-progress"><span style={{width:`${clamp(overall)}%`}}/></div>
-    <div className="admin-v2-hero-stats">
-     <div><span>Active RSO</span><strong>{loading?"…":rows.length}</strong></div>
-     <div><span>Retailers</span><strong>{loading?"…":fmt(totals.ret)}</strong></div>
-     <div><span>On track</span><strong>{loading?"…":onTrack}</strong></div>
-     <div className={behind?"needs-focus":""}><span>Need focus</span><strong>{loading?"…":behind}</strong></div>
-    </div>
+  <section className="dash97-kpis" aria-label="Key performance indicators">
+   <CleanKpi label="GA Activation" value={loading?"…":fmt(totals.gaA)} progress={gaProgress} note={`of ${fmt(totals.gaT)} target`} icon="sim"/>
+   <CleanKpi label="Total Recharge" value={loading?"…":`৳${fmt(totals.trA)}`} progress={rechargeProgress} note={`of ৳${fmt(totals.trT)} target`} icon="chart" tone="teal"/>
+   <CleanKpi label="Field Force" value={loading?"…":fmt(rows.length)} progress={rows.length?Math.round(onTrack/rows.length*100):0} note={`${onTrack} on track · ${fmt(totals.ret)} retailers`} icon="users"/>
+   <article className="dash97-kpi critical">
+    <div className="dash97-critical-icon"><Icon name="target"/></div>
+    <div><span>NEEDS ATTENTION</span><strong>{loading?"…":behind}</strong><small>RSO below 50 composite score</small></div>
    </article>
+  </section>
 
-   <aside className="admin-v2-focus">
-    <Link href="/admin/attention" className="admin-v2-focus-card urgent">
-     <span className="admin-v2-focus-icon"><Icon name="target"/></span><div><small>ACTION REQUIRED</small><strong>{behind} RSO{behind===1?"":"s"} need focus</strong><p>Open SSO, LSO and performance gaps.</p></div><b>›</b>
-    </Link>
-    <Link href="/admin/performance/retailers" className="admin-v2-focus-card">
-     <span className="admin-v2-focus-icon"><Icon name="shop"/></span><div><small>FIELD NETWORK</small><strong>{fmt(totals.ret)} retailers</strong><p>Review outlet execution and status.</p></div><b>›</b>
-    </Link>
-    <div className="admin-v2-health">
-     <div><span className="health-dot"/><strong>System operational</strong></div>
-     <small>Data views are connected to live DMS records.</small>
+  <section className="dash97-main-grid">
+   <div className="dash97-block">
+    <div className="dash97-section-head"><div><h2>Quick reports</h2><p>Open the daily workspaces you use most.</p></div><Link href="/admin/performance/rsos">View analytics →</Link></div>
+    <div className="dash97-report-grid">
+     <QuickReport href="/ga" icon="sim" title="GA & SSO" sub="Activations and SIM swap"/>
+     <QuickReport href="/c2c" icon="wallet" title="C2C Recharge" sub="Stock lifting performance"/>
+     <QuickReport href="/c2s" icon="chart" title="C2S & LSO" sub="Retail sales execution"/>
+     <QuickReport href="/ob" icon="balance" title="Opening Balance" sub="Latest balance snapshot"/>
+    </div>
+   </div>
+
+   <aside className="dash97-panel dash97-team">
+    <div className="dash97-section-head compact"><div><h2>Team snapshot</h2><p>Current field network.</p></div></div>
+    <SnapshotRow label="Active RSO" value={rows.length} tone="green"/>
+    <SnapshotRow label="Supervisors" value={supervisors.length} tone="teal"/>
+    <SnapshotRow label="Retailers" value={totals.ret} tone="gold"/>
+    <SnapshotRow label="Target coverage" value={`${targetCoverage}%`} tone="slate"/>
+    <Link href="/admin/employees" className="dash97-panel-btn"><Icon name="users"/>Employee Control Center</Link>
+   </aside>
+  </section>
+
+  <section className="dash97-lower-grid">
+   <div className="dash97-panel dash97-performance">
+    <div className="dash97-section-head"><div><h2>Supervisor performance</h2><p>Recharge and GA progress by team.</p></div><Link href={`/admin/performance/supervisors?month=${month}`}>View all →</Link></div>
+    <div className="dash97-team-list">
+     {supervisors.slice(0,6).map((x,i)=>{
+      const recharge=pct(x.achieved,x.target),ga=pct(x.ga,x.gaTarget);
+      return <Link href={`/admin/performance/supervisors?month=${month}`} className="dash97-team-row" key={x.name}>
+       <span className="dash97-avatar">{x.name.slice(0,2).toUpperCase()}</span>
+       <div className="dash97-team-copy"><strong>{x.name}</strong><small>{x.rsos} RSOs · {x.retailers} retailers</small></div>
+       <div className="dash97-dual">
+        <span><i style={{width:`${clamp(recharge)}%`}}/></span>
+        <span className="alt"><i style={{width:`${clamp(ga)}%`}}/></span>
+       </div>
+       <b>{recharge}%</b>
+      </Link>
+     })}
+     {!supervisors.length&&<div className="dash97-empty">No supervisor data available.</div>}
+    </div>
+    <div className="dash97-legend"><span><i/>Recharge</span><span><i/>GA</span></div>
+   </div>
+
+   <aside className="dash97-panel dash97-watch">
+    <div className="dash97-section-head"><div><h2>Attention watchlist</h2><p>Lowest composite execution scores.</p></div><Link href="/admin/attention">Open list →</Link></div>
+    <div className="dash97-watch-list">
+     {attention.map(r=><Link href={`/admin/rsos/${r.employeeId}?month=${month}`} className="dash97-watch-row" key={r.employeeId}>
+      <span className="dash97-watch-dot"/>
+      <div><strong>{r.name}</strong><small>{r.supervisor} · GA {r.ga}% · Recharge {r.recharge}%</small></div>
+      <b className={r.score<50?"critical":"warn"}>{r.score}</b>
+     </Link>)}
+     {!attention.length&&<div className="dash97-good-state"><Icon name="chart"/><strong>No priority risks</strong><span>All scored RSOs are currently at 70+.</span></div>}
     </div>
    </aside>
   </section>
 
-  <section className="admin-v2-section">
-   <div className="admin-v2-section-head"><div><span>BUSINESS KPIs</span><h2>Target vs Achievement</h2><p>Monthly execution across the core distribution metrics.</p></div><Link href="/targets">Manage targets <b>›</b></Link></div>
-   <div className="admin-v2-kpis">
-    <V2Kpi tone="blue" label="GA" icon="sim" achieved={totals.gaA} target={totals.gaT}/>
-    <V2Kpi tone="violet" label="C2C" icon="wallet" achieved={totals.c2cA} target={totals.c2cT} money/>
-    <V2Kpi tone="cyan" label="SC" icon="balance" achieved={totals.scA} target={totals.scT} money/>
-    <V2Kpi tone="green" label="Total Recharge" icon="chart" achieved={totals.trA} target={totals.trT} money featured/>
-    <V2Kpi tone="orange" label="SSO" icon="shop" achieved={totals.ssoA} target={totals.ssoT}/>
-    <V2Kpi tone="rose" label="LSO" icon="target" achieved={totals.lsoA} target={totals.lsoT}/>
-   </div>
-  </section>
-
-
-
-  <section className="admin-v2-section analytics-section-v90">
-   <div className="admin-v2-section-head"><div><span>PERFORMANCE ANALYTICS</span><h2>Execution at a glance</h2><p>Real performance data from the selected reporting month.</p></div></div>
-   <div className="analytics-grid-v90">
-    <RankedBarChart title="Top RSO execution" subtitle="Composite execution score across recharge, GA, SSO and LSO." data={scored.slice(0,6).map(r=>({label:r.name,value:r.score,meta:`${r.supervisor} · ${r.retailerCount} retailers`}))}/>
-    <ComparisonChart title="Supervisor execution" subtitle="Recharge and GA achievement by supervisor team." data={supervisors.slice(0,6).map(x=>({label:x.name,value:pct(x.achieved,x.target),secondary:pct(x.ga,x.gaTarget),meta:`${x.rsos} RSOs · ${x.retailers} retailers`}))}/>
-   </div>
-  </section>
-
-  <section className="admin-exec-v49">
-   <div className="admin-v2-section-head"><div><span>EXECUTIVE INTELLIGENCE</span><h2>What needs your attention</h2><p>Fast signals derived from the current monthly performance picture.</p></div><Link href={`/admin/performance/rsos?month=${month}`}>Open analytics <b>›</b></Link></div>
-   <div className="admin-exec-v49-grid">
-    <article className="admin-exec-v49-card spotlight">
-     <div className="admin-exec-v49-card-head"><span><Icon name="chart"/></span><b>TOP PERFORMER</b></div>
-     <strong>{topPerformer?.name||"No data"}</strong>
-     <p>{topPerformer?`${topPerformer.score} composite score · ${topPerformer.recharge}% recharge · ${topPerformer.ga}% GA`:"Import performance data to populate this insight."}</p>
-     {topPerformer&&<Link href={`/admin/rsos/${topPerformer.employeeId}?month=${month}`}>View employee <b>›</b></Link>}
-    </article>
-    <article className="admin-exec-v49-card risk">
-     <div className="admin-exec-v49-card-head"><span><Icon name="target"/></span><b>PRIORITY RISK</b></div>
-     <strong>{weakest?.name||"No data"}</strong>
-     <p>{weakest?`${weakest.score} composite score · ${Math.max(0,70-weakest.score)} points below on-track threshold`:"No current performance risk is available."}</p>
-     {weakest&&<Link href={`/admin/rsos/${weakest.employeeId}?month=${month}`}>Review RSO <b>›</b></Link>}
-    </article>
-    <article className="admin-exec-v49-card">
-     <div className="admin-exec-v49-card-head"><span><Icon name="target"/></span><b>TARGET COVERAGE</b></div>
-     <strong>{targetCoverage}%</strong>
-     <p>{targetReady} of {rows.length} RSOs have at least one active monthly target configured.</p>
-     <Link href="/targets">Manage targets <b>›</b></Link>
-    </article>
-    <article className="admin-exec-v49-card">
-     <div className="admin-exec-v49-card-head"><span><Icon name="users"/></span><b>NETWORK DENSITY</b></div>
-     <strong>{avgRetailers}</strong>
-     <p>Average retailers per active RSO · {supervisorOnTrack} of {supervisors.length} supervisor teams at 70%+ recharge progress.</p>
-     <Link href={`/admin/performance/supervisors?month=${month}`}>View teams <b>›</b></Link>
-    </article>
-   </div>
-  </section>
-
-  <section className="admin-v2-main-grid">
-   <div className="admin-v2-section">
-    <div className="admin-v2-section-head compact"><div><span>TEAM PERFORMANCE</span><h2>RSO leaderboard</h2></div><Link href={`/admin/performance/rsos?month=${month}`}>View all <b>›</b></Link></div>
-    <div className="admin-v2-table-card">
-     {loading?<div className="skeleton" style={{height:410}}/>:scored.length?<div className="admin-v2-leaderboard">
-      <div className="admin-v2-table-head"><span>Rank</span><span>Employee</span><span>GA</span><span>Recharge</span><span>Score</span></div>
-      {scored.slice(0,8).map((r,i)=><Link href={`/admin/rsos/${r.employeeId}?month=${month}`} className="admin-v2-rank-row" key={r.employeeId}>
-       <span className={`admin-v2-rank rank-${i+1}`}>{i+1}</span>
-       <div className="admin-v2-person"><span>{r.name.slice(0,2).toUpperCase()}</span><div><strong>{r.name}</strong><small>{r.supervisor} · {r.retailerCount} retailers</small></div></div>
-       <div className="admin-v2-cell"><strong>{r.gaAchieved}/{r.gaTarget}</strong><small>{r.ga}%</small></div>
-       <div className="admin-v2-cell"><strong>{r.recharge}%</strong><small>target</small></div>
-       <span className={`admin-v2-score-pill ${r.score>=70?"good":r.score>=50?"mid":"low"}`}>{r.score}</span>
-      </Link>)}
-     </div>:<div className="admin-empty"><Icon name="users"/><strong>No performance data yet</strong><span>Import master data and set monthly targets first.</span></div>}
+  <section className="dash97-footer-grid">
+   <div className="dash97-panel">
+    <div className="dash97-section-head"><div><h2>Business KPI progress</h2><p>Core monthly target completion.</p></div><Link href="/targets">Manage targets →</Link></div>
+    <div className="dash97-progress-list">
+     <ProgressLine label="GA" achieved={totals.gaA} target={totals.gaT}/>
+     <ProgressLine label="Recharge" achieved={totals.trA} target={totals.trT} money/>
+     <ProgressLine label="SSO" achieved={totals.ssoA} target={totals.ssoT}/>
+     <ProgressLine label="LSO" achieved={totals.lsoA} target={totals.lsoT}/>
     </div>
    </div>
 
-   <aside className="admin-v2-section">
-    <div className="admin-v2-section-head compact"><div><span>SHORTCUTS</span><h2>Daily operations</h2></div></div>
-    <div className="admin-v2-actions">
-     <AdminQuick href="/ga" icon="sim" title="GA Upload" sub="Daily activation"/>
-     <AdminQuick href="/c2c" icon="wallet" title="C2C" sub="Stock lifting"/>
-     <AdminQuick href="/c2s" icon="chart" title="C2S" sub="Retail sales"/>
-     <AdminQuick href="/ob" icon="balance" title="Opening Balance" sub="Latest snapshot"/>
-     <AdminQuick href="/targets" icon="target" title="Targets" sub="Monthly setup"/>
-     <AdminQuick href="/admin/employees" icon="users" title="Employees" sub="Hierarchy & access"/>
+   <div className="dash97-panel dash97-shortcuts">
+    <div className="dash97-section-head compact"><div><h2>Administration</h2><p>Common management tools.</p></div></div>
+    <div>
+     <AdminShortcut href="/admin/users" icon="users" title="Login Accounts"/>
+     <AdminShortcut href="/admin/permissions" icon="shield" title="Permissions"/>
+     <AdminShortcut href="/admin/audit" icon="chart" title="Activity Log"/>
+     <AdminShortcut href="/targets" icon="target" title="Targets"/>
     </div>
-    <div className="admin-v2-ops-card">
-     <div className="admin-v2-ops-head"><span><Icon name="upload"/></span><div><strong>Data Operations</strong><small>Master files, targets and reports</small></div></div>
-     <Link href="/admin/upload">Open Upload Center <b>›</b></Link>
-    </div>
-   </aside>
-  </section>
-
-  <section className="admin-exec-v49-operations">
-   <div className="admin-exec-v49-op-copy"><span>OPERATIONS CONTROL</span><h2>Keep reporting data current</h2><p>Upload source files, maintain targets, validate people mappings and review exceptions before field teams consume the data.</p></div>
-   <div className="admin-exec-v49-op-links">
-    <Link href="/admin/upload"><Icon name="upload"/><span><strong>Upload Center</strong><small>Daily & master files</small></span><b>›</b></Link>
-    <Link href="/admin/audit"><Icon name="chart"/><span><strong>Activity Log</strong><small>Security & history</small></span><b>›</b></Link>
-    <Link href="/admin/permissions"><Icon name="users"/><span><strong>Access Control</strong><small>Permissions & roles</small></span><b>›</b></Link>
-   </div>
-  </section>
-
-  <section className="admin-v2-section">
-   <div className="admin-v2-section-head"><div><span>TEAM STRUCTURE</span><h2>Supervisor overview</h2><p>Compare recharge and GA execution by team.</p></div><Link href={`/admin/performance/supervisors?month=${month}`}>Supervisor performance <b>›</b></Link></div>
-   <div className="admin-v2-supervisors">
-    {supervisors.length?supervisors.map((s,i)=><article className="admin-v2-supervisor" key={s.name}>
-     <div className="admin-v2-supervisor-top"><span className={`team-avatar team-${(i%4)+1}`}>{s.name.slice(0,2).toUpperCase()}</span><div><strong>{s.name}</strong><small>{s.rsos} RSOs · {s.retailers} retailers</small></div><b>{pct(s.achieved,s.target)}%</b></div>
-     <div className="admin-v2-supervisor-metric"><div><span>Recharge</span><b>{pct(s.achieved,s.target)}%</b></div><div className="admin-v2-mini-progress"><span style={{width:`${clamp(pct(s.achieved,s.target))}%`}}/></div></div>
-     <div className="admin-v2-supervisor-metric"><div><span>GA</span><b>{pct(s.ga,s.gaTarget)}%</b></div><div className="admin-v2-mini-progress alt"><span style={{width:`${clamp(pct(s.ga,s.gaTarget))}%`}}/></div></div>
-    </article>):<div className="admin-empty card"><Icon name="users"/><strong>No supervisor data</strong></div>}
    </div>
   </section>
  </main>
 }
 
-function V2Kpi({tone,label,icon,achieved,target,money=false,featured=false}:{tone:string;label:string;icon:string;achieved:number;target:number;money?:boolean;featured?:boolean}){
- const p=pct(achieved,target),remaining=Math.max(0,target-achieved);
- return <article className={`admin-v2-kpi tone-${tone} ${featured?"featured":""}`}>
-  <div className="admin-v2-kpi-top"><span><Icon name={icon}/></span><b className={p>=80?"good":p>=50?"mid":"low"}>{p}%</b></div>
-  <div className="admin-v2-kpi-label">{label}</div>
-  <strong className="admin-v2-kpi-value">{money?"৳":""}{fmt(achieved)}</strong>
-  <div className="admin-v2-kpi-meta"><span>Target {money?"৳":""}{fmt(target)}</span><span>{target?`${money?"৳":""}${fmt(remaining)} left`:"No target"}</span></div>
-  <div className="admin-v2-mini-progress"><span style={{width:`${clamp(p)}%`}}/></div>
+function CleanKpi({label,value,progress,note,icon,tone="green"}:{label:string;value:string;progress:number;note:string;icon:string;tone?:string}){
+ const p=clamp(progress);
+ return <article className={`dash97-kpi tone-${tone}`}>
+  <div className="dash97-ring" style={{"--dash97-p":`${p*3.6}deg`} as CSSProperties}>
+   <div><Icon name={icon}/><b>{p}%</b></div>
+  </div>
+  <div><span>{label}</span><strong>{value}</strong><small>{note}</small></div>
  </article>
 }
 
-function AdminQuick({href,icon,title,sub}:{href:string;icon:string;title:string;sub:string}){
- return <Link href={href} className="admin-v2-action"><span><Icon name={icon}/></span><div><strong>{title}</strong><small>{sub}</small></div><b>›</b></Link>
+function QuickReport({href,icon,title,sub}:{href:string;icon:string;title:string;sub:string}){
+ return <Link href={href} className="dash97-report"><span><Icon name={icon}/></span><div><strong>{title}</strong><small>{sub}</small></div><b>›</b></Link>
+}
+
+function SnapshotRow({label,value,tone}:{label:string;value:string|number;tone:string}){
+ return <div className="dash97-snapshot"><span><i className={`tone-${tone}`}/>{label}</span><strong>{typeof value==="number"?fmt(value):value}</strong></div>
+}
+
+function ProgressLine({label,achieved,target,money=false}:{label:string;achieved:number;target:number;money?:boolean}){
+ const p=pct(achieved,target);
+ return <div className="dash97-progress-row">
+  <div><strong>{label}</strong><span>{money?"৳":""}{fmt(achieved)} / {money?"৳":""}{fmt(target)}</span><b>{p}%</b></div>
+  <div className="dash97-progress-track"><i style={{width:`${clamp(p)}%`}}/></div>
+ </div>
+}
+
+function AdminShortcut({href,icon,title}:{href:string;icon:string;title:string}){
+ return <Link href={href} className="dash97-admin-link"><span><Icon name={icon}/>{title}</span><b>›</b></Link>
 }

@@ -6,6 +6,8 @@ import {monthStartsInRange,monthStartUtc} from "@/lib/date-range";
 import {dhakaMonth} from "@/lib/business-time";
 import {apiError} from "@/lib/http-errors";
 
+export const dynamic = "force-dynamic";
+
 function parseDate(value: string | null) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [y,m,d] = value.split("-").map(Number);

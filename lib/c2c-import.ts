@@ -289,38 +289,40 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
   }
 
   try {
-    const retailerIds = mapped.map((r) => r.retailerId);
-    const endExclusive = new Date(reportEndDate.getTime() + 24 * 60 * 60 * 1000);
+    const monthEnd = new Date(Date.UTC(month.getUTCFullYear(),month.getUTCMonth()+1,1));
 
-    // Daily columns contain amount only; TRANSACTION_COUNT is a month-to-date total.
-    // Store daily amounts separately and keep the exact monthly transaction total in C2cMonthlySummary.
-    if (retailerIds.length) {
-      const dailyData: Prisma.C2cRecordCreateManyInput[] = [];
-      for (const row of mapped) {
-        for (const day of row.daily) {
-          dailyData.push({
-            retailerId: row.retailerId,
-            date: day.date,
-            transactionCount: 0,
-            amount: new Prisma.Decimal(day.amount),
-            batchId: batch.id,
-          });
-        }
-      }
-      await prisma.$transaction(async tx => {
-        await tx.c2cRecord.deleteMany({
-          where: { retailerId: { in: retailerIds }, date: { gte: firstDate, lt: endExclusive } },
+    // The uploaded C2C report is an authoritative month-to-date snapshot.
+    // Replace the entire stored month so retailers/dates missing from the new file cannot leave stale values behind.
+    const dailyData: Prisma.C2cRecordCreateManyInput[] = [];
+    for (const row of mapped) {
+      for (const day of row.daily) {
+        dailyData.push({
+          retailerId: row.retailerId,
+          date: day.date,
+          transactionCount: 0,
+          amount: new Prisma.Decimal(day.amount),
+          batchId: batch.id,
         });
-        for (let i=0;i<dailyData.length;i+=1000) await tx.c2cRecord.createMany({data:dailyData.slice(i,i+1000)});
-        for (const row of mapped) {
-          await tx.c2cMonthlySummary.upsert({
-            where:{retailerId_month:{retailerId:row.retailerId,month}},
-            update:{transactionCount:row.transactionCount,totalAmount:new Prisma.Decimal(row.totalAmount),reportEndDate},
-            create:{retailerId:row.retailerId,month,transactionCount:row.transactionCount,totalAmount:new Prisma.Decimal(row.totalAmount),reportEndDate},
-          });
-        }
-      });
+      }
     }
+    await prisma.$transaction(async tx => {
+      await tx.c2cRecord.deleteMany({where:{date:{gte:month,lt:monthEnd}}});
+      await tx.c2cMonthlySummary.deleteMany({where:{month}});
+      for (let i=0;i<dailyData.length;i+=1000) {
+        await tx.c2cRecord.createMany({data:dailyData.slice(i,i+1000)});
+      }
+      for (const row of mapped) {
+        await tx.c2cMonthlySummary.create({
+          data:{
+            retailerId:row.retailerId,
+            month,
+            transactionCount:row.transactionCount,
+            totalAmount:new Prisma.Decimal(row.totalAmount),
+            reportEndDate,
+          },
+        });
+      }
+    });
 
     if (errors.length) {
       await prisma.importError.createMany({
@@ -351,7 +353,8 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
       successRows: mapped.length,
       failedRows,
       assignmentWarnings,
-      dailyRecordsStored: mapped.reduce((sum, row) => sum + row.daily.length, 0),
+      dailyRecordsStored: dailyData.length,
+      replacedMonth: iso(month),
       status,
     };
   } catch (error) {

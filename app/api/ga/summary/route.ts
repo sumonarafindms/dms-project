@@ -7,6 +7,8 @@ import {dhakaMonth} from "@/lib/business-time";
 import {apiError} from "@/lib/http-errors";
 import {isSimSwapProduct,isGa170Product,isGa300Product} from "@/lib/ga-product";
 
+export const dynamic = "force-dynamic";
+
 function dateOnly(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [year, month, day] = value.split("-").map(Number);

@@ -526,3 +526,34 @@
 - Added sticky account-creation panel on desktop.
 - Improved tablet and mobile stacking rules.
 - Business logic, APIs, permissions, auth and database behavior unchanged.
+
+## v94 - Adaptive Workspace
+- Added a reusable WorkspaceSection composition component and adopted it in Employee Control Center.
+- Added sticky desktop filter/search toolbars for performance and other long data pages.
+- Improved sticky table headers and horizontal data-reading behavior.
+- Refined desktop information density for performance cards and dashboard sections.
+- Improved section scan rhythm and scroll targeting on long admin pages.
+- Preserved tablet/mobile behavior and all business logic.
+
+## v95 - Import Pipeline Fix
+- GA upload no longer requires the chosen view date to match every ACTIVATION_DATE in the workbook.
+- One GA workbook can contain multiple activation dates; every SIM is stored using its own ACTIVATION_DATE.
+- Existing SIM_NO deduplication remains: identical duplicates are ignored and corrected existing SIM rows are updated.
+- EV-SWAP now requires SELLING_PRICE 100; SIMWAP remains SELLING_PRICE 350.
+- C2C and C2S cumulative files now replace the authoritative stored month, removing stale retailer/date values from older uploads.
+- C2C/C2S pages switch their visible date range to the uploaded report range and immediately reload using those exact dates.
+- GA/C2C/C2S summary routes are explicitly force-dynamic and client reloads include a cache-buster.
+
+## v96 - Data Operations Visibility
+- Added live latest-import health cards to Upload Center for GA, C2C, C2S and OB.
+- Added latest file/report-end/upload-time freshness strips to GA, C2C and C2S workspaces.
+- Updated Upload Center rules to describe GA multi-date imports, EV-SWAP price 100, and authoritative C2C/C2S monthly replacement.
+- Renamed GA workspace copy from daily-only language to multi-date activation upload language.
+- No database schema, import algorithm, permissions, auth or business calculations changed.
+
+## v97 - Clean Dashboard
+- Rebuilt the admin dashboard around the supplied clean admin UI reference.
+- Reduced visual noise and replaced the oversized command-center layout with compact KPI rings, quick reports, team snapshot, supervisor performance and an attention watchlist.
+- Uses only live DMS values already available to the dashboard; no mock/fake metrics were introduced.
+- Added a warm off-white, restrained green/teal dashboard palette with compact enterprise spacing.
+- Added mobile horizontal KPI cards and responsive single-column dashboard sections.

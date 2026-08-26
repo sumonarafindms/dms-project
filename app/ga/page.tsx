@@ -68,8 +68,9 @@ export default function GaPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function load() {
-    const params = new URLSearchParams({ month: `${month}-01`, date: dataDate, from:fromDate, to:toDate });
+  async function load(overrides?:{month?:string;date?:string;from?:string;to?:string}) {
+    const nextMonth=overrides?.month||month,nextDate=overrides?.date||dataDate,nextFrom=overrides?.from||fromDate,nextTo=overrides?.to||toDate;
+    const params = new URLSearchParams({ month: `${nextMonth}-01`, date: nextDate, from:nextFrom, to:nextTo, _:String(Date.now()) });
     const res = await fetch(`/api/ga/summary?${params.toString()}`, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok) {
@@ -101,7 +102,6 @@ export default function GaPage() {
     setMessage("Uploading and checking activation data...");
     const body = new FormData();
     body.append("file", input.files[0]);
-    body.append("businessDate", dataDate);
 
     const res = await fetch("/api/import/GA", { method: "POST", body });
     const data = await res.json();
@@ -116,8 +116,18 @@ export default function GaPage() {
       setMessage(`This exact file was already imported for ${prettyDate(data.businessDate)}. No GA was counted twice.`);
     } else {
       setMessage(
-        `GA import complete for ${data.businessDate}: ${data.insertedRows} new SIM, ${data.updatedRows} corrected SIM, ${data.duplicateRows} duplicate SIM ignored, ${data.failedRows} failed row(s).`,
+        `GA import complete ${data.reportStartDate} → ${data.reportEndDate}: ${data.insertedRows} new SIM, ${data.updatedRows} corrected SIM, ${data.duplicateRows} duplicate SIM ignored, ${data.failedRows} failed row(s).`,
       );
+      if(data.reportStartDate&&data.reportEndDate){
+        const nextMonth=data.reportEndDate.slice(0,7);
+        setDataDate(data.reportEndDate);
+        setMonth(nextMonth);
+        setFromDate(data.reportStartDate);
+        setToDate(data.reportEndDate);
+        input.value="";
+        await load({month:nextMonth,date:data.reportEndDate,from:data.reportStartDate,to:data.reportEndDate});
+        return;
+      }
     }
 
     input.value = "";
@@ -145,15 +155,14 @@ export default function GaPage() {
   const uploadPanel = canAdd ? (
     <section className="ga-upload-card">
       <div className="ga-upload-card-head">
-        <div><span className="ga-section-icon">⇧</span><div><span className="ga-upload-overline">IMPORT WORKSPACE</span><h2>Upload Activation Details</h2><p>Import the selected day&apos;s activation workbook.</p></div></div>
+        <div><span className="ga-section-icon">⇧</span><div><span className="ga-upload-overline">IMPORT WORKSPACE</span><h2>Upload Activation Details</h2><p>Import one activation workbook containing one or many activation dates.</p></div></div>
         <a href="/api/samples/ga" className="ga-sample-btn">⇩ Download Sample File</a>
       </div>
-      <div className="ga-upload-flow"><span><b>1</b> Select date</span><i>→</i><span><b>2</b> Choose file</span><i>→</i><span><b>3</b> Validate SIM</span><i>→</i><span><b>4</b> Save</span></div><form onSubmit={upload} className="ga-upload-form">
-        <label><span>GA Data Date</span><input name="businessDate" type="date" value={dataDate} onChange={(e)=>changeDataDate(e.target.value)} required/></label>
+      <div className="ga-upload-flow"><span><b>1</b> Choose file</span><i>→</i><span><b>2</b> Validate rows</span><i>→</i><span><b>3</b> Save by activation date</span></div><form onSubmit={upload} className="ga-upload-form ga-upload-form-multidate">
         <label className="ga-file-field"><span>ActivationDetailsReport.xlsx</span><small>Excel · max 20 MB</small><input name="file" type="file" accept=".xlsx,.xlsm,.xls" required/></label>
         <button disabled={loading} className="ga-upload-btn">{loading?"Processing...":"⇧  Upload GA"}</button>
       </form>
-      <div className="ga-rule-box"><span className="ga-info-dot">i</span><div><b>GA counting rule:</b> PRODUCT_CODE <b>MMST / MMSTs</b> = 300 SIM, <b>MMSTC</b> = 170 SIM. <b>SIMWAP / EV-SWAP</b> must also have <b>SELLING_PRICE 350</b>. They are counted only under <b>SIM SWAP</b> and are excluded from GA achievement, GA target progress and SSO. SIM_NO still prevents duplicate import.</div></div>
+      <div className="ga-rule-box"><span className="ga-info-dot">i</span><div><b>GA counting rule:</b> PRODUCT_CODE <b>MMST / MMSTs</b> = 300 SIM, <b>MMSTC</b> = 170 SIM. <b>SIMWAP</b> must have <b>SELLING_PRICE 350</b>; <b>EV-SWAP</b> must have <b>SELLING_PRICE 100</b>. Both are counted only under <b>SIM SWAP</b> and are excluded from GA achievement, GA target progress and SSO. SIM_NO still prevents duplicate import.</div></div>
       {message&&<div className="ga-message">{message}</div>}
     </section>
   ) : null;
@@ -164,14 +173,16 @@ export default function GaPage() {
       <header className="ga-page-head">
         <div className="ga-head-copy">
           <a href="/admin/upload" className="ga-back-link">← Upload Center</a>
-          <div className="ga-title-line"><h1>Daily GA Upload &amp; SSO</h1><span className="ga-title-badge">GA</span></div>
-          <p>Upload the Activation Details report. Standard SIM sales count toward GA; replacement SIMs are tracked separately as SIM SWAP.</p>
+          <div className="ga-title-line"><h1>GA Activation Upload &amp; SSO</h1><span className="ga-title-badge">GA</span></div>
+          <p>Upload one Activation Details report with one or many activation dates. Standard SIM sales count toward GA; replacement SIMs are tracked separately as SIM SWAP.</p>
         </div>
         <div className="ga-date-card">
           <label><span>FROM</span><input type="date" value={fromDate} onChange={e=>changeFrom(e.target.value)}/></label>
           <label><span>TO</span><input type="date" value={toDate} min={fromDate} onChange={e=>setToDate(e.target.value)}/></label>
         </div>
       </header>
+
+      <div className="ga-freshness-v96"><span/><div><small>LATEST GA IMPORT</small><strong>{history[0]?.businessDate?prettyDate(history[0].businessDate):"No import yet"}</strong><em>{fromDate} → {toDate}</em></div><div><b>{history[0]?.fileName||"Upload an activation file"}</b><small>{history[0]?.uploadedAt?`Imported ${new Date(history[0].uploadedAt).toLocaleString()}`:"No import history available"}</small></div></div>
 
       {uploadPanel}
 
@@ -181,7 +192,7 @@ export default function GaPage() {
           <Metric tone="blue" icon="⌁" name="Total" value={dayTotals.total.toLocaleString()} note="All SIM activations"/>
           <Metric tone="green" icon="150" name="150" value={dayTotals.ga150.toLocaleString()} note="Selling price = 170"/>
           <Metric tone="orange" icon="300" name="300" value={dayTotals.ga300.toLocaleString()} note="MMST / MMSTs"/>
-          <Metric tone="rose" icon="↻" name="SIM SWAP" value={dayTotals.simSwap.toLocaleString()} note="SIMWAP / EV-SWAP · price 350 · excluded from GA"/>
+          <Metric tone="rose" icon="↻" name="SIM SWAP" value={dayTotals.simSwap.toLocaleString()} note="SIMWAP 350 / EV-SWAP 100 · excluded from GA"/>
           <Metric tone="purple" icon="●" name="Active Retailers" value={retailerDaily.length.toLocaleString()} note="Retailers with GA that day"/>
         </div>
       </section>

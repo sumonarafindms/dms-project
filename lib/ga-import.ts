@@ -2,7 +2,7 @@ import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {isSimSwapProduct,SIM_SWAP_SELLING_PRICE} from "@/lib/ga-product";
+import {isSimSwapProduct,expectedSimSwapPrice} from "@/lib/ga-product";
 
 type Cell = string | number | boolean | Date | null | undefined;
 
@@ -81,17 +81,6 @@ function parseDate(value: Cell): Date | null {
   return null;
 }
 
-function parseBusinessDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error("Please select the GA data date before uploading.");
-  }
-  const [year, month, day] = value.split("-").map(Number);
-  const date = dateOnlyUtc(year, month - 1, day);
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
-    throw new Error("Invalid GA data date.");
-  }
-  return date;
-}
 
 function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -117,9 +106,7 @@ function normalizeTime(value: Cell): string | null {
 export async function importGaActivationWorkbook(
   fileName: string,
   bytes: Buffer,
-  selectedDateText: string,
 ) {
-  const selectedDate = parseBusinessDate(selectedDateText);
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("No worksheet found in Excel file.");
@@ -139,7 +126,6 @@ export async function importGaActivationWorkbook(
 
   const parsedRows: ParsedActivation[] = [];
   const preErrors: Array<{ rowNumber: number; message: string; rawData: object }> = [];
-  const datesFound = new Set<string>();
   let sourceRows = 0;
 
   for (let i = 1; i < rows.length; i++) {
@@ -170,11 +156,12 @@ export async function importGaActivationWorkbook(
       preErrors.push({ rowNumber: i + 1, message: "SELLING_PRICE is invalid", rawData: { retailerCode, simNo } });
       continue;
     }
-    if (isSimSwapProduct(productCode) && sellingPrice !== SIM_SWAP_SELLING_PRICE) {
+    const expectedSwapPrice=expectedSimSwapPrice(productCode);
+    if (expectedSwapPrice !== null && sellingPrice !== expectedSwapPrice) {
       preErrors.push({
         rowNumber: i + 1,
-        message: `${productCode} must have SELLING_PRICE ${SIM_SWAP_SELLING_PRICE} for SIM SWAP verification`,
-        rawData: { retailerCode, simNo, productCode, sellingPrice },
+        message: `${productCode} must have SELLING_PRICE ${expectedSwapPrice} for SIM SWAP verification`,
+        rawData: { retailerCode, simNo, productCode, sellingPrice, expectedSwapPrice },
       });
       continue;
     }
@@ -183,7 +170,6 @@ export async function importGaActivationWorkbook(
       continue;
     }
 
-    datesFound.add(isoDate(activationDate));
     parsedRows.push({ rowNumber: i + 1, retailerCode, simNo, productCode, sellingPrice, activationDate, activationTime });
   }
 
@@ -194,13 +180,9 @@ export async function importGaActivationWorkbook(
   }
   if (!parsedRows.length) throw new Error("No valid activation rows were found in the uploaded file.");
 
-  const selectedIso = isoDate(selectedDate);
-  const mismatchedDates = [...datesFound].filter((date) => date !== selectedIso);
-  if (mismatchedDates.length) {
-    throw new Error(
-      `Selected date is ${selectedIso}, but the file contains activation date(s): ${[...datesFound].sort().join(", ")}. Select the correct date and upload again.`,
-    );
-  }
+  const activationDates=parsedRows.map(row=>row.activationDate.getTime());
+  const reportStartDate=new Date(Math.min(...activationDates));
+  const reportEndDate=new Date(Math.max(...activationDates));
 
   const hash = crypto.createHash("sha256").update(bytes).digest("hex");
   const duplicateFile = await prisma.importBatch.findUnique({ where: { hash } });
@@ -256,7 +238,7 @@ export async function importGaActivationWorkbook(
       type: ImportType.GA,
       fileName,
       hash,
-      businessDate: selectedDate,
+      businessDate: reportEndDate,
       totalRows: sourceRows,
       status: ImportStatus.PROCESSING,
     },
@@ -344,7 +326,9 @@ export async function importGaActivationWorkbook(
       batchId: batch.id,
       fileName,
       sheetName,
-      businessDate: selectedIso,
+      businessDate: isoDate(reportEndDate),
+      reportStartDate: isoDate(reportStartDate),
+      reportEndDate: isoDate(reportEndDate),
       totalRows: sourceRows,
       successRows,
       insertedRows,

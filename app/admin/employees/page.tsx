@@ -3,6 +3,7 @@ import {requireUser} from "../../../lib/auth";
 import {prisma} from "../../../lib/prisma";
 import {Icon} from "../../components/icons";
 import {withDatabaseRetry} from "../../../lib/db-retry";
+import {WorkspaceSection} from "../../components/WorkspaceSection";
 
 function RoleCard({href,icon,label,count,description,tone}:{href:string;icon:string;label:string;count:number;description:string;tone:string}){
  return <Link href={href} className={`ecc-v82-role ${tone}`}>
@@ -58,24 +59,18 @@ export default async function Page(){
   </section>
 
   <section className="ecc-v82-lower">
-   <div className="ecc-v82-hierarchy">
-    <div className="ecc-v82-section-label">ORGANIZATION STRUCTURE</div>
-    <h2>Field reporting hierarchy</h2>
+   <WorkspaceSection eyebrow="ORGANIZATION STRUCTURE" title="Field reporting hierarchy" description="Assignments follow this reporting chain. IT stays outside the field hierarchy." className="ecc-v82-hierarchy">
     <div className="ecc-v82-flow">
      <span>Manager</span><b>→</b><span>Supervisor</span><b>→</b><span>RSO</span><b>→</b><span>BP / Retailer</span>
     </div>
-    <p>Assignments follow this reporting chain. IT is a system-access role and stays outside the field hierarchy.</p>
-   </div>
+   </WorkspaceSection>
 
-   <aside className="ecc-v82-access">
-    <span className="ecc-v82-section-label">ACCESS MANAGEMENT</span>
-    <h2>Control accounts and permissions</h2>
-    <p>Manage authorized users and define module-level access from one place.</p>
+   <WorkspaceSection eyebrow="ACCESS MANAGEMENT" title="Control accounts and permissions" description="Manage authorized users and define module-level access from one place." className="ecc-v82-access" action={<span className="workspace-secure-v94"><Icon name="shield"/>Secure</span>}>
     <div className="ecc-v82-actions">
      <Link className="ecc-v82-primary" href="/admin/permissions"><Icon name="users"/>Manage Permissions</Link>
      <Link className="ecc-v82-secondary" href="/admin/users">Login Accounts</Link>
     </div>
-   </aside>
+   </WorkspaceSection>
   </section>
  </main>
 }

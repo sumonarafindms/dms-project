@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {useCan} from "../components/PermissionContext";
-import {OpsHeader,OpsUpload,OpsSectionTitle,OpsMetric,OpsDataCard,OpsTable,PersonCell,ProgressCell,EmptyState,StatusPill} from "../components/OperationsPremiumUI";
+import {OpsHeader,OpsUpload,OpsSectionTitle,OpsMetric,OpsDataCard,OpsTable,PersonCell,ProgressCell,EmptyState,StatusPill,OpsFreshness} from "../components/OperationsPremiumUI";
 import {dhakaTodayYmd} from "../../lib/business-time";
 import {TableScrollHint} from "../components/TableScrollHint";
 
@@ -30,8 +30,9 @@ export default function C2cPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function load() {
-    const p = new URLSearchParams({ month: `${month}-01`, date,from:fromDate,to:toDate });
+  async function load(overrides?:{month?:string;date?:string;from?:string;to?:string}) {
+    const nextMonth=overrides?.month||month,nextDate=overrides?.date||date,nextFrom=overrides?.from||fromDate,nextTo=overrides?.to||toDate;
+    const p = new URLSearchParams({ month: `${nextMonth}-01`, date:nextDate,from:nextFrom,to:nextTo,_:String(Date.now()) });
     const res = await fetch(`/api/c2c/summary?${p}`, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok) return setMessage(data.error || "Failed to load C2C data");
@@ -51,7 +52,13 @@ export default function C2cPage() {
     if (data.duplicate) setMessage(`This exact C2C file was already imported. Nothing was counted twice.`);
     else {
       setMessage(`C2C updated ${data.reportStartDate} → ${data.reportEndDate}. ${data.successRows} retailers mapped, ${data.failedRows} failed, ${data.dailyRecordsStored} non-zero daily balance records stored.${data.assignmentWarnings ? ` ${data.assignmentWarnings} RSO assignment mismatch warning(s).` : ""}`);
-      if (data.reportEndDate) { setDate(data.reportEndDate); setMonth(data.reportEndDate.slice(0, 7)); }
+      if (data.reportStartDate&&data.reportEndDate) {
+        const nextMonth=data.reportEndDate.slice(0,7);
+        setDate(data.reportEndDate);setMonth(nextMonth);setFromDate(data.reportStartDate);setToDate(data.reportEndDate);
+        input.value="";
+        await load({month:nextMonth,date:data.reportEndDate,from:data.reportStartDate,to:data.reportEndDate});
+        return;
+      }
     }
     input.value = ""; await load();
   }
@@ -62,8 +69,9 @@ export default function C2cPage() {
   if(!canView)return null;
   return <main className="page ops-premium-page">
     <OpsHeader badge="C2C" title="C2C Recharge Balance" subtitle="Upload cumulative stock lifting, monitor RSO recharge achievement and inspect any date in the selected range." from={fromDate} to={toDate} onFrom={v=>{setFromDate(v);setMonth(v.slice(0,7));if(toDate<v)setToDate(v)}} onTo={setToDate}/>
+    <OpsFreshness label="C2C" businessDate={history[0]?.businessDate} uploadedAt={history[0]?.uploadedAt} fileName={history[0]?.fileName} range={`${fromDate} → ${toDate}`}/>
 
-    {canAdd&&<OpsUpload title="Upload C2C File" subtitle="Import your month-to-date Stock Lifting workbook." sample="/api/samples/c2c" message={message} rule={<><b>How it works:</b> RETAILER_CODE maps the outlet, SRNUMBER confirms RSO ownership, and each date column is stored separately. Repeated cumulative uploads update covered dates instead of double counting.</>}>
+    {canAdd&&<OpsUpload title="Upload C2C File" subtitle="Import your month-to-date Stock Lifting workbook." sample="/api/samples/c2c" message={message} rule={<><b>How it works:</b> RETAILER_CODE maps the outlet, SRNUMBER confirms RSO ownership, and each date column is stored separately. Each upload is the authoritative month-to-date snapshot: DMS replaces that month before saving the new file, so stale retailer/date values cannot remain.</>}>
       <form onSubmit={upload} className="ops-upload-form"><label className="ops-file-field"><span>ITop_Up_StockLifting file</span><small>Excel / TXT · max 20 MB</small><input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required/></label><button disabled={loading} className="ops-upload-btn">{loading?"Processing...":"⇧  Upload C2C"}</button></form>
     </OpsUpload>}
 

@@ -34,11 +34,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ type: 
     if(fileError)return NextResponse.json({error:fileError},{status:400});
 
     if (normalizedType === "GA") {
-      const businessDate = String(form.get("businessDate") || "");
       const result = await importGaActivationWorkbook(
         file.name,
         Buffer.from(await file.arrayBuffer()),
-        businessDate,
       );
       await audit(actor,"IMPORT_GA","ga",{targetType:"File",targetName:file.name,detail:"Imported GA workbook"});
       return NextResponse.json(result);

@@ -18,8 +18,17 @@ export function isGa170Product(value:string|null|undefined){
   return normalizeGaProductCode(value)==="MMSTC";
 }
 
-export const SIM_SWAP_SELLING_PRICE=350;
+export const SIMWAP_SELLING_PRICE=350;
+export const EV_SWAP_SELLING_PRICE=100;
+
+export function expectedSimSwapPrice(productCode:string|null|undefined){
+  const code=normalizeGaProductCode(productCode);
+  if(code==="SIMWAP")return SIMWAP_SELLING_PRICE;
+  if(code==="EV-SWAP")return EV_SWAP_SELLING_PRICE;
+  return null;
+}
 
 export function hasExpectedSimSwapPrice(productCode:string|null|undefined,sellingPrice:number){
-  return !isSimSwapProduct(productCode)||sellingPrice===SIM_SWAP_SELLING_PRICE;
+  const expected=expectedSimSwapPrice(productCode);
+  return expected===null||sellingPrice===expected;
 }

@@ -22,3 +22,7 @@ export function ProgressCell({value}:{value:number}){return <div className="ops-
 export function EmptyState({title,subtitle,icon="info"}:{title:string;subtitle:string;icon?:string}){return <PremiumEmpty title={title} subtitle={subtitle} icon={icon}/>}
 export function StatusPill({value}:{value:string}){return <span className={`ops-status ${value.toLowerCase().replace(/\s+/g,"-")}`}>{value}</span>}
 function initials(value:string){return (value||"?").trim().split(/\s+/).slice(0,2).map(v=>v[0]).join("").toUpperCase()}
+
+export function OpsFreshness({label,businessDate,uploadedAt,fileName,range}:{label:string;businessDate?:string|null;uploadedAt?:string|null;fileName?:string|null;range?:string}){
+ return <div className="ops-freshness-v96"><span className="ops-freshness-dot-v96"/><div><small>LATEST {label.toUpperCase()} DATA</small><strong>{businessDate?new Date(businessDate).toLocaleDateString():"No import yet"}</strong>{range?<em>{range}</em>:null}</div><div className="ops-freshness-file-v96"><span>{fileName||"Upload a source file"}</span><small>{uploadedAt?`Imported ${new Date(uploadedAt).toLocaleString()}`:"No import history available"}</small></div></div>
+}
