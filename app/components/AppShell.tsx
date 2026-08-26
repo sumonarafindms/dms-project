@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
-import {usePathname} from "next/navigation";
+import {usePathname,useRouter} from "next/navigation";
 import {Icon} from "./icons";
+import {useEffect,useRef,useState} from "react";
 import {PermissionProvider,type ClientPermissionMap} from "./PermissionContext";
 
 type NavItem={href:string;label:string;icon:string;module?:string};
@@ -59,18 +60,32 @@ function allowed(item:NavItem,permissions:ClientPermissionMap,admin:boolean){
  return !item.module||Boolean(permissions[item.module]?.view)
 }
 export default function AppShell({children,user,permissions}:{children:React.ReactNode;user:{displayName:string;role:string}|null;permissions:ClientPermissionMap}){
- const path=usePathname(); if(path==="/login"||path==="/setup"||path==="/sacool") return <PermissionProvider permissions={permissions}>{children}</PermissionProvider>;
+ const path=usePathname();
+ const router=useRouter();
+ const [navPending,setNavPending]=useState<string|null>(null);
+ const sidebarRef=useRef<HTMLElement|null>(null);
+ useEffect(()=>{setNavPending(null)},[path]);
+ useEffect(()=>{
+   const saved=sessionStorage.getItem("dms_sidebar_scroll");
+   if(saved&&sidebarRef.current)sidebarRef.current.scrollTop=Number(saved)||0;
+   return ()=>{if(sidebarRef.current)sessionStorage.setItem("dms_sidebar_scroll",String(sidebarRef.current.scrollTop))};
+ },[]);
+ useEffect(()=>{
+   const warm=[roleFor(path).home,...adminNav.slice(0,6).map(i=>i.href)];
+   for(const href of new Set(warm)) router.prefetch(href);
+ },[path,router]);
+ if(path==="/login"||path==="/setup"||path==="/sacool") return <PermissionProvider permissions={permissions}>{children}</PermissionProvider>;
  const roleKey=user?.role.toLowerCase()||path.split("/").filter(Boolean)[0]||"admin",role=user?configs[roleKey]||roleFor(path):roleFor(path),profileName=user?.displayName||role.name;
  const roleName=(user?.role||"").toUpperCase();const isAdmin=roleName==="ADMIN"||roleName==="IT"||path==="/dashboard"||path.startsWith("/admin/");
  const visibleNav=role.nav.filter(i=>allowed(i,permissions,isAdmin));
  const visibleBottom=role.bottom.filter(i=>allowed(i,permissions,isAdmin));
  return <PermissionProvider permissions={permissions}><div className={`app-root ${isAdmin?"admin-app":`${roleKey}-app`}`}>
-  <aside className="desktop-sidebar"><div className="sidebar-brand"><Brand href={role.home}/></div><div className="sidebar-section">{role.title}</div>{isAdmin?<AdminNav path={path} permissions={permissions}/>:visibleNav.map(i=><NavLink key={i.href} item={i} path={path}/>)}<div className="sidebar-spacer"/><button className="sidebar-link sidebar-button" aria-label="Sign out" onClick={async()=>{await fetch("/api/auth/logout",{method:"POST"});location.href="/login"}}><Icon name="logout"/>Sign out</button><div className="sidebar-profile"><div className="avatar">{role.initials}</div><div><div className="profile-name">{profileName}</div><div className="profile-role">{role.title}</div></div></div></aside>
+  <aside ref={sidebarRef} className={`desktop-sidebar ${navPending?"nav-is-pending":""}`}><div className="sidebar-brand"><Brand href={role.home}/></div><div className="sidebar-section">{role.title}</div>{isAdmin?<AdminNav path={path} permissions={permissions} onNavigate={setNavPending}/>:visibleNav.map(i=><NavLink key={i.href} item={i} path={path} onNavigate={setNavPending}/>)}{navPending?<div className="sidebar-nav-pending" role="status" aria-live="polite"><span/><b>Opening page…</b></div>:null}<div className="sidebar-spacer"/><button className="sidebar-link sidebar-button" aria-label="Sign out" onClick={async()=>{await fetch("/api/auth/logout",{method:"POST"});location.href="/login"}}><Icon name="logout"/>Sign out</button><div className="sidebar-profile"><div className="avatar">{role.initials}</div><div><div className="profile-name">{profileName}</div><div className="profile-role">{role.title}</div></div></div></aside>
   <div className="app-main"><header className="mobile-topbar"><div className="mobile-context"><Brand href={role.home}/><span>{currentLabel(path,visibleNav,role.home)}</span></div><Link href={role.home} className="avatar avatar-link" aria-label={`${role.title} home`}>{role.initials}</Link></header>{children}</div>
-  {visibleBottom.length>0&&<nav className="bottom-nav role-bottom" style={{gridTemplateColumns:`repeat(${visibleBottom.length},1fr)`}}>{visibleBottom.map(i=><Link key={i.href} href={i.href} className={`bottom-link ${active(path,i.href)?"active":""}`}><Icon name={i.icon}/><span>{i.label}</span></Link>)}</nav>}
+  {visibleBottom.length>0&&<nav className="bottom-nav role-bottom" style={{gridTemplateColumns:`repeat(${visibleBottom.length},1fr)`}}>{visibleBottom.map(i=><Link key={i.href} href={i.href} prefetch={true} onPointerEnter={()=>router.prefetch(i.href)} onClick={()=>setNavPending(i.href)} className={`bottom-link ${active(path,i.href)?"active":""}`}><Icon name={i.icon}/><span>{i.label}</span></Link>)}</nav>}
  </div></PermissionProvider>
 }
-function AdminNav({path,permissions}:{path:string;permissions:ClientPermissionMap}){
+function AdminNav({path,permissions,onNavigate}:{path:string;permissions:ClientPermissionMap;onNavigate:(href:string)=>void}){
  const groups=[
   {label:"Overview",icon:"home",items:[adminNav[0]]},
   {label:"Performance",icon:"chart",items:adminNav.slice(1,5)},
@@ -82,7 +97,7 @@ function AdminNav({path,permissions}:{path:string;permissions:ClientPermissionMa
   const groupActive=items.some(i=>active(path,i.href));
   return <details className={`admin-nav-group ${groupActive?"group-active":""}`} open={groupActive||g.label==="Overview"} key={g.label}>
    <summary><span><Icon name={g.icon}/>{g.label}</span><b>⌄</b></summary>
-   <div className="admin-nav-items">{items.map(i=><NavLink key={i.href} item={i} path={path}/>)}</div>
+   <div className="admin-nav-items">{items.map(i=><NavLink key={i.href} item={i} path={path} onNavigate={onNavigate}/>)}</div>
   </details>
  })}</nav>
 }
@@ -92,4 +107,16 @@ function currentLabel(path:string,nav:NavItem[],home:string){
  return exact?.label||"DMS";
 }
 function Brand({href}:{href:string}){return <Link href={href} className="brand"><div className="brand-mark">D</div><div><div className="brand-title">DMS</div><div className="brand-sub">Distribution Management</div></div></Link>}
-function NavLink({item,path}:{item:NavItem;path:string}){return <Link href={item.href} className={`sidebar-link ${active(path,item.href)?"active":""}`}><Icon name={item.icon}/>{item.label}</Link>}
+function NavLink({item,path,onNavigate}:{item:NavItem;path:string;onNavigate:(href:string)=>void}){
+ const router=useRouter();
+ const isActive=active(path,item.href);
+ return <Link
+  href={item.href}
+  prefetch={true}
+  aria-current={isActive?"page":undefined}
+  onPointerEnter={()=>router.prefetch(item.href)}
+  onFocus={()=>router.prefetch(item.href)}
+  onClick={()=>{if(!isActive)onNavigate(item.href)}}
+  className={`sidebar-link ${isActive?"active":""}`}
+ ><Icon name={item.icon}/><span className="sidebar-link-label">{item.label}</span></Link>
+}

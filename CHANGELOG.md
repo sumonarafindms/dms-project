@@ -477,3 +477,27 @@
 - Restyled login, hidden admin login, upload center, employee control center and detail/profile surfaces.
 - Updated mobile navigation and responsive surfaces to match the new identity.
 - Kept all business logic, calculations, APIs, permissions, authentication and database behavior unchanged.
+
+## v88 - Layout System Repair
+- Replaced competing v85/v86 shell layers with one authoritative desktop layout layer.
+- Desktop admin navigation is now fixed to the viewport with its own vertical scrolling.
+- Removed the large blank gap between the sidebar and page content at 100% browser zoom.
+- Standardized sidebar width, menu row sizing, wrapping and nested-group spacing.
+- Rebuilt desktop Performance headers, reporting-period panel, filters, KPI summary and card grids with explicit dimensions.
+- Preserved responsive tablet/mobile behavior and all application business logic.
+
+## v89 - Fast Navigation
+- Added proactive prefetching for common admin routes and hover/focus prefetch for every sidebar link.
+- Added immediate sidebar navigation feedback while the destination server page loads.
+- Preserved sidebar scroll position across route changes.
+- Locked pointer-events so decorative CSS cannot intercept menu clicks.
+- Added route loading skeleton/progress feedback for admin navigation.
+- No database query, API, permission, auth or business calculation behavior changed.
+
+## v90 - Modern Analytics UI
+- Added reusable dependency-free analytics charts using live dashboard/performance data.
+- Added top-RSO execution and supervisor comparison charts to the executive dashboard.
+- Added team execution chart to Supervisor Performance.
+- Redesigned tables as modern enterprise data grids with stronger headers, row rhythm and hover states.
+- Improved performance cards, detail/profile metadata, KPI readability and activity panels.
+- No fake chart data, API changes, database changes or business-logic changes.

@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import type {CSSProperties} from "react";
 import {Icon} from "../components/icons";
 import {dhakaMonth} from "../../lib/business-time";
+import {RankedBarChart,ComparisonChart} from "../components/AnalyticsCharts";
 
 type Row={
  employeeId:string;employeeCode?:string|null;name:string;supervisor:string;retailerCount:number;
@@ -144,6 +145,16 @@ export default function Dashboard(){
     <V2Kpi tone="green" label="Total Recharge" icon="chart" achieved={totals.trA} target={totals.trT} money featured/>
     <V2Kpi tone="orange" label="SSO" icon="shop" achieved={totals.ssoA} target={totals.ssoT}/>
     <V2Kpi tone="rose" label="LSO" icon="target" achieved={totals.lsoA} target={totals.lsoT}/>
+   </div>
+  </section>
+
+
+
+  <section className="admin-v2-section analytics-section-v90">
+   <div className="admin-v2-section-head"><div><span>PERFORMANCE ANALYTICS</span><h2>Execution at a glance</h2><p>Real performance data from the selected reporting month.</p></div></div>
+   <div className="analytics-grid-v90">
+    <RankedBarChart title="Top RSO execution" subtitle="Composite execution score across recharge, GA, SSO and LSO." data={scored.slice(0,6).map(r=>({label:r.name,value:r.score,meta:`${r.supervisor} · ${r.retailerCount} retailers`}))}/>
+    <ComparisonChart title="Supervisor execution" subtitle="Recharge and GA achievement by supervisor team." data={supervisors.slice(0,6).map(x=>({label:x.name,value:pct(x.achieved,x.target),secondary:pct(x.ga,x.gaTarget),meta:`${x.rsos} RSOs · ${x.retailers} retailers`}))}/>
    </div>
   </section>
 

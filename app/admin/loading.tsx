@@ -1,1 +1,7 @@
-export default function Loading(){return <main className="page admin-loading-v4"><div className="loading-v4-hero"><div className="loading-v4-line short"/><div className="loading-v4-line title"/><div className="loading-v4-line medium"/></div><div className="loading-v4-metrics">{[1,2,3,4].map(x=><div className="loading-v4-card" key={x}><span/><b/><i/></div>)}</div><div className="loading-v4-panel"><div className="loading-v4-line medium"/>{[1,2,3,4,5].map(x=><div className="loading-v4-row" key={x}><span/><div><b/><i/></div><em/></div>)}</div></main>}
+export default function Loading(){
+ return <main className="page route-loading-v89" aria-live="polite" aria-busy="true">
+  <div className="route-loading-bar-v89"/>
+  <div className="route-loading-head-v89"><span/><div><b/><i/></div></div>
+  <div className="route-loading-grid-v89">{[1,2,3,4].map(x=><div key={x}/>)}</div>
+ </main>
+}
