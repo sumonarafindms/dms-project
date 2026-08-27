@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {useCan} from "../components/PermissionContext";
 import {dhakaYesterdayYmd} from "../../lib/business-time";
-import {TableScrollHint} from "../components/TableScrollHint";
 
 type EmployeeRow = {
   employeeId: string;
@@ -85,11 +84,21 @@ export default function GaPage() {
     load();
   }, [month, dataDate,fromDate,toDate]);
 
-  function changeDataDate(value: string) {
-    setDataDate(value);
-    if (value?.length >= 7) setMonth(value.slice(0, 7));
+  function changeFrom(value:string){
+    setFromDate(value);
+    if(value?.length>=7)setMonth(value.slice(0,7));
+    if(toDate<value){
+      setToDate(value);
+      setDataDate(value);
+    }
   }
-  function changeFrom(value:string){setFromDate(value);if(value?.length>=7)setMonth(value.slice(0,7));if(toDate<value)setToDate(value)}
+  function changeTo(value:string){
+    setToDate(value);
+    if(value){
+      setDataDate(value);
+      if(value.length>=7)setMonth(value.slice(0,7));
+    }
+  }
 
   async function upload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -149,6 +158,7 @@ export default function GaPage() {
     (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300 }),
     { total: 0, ga150: 0, ga300: 0 },
   ), [retailerDaily]);
+  const activeGaRetailers=useMemo(()=>retailerDaily.filter(r=>r.total>0).length,[retailerDaily]);
 
   const uploadPanel = canAdd ? (
     <section className="ga-upload-card">
@@ -176,7 +186,7 @@ export default function GaPage() {
         </div>
         <div className="ga-date-card">
           <label><span>FROM</span><input type="date" value={fromDate} onChange={e=>changeFrom(e.target.value)}/></label>
-          <label><span>TO</span><input type="date" value={toDate} min={fromDate} onChange={e=>setToDate(e.target.value)}/></label>
+          <label><span>TO / SELECTED DAY</span><input type="date" value={toDate} min={fromDate} onChange={e=>changeTo(e.target.value)}/></label>
         </div>
       </header>
 
@@ -185,12 +195,12 @@ export default function GaPage() {
       {uploadPanel}
 
       <section className="ga-section">
-        <div className="ga-section-title"><span className="ga-section-icon">▣</span><div><h2>Selected Day: {prettyDate(dataDate)}</h2><p>Daily activation snapshot</p></div></div>
+        <div className="ga-section-title"><span className="ga-section-icon">▣</span><div><h2>Selected Day: {prettyDate(dataDate)}</h2><p>Daily activation snapshot · follows the TO / SELECTED DAY filter above</p></div></div>
         <div className="ga-day-metrics">
-          <Metric tone="blue" icon="⌁" name="Total GA" value={dayTotals.total.toLocaleString()} note="Excludes SIMWAP & EV-SWAP"/>
+          <Metric tone="blue" icon="⌁" name="Total GA" value={dayTotals.total.toLocaleString()} note={`${dayTotals.ga150.toLocaleString()} + ${dayTotals.ga300.toLocaleString()} · standard GA only`}/>
           <Metric tone="green" icon="150" name="150" value={dayTotals.ga150.toLocaleString()} note="MMSTC · selling price 170"/>
           <Metric tone="orange" icon="300" name="300" value={dayTotals.ga300.toLocaleString()} note="MMST / MMSTs"/>
-          <Metric tone="purple" icon="●" name="Active Retailers" value={retailerDaily.length.toLocaleString()} note="Retailers with standard GA"/>
+          <Metric tone="purple" icon="●" name="Active Retailers" value={activeGaRetailers.toLocaleString()} note="Retailers with standard GA"/>
         </div>
       </section>
 

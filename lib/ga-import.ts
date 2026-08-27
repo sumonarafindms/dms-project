@@ -2,7 +2,7 @@ import crypto from "crypto";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {isSimSwapProduct,expectedSimSwapPrice} from "@/lib/ga-product";
+import {expectedSimSwapPrice} from "@/lib/ga-product";
 
 type Cell = string | number | boolean | Date | null | undefined;
 

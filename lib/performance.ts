@@ -1,7 +1,7 @@
 import {prisma} from "./prisma";
 import {monthBounds} from "./month";
 import {parseYmd,monthStartUtc,monthStartsInRange,fullyCoveredMonths} from "./date-range";
-import {isSimSwapProduct,isGa170Product,isGa300Product} from "./ga-product";
+import {classifyGaActivation,isLsoComplete,isSsoComplete} from "./business-rules";
 
 export type EmployeePerformance={employeeId:string;name:string;rsoMsisdn:string;employeeCode:string|null;supervisor:string;retailerCount:number;gaTarget:number;gaAchieved:number;ga150:number;ga300:number;ssoTarget:number;ssoAchieved:number;c2cTarget:number;c2cAchieved:number;scTarget:number;scAchieved:number;totalRechargeTarget:number;totalRechargeAchieved:number;lsoTarget:number;lsoAchieved:number;c2sAmount:number;c2sTransactions:number};
 
@@ -38,18 +38,19 @@ export async function employeePerformance(month:string,employeeIds?:string[],fro
   prisma.c2sMonthlySummary.findMany({where:{retailerId:{in:retailerIds},month:{gte:firstMonth,lt:afterLast}},select:{retailerId:true,totalAmount:true,transactionCount:true}}),
  ]);
 
- const gaBy=new Map<string,{t:number;a150:number;a300:number}>(),retailerGaMonth=new Map<string,{eid:string;count:number;eligible:boolean}>();
+ const gaBy=new Map<string,{t:number;a150:number;a300:number}>(),retailerGaMonth=new Map<string,{eid:string;count:number;simSeller:string|null}>();
  for(const x of gaGroups){
   const rr=retailerMap.get(x.retailerId),eid=rr?.employeeId;if(!eid)continue;
   const count=x._count._all;
-  if(isSimSwapProduct(x.productCode))continue;
+  // Standard GA only. SIMWAP / EV-SWAP and unknown product codes never count.
+  const category=classifyGaActivation(x);
+  if(category!=="GA_170"&&category!=="GA_300")continue;
   const g=gaBy.get(eid)||{t:0,a150:0,a300:0};g.t+=count;
-  if(isGa170Product(x.productCode)||(!x.productCode&&Number(x.sellingPrice)===170))g.a150+=count;
-  else if(isGa300Product(x.productCode)||!x.productCode)g.a300+=count;
+  if(category==="GA_170")g.a150+=count;else g.a300+=count;
   gaBy.set(eid,g);
-  const key=`${x.retailerId}|${x.activationDate.toISOString().slice(0,7)}`,r=retailerGaMonth.get(key)||{eid,count:0,eligible:(rr?.simSeller||"").trim().toUpperCase()==="Y"};r.count+=count;retailerGaMonth.set(key,r);
+  const key=`${x.retailerId}|${x.activationDate.toISOString().slice(0,7)}`,r=retailerGaMonth.get(key)||{eid,count:0,simSeller:rr?.simSeller??null};r.count+=count;retailerGaMonth.set(key,r);
  }
- const sso=new Map<string,number>();for(const r of retailerGaMonth.values())if(r.eligible&&r.count>=2)sso.set(r.eid,(sso.get(r.eid)||0)+1);
+ const sso=new Map<string,number>();for(const r of retailerGaMonth.values())if(isSsoComplete(r.simSeller,r.count))sso.set(r.eid,(sso.get(r.eid)||0)+1);
 
  const c2cBy=new Map<string,number>();for(const x of c2cGroups){const eid=retailerMap.get(x.retailerId)?.employeeId;if(eid)c2cBy.set(eid,(c2cBy.get(eid)||0)+Number(x._sum.amount||0))}
  const c2sAmountBy=new Map<string,number>();for(const x of c2sGroups){const eid=retailerMap.get(x.retailerId)?.employeeId;if(eid)c2sAmountBy.set(eid,(c2sAmountBy.get(eid)||0)+Number(x._sum.amount||0))}
@@ -57,7 +58,7 @@ export async function employeePerformance(month:string,employeeIds?:string[],fro
  for(const r of c2sMonthly){
   const eid=retailerMap.get(r.retailerId)?.employeeId;if(!eid)continue;
   const e=c2sBy.get(eid)||{amount:c2sAmountBy.get(eid)||0,trx:0,lso:0};
-  e.trx+=r.transactionCount;if(Number(r.totalAmount)>=500&&r.transactionCount>=7)e.lso++;c2sBy.set(eid,e)
+  e.trx+=r.transactionCount;if(isLsoComplete(r.totalAmount,r.transactionCount))e.lso++;c2sBy.set(eid,e)
  }
  for(const [eid,amount] of c2sAmountBy)if(!c2sBy.has(eid))c2sBy.set(eid,{amount,trx:0,lso:0});
 

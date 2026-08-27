@@ -3,7 +3,7 @@ import {prisma} from "./prisma";
 import {monthBounds} from "./month";
 import {normalizeMonth} from "./drilldown";
 import {monthStartsInRange,monthStartUtc} from "./date-range";
-import {SIM_SWAP_PRODUCT_CODES} from "./ga-product";
+import {withGa170,withSimSwap,withStandardGa} from "./business-rules";
 
 export type BpViewer={role:string;employeeId?:string|null;supervisorId?:string|null;bpRetailerId?:string|null;managerSupervisorIds?:string[]};
 
@@ -61,7 +61,7 @@ export async function listBpAssignments(user:BpViewer,monthInput?:string,qInput?
     const effectiveStart=a.startDate>rangeStart?a.startDate:rangeStart;
     const assignmentEnd=a.endDate?new Date(a.endDate.getTime()+86400000):rangeEnd;
     const effectiveEnd=assignmentEnd<rangeEnd?assignmentEnd:rangeEnd;
-    const monthGa=effectiveStart<effectiveEnd?await prisma.gaActivation.count({where:{retailerId:a.retailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd},productCode:{notIn:[...SIM_SWAP_PRODUCT_CODES]}}}):0;
+    const monthGa=effectiveStart<effectiveEnd?await prisma.gaActivation.count({where:withStandardGa({retailerId:a.retailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}})}):0;
     const targetMap=new Map(a.monthlyTargets.map(x=>[x.month.toISOString().slice(0,7),x.gaTarget]));
     const gaTarget=monthStartsInRange(effectiveStart,effectiveEnd).reduce((sum,m)=>sum+(targetMap.get(m.toISOString().slice(0,7))??a.gaTarget),0);
     return {
@@ -97,14 +97,16 @@ export async function bpAssignmentDetail(user:BpViewer,id:string,monthInput?:str
   const rangeTarget=effectiveStart<effectiveEnd?monthStartsInRange(effectiveStart,effectiveEnd).reduce((sum,m)=>sum+(targetMap.get(m.toISOString().slice(0,7))??assignment.gaTarget),0):0;
   const assignmentView={...assignment,gaTarget:rangeTarget};
   const commonWhere: Prisma.GaActivationWhereInput={retailerId:assignment.retailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd},...(q?{simNo:{contains:q,mode:"insensitive"}}:{})};
-  const where: Prisma.GaActivationWhereInput={...commonWhere,productCode:{notIn:[...SIM_SWAP_PRODUCT_CODES]}};
-  const swapWhere: Prisma.GaActivationWhereInput={...commonWhere,productCode:{in:[...SIM_SWAP_PRODUCT_CODES]}};
-  const [rows,total,simSwap]=await Promise.all([
+  // Standard GA vs replacement SIM is decided by the shared rules, so separator
+  // variants (EV_SWAP / EVSWAP / SIM-WAP) cannot leak into the GA count.
+  const where=withStandardGa(commonWhere);
+  const swapWhere=withSimSwap(commonWhere);
+  const [rows,total,simSwap,total150]=await Promise.all([
     prisma.gaActivation.findMany({where,orderBy:[{activationDate:"desc"},{activationTime:"desc"}],take:500,select:{simNo:true,sellingPrice:true,productCode:true,activationDate:true,activationTime:true}}),
     prisma.gaActivation.count({where}),
     prisma.gaActivation.count({where:swapWhere}),
+    prisma.gaActivation.count({where:withGa170(commonWhere)}),
   ]);
-  const total150=await prisma.gaActivation.count({where:{...where,sellingPrice:170}});
   const total300=total-total150;
   const dailyRaw=await prisma.gaActivation.groupBy({by:["activationDate"],where,_count:{_all:true},orderBy:{activationDate:"desc"}});
   return {month,q,assignment:assignmentView,total,total150,total300,simSwap,rows,daily:dailyRaw.map(x=>({date:x.activationDate,count:x._count._all})),effectiveStart,effectiveEnd};

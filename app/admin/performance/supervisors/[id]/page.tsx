@@ -4,6 +4,7 @@ import {employeePerformance,pct} from "../../../../../lib/performance";
 import {normalizeMonth} from "../../../../../lib/drilldown";
 import {monthBounds} from "../../../../../lib/month";
 import {parseYmd,monthStartsInRange} from "../../../../../lib/date-range";
+import {withStandardGa} from "../../../../../lib/business-rules";
 import {notFound} from "next/navigation";
 import Link from "next/link";
 import {Breadcrumb,PerfSummary,PerfBar} from "../../../../components/AdminPerformanceUI";
@@ -19,7 +20,7 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
    const es=b.startDate>rs?b.startDate:rs,ae=b.endDate?new Date(b.endDate.getTime()+86400000):re,ee=ae<re?ae:re;
    const targetMap=new Map(b.monthlyTargets.map(x=>[x.month.toISOString().slice(0,7),x.gaTarget]));
    const target=es<ee?monthStartsInRange(es,ee).reduce((n,m)=>n+(targetMap.get(m.toISOString().slice(0,7))??b.gaTarget),0):0;
-   const achieved=es<ee?await prisma.gaActivation.count({where:{retailerId:b.retailerId,activationDate:{gte:es,lt:ee}}}):0;
+   const achieved=es<ee?await prisma.gaActivation.count({where:withStandardGa({retailerId:b.retailerId,activationDate:{gte:es,lt:ee}})}):0;
    return {...b,target,achieved};
  }));
  const rechargeTarget=rows.reduce((a,x)=>a+x.totalRechargeTarget,0),rechargeAchieved=rows.reduce((a,x)=>a+x.totalRechargeAchieved,0),rsoGaT=rows.reduce((a,x)=>a+x.gaTarget,0),rsoGaA=rows.reduce((a,x)=>a+x.gaAchieved,0),bpGaT=bpStats.reduce((a,x)=>a+x.target,0),bpGaA=bpStats.reduce((a,x)=>a+x.achieved,0);

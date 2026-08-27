@@ -13,7 +13,7 @@ function monthFromParam(value: string | null) {
 }
 
 export async function GET(request: NextRequest) {
-  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiUser(["ADMIN","IT","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   if(!(await apiPermission("targets","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   const month = monthFromParam(request.nextUrl.searchParams.get("month"));
 
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const actor=await apiUser(["ADMIN","ACCOUNTS"]);if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});
+  const actor=await apiUser(["ADMIN","IT","ACCOUNTS"]);if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});
   if(!(await apiPermission("targets","update"))) return NextResponse.json({error:"You do not have permission to update targets."},{status:403});
   const body = await request.json();
   if (!body?.month || !/^\d{4}-\d{2}$/.test(body.month) || !Array.isArray(body.rows)) {

@@ -16,7 +16,7 @@ function parseDate(value: string | null) {
 }
 
 export async function GET(req: NextRequest) {
-  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiUser(["ADMIN","IT","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   if(!(await apiPermission("c2c","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   try {
     const monthText = req.nextUrl.searchParams.get("month") || dhakaMonth()+"-01";

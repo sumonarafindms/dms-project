@@ -3,7 +3,7 @@ import {prisma} from "./prisma";
 import {monthBounds} from "./month";
 import type {EmployeePerformance} from "./performance";
 import {dhakaTodayYmd} from "./business-time";
-import {SIM_SWAP_PRODUCT_CODES} from "./ga-product";
+import {withStandardGa} from "./business-rules";
 
 export type PaceStatus="Ahead"|"On track"|"Behind"|"No target";
 export function monthPace(month:string, now=new Date()){
@@ -35,7 +35,7 @@ export function rankRows(rows:EmployeePerformance[],expected:number){
   }).sort((a,b)=>b.score-a.score);
 }
 export async function latestDailySnapshot(employeeIds?:string[]){
-  const gaFilter:Prisma.GaActivationWhereInput={productCode:{notIn:[...SIM_SWAP_PRODUCT_CODES]},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})};
+  const gaFilter:Prisma.GaActivationWhereInput=withStandardGa(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{});
   const c2cFilter:Prisma.C2cRecordWhereInput=employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{};
   const [latestGa,latestC2c]=await Promise.all([
     prisma.gaActivation.findFirst({where:gaFilter,orderBy:{activationDate:"desc"},select:{activationDate:true}}),

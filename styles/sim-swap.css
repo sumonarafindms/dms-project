@@ -1,0 +1,17 @@
+/* SIM swap (replacement SIM) presentation.
+   Feature-scoped, not a version layer: replacement activity is always shown
+   separately from Total GA, so it needs its own consistent visual treatment. */
+
+.retailer-profile-kpi.tone-amber {
+  background: linear-gradient(145deg, #fff, #fff7ed);
+  border-color: #fed7aa;
+}
+
+.retailer-profile-kpi.tone-amber > strong {
+  color: #c2410c;
+}
+
+.activity-type.swap {
+  background: #fff7ed;
+  color: #c2410c;
+}

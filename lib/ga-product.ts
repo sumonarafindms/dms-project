@@ -22,6 +22,12 @@ export function isGa170Product(value:string|null|undefined){
   return normalizeGaProductCode(value)==="MMSTC";
 }
 
+
+
+export function isStandardGaProduct(value:string|null|undefined){
+  return isGa170Product(value)||isGa300Product(value);
+}
+
 export const SIMWAP_SELLING_PRICE=350;
 export const EV_SWAP_SELLING_PRICE=100;
 

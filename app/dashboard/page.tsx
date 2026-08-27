@@ -67,29 +67,14 @@ export default function Dashboard(){
   return [...map.values()].sort((a,b)=>pct(b.achieved,b.target)-pct(a.achieved,a.target));
  },[rows]);
 
- const overall=useMemo(()=>{
-  const vals=[
-   totals.gaT?pct(totals.gaA,totals.gaT):null,
-   totals.c2cT?pct(totals.c2cA,totals.c2cT):null,
-   totals.ssoT?pct(totals.ssoA,totals.ssoT):null,
-   totals.lsoT?pct(totals.lsoA,totals.lsoT):null
-  ].filter((v):v is number=>v!==null);
-  return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
- },[totals]);
 
  const behind=scored.filter(r=>r.score<50).length;
  const onTrack=scored.filter(r=>r.score>=70).length;
- const topPerformer=scored[0]||null;
- const weakest=scored.at(-1)||null;
  const targetReady=rows.filter(r=>r.gaTarget||r.c2cTarget||r.totalRechargeTarget||r.ssoTarget||r.lsoTarget).length;
  const targetCoverage=rows.length?Math.round(targetReady/rows.length*100):0;
- const avgRetailers=rows.length?Math.round(totals.ret/rows.length):0;
- const supervisorOnTrack=supervisors.filter(s=>pct(s.achieved,s.target)>=70).length;
  const firstLoad=loading&&rows.length===0;
  const gaProgress=pct(totals.gaA,totals.gaT);
  const rechargeProgress=pct(totals.trA,totals.trT);
- const ssoProgress=pct(totals.ssoA,totals.ssoT);
- const lsoProgress=pct(totals.lsoA,totals.lsoT);
  const attention=[...scored].filter(r=>r.score<70).sort((a,b)=>a.score-b.score).slice(0,4);
 
  return <main className="page admin-dashboard-v97">
@@ -142,7 +127,7 @@ export default function Dashboard(){
    <div className="dash97-panel dash97-performance">
     <div className="dash97-section-head"><div><h2>Supervisor performance</h2><p>Recharge and GA progress by team.</p></div><Link href={`/admin/performance/supervisors?month=${month}`}>View all →</Link></div>
     <div className="dash97-team-list">
-     {supervisors.slice(0,6).map((x,i)=>{
+     {supervisors.slice(0,6).map((x)=>{
       const recharge=pct(x.achieved,x.target),ga=pct(x.ga,x.gaTarget);
       return <Link href={`/admin/performance/supervisors?month=${month}`} className="dash97-team-row" key={x.name}>
        <span className="dash97-avatar">{x.name.slice(0,2).toUpperCase()}</span>

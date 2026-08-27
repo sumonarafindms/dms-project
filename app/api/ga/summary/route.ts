@@ -5,7 +5,7 @@ import { monthBounds } from "@/lib/month";
 import {monthStartsInRange,monthStartUtc} from "@/lib/date-range";
 import {dhakaMonth} from "@/lib/business-time";
 import {apiError} from "@/lib/http-errors";
-import {isSimSwapProduct,isGa170Product,isGa300Product} from "@/lib/ga-product";
+import {GA_CLASSIFICATION_SELECT,addGaActivation,emptyGaBreakdown,isSsoComplete,withGa170,withGa300,withSimSwap,withStandardGa} from "@/lib/business-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ function dateOnly(value: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiUser(["ADMIN","IT","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   if(!(await apiPermission("ga","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   try {
     const month = req.nextUrl.searchParams.get("month") || dhakaMonth()+"-01";
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const dailyStart = requestedDate ? dateOnly(requestedDate) : null;
     const dailyEnd = dailyStart ? new Date(dailyStart.getTime() + 24 * 60 * 60 * 1000) : null;
 
-    const [employees, monthlyActivations, dailyActivations, importHistory] = await Promise.all([
+    const [employees, retailers, ga170Groups, ga300Groups, swapGroups, monthlyStandardByDay, dailyActivations, importHistory] = await Promise.all([
       prisma.employee.findMany({
         where: { active: true },
         orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
@@ -43,28 +43,41 @@ export async function GET(req: NextRequest) {
           targets: { where: { month: {gte:targetStart,lt:targetEnd} } },
         },
       }),
-      prisma.gaActivation.findMany({
-        where: { activationDate: { gte: fromDate, lt: rangeEnd } },
-        select: {
-          retailerId: true,
-          sellingPrice: true,
-          productCode: true,
-          activationDate: true,
-          retailer: {
-            select: {
-              employeeId: true,
-              simSeller: true,
-            },
-          },
-        },
+      prisma.retailer.findMany({
+        where: { employeeId: { not: null } },
+        select: { id: true, employeeId: true, simSeller: true },
       }),
+      prisma.gaActivation.groupBy({
+        by: ["retailerId"],
+        where: withGa170({ activationDate: { gte: fromDate, lt: rangeEnd } }),
+        _count: { _all: true },
+      }),
+      prisma.gaActivation.groupBy({
+        by: ["retailerId"],
+        where: withGa300({ activationDate: { gte: fromDate, lt: rangeEnd } }),
+        _count: { _all: true },
+      }),
+      prisma.gaActivation.groupBy({
+        by: ["retailerId"],
+        where: withSimSwap({ activationDate: { gte: fromDate, lt: rangeEnd } }),
+        _count: { _all: true },
+      }),
+      // SSO is a per-calendar-month rule. When the selected range sits inside a
+      // single month the per-retailer totals above already answer it, so the
+      // extra day-level grouping is only issued for multi-month ranges.
+      targetMonths.length > 1
+        ? prisma.gaActivation.groupBy({
+            by: ["retailerId", "activationDate"],
+            where: withStandardGa({ activationDate: { gte: fromDate, lt: rangeEnd } }),
+            _count: { _all: true },
+          })
+        : Promise.resolve([]),
       dailyStart && dailyEnd
         ? prisma.gaActivation.findMany({
             where: { activationDate: { gte: dailyStart, lt: dailyEnd } },
             select: {
               retailerId: true,
-              sellingPrice: true,
-              productCode: true,
+              ...GA_CLASSIFICATION_SELECT,
               retailer: {
                 select: {
                   retailerCode: true,
@@ -100,42 +113,56 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const employeeAgg = new Map<string, { total: number; ga150: number; ga300: number; simSwap:number }>();
-    const retailerMonthlyCount = new Map<string, { employeeId: string; count: number; simSeller: boolean }>();
-
-    for (const activation of monthlyActivations) {
-      const employeeId = activation.retailer.employeeId;
-      if (!employeeId) continue;
-      const price = Number(activation.sellingPrice);
-      const current = employeeAgg.get(employeeId) || { total: 0, ga150: 0, ga300: 0, simSwap:0 };
-      if(isSimSwapProduct(activation.productCode)){
-        current.simSwap += 1;
-        employeeAgg.set(employeeId,current);
-        continue;
-      }
-      current.total += 1;
-      if (isGa170Product(activation.productCode) || (!activation.productCode && price === 170)) current.ga150 += 1;
-      else if (isGa300Product(activation.productCode) || !activation.productCode) current.ga300 += 1;
+    const retailerMap = new Map(retailers.map((r) => [r.id, r]));
+    const employeeAgg = new Map<string, ReturnType<typeof emptyGaBreakdown>>();
+    const aggFor = (employeeId: string) => {
+      const current = employeeAgg.get(employeeId) || emptyGaBreakdown();
       employeeAgg.set(employeeId, current);
+      return current;
+    };
 
-      const retailerKey=`${activation.retailerId}|${activation.activationDate.toISOString().slice(0,7)}`;
-      const retailer = retailerMonthlyCount.get(retailerKey) || {
-        employeeId,
-        count: 0,
-        simSeller: (activation.retailer.simSeller || "").trim().toUpperCase() === "Y",
-      };
-      retailer.count += 1;
-      retailerMonthlyCount.set(retailerKey, retailer);
+    const standardByRetailer = new Map<string, number>();
+    for (const [groups, bucket] of [
+      [ga170Groups, "ga170"],
+      [ga300Groups, "ga300"],
+      [swapGroups, "simSwap"],
+    ] as const) {
+      for (const group of groups) {
+        const employeeId = retailerMap.get(group.retailerId)?.employeeId;
+        if (!employeeId) continue;
+        const count = group._count._all;
+        const agg = aggFor(employeeId);
+        agg[bucket] += count;
+        if (bucket !== "simSwap") {
+          agg.total += count;
+          standardByRetailer.set(group.retailerId, (standardByRetailer.get(group.retailerId) || 0) + count);
+        }
+      }
+    }
+
+    // retailerId|YYYY-MM -> standard GA count, for the per-month SSO rule.
+    const retailerMonthlyCount = new Map<string, number>();
+    if (targetMonths.length > 1) {
+      for (const group of monthlyStandardByDay) {
+        const key = `${group.retailerId}|${group.activationDate.toISOString().slice(0, 7)}`;
+        retailerMonthlyCount.set(key, (retailerMonthlyCount.get(key) || 0) + group._count._all);
+      }
+    } else {
+      for (const [retailerId, count] of standardByRetailer) {
+        retailerMonthlyCount.set(`${retailerId}|single`, count);
+      }
     }
 
     const ssoByEmployee = new Map<string, number>();
-    for (const retailer of retailerMonthlyCount.values()) {
-      if (!retailer.simSeller || retailer.count < 2) continue;
+    for (const [key, count] of retailerMonthlyCount) {
+      const retailer = retailerMap.get(key.slice(0, key.lastIndexOf("|")));
+      if (!retailer?.employeeId) continue;
+      if (!isSsoComplete(retailer.simSeller, count)) continue;
       ssoByEmployee.set(retailer.employeeId, (ssoByEmployee.get(retailer.employeeId) || 0) + 1);
     }
 
     const rows = employees.map((employee) => {
-      const ga = employeeAgg.get(employee.id) || { total: 0, ga150: 0, ga300: 0, simSwap:0 };
+      const ga = employeeAgg.get(employee.id) || emptyGaBreakdown();
       const target = employee.targets.reduce((a,x)=>({ga:a.ga+x.gaTarget,sso:a.sso+x.ssoTarget}),{ga:0,sso:0});
       return {
         employeeId: employee.id,
@@ -144,7 +171,7 @@ export async function GET(req: NextRequest) {
         rsoMsisdn: employee.rsoMsisdn,
         supervisor: employee.supervisor?.name ?? "Unassigned",
         retailerCount: employee._count.retailers,
-        ga150: ga.ga150,
+        ga150: ga.ga170,
         ga300: ga.ga300,
         simSwap: ga.simSwap,
         gaAchieved: ga.total,
@@ -155,43 +182,36 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const dailyMap = new Map<string, {
+    type DailyRetailerRow = ReturnType<typeof emptyGaBreakdown> & {
       retailerCode: string;
       retailerName: string;
       employee: string;
       rsoMsisdn: string;
       supervisor: string;
-      total: number;
-      ga150: number;
-      ga300: number;
-      simSwap: number;
-    }>();
+    };
+    const dailyMap = new Map<string, DailyRetailerRow>();
 
     for (const activation of dailyActivations) {
       const info = activation.retailer;
-      const current = dailyMap.get(activation.retailerId) || {
+      const current: DailyRetailerRow = dailyMap.get(activation.retailerId) || {
         retailerCode: info.retailerCode,
         retailerName: info.retailerName || "",
         employee: info.employee?.name || "Unassigned",
         rsoMsisdn: info.employee?.rsoMsisdn || "",
         supervisor: info.employee?.supervisor?.name || "Unassigned",
-        total: 0,
-        ga150: 0,
-        ga300: 0,
-        simSwap: 0,
+        ...emptyGaBreakdown(),
       };
-      if(isSimSwapProduct(activation.productCode)) current.simSwap += 1;
-      else {
-        current.total += 1;
-        if (isGa170Product(activation.productCode) || (!activation.productCode && Number(activation.sellingPrice) === 170)) current.ga150 += 1;
-        else if (isGa300Product(activation.productCode) || !activation.productCode) current.ga300 += 1;
-      }
+      addGaActivation(current, activation);
       dailyMap.set(activation.retailerId, current);
     }
 
-    const retailerDaily = [...dailyMap.values()].sort((a, b) =>
-      b.total - a.total || a.retailerCode.localeCompare(b.retailerCode),
-    );
+    // API contract unchanged: the 170 bucket is still published as `ga150`.
+    const retailerDaily = [...dailyMap.values()]
+      .map(({ ga170, unknown, ...rest }) => ({ ...rest, ga150: ga170, unknown }))
+      .sort(
+        (a, b) =>
+          b.total - a.total || b.simSwap - a.simSwap || a.retailerCode.localeCompare(b.retailerCode),
+      );
 
     return NextResponse.json({
       month: start,

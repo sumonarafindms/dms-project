@@ -54,7 +54,7 @@ const definitions:Record<string,{name:string;sheet:string;rows:Record<string,unk
 };
 
 export async function GET(_:Request,{params}:{params:Promise<{type:string}>}){
-  if(!(await apiUser(["ADMIN","ACCOUNTS"])))return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiUser(["ADMIN","IT","ACCOUNTS"])))return NextResponse.json({error:"Unauthorized"},{status:401});
   const {type}=await params,d=definitions[type.toLowerCase()];
   if(!d)return NextResponse.json({error:"Unsupported sample type"},{status:404});
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(d.rows);

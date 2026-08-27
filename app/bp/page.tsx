@@ -4,6 +4,7 @@ import {monthBounds} from "../../lib/month";
 import {PageHead} from "../components/RoleUI";
 import {BpHero,BpInfo,BpAction} from "../components/BpUI";
 import {dhakaMonth,dhakaTodayYmd} from "../../lib/business-time";
+import {classifyGaActivation,withStandardGa} from "../../lib/business-rules";
 import {Icon} from "../components/icons";
 
 export default async function BP(){
@@ -18,9 +19,9 @@ export default async function BP(){
  if(!assignment)return <main className="page bp-v8-page"><PageHead eyebrow="BP" title="No active BP assignment" subtitle="Ask Admin to assign this retailer as an active BP."/></main>;
  const effectiveStart=assignment.startDate>start?assignment.startDate:start,assignmentEnd=assignment.endDate?new Date(assignment.endDate.getTime()+86400000):end,effectiveEnd=assignmentEnd<end?assignmentEnd:end,todayStart=dayStart>effectiveStart?dayStart:effectiveStart,todayEnd=dayEnd<effectiveEnd?dayEnd:effectiveEnd;
  const [monthlyGa,todayGa,recent]=await Promise.all([
-  prisma.gaActivation.count({where:{retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}}}),
-  todayStart<todayEnd?prisma.gaActivation.count({where:{retailerId:u.bpRetailerId,activationDate:{gte:todayStart,lt:todayEnd}}}):Promise.resolve(0),
-  prisma.gaActivation.findMany({where:{retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}},orderBy:[{activationDate:"desc"},{activationTime:"desc"}],take:5,select:{simNo:true,sellingPrice:true,activationDate:true,activationTime:true}})
+  prisma.gaActivation.count({where:withStandardGa({retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}})}),
+  todayStart<todayEnd?prisma.gaActivation.count({where:withStandardGa({retailerId:u.bpRetailerId,activationDate:{gte:todayStart,lt:todayEnd}})}):Promise.resolve(0),
+  prisma.gaActivation.findMany({where:{retailerId:u.bpRetailerId,activationDate:{gte:effectiveStart,lt:effectiveEnd}},orderBy:[{activationDate:"desc"},{activationTime:"desc"}],take:5,select:{simNo:true,sellingPrice:true,productCode:true,activationDate:true,activationTime:true}})
  ]);
  const target=assignment.monthlyTargets[0]?.gaTarget??assignment.gaTarget??0,remaining=Math.max(0,target-monthlyGa);
  return <main className="page bp-v8-page">
@@ -32,7 +33,7 @@ export default async function BP(){
   </div>
   <section className="bp-v8-section"><div className="bp-v8-section-head"><div><span>QUICK ACTION</span><h2>Sales activity</h2></div></div><BpAction href="/bp/sales" title="Activation Details" sub="Search SIM serials and review your sales history"/></section>
   <section className="bp-v8-section"><div className="bp-v8-section-head"><div><span>LATEST SALES</span><h2>Recent activations</h2></div><a href="/bp/sales">View all ›</a></div><div className="bp-v8-recent">
-   {recent.map(x=><div key={x.simNo}><span className="bp-v8-sim-icon"><Icon name="sim"/></span><div><strong>SIM {x.simNo}</strong><small>{x.activationDate.toISOString().slice(0,10)}{x.activationTime?` · ${x.activationTime}`:""}</small></div><div className="bp-v8-price"><strong>৳{Number(x.sellingPrice)}</strong><small>{Number(x.sellingPrice)===170?"150":"300"}</small></div></div>)}
+   {recent.map(x=>{const category=classifyGaActivation(x);return <div key={x.simNo}><span className="bp-v8-sim-icon"><Icon name="sim"/></span><div><strong>SIM {x.simNo}</strong><small>{x.activationDate.toISOString().slice(0,10)}{x.activationTime?` · ${x.activationTime}`:""}</small></div><div className="bp-v8-price"><strong>৳{Number(x.sellingPrice)}</strong><small>{category==="GA_170"?"170":category==="GA_300"?"300":category==="SIM_SWAP"?"SWAP":"—"}</small></div></div>})}
    {!recent.length&&<div className="bp-v8-empty"><span>0</span><div><strong>No activations yet</strong><small>Your latest SIM sales will appear here.</small></div></div>}
   </div></section>
  </main>

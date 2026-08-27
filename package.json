@@ -15,8 +15,8 @@
     "prisma:generate": "prisma generate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"eslint.config.mjs\" \"vitest.config.ts\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\"",
-    "format:check": "prettier --check \"eslint.config.mjs\" \"vitest.config.ts\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\"",
+    "format": "prettier --write \"eslint.config.mjs\" \"vitest.config.ts\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\"",
+    "format:check": "prettier --check \"eslint.config.mjs\" \"vitest.config.ts\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\"",
     "test": "vitest run",
     "test:watch": "vitest"
   },

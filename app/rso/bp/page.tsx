@@ -4,6 +4,7 @@ import {prisma} from "../../../lib/prisma";
 import {monthBounds} from "../../../lib/month";
 import {PageHead} from "../../components/RoleUI";
 import {dhakaMonth} from "../../../lib/business-time";
+import {withStandardGa} from "../../../lib/business-rules";
 import {RsoSection} from "../../components/RsoUI";
 
 export default async function Page(){
@@ -26,7 +27,7 @@ export default async function Page(){
  </main>;
 
  const target=current.monthlyTargets[0]?.gaTarget??current.gaTarget;
- const ga=await prisma.gaActivation.count({where:{retailerId:current.retailerId,activationDate:{gte:start,lt:end}}});
+ const ga=await prisma.gaActivation.count({where:withStandardGa({retailerId:current.retailerId,activationDate:{gte:start,lt:end}})});
  const progress=target?Math.round(ga/target*100):0;
  const login=current.retailer.bpUser?.active&&current.retailer.bpUser.role==="BP"?current.retailer.bpUser:null;
 

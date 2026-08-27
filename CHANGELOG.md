@@ -567,3 +567,19 @@
 - SIM SWAP is shown only beside Total GA in the retailer daily table.
 - Product normalization now recognizes EV-SWAP/EV SWAP/EV_SWAP/EVSWAP and SIMWAP/SIM-WAP variants.
 - Dashboard typography, card sizing and panel height behavior were refined to reduce tiny text and empty space.
+
+## v99 - GA Total & Date Filter Accuracy
+- Total GA now equals MMSTC + MMST/MMSTS only.
+- Unknown/other product codes, SIMWAP and EV-SWAP cannot enter Total GA, GA achievement, dashboard GA or SSO.
+- Retailer SIM SWAP remains visible as its own column, including swap-only retailers.
+- Active Retailers now counts only retailers with standard GA.
+- Top TO date is now the authoritative Selected Day for daily KPI cards and Retailer GA table.
+- FROM/TO continues to control the range-based employee/target view; changing TO immediately moves the selected daily snapshot.
+
+## v99.1 - Test & Warning Patch
+- Fixed GA product smoke test structure so every Vitest test is declared at suite level.
+- Formatted the GA product smoke test to satisfy Prettier.
+- Removed dashboard variables no longer used by the clean-dashboard composition.
+- Removed unused GA page/importer symbols introduced by recent GA changes.
+- Fixed AppShell sidebar ref cleanup warning without changing navigation behavior.
+- No schema, API contract, auth, permission, import-rule or calculation changes.

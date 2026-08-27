@@ -66,9 +66,10 @@ export default function AppShell({children,user,permissions}:{children:React.Rea
  const sidebarRef=useRef<HTMLElement|null>(null);
  useEffect(()=>{setNavPending(null)},[path]);
  useEffect(()=>{
+   const node=sidebarRef.current;
    const saved=sessionStorage.getItem("dms_sidebar_scroll");
-   if(saved&&sidebarRef.current)sidebarRef.current.scrollTop=Number(saved)||0;
-   return ()=>{if(sidebarRef.current)sessionStorage.setItem("dms_sidebar_scroll",String(sidebarRef.current.scrollTop))};
+   if(saved&&node)node.scrollTop=Number(saved)||0;
+   return ()=>{if(node)sessionStorage.setItem("dms_sidebar_scroll",String(node.scrollTop))};
  },[]);
  useEffect(()=>{
    const warm=[roleFor(path).home,...adminNav.slice(0,6).map(i=>i.href)];

@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from "next/server";
 import {apiUser} from "@/lib/auth";
 import {prisma} from "@/lib/prisma";
 import {monthBounds} from "@/lib/month";
-import {isSimSwapProduct} from "@/lib/ga-product";
+import {isSsoComplete,lsoCompleteMonthlySummaryWhere,withStandardGa} from "@/lib/business-rules";
 import {apiError} from "@/lib/http-errors";
 import {dhakaMonth} from "@/lib/business-time";
 
@@ -20,7 +20,12 @@ export async function GET(req:NextRequest){
   try{
     const {start,end}=selectedMonth(req.nextUrl.searchParams.get("month"));
 
-    const [employees,gaRows,c2cRows,c2sSummaries]=await Promise.all([
+    // Everything below is aggregated in the database. This endpoint used to pull
+    // every GaActivation and C2cRecord row for the month into memory, which is
+    // what made the dashboard slow once a month held tens of thousands of rows.
+    // The request window is exactly one calendar month, so a groupBy on
+    // retailerId already gives the per-retailer monthly count SSO needs.
+    const [employees,retailers,gaGroups,c2cGroups,lsoRetailers]=await Promise.all([
       prisma.employee.findMany({
         where:{active:true},
         select:{
@@ -32,55 +37,51 @@ export async function GET(req:NextRequest){
         },
         orderBy:[{supervisor:{name:"asc"}},{name:"asc"}],
       }),
-      prisma.gaActivation.findMany({
-        where:{activationDate:{gte:start,lt:end}},
-        select:{
-          retailerId:true,productCode:true,activationDate:true,
-          retailer:{select:{employeeId:true,simSeller:true}},
-        },
+      prisma.retailer.findMany({
+        where:{employeeId:{not:null}},
+        select:{id:true,employeeId:true,simSeller:true},
       }),
-      prisma.c2cRecord.findMany({
+      prisma.gaActivation.groupBy({
+        by:["retailerId"],
+        where:withStandardGa({activationDate:{gte:start,lt:end}}),
+        _count:{_all:true},
+      }),
+      prisma.c2cRecord.groupBy({
+        by:["retailerId"],
         where:{date:{gte:start,lt:end}},
-        select:{amount:true,retailer:{select:{employeeId:true}}},
+        _sum:{amount:true},
       }),
       prisma.c2sMonthlySummary.findMany({
-        where:{month:start},
-        select:{totalAmount:true,transactionCount:true,retailer:{select:{employeeId:true}}},
+        where:{month:start,...lsoCompleteMonthlySummaryWhere},
+        select:{retailerId:true},
       }),
     ]);
 
-    const gaByEmployee=new Map<string,number>();
-    const retailerGa=new Map<string,{employeeId:string;count:number;simSeller:boolean}>();
-    for(const row of gaRows){
-      if(isSimSwapProduct(row.productCode))continue;
-      const employeeId=row.retailer.employeeId;
-      if(!employeeId)continue;
-      gaByEmployee.set(employeeId,(gaByEmployee.get(employeeId)||0)+1);
-      const key=`${row.retailerId}|${row.activationDate.toISOString().slice(0,7)}`;
-      const current=retailerGa.get(key)||{employeeId,count:0,simSeller:(row.retailer.simSeller||"").trim().toUpperCase()==="Y"};
-      current.count++;
-      retailerGa.set(key,current);
-    }
+    const retailerMap=new Map(retailers.map(r=>[r.id,r]));
 
+    const gaByEmployee=new Map<string,number>();
     const ssoByEmployee=new Map<string,number>();
-    for(const row of retailerGa.values()){
-      if(row.simSeller&&row.count>=2)ssoByEmployee.set(row.employeeId,(ssoByEmployee.get(row.employeeId)||0)+1);
+    for(const group of gaGroups){
+      const retailer=retailerMap.get(group.retailerId);
+      const employeeId=retailer?.employeeId;
+      if(!employeeId)continue;
+      const count=group._count._all;
+      gaByEmployee.set(employeeId,(gaByEmployee.get(employeeId)||0)+count);
+      if(isSsoComplete(retailer.simSeller,count))ssoByEmployee.set(employeeId,(ssoByEmployee.get(employeeId)||0)+1);
     }
 
     const c2cByEmployee=new Map<string,number>();
-    for(const row of c2cRows){
-      const employeeId=row.retailer.employeeId;
+    for(const group of c2cGroups){
+      const employeeId=retailerMap.get(group.retailerId)?.employeeId;
       if(!employeeId)continue;
-      c2cByEmployee.set(employeeId,(c2cByEmployee.get(employeeId)||0)+Number(row.amount));
+      c2cByEmployee.set(employeeId,(c2cByEmployee.get(employeeId)||0)+Number(group._sum.amount||0));
     }
 
     const lsoByEmployee=new Map<string,number>();
-    for(const row of c2sSummaries){
-      const employeeId=row.retailer.employeeId;
+    for(const row of lsoRetailers){
+      const employeeId=retailerMap.get(row.retailerId)?.employeeId;
       if(!employeeId)continue;
-      if(Number(row.totalAmount)>=500&&row.transactionCount>=7){
-        lsoByEmployee.set(employeeId,(lsoByEmployee.get(employeeId)||0)+1);
-      }
+      lsoByEmployee.set(employeeId,(lsoByEmployee.get(employeeId)||0)+1);
     }
 
     const rows=employees.map(employee=>{

@@ -5,6 +5,7 @@ import { monthBounds } from "@/lib/month";
 import {monthStartsInRange,monthStartUtc} from "@/lib/date-range";
 import {dhakaMonth} from "@/lib/business-time";
 import {apiError} from "@/lib/http-errors";
+import {isLsoComplete} from "@/lib/business-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ function parseDate(value: string | null) {
 }
 
 export async function GET(req: NextRequest) {
-  if(!(await apiUser(["ADMIN","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
+  if(!(await apiUser(["ADMIN","IT","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
   if(!(await apiPermission("c2s","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
   try {
     const monthText = req.nextUrl.searchParams.get("month") || dhakaMonth()+"-01";
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
       const eid=summary.retailer.employeeId;if(!eid)continue;
       const cur=byEmployee.get(eid)||{amount:amountByEmployee.get(eid)||0,transactions:0,lso:0};
       cur.transactions+=summary.transactionCount;
-      if(Number(summary.totalAmount)>=500&&summary.transactionCount>=7)cur.lso++;
+      if(isLsoComplete(summary.totalAmount,summary.transactionCount))cur.lso++;
       byEmployee.set(eid,cur);
       const old=reportEndByEmployee.get(eid);if(!old||summary.reportEndDate>old)reportEndByEmployee.set(eid,summary.reportEndDate);
     }

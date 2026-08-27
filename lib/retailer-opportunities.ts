@@ -2,7 +2,7 @@ import {prisma} from "./prisma";
 import {monthBounds} from "./month";
 import {monthStartsInRange,monthStartUtc} from "./date-range";
 import {normalizeMonth} from "./drilldown";
-import {isSimSwapProduct} from "./ga-product";
+import {isLsoComplete,isSimSellerRetailer,isSsoComplete,isStandardGaActivation,lsoAmountRemaining,lsoTransactionsRemaining,ssoGaRemaining} from "./business-rules";
 
 export type RetailerOpportunity={
   id:string;retailerCode:string;retailerName:string;simSeller:boolean;category:string;route:string;
@@ -19,7 +19,7 @@ export async function retailerOpportunities(monthInput:string,employeeIds?:strin
   const scope=employeeIds?{employeeId:{in:employeeIds}}:{};
   const [retailers,ga,c2c,c2s,c2sMonthly,ob]=await Promise.all([
     prisma.retailer.findMany({where:{active:true,...scope},select:{id:true,retailerCode:true,retailerName:true,simSeller:true,category:true,route:true,employeeId:true,employee:{select:{name:true,supervisor:{select:{name:true}}}}}}),
-    prisma.gaActivation.groupBy({by:["retailerId","activationDate","productCode"],where:{activationDate:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},_count:{_all:true}}),
+    prisma.gaActivation.groupBy({by:["retailerId","activationDate","productCode","sellingPrice"],where:{activationDate:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},_count:{_all:true}}),
     prisma.c2cRecord.groupBy({by:["retailerId"],where:{date:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},_sum:{amount:true}}),
     prisma.c2sRecord.groupBy({by:["retailerId"],where:{date:{gte:rangeStart,lt:rangeEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},_sum:{amount:true}}),
     prisma.c2sMonthlySummary.findMany({where:{month:{gte:targetStart,lt:targetEnd},...(employeeIds?{retailer:{employeeId:{in:employeeIds}}}:{})},select:{retailerId:true,month:true,totalAmount:true,transactionCount:true}}),
@@ -28,7 +28,7 @@ export async function retailerOpportunities(monthInput:string,employeeIds?:strin
 
   const gaByMonth=new Map<string,number>(),gaTotal=new Map<string,number>();
   for(const x of ga){
-    if(isSimSwapProduct(x.productCode))continue;
+    if(!isStandardGaActivation(x))continue;
     const count=x._count._all,mk=x.activationDate.toISOString().slice(0,7),key=`${x.retailerId}|${mk}`;
     gaByMonth.set(key,(gaByMonth.get(key)||0)+count);gaTotal.set(x.retailerId,(gaTotal.get(x.retailerId)||0)+count);
   }
@@ -45,21 +45,22 @@ export async function retailerOpportunities(monthInput:string,employeeIds?:strin
 
   return retailers.map(r=>{
     const gaCount=gaTotal.get(r.id)||0,c2cAmount=c2cMap.get(r.id)||0,c2sAmount=c2sMap.get(r.id)||0,monthly=monthlyByRetailer.get(r.id)||[];
-    const simSeller=(r.simSeller||"").trim().toUpperCase()==="Y";
+    const simSeller=isSimSellerRetailer(r.simSeller);
     const bestGa=monthKeys.reduce((n,m)=>Math.max(n,gaByMonth.get(`${r.id}|${m}`)||0),0);
-    const ssoComplete=simSeller&&monthKeys.some(m=>(gaByMonth.get(`${r.id}|${m}`)||0)>=2);
-    const lsoComplete=monthly.some(x=>x.amount>=500&&x.trx>=7);
+    const ssoComplete=monthKeys.some(m=>isSsoComplete(simSeller,gaByMonth.get(`${r.id}|${m}`)||0));
+    const lsoComplete=monthly.some(x=>isLsoComplete(x.amount,x.trx));
     const bestLso=monthly.reduce((best,x)=>{
-      const score=Math.min(1,x.amount/500)+Math.min(1,x.trx/7);
+      const score=(1-lsoAmountRemaining(x.amount)/500)+(1-lsoTransactionsRemaining(x.trx)/7);
       return score>best.score?{amount:x.amount,trx:x.trx,score}:best;
     },{amount:0,trx:0,score:-1});
     const c2sTransactions=monthly.reduce((n,x)=>n+x.trx,0);
+    const amountGap=lsoAmountRemaining(bestLso.amount),trxGap=lsoTransactionsRemaining(bestLso.trx);
     const reasons:string[]=[];
-    if(simSeller&&!ssoComplete)reasons.push(`SSO needs ${Math.max(0,2-bestGa)} GA in one month`);
+    if(simSeller&&!ssoComplete)reasons.push(`SSO needs ${ssoGaRemaining(bestGa)} GA in one month`);
     if(!lsoComplete){
-      if(bestLso.amount<500&&bestLso.trx<7)reasons.push(`LSO needs ৳${Math.ceil(500-bestLso.amount)} + ${Math.max(0,7-bestLso.trx)} trx in one month`);
-      else if(bestLso.amount<500)reasons.push(`LSO needs ৳${Math.ceil(500-bestLso.amount)} in one month`);
-      else reasons.push(`LSO needs ${Math.max(0,7-bestLso.trx)} trx in one month`);
+      if(amountGap>0&&trxGap>0)reasons.push(`LSO needs ৳${Math.ceil(amountGap)} + ${trxGap} trx in one month`);
+      else if(amountGap>0)reasons.push(`LSO needs ৳${Math.ceil(amountGap)} in one month`);
+      else reasons.push(`LSO needs ${trxGap} trx in one month`);
     }
     if(c2sAmount===0)reasons.push("No C2S in selected range");
     if(simSeller&&gaCount===0)reasons.push("No GA in selected range");
