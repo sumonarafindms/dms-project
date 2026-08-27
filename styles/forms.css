@@ -1,0 +1,385 @@
+/**
+ * Form controls, auth pages (login / setup / sacool admin login),
+ * employee & permission editing forms, target workspace.
+ */
+@layer components {
+  /* ---------- Generic form controls ---------- */
+  .control,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    width: 100%;
+    height: 2.5rem;
+    padding: 0 0.85rem;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--color-slate-200);
+    background: white;
+    color: var(--color-slate-800);
+    font-size: 0.85rem;
+    font-family: var(--font-sans);
+    transition:
+      border-color 0.14s var(--ease-premium),
+      box-shadow 0.14s var(--ease-premium);
+  }
+  textarea {
+    height: auto;
+    min-height: 5.5rem;
+    padding: 0.65rem 0.85rem;
+    resize: vertical;
+  }
+  .control:focus,
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--color-accent-500);
+    box-shadow: 0 0 0 3px var(--color-accent-100);
+  }
+  .control::placeholder,
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-slate-400);
+  }
+  .control:disabled,
+  input:disabled,
+  select:disabled {
+    background: var(--color-slate-50);
+    color: var(--color-slate-400);
+    cursor: not-allowed;
+  }
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-slate-600);
+    margin-bottom: 0.3rem;
+  }
+
+  .employee-field,
+  .bp-target-field,
+  .login-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-bottom: 0.75rem;
+  }
+  .employee-form-grid,
+  .form-grid,
+  .permission-form-grid,
+  .target-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.85rem;
+  }
+  .employee-readonly {
+    color: var(--color-slate-500);
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+  }
+  .employee-form-head {
+    margin-bottom: 1rem;
+  }
+  .employee-form-divider {
+    height: 1px;
+    background: var(--color-slate-200);
+    margin: 1rem 0;
+  }
+  .employee-active-toggle,
+  .employee-form-actions,
+  .form-actions,
+  .permission-actions,
+  .target-save-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-slate-100);
+  }
+  .employee-notice {
+    font-size: 0.78rem;
+    color: var(--color-slate-500);
+    background: var(--color-accent-50);
+    border-radius: var(--radius-control);
+    padding: 0.6rem 0.85rem;
+    margin-top: 0.75rem;
+  }
+  .employee-form-layout,
+  .permission-workspace,
+  .target-premium-workspace,
+  .users-v3-workspace {
+    display: grid;
+    gap: 1.1rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 960px) {
+    .employee-form-layout,
+    .permission-workspace,
+    .target-premium-workspace,
+    .users-v3-workspace {
+      grid-template-columns: minmax(0, 1fr) 18rem;
+    }
+  }
+  .employee-v3-aside,
+  .employee-v3-guide,
+  .employee-v3-security {
+    background: white;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-card);
+    padding: 1rem 1.1rem;
+    font-size: 0.8rem;
+    color: var(--color-slate-500);
+  }
+
+  .permission-head,
+  .permission-workspace-main,
+  .permission-editor-presets,
+  .permission-bulk-tool {
+    background: white;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-card);
+    padding: 1rem 1.1rem;
+    margin-bottom: 0.85rem;
+  }
+  .permission-row,
+  .permission-row.permission-header {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(4, 0.7fr);
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--color-slate-100);
+    font-size: 0.82rem;
+  }
+  .permission-row.permission-header {
+    font-weight: 700;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-slate-400);
+  }
+
+  /* ---------- Login / auth ---------- */
+  .auth-v54,
+  .admin-login-shell,
+  .auth-page,
+  .login-page,
+  .login-shell,
+  .setup-v54-screen {
+    min-height: 100dvh;
+    display: grid;
+    background: linear-gradient(160deg, var(--color-navy-950), var(--color-navy-800) 55%, var(--color-navy-700));
+  }
+  @media (min-width: 980px) {
+    .auth-v54 {
+      grid-template-columns: 1.1fr 1fr;
+    }
+  }
+
+  .auth-v54-brand {
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 3.5rem 3.25rem;
+    color: white;
+  }
+  @media (min-width: 980px) {
+    .auth-v54-brand {
+      display: flex;
+    }
+  }
+  .auth-v54-brand-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .auth-v54-logo {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--radius-control);
+    background: linear-gradient(135deg, var(--color-accent-500), var(--color-teal-500));
+    font-weight: 800;
+    box-shadow: 0 6px 16px -4px rgb(37 99 235 / 0.5);
+  }
+  .auth-v54-brand-top strong {
+    display: block;
+    font-size: 1.05rem;
+  }
+  .auth-v54-brand-top span {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--color-slate-400);
+  }
+  .auth-v54-kicker {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--color-accent-300);
+    margin: 2rem 0 0.75rem;
+  }
+  .auth-v54-copy h1 {
+    color: white;
+    font-size: 2.1rem;
+    line-height: 1.2;
+    max-width: 26rem;
+  }
+  .auth-v54-copy p {
+    color: var(--color-slate-300);
+    font-size: 0.92rem;
+    max-width: 28rem;
+    margin-top: 0.9rem;
+  }
+  .auth-v54-role-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+    margin-top: 1.75rem;
+    max-width: 26rem;
+  }
+  .auth-v54-role-grid > div {
+    background: rgb(255 255 255 / 0.06);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    border-radius: var(--radius-control);
+    padding: 0.6rem 0.7rem;
+  }
+  .auth-v54-role-grid b {
+    display: block;
+    font-size: 0.8rem;
+    color: white;
+  }
+  .auth-v54-role-grid small {
+    color: var(--color-slate-400);
+    font-size: 0.68rem;
+  }
+  .auth-v54-foot {
+    display: flex;
+    gap: 1.5rem;
+    color: var(--color-slate-400);
+    font-size: 0.75rem;
+  }
+
+  .auth-v54-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+  }
+  .auth-v54-card,
+  .admin-login-card,
+  .auth-card,
+  .login-card,
+  .login-panel,
+  .sacool-card,
+  .sacool-v58-card,
+  .setup-v54-form {
+    width: 100%;
+    max-width: 24rem;
+    background: white;
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-elevated);
+    padding: 2rem 1.9rem;
+  }
+  .auth-v54-mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+  }
+  @media (min-width: 980px) {
+    .auth-v54-mobile-brand {
+      display: none;
+    }
+  }
+  .auth-v58-team-badge,
+  .sacool-v58-kicker {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent-50);
+    color: var(--color-accent-700);
+    margin-bottom: 0.75rem;
+  }
+  .auth-v54-overline {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--color-accent-600);
+    text-transform: uppercase;
+  }
+  .auth-v54-card h2 {
+    font-size: 1.35rem;
+    margin: 0.25rem 0 0.35rem;
+  }
+  .auth-v54-intro {
+    color: var(--color-slate-500);
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+  .auth-v54-field {
+    display: block;
+    margin-bottom: 1rem;
+  }
+  .auth-v54-field span {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-slate-600);
+    margin-bottom: 0.35rem;
+  }
+  .auth-v54-error {
+    background: var(--color-danger-50);
+    color: var(--color-danger-700);
+    border-radius: var(--radius-control);
+    padding: 0.6rem 0.8rem;
+    font-size: 0.8rem;
+    margin-bottom: 0.9rem;
+  }
+  .auth-v54-submit {
+    width: 100%;
+    height: 2.7rem;
+  }
+  .auth-v54-help {
+    margin-top: 1.4rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--color-slate-100);
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  .auth-v54-help strong {
+    display: block;
+    color: var(--color-slate-700);
+    margin-bottom: 0.2rem;
+  }
+
+  .sacool-v58 {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(160deg, var(--color-navy-950), var(--color-navy-800));
+    padding: 1.5rem;
+  }
+  .sacool-v58-mark {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-control);
+    background: linear-gradient(135deg, var(--color-accent-500), var(--color-teal-500));
+    color: white;
+    font-weight: 800;
+    margin-bottom: 0.85rem;
+  }
+
+  .setup-v54-copy {
+    color: white;
+    text-align: center;
+    margin-bottom: 1.25rem;
+  }
+}

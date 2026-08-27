@@ -5,7 +5,7 @@ import { monthBounds } from "@/lib/month";
 import {monthStartsInRange,monthStartUtc} from "@/lib/date-range";
 import {dhakaMonth} from "@/lib/business-time";
 import {apiError} from "@/lib/http-errors";
-import {isLsoComplete} from "@/lib/business-rules";
+import {lsoCompleteMonthlySummaryWhere} from "@/lib/business-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,11 @@ export async function GET(req: NextRequest) {
     const targetMonths=monthStartsInRange(fromDate,rangeEnd),targetStart=targetMonths[0]||monthStartUtc(fromDate),targetEnd=new Date(Date.UTC((targetMonths.at(-1)||targetStart).getUTCFullYear(),(targetMonths.at(-1)||targetStart).getUTCMonth()+1,1));
     const dayEnd = selectedDate ? new Date(selectedDate.getTime()+86400000) : null;
 
-    const [employees,dailyRows,history,monthRows,monthlySummaries] = await Promise.all([
+    // Range totals are aggregated in the database rather than summed in memory.
+    // LSO is a per-retailer-per-month threshold, so it is filtered in SQL with
+    // `lsoCompleteMonthlySummaryWhere` and counted, instead of loading every
+    // monthly summary row and testing each one here.
+    const [employees,dailyRows,history,retailers,recordGroups,summaryGroups,lsoGroups] = await Promise.all([
       prisma.employee.findMany({
         where:{active:true}, orderBy:[{supervisor:{name:"asc"}},{name:"asc"}],
         include:{ supervisor:{select:{name:true}}, _count:{select:{retailers:true}}, targets:{where:{month:{gte:targetStart,lt:targetEnd}}} },
@@ -42,26 +46,47 @@ export async function GET(req: NextRequest) {
       }) : Promise.resolve([]),
       prisma.importBatch.findMany({ where:{type:"C2S"}, orderBy:{uploadedAt:"desc"}, take:10,
         select:{id:true,fileName:true,uploadedAt:true,businessDate:true,totalRows:true,successRows:true,failedRows:true,status:true} }),
-      prisma.c2sRecord.findMany({ where:{date:{gte:fromDate,lt:rangeEnd}}, select:{amount:true,date:true,retailer:{select:{id:true,employeeId:true}}} }),
-      prisma.c2sMonthlySummary.findMany({where:{month:{gte:targetStart,lt:targetEnd}},select:{month:true,totalAmount:true,transactionCount:true,reportEndDate:true,retailer:{select:{id:true,employeeId:true}}}}),
+      prisma.retailer.findMany({ where:{employeeId:{not:null}}, select:{id:true,employeeId:true} }),
+      prisma.c2sRecord.groupBy({ by:["retailerId"], where:{date:{gte:fromDate,lt:rangeEnd}}, _sum:{amount:true} }),
+      prisma.c2sMonthlySummary.groupBy({
+        by:["retailerId"],
+        where:{month:{gte:targetStart,lt:targetEnd}},
+        _sum:{transactionCount:true},
+        _max:{reportEndDate:true},
+      }),
+      prisma.c2sMonthlySummary.groupBy({
+        by:["retailerId"],
+        where:{month:{gte:targetStart,lt:targetEnd},...lsoCompleteMonthlySummaryWhere},
+        _count:{_all:true},
+      }),
     ]);
 
-    const amountByEmployee = new Map<string,number>();
-    for (const row of monthRows) {
-      const eid=row.retailer.employeeId;if(!eid)continue;
-      amountByEmployee.set(eid,(amountByEmployee.get(eid)||0)+Number(row.amount));
-    }
+    const employeeOf = new Map(retailers.map(r=>[r.id,r.employeeId]));
     const reportEndByEmployee = new Map<string,Date>();
     const byEmployee = new Map<string,{amount:number;transactions:number;lso:number}>();
-    for(const summary of monthlySummaries){
-      const eid=summary.retailer.employeeId;if(!eid)continue;
-      const cur=byEmployee.get(eid)||{amount:amountByEmployee.get(eid)||0,transactions:0,lso:0};
-      cur.transactions+=summary.transactionCount;
-      if(isLsoComplete(summary.totalAmount,summary.transactionCount))cur.lso++;
-      byEmployee.set(eid,cur);
-      const old=reportEndByEmployee.get(eid);if(!old||summary.reportEndDate>old)reportEndByEmployee.set(eid,summary.reportEndDate);
+    const bucketFor=(employeeId:string)=>{
+      const current=byEmployee.get(employeeId)||{amount:0,transactions:0,lso:0};
+      byEmployee.set(employeeId,current);
+      return current;
+    };
+
+    for(const group of recordGroups){
+      const eid=employeeOf.get(group.retailerId);if(!eid)continue;
+      bucketFor(eid).amount+=Number(group._sum.amount||0);
     }
-    for(const [eid,amount] of amountByEmployee)if(!byEmployee.has(eid))byEmployee.set(eid,{amount,transactions:0,lso:0});
+    for(const group of summaryGroups){
+      const eid=employeeOf.get(group.retailerId);if(!eid)continue;
+      bucketFor(eid).transactions+=group._sum.transactionCount||0;
+      const latest=group._max.reportEndDate;
+      const old=reportEndByEmployee.get(eid);
+      if(latest&&(!old||latest>old))reportEndByEmployee.set(eid,latest);
+    }
+    // One LSO credit per retailer-month that met both thresholds, matching the
+    // previous per-summary-row count.
+    for(const group of lsoGroups){
+      const eid=employeeOf.get(group.retailerId);if(!eid)continue;
+      bucketFor(eid).lso+=group._count._all;
+    }
 
     const rows = employees.map(employee=>{
       const perf = byEmployee.get(employee.id) || {amount:0,transactions:0,lso:0};

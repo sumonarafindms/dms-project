@@ -30,7 +30,11 @@ export async function GET(req: NextRequest) {
     const fullMonthKeys=new Set(fullyCoveredMonths(fromDate,rangeEnd).map(x=>x.toISOString().slice(0,7)));
     const dayEnd = selectedDate ? new Date(selectedDate.getTime() + 86400000) : null;
 
-    const [employees, dailyRows, history, latestMonthRows, monthlySummaries] = await Promise.all([
+    // Range totals are aggregated in the database. This endpoint used to pull every
+    // C2cRecord and C2cMonthlySummary row for the range into memory purely to sum
+    // them per employee, which does not scale as months accumulate. A groupBy on
+    // retailerId plus one Retailer lookup gives the same numbers in constant memory.
+    const [employees, dailyRows, history, retailers, recordGroups, summaryGroups] = await Promise.all([
       prisma.employee.findMany({
         where: { active: true },
         orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
@@ -65,32 +69,49 @@ export async function GET(req: NextRequest) {
         take: 10,
         select: { id: true, fileName: true, uploadedAt: true, businessDate: true, totalRows: true, successRows: true, failedRows: true, status: true },
       }),
-      prisma.c2cRecord.findMany({
-        where: { date: { gte: fromDate, lt: rangeEnd } },
-        select: { amount: true, date: true, retailer: { select: { employeeId: true } } },
+      prisma.retailer.findMany({
+        where: { employeeId: { not: null } },
+        select: { id: true, employeeId: true },
       }),
-      prisma.c2cMonthlySummary.findMany({
-        where:{month:{gte:targetStart,lt:targetEnd}},
-        select:{transactionCount:true,reportEndDate:true,retailer:{select:{employeeId:true}}},
+      prisma.c2cRecord.groupBy({
+        by: ["retailerId"],
+        where: { date: { gte: fromDate, lt: rangeEnd } },
+        _sum: { amount: true },
+        _max: { date: true },
+      }),
+      prisma.c2cMonthlySummary.groupBy({
+        by: ["retailerId"],
+        where: { month: { gte: targetStart, lt: targetEnd } },
+        _sum: { transactionCount: true },
+        _max: { reportEndDate: true },
       }),
     ]);
 
+    const employeeOf = new Map(retailers.map((r) => [r.id, r.employeeId]));
+
     const byEmployee = new Map<string, { amount: number; transactions: number; reportEndDate: Date | null }>();
-    for (const row of latestMonthRows) {
-      const employeeId = row.retailer.employeeId;
-      if (!employeeId) continue;
+    const bucketFor = (employeeId: string) => {
       const current = byEmployee.get(employeeId) || { amount: 0, transactions: 0, reportEndDate: null };
-      current.amount += Number(row.amount);
-      if (!current.reportEndDate || row.date > current.reportEndDate) current.reportEndDate = row.date;
       byEmployee.set(employeeId, current);
+      return current;
+    };
+
+    for (const group of recordGroups) {
+      const employeeId = employeeOf.get(group.retailerId);
+      if (!employeeId) continue;
+      const current = bucketFor(employeeId);
+      current.amount += Number(group._sum.amount || 0);
+      const latest = group._max.date;
+      if (latest && (!current.reportEndDate || latest > current.reportEndDate)) current.reportEndDate = latest;
     }
 
-    for (const summary of monthlySummaries) {
-      const employeeId=summary.retailer.employeeId;if(!employeeId)continue;
-      const current=byEmployee.get(employeeId)||{amount:0,transactions:0,reportEndDate:null};
-      current.transactions+=summary.transactionCount;
-      if(!current.reportEndDate||summary.reportEndDate>current.reportEndDate)current.reportEndDate=summary.reportEndDate;
-      byEmployee.set(employeeId,current);
+    for (const group of summaryGroups) {
+      const employeeId = employeeOf.get(group.retailerId);
+      if (!employeeId) continue;
+      const current = bucketFor(employeeId);
+      current.transactions += group._sum.transactionCount || 0;
+      const latest = group._max.reportEndDate;
+      if (latest && (!current.reportEndDate || latest > current.reportEndDate)) current.reportEndDate = latest;
     }
 
     const rows = employees.map((employee) => {

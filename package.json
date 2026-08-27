@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --turbopack",
     "start": "next start",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -15,8 +15,8 @@
     "prisma:generate": "prisma generate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"eslint.config.mjs\" \"vitest.config.ts\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\" \"lib/c2-import-core.ts\" \"lib/c2c-import.ts\" \"lib/c2s-import.ts\"",
-    "format:check": "prettier --check \"eslint.config.mjs\" \"vitest.config.ts\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\" \"lib/c2-import-core.ts\" \"lib/c2c-import.ts\" \"lib/c2s-import.ts\"",
+    "format": "prettier --write \"eslint.config.mjs\" \"vitest.config.ts\" \"postcss.config.mjs\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\" \"lib/c2-import-core.ts\" \"lib/c2c-import.ts\" \"lib/c2s-import.ts\" \"styles/*.css\" \"app/globals.css\"",
+    "format:check": "prettier --check \"eslint.config.mjs\" \"vitest.config.ts\" \"postcss.config.mjs\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\" \"lib/c2-import-core.ts\" \"lib/c2c-import.ts\" \"lib/c2s-import.ts\" \"styles/*.css\" \"app/globals.css\"",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -29,15 +29,17 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.14.1",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
-    "prisma": "^6.14.0",
-    "typescript": "^5.9.2",
     "eslint": "^9.35.0",
     "eslint-config-next": "^15.5.2",
     "prettier": "^3.6.2",
-    "vitest": "^3.2.4",
-    "@eslint/eslintrc": "^3.3.1"
+    "prisma": "^6.14.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }

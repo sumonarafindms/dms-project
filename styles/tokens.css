@@ -1,5 +1,90 @@
-:root{
-  --bg:#f6f7fb;--surface:#fff;--surface-2:#f8fafc;--text:#172033;--muted:#667085;--line:#e8ebf0;
-  --brand:#165dff;--brand-2:#0f4bd8;--brand-soft:#eef4ff;--success:#12a66a;--warning:#f59e0b;--danger:#e5484d;
-  --shadow:0 8px 30px rgba(16,24,40,.07);--radius:18px;--radius-sm:12px;
+/**
+ * Design tokens — DMS premium theme (Deep Navy + Slate).
+ * Tailwind v4 CSS-first config: everything below becomes a `bg-navy-900`,
+ * `text-accent-600`, `rounded-card`, `shadow-panel` utility automatically.
+ * Change values here to re-theme the entire application.
+ */
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+
+  /* Brand navy — sidebar, headers, dark surfaces */
+  --color-navy-50: #eef2f8;
+  --color-navy-100: #dbe4f0;
+  --color-navy-200: #b7c8e1;
+  --color-navy-300: #8ea7cc;
+  --color-navy-400: #5c7fac;
+  --color-navy-500: #3c5f8a;
+  --color-navy-600: #2a4770;
+  --color-navy-700: #1f3760;
+  --color-navy-800: #172a4a;
+  --color-navy-900: #111f38;
+  --color-navy-950: #0a1526;
+
+  /* Neutral slate — page background, borders, body text */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  /* Primary accent — buttons, links, active states */
+  --color-accent-50: #eff6ff;
+  --color-accent-100: #dbeafe;
+  --color-accent-200: #bfdbfe;
+  --color-accent-300: #93c5fd;
+  --color-accent-400: #60a5fa;
+  --color-accent-500: #3b82f6;
+  --color-accent-600: #2563eb;
+  --color-accent-700: #1d4ed8;
+  --color-accent-800: #1e40af;
+
+  /* Secondary accent — recharge / secondary series */
+  --color-teal-50: #f0fdfa;
+  --color-teal-100: #ccfbf1;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #0d9488;
+  --color-teal-700: #0f766e;
+
+  /* Semantic */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  --color-gold-500: #eab308;
+  --color-gold-600: #ca8a04;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-panel: 0 4px 6px -2px rgb(15 23 42 / 0.05), 0 10px 20px -4px rgb(15 23 42 / 0.08);
+  --shadow-elevated: 0 12px 24px -6px rgb(15 23 42 / 0.16), 0 4px 8px -2px rgb(15 23 42 / 0.08);
+  --shadow-sidebar: 4px 0 24px -8px rgb(10 21 38 / 0.35);
+
+  /* Radius scale used across cards, controls, pills */
+  --radius-card: 0.875rem;
+  --radius-control: 0.625rem;
+  --radius-pill: 999px;
+
+  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
 }
