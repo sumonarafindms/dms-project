@@ -378,15 +378,12 @@
     min-width: 7rem;
   }
 
-  /* ================= KPI / stat blocks ================= */
-  .admin-kpi,
-  .admin-kpi-card,
-  .rso-v7-kpi,
-  .supervisor-v6-kpi,
+  /* ================= KPI / stat blocks =================
+     Only genuinely icon-beside-text blocks belong here. Stat cards that stack
+     label / value / sub are laid out by styles/patterns.css — listing them here
+     too would override that with a row layout and re-break them. */
   .target-kpis > *,
-  .retailer-profile-kpi,
   .retailer-v2-kpis > *,
-  .detail-stat,
   .premium-detail-stat-v68 {
     background: white;
     border: 1px solid var(--color-slate-200);

@@ -258,15 +258,24 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .ops-data-card,
-  .ops-data-head {
-    display: flex;
+  /* The card stacks head over table; only the head itself is a row. */
+  .ops-data-card {
+    display: block;
   }
   .ops-data-head {
+    display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 0.9rem;
+  }
+  .ops-data-head h2 {
+    font-size: 1rem;
+  }
+  .ops-data-head p {
+    font-size: 0.8rem;
+    color: var(--color-slate-500);
+    margin-top: 0.15rem;
   }
   .ops-count-pill {
     display: inline-flex;
@@ -341,7 +350,7 @@
     align-items: center;
     gap: 0.6rem;
   }
-  .ops-person span {
+  .ops-person > span {
     display: grid;
     place-items: center;
     width: 1.9rem;
@@ -352,6 +361,21 @@
     font-weight: 700;
     font-size: 0.65rem;
     flex-shrink: 0;
+  }
+  /* name over code, not run together on one line */
+  .ops-person > div {
+    min-width: 0;
+  }
+  .ops-person > div > b {
+    display: block;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .ops-person > div > small {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--color-slate-500);
   }
   .ops-progress-cell {
     display: flex;

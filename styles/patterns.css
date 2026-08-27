@@ -1,0 +1,1031 @@
+/**
+ * Element-level pattern layer.
+ *
+ * Across all ~80 pages the app repeats a handful of markup idioms built from
+ * bare elements rather than classes — most importantly the stat block:
+ *
+ *     <span>LABEL</span><strong>VALUE</strong><small>SUB</small><i/>
+ *
+ * The container has a class; the three lines inside do not. Styling only the
+ * container leaves those three running together on one line ("Supervisors2Active
+ * teams"), which is exactly what happened when this file did not exist. Every
+ * rule below targets one of those shared idioms, so a fix lands on every page
+ * that uses it instead of one page at a time.
+ *
+ * Loaded after coverage.css (generic fallbacks) and before the area files
+ * (shell/dashboard/tables/forms/components), so a bespoke rule for a specific
+ * component still wins.
+ */
+@layer components {
+  /* ==================================================================
+     1. STAT BLOCK — label / value / sub stacked
+     ================================================================== */
+  .perf-summary-card,
+  .perf-v2-summary-card,
+  .perf-v2-period,
+  .accounts-v12-stat,
+  .accounts-v12-substat,
+  .accounts-v12-fresh,
+  .manager-v5-subhero-stat,
+  .manager-v5-metric,
+  .rso-v7-substat,
+  .rso-v7-kpi,
+  .supervisor-v6-substat,
+  .supervisor-v6-kpi,
+  .admin-kpi,
+  .admin-kpi-card,
+  .admin-v2-kpi,
+  .retailer-profile-kpi,
+  .detail-stat,
+  .role-metric,
+  .users-v3-hero-count,
+  .attention-v4-score,
+  .audit-v4-today,
+  .permissions-v3-state,
+  .manager-v5-command > div,
+  .manager-v5-network > div,
+  .supervisor-v6-network > div,
+  .rso-v7-network > div,
+  .rso-v7-ga > div:first-child,
+  .bp-v8-main > div:first-child,
+  .bp-v8-info > div,
+  .bp-v8-today > div,
+  .supervisor-v6-alert > div,
+  .ops-freshness-v96 > div:not([class]) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  /* --- the label line (first span / small) --- */
+  .perf-summary-card > span,
+  .perf-v2-period > span,
+  .accounts-v12-stat > span,
+  .accounts-v12-substat > span,
+  .accounts-v12-fresh > span,
+  .manager-v5-subhero-stat > span,
+  .manager-v5-metric > small,
+  .rso-v7-substat > span,
+  .rso-v7-kpi > small,
+  .supervisor-v6-substat > span,
+  .supervisor-v6-kpi > small,
+  .admin-kpi > span,
+  .admin-kpi-card > span,
+  .admin-v2-kpi > span,
+  .retailer-profile-kpi > span,
+  .detail-stat > span,
+  .users-v3-hero-count > span,
+  .attention-v4-score > span,
+  .audit-v4-today > span,
+  .manager-v5-command > div > span,
+  .manager-v5-network > div > span,
+  .supervisor-v6-network > div > small,
+  .rso-v7-network > div > small,
+  .rso-v7-ga > div > small,
+  .bp-v8-main > div > small,
+  .bp-v8-info > div > small,
+  .bp-v8-today > div > small,
+  .supervisor-v6-alert > div > small,
+  .metric-label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-slate-500);
+    line-height: 1.3;
+  }
+
+  /* --- the value line --- */
+  .perf-summary-card > strong,
+  .perf-v2-period > strong,
+  .accounts-v12-stat > strong,
+  .accounts-v12-substat > strong,
+  .accounts-v12-fresh > strong,
+  .manager-v5-subhero-stat > strong,
+  .manager-v5-metric > strong,
+  .rso-v7-substat > strong,
+  .rso-v7-kpi > strong,
+  .supervisor-v6-substat > strong,
+  .supervisor-v6-kpi > strong,
+  .admin-kpi > strong,
+  .admin-kpi-card > strong,
+  .admin-v2-kpi > strong,
+  .retailer-profile-kpi > strong,
+  .detail-stat > strong,
+  .users-v3-hero-count > strong,
+  .attention-v4-score > strong,
+  .audit-v4-today > strong,
+  .manager-v5-command > div > strong,
+  .manager-v5-network > div > strong,
+  .supervisor-v6-network > div > strong,
+  .rso-v7-network > div > strong,
+  .rso-v7-ga > div > strong,
+  .bp-v8-main > div > strong,
+  .bp-v8-info > div > strong,
+  .bp-v8-today > div > strong,
+  .supervisor-v6-alert > div > strong,
+  .metric-value,
+  .progress-number,
+  .detail-stat-value,
+  .mini-value {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    color: var(--color-slate-900);
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  /* inline fraction inside a value, e.g. 148 / 240 */
+  strong > i {
+    font-style: normal;
+    font-size: 0.72em;
+    font-weight: 600;
+    opacity: 0.6;
+  }
+
+  /* --- the sub line --- */
+  .perf-summary-card > small,
+  .accounts-v12-stat > small,
+  .accounts-v12-substat > small,
+  .accounts-v12-fresh > small,
+  .accounts-v12-fresh > i,
+  .manager-v5-subhero-stat > small,
+  .rso-v7-substat > small,
+  .supervisor-v6-substat > small,
+  .admin-kpi > small,
+  .admin-kpi-card > small,
+  .admin-v2-kpi > small,
+  .retailer-profile-kpi > small,
+  .detail-stat > small,
+  .users-v3-hero-count > small,
+  .manager-v5-command > div > small,
+  .rso-v7-ga > div > p,
+  .bp-v8-main > div > p,
+  .bp-v8-info > div > p,
+  .supervisor-v6-alert > div > p,
+  .metric-sub {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-style: normal;
+    color: var(--color-slate-500);
+    line-height: 1.35;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* decorative trailing <i/> in stat cards — a thin accent bar, not text */
+  .perf-summary-card > i:empty,
+  .accounts-v12-stat > i:empty,
+  .admin-kpi > i:empty {
+    display: block;
+    height: 3px;
+    width: 2.5rem;
+    margin-top: 0.5rem;
+    border-radius: 999px;
+    background: var(--tone-color, var(--color-accent-500));
+    opacity: 0.85;
+  }
+
+  /* ==================================================================
+     2. Stat blocks sitting on a dark hero — flip the palette.
+     These repeat the structural selectors from section 1 prefixed by the
+     hero, so they carry higher specificity and win over the light-theme
+     colors above. A plain `[class$="-hero"] strong` would lose to
+     `.rso-v7-network > div > strong` and leave dark text on dark navy.
+     ================================================================== */
+  [class$="-hero"] h1,
+  [class$="-hero"] h2,
+  [class$="-hero"] > p,
+  [class$="-hero"] .metric-value {
+    color: #fff;
+  }
+  [class$="-hero"] p,
+  [class$="-hero"] > span,
+  [class$="-hero"] .metric-label {
+    color: var(--color-slate-300);
+  }
+
+  [class$="-hero"] [class$="-network"] > div > strong,
+  [class$="-hero"] [class$="-command"] > div > strong,
+  [class$="-hero"] [class$="-alert"] > div > strong,
+  [class$="-hero"] [class$="-ga"] > div > strong,
+  [class$="-hero"] [class$="-main"] > div > strong,
+  [class$="-hero"] [class$="-today"] > div > strong,
+  [class$="-hero"] [class$="-fresh"] > strong,
+  .accounts-v12-fresh > strong,
+  .manager-v5-subhero-stat > strong,
+  .rso-v7-substat > strong,
+  .supervisor-v6-substat > strong,
+  .accounts-v12-substat > strong {
+    color: #fff;
+  }
+
+  [class$="-hero"] [class$="-network"] > div > span,
+  [class$="-hero"] [class$="-network"] > div > small,
+  [class$="-hero"] [class$="-command"] > div > span,
+  [class$="-hero"] [class$="-command"] > div > small,
+  [class$="-hero"] [class$="-alert"] > div > small,
+  [class$="-hero"] [class$="-alert"] > div > p,
+  [class$="-hero"] [class$="-ga"] > div > small,
+  [class$="-hero"] [class$="-ga"] > div > p,
+  [class$="-hero"] [class$="-main"] > div > small,
+  [class$="-hero"] [class$="-main"] > div > p,
+  [class$="-hero"] [class$="-today"] > div > small,
+  [class$="-hero"] [class$="-fresh"] > span,
+  [class$="-hero"] [class$="-fresh"] > small,
+  [class$="-hero"] [class$="-fresh"] > i,
+  .accounts-v12-fresh > span,
+  .accounts-v12-fresh > small,
+  .accounts-v12-fresh > i,
+  .manager-v5-subhero-stat > span,
+  .manager-v5-subhero-stat > small,
+  .rso-v7-substat > span,
+  .rso-v7-substat > small,
+  .supervisor-v6-substat > span,
+  .supervisor-v6-substat > small,
+  .accounts-v12-substat > span,
+  .accounts-v12-substat > small {
+    color: var(--color-slate-300);
+  }
+
+  /* full-width feature blocks inside a wrapping flex hero */
+  .rso-v7-ga,
+  .bp-v8-main,
+  .bp-v8-today,
+  .rso-v7-hero-progress,
+  .bp-v8-progress {
+    width: 100%;
+  }
+
+  /* ==================================================================
+     3. PROGRESS BARS — <div class="*-progress"><i style="width:x%"/></div>
+     ================================================================== */
+  .progress,
+  .perf-bar,
+  .manager-v5-progress,
+  .supervisor-v6-progress,
+  .rso-v7-progress,
+  .rso-v7-hero-progress,
+  .bp-v8-progress,
+  [class$="-progress"] {
+    display: block;
+    height: 0.5rem;
+    width: 100%;
+    border-radius: 999px;
+    background: var(--color-slate-200);
+    overflow: hidden;
+    margin: 0.35rem 0;
+  }
+  .progress > span,
+  .perf-bar > span,
+  [class$="-progress"] > i,
+  [class$="-progress"] > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--color-accent-500), var(--color-teal-500));
+    transition: width 0.4s var(--ease-premium);
+  }
+  [class$="-hero"] [class$="-progress"] {
+    background: rgb(255 255 255 / 0.18);
+  }
+  [class$="-hero"] [class$="-progress"] > i {
+    background: linear-gradient(90deg, var(--color-accent-400), var(--color-teal-400));
+  }
+
+  /* percentage badge next to a bar */
+  .perf-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+  }
+  .perf-bar-wrap .perf-bar {
+    flex: 1;
+    margin: 0;
+  }
+  .perf-bar-wrap > b {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--color-slate-700);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* good / mid / low percentage chips used in KPI headers */
+  b.good,
+  b.mid,
+  b.low {
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-pill);
+  }
+  b.good {
+    background: var(--color-success-50);
+    color: var(--color-success-700);
+  }
+  b.mid {
+    background: var(--color-warning-50);
+    color: var(--color-warning-700);
+  }
+  b.low {
+    background: var(--color-danger-50);
+    color: var(--color-danger-700);
+  }
+
+  /* ==================================================================
+     4. KPI CARD HEAD — icon chip on the left, % chip on the right
+     ================================================================== */
+  .manager-v5-metric-top,
+  .manager-v5-metric > .manager-v5-metric-top,
+  .supervisor-v6-kpi > div:first-child,
+  .rso-v7-kpi > div:first-child,
+  .admin-v2-kpi > div:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+  .manager-v5-metric-top > span,
+  .supervisor-v6-kpi > div:first-child > span,
+  .rso-v7-kpi > div:first-child > span {
+    display: grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: var(--radius-control);
+    background: var(--color-accent-50);
+    color: var(--color-accent-600);
+    flex-shrink: 0;
+    font-size: 0.95rem;
+  }
+
+  /* KPI / metric footers: "Target x" ... "y left" */
+  .manager-v5-metric-foot,
+  .supervisor-v6-kpi > footer,
+  .rso-v7-kpi > footer,
+  .progress-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--color-slate-100);
+    font-size: 0.72rem;
+    color: var(--color-slate-500);
+  }
+
+  /* stat cards themselves get card chrome */
+  .manager-v5-metric,
+  .supervisor-v6-kpi,
+  .rso-v7-kpi,
+  .admin-v2-kpi,
+  .admin-kpi,
+  .admin-kpi-card,
+  .retailer-profile-kpi,
+  .detail-stat,
+  .accounts-v12-stat,
+  .perf-summary-card {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 1rem 1.1rem;
+  }
+
+  /* ==================================================================
+     5. GRID WRAPPERS that hold the stat cards
+     ================================================================== */
+  .perf-summary,
+  .perf-v2-summary,
+  .manager-v5-metrics,
+  .supervisor-v6-kpis,
+  .rso-v7-kpis,
+  .admin-v2-kpis,
+  .bp-v8-grid,
+  .manager-v5-subhero,
+  .accounts-v12-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.9rem;
+    margin-bottom: 1.1rem;
+  }
+  .perf-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: 1rem;
+  }
+
+  /* ==================================================================
+     6. HERO INTERNALS — tag strips, network strips, side panels
+     ================================================================== */
+  .manager-v5-tags,
+  .supervisor-v6-tags,
+  .accounts-v12-tags,
+  .rso-v7-tags,
+  .bp-v8-tags,
+  .target-v3-chips,
+  .attention-v4-chips,
+  .audit-v4-chips,
+  .ops-head-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+  }
+  .manager-v5-tags > span,
+  .supervisor-v6-tags > span,
+  .accounts-v12-tags > span,
+  .rso-v7-tags > span,
+  .bp-v8-tags > span {
+    display: inline-flex;
+    align-items: center;
+    height: 1.6rem;
+    padding: 0 0.65rem;
+    border-radius: var(--radius-pill);
+    background: rgb(255 255 255 / 0.12);
+    border: 1px solid rgb(255 255 255 / 0.14);
+    color: var(--color-slate-200);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .manager-v5-network,
+  .supervisor-v6-network,
+  .rso-v7-network {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding-top: 0.9rem;
+    margin-top: 0.9rem;
+    border-top: 1px solid rgb(255 255 255 / 0.12);
+    width: 100%;
+  }
+  .manager-v5-network > div > strong,
+  .supervisor-v6-network > div > strong,
+  .rso-v7-network > div > strong {
+    font-size: 1.15rem;
+  }
+  .rso-v7-network > div.alert > strong {
+    color: var(--color-warning-400, #fbbf24);
+  }
+
+  .manager-v5-command,
+  .supervisor-v6-alert,
+  .accounts-v12-fresh,
+  .rso-v7-ga,
+  .bp-v8-main,
+  .bp-v8-today {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    background: rgb(255 255 255 / 0.08);
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: var(--radius-control);
+    padding: 0.85rem 1rem;
+  }
+  .manager-v5-command {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .manager-v5-command > a,
+  .supervisor-v6-alert > b,
+  .bp-v8-today > b {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--color-accent-300);
+    white-space: nowrap;
+  }
+  .supervisor-v6-alert > span,
+  .bp-v8-today > span {
+    display: grid;
+    place-items: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.14);
+    flex-shrink: 0;
+    font-weight: 800;
+  }
+  .supervisor-v6-alert.active > span {
+    background: var(--color-warning-500);
+    color: #fff;
+  }
+  .supervisor-v6-alert > b,
+  .bp-v8-today > b {
+    margin-left: auto;
+  }
+
+  /* circular progress rings in RSO / BP heroes */
+  .rso-v7-ring,
+  .bp-v8-ring {
+    --rso-p: 0deg;
+    display: grid;
+    place-items: center;
+    width: 4rem;
+    height: 4rem;
+    flex-shrink: 0;
+    margin-left: auto;
+    border-radius: 50%;
+    background: conic-gradient(var(--color-teal-400) var(--rso-p), rgb(255 255 255 / 0.15) 0);
+  }
+  .rso-v7-ring > span,
+  .bp-v8-ring {
+    font-weight: 800;
+  }
+  .rso-v7-ring > span {
+    display: grid;
+    place-items: center;
+    width: 3.1rem;
+    height: 3.1rem;
+    border-radius: 50%;
+    background: var(--color-navy-900);
+    color: #fff;
+    font-size: 0.85rem;
+  }
+  .bp-v8-ring {
+    background: rgb(255 255 255 / 0.12);
+    flex-direction: column;
+    gap: 0;
+  }
+  .bp-v8-ring > b {
+    font-size: 1rem;
+    color: #fff;
+  }
+  .bp-v8-ring > small {
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+  }
+
+  .rso-v7-hero-top,
+  .bp-v8-top,
+  .accounts-v12-hero > div:first-child,
+  .manager-v5-copy {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    flex-direction: column;
+  }
+  .rso-v7-hero-top,
+  .bp-v8-top {
+    flex-direction: row;
+  }
+  .rso-v7-hero-top > span,
+  .bp-v8-top > span {
+    flex-shrink: 0;
+    padding: 0.25rem 0.7rem;
+    border-radius: var(--radius-pill);
+    background: rgb(255 255 255 / 0.14);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  /* icon+text+chevron action rows */
+  .accounts-v12-action,
+  .bp-v8-action {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.8rem 0.95rem;
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .accounts-v12-action > span,
+  .bp-v8-action > span,
+  .bp-v8-info > span {
+    display: grid;
+    place-items: center;
+    width: 2.3rem;
+    height: 2.3rem;
+    border-radius: var(--radius-control);
+    background: var(--tone-bg, var(--color-accent-50));
+    color: var(--tone-color, var(--color-accent-600));
+    flex-shrink: 0;
+  }
+  .accounts-v12-action > div > strong,
+  .bp-v8-action > div > strong {
+    display: block;
+    font-size: 0.88rem;
+    color: var(--color-slate-900);
+  }
+  .accounts-v12-action > div > small,
+  .bp-v8-action > div > small {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+  .accounts-v12-action > b,
+  .bp-v8-action > b {
+    margin-left: auto;
+    color: var(--color-slate-300);
+  }
+  .bp-v8-info {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 0.95rem 1.05rem;
+  }
+
+  /* ==================================================================
+     7. PERF PAGE — head, period, filter, person cards
+     ================================================================== */
+  .perf-v2-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+  }
+  .perf-v2-head h1 {
+    font-size: 1.4rem;
+    margin-top: 0.1rem;
+  }
+  .perf-v2-head p {
+    font-size: 0.85rem;
+    color: var(--color-slate-500);
+    margin-top: 0.15rem;
+  }
+  .perf-v2-period {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .perf-v2-period > strong {
+    font-size: 0.92rem;
+    font-weight: 700;
+  }
+  .perf-v2-period > i {
+    display: none;
+  }
+  .perf-v2-period::after {
+    content: "";
+  }
+
+  .perf-search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 13rem;
+  }
+  .perf-search > span {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-control);
+    background: var(--color-slate-100);
+    color: var(--color-slate-500);
+    flex-shrink: 0;
+  }
+  .perf-search > div {
+    flex: 1;
+  }
+  .perf-search label,
+  .perf-filter > label > span {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-slate-400);
+    margin-bottom: 0.15rem;
+  }
+  .perf-filter > label {
+    margin: 0;
+  }
+
+  .perf-person-top {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 0.85rem;
+  }
+  .perf-person-top > div:not([class]) {
+    min-width: 0;
+    flex: 1;
+  }
+  .perf-person-top strong {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--color-slate-900);
+  }
+  .perf-person-top span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  .perf-person-top > em {
+    margin-left: auto;
+    font-style: normal;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--color-accent-600);
+    font-variant-numeric: tabular-nums;
+  }
+  .perf-money {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-slate-100);
+  }
+  .perf-money > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+  .perf-money span {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-slate-400);
+  }
+  .perf-money b {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .perf-person-card {
+    display: block;
+  }
+
+  /* ==================================================================
+     8. ANALYTICS CHARTS (AnalyticsCharts.tsx)
+     ================================================================== */
+  .analytics-card-v90,
+  .performance-chart-wrap-v90 > .analytics-card-v90 {
+    display: block;
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 1.1rem;
+  }
+  .analytics-card-v90 > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .analytics-card-v90 > header span {
+    display: block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-accent-600);
+  }
+  .analytics-card-v90 > header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 0.15rem;
+  }
+  .analytics-card-v90 > header p {
+    font-size: 0.8rem;
+    color: var(--color-slate-500);
+    margin-top: 0.15rem;
+  }
+  .analytics-legend-v90 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.72rem;
+    color: var(--color-slate-500);
+    white-space: nowrap;
+  }
+  .analytics-legend-v90 > i {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 999px;
+    background: var(--color-accent-500);
+    margin-right: 0.15rem;
+  }
+  .analytics-legend-v90 > i:last-of-type {
+    background: var(--color-teal-500);
+  }
+
+  .analytics-bars-v90,
+  .analytics-compare-v90 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .analytics-bar-row-v90,
+  .analytics-compare-row-v90 {
+    display: grid;
+    grid-template-columns: minmax(8rem, 1.1fr) minmax(6rem, 2fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+  }
+  .analytics-bar-label-v90,
+  .analytics-compare-row-v90 > div:first-child {
+    min-width: 0;
+  }
+  .analytics-bar-label-v90 > b,
+  .analytics-compare-row-v90 > div:first-child > b {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-slate-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .analytics-bar-label-v90 > small,
+  .analytics-compare-row-v90 > div:first-child > small {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--color-slate-500);
+  }
+  .analytics-bar-track-v90 {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--color-slate-100);
+    overflow: hidden;
+  }
+  .analytics-bar-track-v90 > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--color-accent-500), var(--color-teal-500));
+  }
+  .analytics-dual-v90 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .analytics-dual-v90 > span {
+    display: block;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: var(--color-slate-100);
+    overflow: hidden;
+  }
+  .analytics-dual-v90 > span > i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-accent-500);
+  }
+  .analytics-dual-v90 > span.alt > i {
+    background: var(--color-teal-500);
+  }
+  .analytics-bar-row-v90 > strong,
+  .analytics-compare-row-v90 > strong {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--color-slate-800);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .analytics-empty-v90 {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--color-slate-500);
+    font-size: 0.85rem;
+  }
+
+  /* ==================================================================
+     9. Progress card (RoleUI) + status pills
+     ================================================================== */
+  .progress-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .status-pill.status-good {
+    background: var(--color-success-50);
+    color: var(--color-success-700);
+  }
+  .status-pill.status-mid {
+    background: var(--color-warning-50);
+    color: var(--color-warning-700);
+  }
+  .status-pill.status-low {
+    background: var(--color-danger-50);
+    color: var(--color-danger-700);
+  }
+  .metric-icon {
+    display: grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: var(--radius-control);
+    background: var(--color-accent-50);
+    color: var(--color-accent-600);
+    margin-bottom: 0.5rem;
+  }
+
+  /* ==================================================================
+     10. Section heads whose content belongs on the LEFT
+     coverage.css gives every [class$="-head"] space-between, which is right
+     for a title/action bar but wrong where an icon leads into a title.
+     ================================================================== */
+  .premium-form-section-head,
+  .ops-title,
+  .premium-page-head-copy,
+  .perf-person-top,
+  .ops-person {
+    justify-content: flex-start;
+  }
+  .premium-form-section-head > div:not([class]) {
+    flex: 1;
+    min-width: 0;
+  }
+  .premium-form-section-aside {
+    margin-left: auto;
+  }
+
+  /* ==================================================================
+     11. Remaining label/value pairs that sit inside a row
+     ================================================================== */
+  .ops-metric > div > strong {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--color-slate-900);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+  .ops-metric > div > small {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+
+  .import-health-meta-v96 > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  .import-health-meta-v96 span {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--color-slate-400);
+  }
+  .import-health-meta-v96 b {
+    font-size: 0.78rem;
+    color: var(--color-slate-700);
+  }
+
+  /* retailer detail — recent GA / recharge activity rows */
+  .retailer-activity-row > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+  .retailer-activity-row > div:first-of-type {
+    flex: 1;
+  }
+  .retailer-activity-row > div:last-child {
+    margin-left: auto;
+    text-align: right;
+  }
+  .retailer-activity-row strong {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .retailer-activity-row small {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--color-slate-500);
+  }
+  .retailer-v2-panel-head > b {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--color-slate-900);
+  }
+}
