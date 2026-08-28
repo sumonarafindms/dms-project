@@ -289,62 +289,140 @@
     font-weight: 700;
   }
 
-  /* ---------- Tables ---------- */
+  /* ---------- Tables ----------
+     One premium table treatment for every table in the app. Long tables are
+     the primary working surface here (retailer GA, employee performance,
+     import history), so the priorities are: a scannable sticky header,
+     numbers that line up, a clear row-hover target, and horizontal scrolling
+     that never breaks the page layout. */
   .ops-table-shell,
   .ga-table-shell,
   .modern-table-wrap,
   .ops-table-wrap,
   .premium-table-shell,
+  .premium-table-shell-v71,
   .table-wrap,
   .data-table-wrap,
   .admin-table-wrap {
     border: 1px solid var(--color-slate-200);
     border-radius: var(--radius-card);
     overflow: hidden;
-    background: white;
+    background: #fff;
+    box-shadow: var(--shadow-card);
   }
-  .ops-table-scroll {
+  .ops-table-scroll,
+  .ga-table-scroll,
+  .table-scroll {
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    max-height: 34rem;
+    overflow-y: auto;
   }
+
   .ops-table,
+  .ga-premium-table,
   .data-table,
   table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.84rem;
   }
+
+  /* header — sticky so column meaning survives a long scroll */
   .ops-table thead th,
+  .ga-premium-table thead th,
   .data-table thead th,
   table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     text-align: left;
-    padding: 0.75rem 0.9rem;
+    padding: 0.7rem 1rem;
     background: var(--color-slate-50);
     color: var(--color-slate-500);
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
     border-bottom: 1px solid var(--color-slate-200);
     white-space: nowrap;
   }
+
   .ops-table tbody td,
+  .ga-premium-table tbody td,
   .data-table tbody td,
   table tbody td {
-    padding: 0.7rem 0.9rem;
+    padding: 0.72rem 1rem;
     border-bottom: 1px solid var(--color-slate-100);
     color: var(--color-slate-700);
     vertical-align: middle;
   }
-  .ops-table tbody tr:hover,
-  .data-table tbody tr:hover,
-  table tbody tr:hover {
-    background: var(--color-slate-50);
-  }
   .ops-table tbody tr:last-child td,
+  .ga-premium-table tbody tr:last-child td,
   .data-table tbody tr:last-child td,
   table tbody tr:last-child td {
     border-bottom: none;
   }
+
+  /* row hover — a real target, not a tint you have to look for */
+  .ops-table tbody tr,
+  .ga-premium-table tbody tr,
+  .data-table tbody tr,
+  table tbody tr {
+    transition: background-color 0.12s var(--ease-premium);
+  }
+  .ops-table tbody tr:hover,
+  .ga-premium-table tbody tr:hover,
+  .data-table tbody tr:hover,
+  table tbody tr:hover {
+    background: var(--color-accent-50);
+  }
+
+  /* numeric columns line up and read as figures */
+  .ops-table td:has(.ops-number),
+  .ops-table td:has(.ga-number),
+  .ga-premium-table td:has(.ga-number),
+  .ops-number,
+  .ga-number,
+  .perf-money b,
+  .mini-value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* breathing room at the table edges */
+  .ops-table th:first-child,
+  .ops-table td:first-child,
+  .ga-premium-table th:first-child,
+  .ga-premium-table td:first-child,
+  .data-table th:first-child,
+  .data-table td:first-child,
+  table th:first-child,
+  table td:first-child {
+    padding-left: 1.25rem;
+  }
+  .ops-table th:last-child,
+  .ops-table td:last-child,
+  .ga-premium-table th:last-child,
+  .ga-premium-table td:last-child,
+  .data-table th:last-child,
+  .data-table td:last-child,
+  table th:last-child,
+  table td:last-child {
+    padding-right: 1.25rem;
+  }
+
+  /* a table sitting directly inside a card should meet the card's edges */
+  .ga-data-card > .ga-table-shell,
+  .ops-data-card > .ops-table-shell {
+    margin: 0 -1.4rem -1.25rem;
+    border-radius: 0 0 var(--radius-card) var(--radius-card);
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: none;
+  }
+
   .ops-person {
     display: flex;
     align-items: center;
@@ -523,10 +601,18 @@
   .import-health-file-v96 span {
     display: block;
     color: var(--color-slate-400);
-    font-size: 0.68rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
   }
   .import-health-file-v96 strong {
     display: block;
+    /* A filename, not a stat value — the universal stat rule in patterns.css
+       would otherwise render it at display size. */
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    margin-top: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
