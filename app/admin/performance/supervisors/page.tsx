@@ -95,8 +95,6 @@ export default async function Page({
       />
       <Card padded style={{ marginBottom: "1.25rem" }}>
         <ComparisonChart
-          title=""
-          subtitle=""
           data={data.map((x) => ({
             label: x.name,
             value: pct(x.achieved, x.target),

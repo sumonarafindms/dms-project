@@ -1902,6 +1902,15 @@
     font-size: 0.75rem;
     color: var(--color-slate-700);
   }
+  /* A cell whose desktop renderer stacks a caption under the value (a BP code
+     with the outlet name below it) keeps that shape in the phone card too —
+     <small> is inline by default, so without this the two run together on
+     one line. */
+  .kit-table-cell > div > small {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
 }
 
 /* ======================================================================
@@ -2733,5 +2742,59 @@
     margin-top: 0.25rem;
     padding-left: 0.75rem;
     border-left: 2px solid var(--color-rose-200);
+  }
+}
+
+/* ======================================================================
+   TEAM COMPARISON (v115)
+   AnalyticsCharts.tsx. One block per team: who they are, then the two
+   achievement bars. Stacked on a phone; name beside the bars from 640px,
+   where the name column is fixed so every bar starts at the same x and the
+   teams can actually be compared by eye.
+   ====================================================================== */
+@layer components {
+  .kit-compare {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+  .kit-compare-row {
+    display: grid;
+    gap: 0.5rem;
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  .kit-compare-row:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  @media (min-width: 640px) {
+    .kit-compare-row {
+      grid-template-columns: 12rem minmax(0, 1fr);
+      gap: 1rem;
+      align-items: center;
+    }
+  }
+  .kit-compare-who {
+    min-width: 0;
+  }
+  .kit-compare-who > strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kit-compare-who > span {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-compare-bars {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
   }
 }

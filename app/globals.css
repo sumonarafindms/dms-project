@@ -1,10 +1,8 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 @import "../styles/base.css";
-@import "../styles/coverage.css";
 @import "../styles/patterns.css";
 @import "../styles/shell.css";
-@import "../styles/dashboard.css";
 @import "../styles/tables.css";
 @import "../styles/forms.css";
 @import "../styles/components.css";

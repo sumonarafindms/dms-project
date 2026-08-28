@@ -1,42 +1,42 @@
 /**
  * Element-level pattern layer.
  *
- * Across all ~80 pages the app repeats a handful of markup idioms built from
- * bare elements rather than classes — most importantly the stat block:
+ * A handful of markup idioms in this app are built from bare elements rather
+ * than classes — most importantly the stat block:
  *
- *     <span>LABEL</span><strong>VALUE</strong><small>SUB</small><i/>
+ *     <span>LABEL</span><strong>VALUE</strong><small>SUB</small>
  *
  * The container has a class; the three lines inside do not. Styling only the
  * container leaves those three running together on one line ("Supervisors2Active
- * teams"), which is exactly what happened when this file did not exist. Every
- * rule below targets one of those shared idioms, so a fix lands on every page
- * that uses it instead of one page at a time.
+ * teams"), which is exactly what happened before this file existed. Each rule
+ * below targets one shared idiom, so a fix lands on every page that uses it.
  *
- * Loaded after coverage.css (generic fallbacks) and before the area files
- * (shell/dashboard/tables/forms/components), so a bespoke rule for a specific
- * component still wins.
+ * Loaded before the area files (shell / tables / forms / components) and
+ * kit.css, so a rule written for a specific component still wins.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * READ THIS BEFORE ADDING A RULE HERE
+ *
+ * `:where()` carries zero specificity, so these rules lose to any explicit
+ * rule — but they still WIN over an INHERITED value, because inheritance only
+ * applies where nothing matches the element at all. That is not theoretical:
+ * `.auth-v54-brand { color: white }` with `:where(...) > :where(strong)
+ * { color: slate-900 }` below it rendered the login pages' product name
+ * near-black on a dark panel (found in v116). Any element inside a dark
+ * surface that these shapes can match needs its colour stated explicitly.
+ * ─────────────────────────────────────────────────────────────────────────
  */
+
 @layer components {
   /* ==================================================================
-     0. THE UNIVERSAL STAT IDIOM — matched by SHAPE, not by class name.
-     ------------------------------------------------------------------
-     Enumerating class names does not scale here: ~360 of the app's class
-     names have no bespoke rule, and each page family invents new ones. But
-     they all build a stat the same way — a label element immediately
-     followed by a <strong> value:
+     THE UNIVERSAL STAT IDIOM — matched by SHAPE, not by class name.
 
          <span>LABEL</span><strong>VALUE</strong><small>SUB</small>
          <small>LABEL</small><strong>VALUE</strong><p>SUB</p>
 
-     `:has()` lets one rule recognise that shape wherever it appears,
-     including inside unclassed wrapper <div>s (e.g. GA's
-     `<article class="ga-metric"><span class="ga-metric-icon"/><div>…stat…</div>`).
-
-     Prose containers are excluded so a sentence like
-     "<p>total is <strong>5</strong> today</p>" is never touched, and the
-     whole selector is wrapped in :where() so it carries ZERO specificity —
-     every rule further down this file, and in the area stylesheets,
-     overrides it freely. This is a floor, not a ceiling.
+     `:has()` recognises that shape wherever it appears, including inside
+     unclassed wrapper <div>s. Prose containers are excluded so a sentence
+     like "<p>total is <strong>5</strong> today</p>" is never touched.
      ================================================================== */
   :where(:not(p, h1, h2, h3, h4, h5, li, label, td, th, a):has(> :is(span, small):first-child + strong))
     > :where(span, small, strong, p) {
@@ -73,454 +73,54 @@
     margin-top: 0.1rem;
   }
 
-  /* The same shape sitting on a dark hero / dark panel. */
-  :where([class$="-hero"], [class*="-hero "])
-    :where(:not(p, h1, h2, h3, h4, li, label):has(> :is(span, small):first-child + strong))
-    > :where(strong) {
-    color: #fff;
-  }
-
   /* ==================================================================
-     1. STAT BLOCK — label / value / sub stacked
-     ================================================================== */
-  .admin-kpi,
-  .admin-kpi-card,
-  .admin-v2-kpi {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-  }
+     THE TITLE-FIRST IDIOM — the same trick, the other way round:
 
-  /* --- the label line (first span / small) --- */
-  .admin-kpi > span,
-  .admin-kpi-card > span,
-  .admin-v2-kpi > span,
-  .metric-label {
+         <strong>Title</strong><span>Description</span>
+         <b>Name</b><span>ROLE</span>
+     ================================================================== */
+  :where(
+      :not(p, h1, h2, h3, h4, h5, li, label, td, th, code):has(> :is(strong, b):first-child + :is(span, small, p, em))
+    )
+    > :where(strong:first-child, b:first-child, strong ~ span, strong ~ small, strong ~ p, b ~ span, b ~ small) {
     display: block;
-    font-size: 0.68rem;
+  }
+  :where(
+      :not(p, h1, h2, h3, h4, h5, li, label, td, th, code):has(> :is(strong, b):first-child + :is(span, small, p, em))
+    )
+    > :where(strong:first-child, b:first-child) {
+    font-size: 0.92rem;
     font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--color-slate-500);
+    color: var(--color-slate-900);
     line-height: 1.3;
   }
-
-  /* --- the value line --- */
-  .admin-kpi > strong,
-  .admin-kpi-card > strong,
-  .admin-v2-kpi > strong {
-    display: block;
-    font-size: 1.35rem;
-    font-weight: 800;
-    letter-spacing: -0.015em;
-    color: var(--color-slate-900);
-    line-height: 1.15;
-    font-variant-numeric: tabular-nums;
+  :where(
+      :not(p, h1, h2, h3, h4, h5, li, label, td, th, code):has(> :is(strong, b):first-child + :is(span, small, p, em))
+    )
+    > :where(strong ~ span, strong ~ small, strong ~ p, b ~ span, b ~ small) {
+    font-size: 0.79rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-slate-500);
+    line-height: 1.4;
   }
-  /* inline fraction inside a value, e.g. 148 / 240 */
+
+  /* An inline fraction inside a value, e.g. 148 / 240. */
   strong > i {
     font-style: normal;
     font-size: 0.72em;
     font-weight: 600;
     opacity: 0.6;
   }
-
-  /* --- the sub line --- */
-  .admin-kpi > small,
-  .admin-kpi-card > small,
-  .admin-v2-kpi > small {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 500;
-    font-style: normal;
-    color: var(--color-slate-500);
-    line-height: 1.35;
-    letter-spacing: 0;
-    text-transform: none;
-  }
-
-  /* decorative trailing <i/> in stat cards — a thin accent bar, not text */
-  .admin-kpi > i:empty {
-    display: block;
-    height: 3px;
-    width: 2.5rem;
-    margin-top: 0.5rem;
-    border-radius: 999px;
-    background: var(--tone-color, var(--color-accent-500));
-    opacity: 0.85;
-  }
-
-  /* ==================================================================
-     2. Stat blocks sitting on a dark hero — flip the palette.
-     These repeat the structural selectors from section 1 prefixed by the
-     hero, so they carry higher specificity and win over the light-theme
-     colors above. A plain `[class$="-hero"] strong` would lose to
-     `.rso-v7-network > div > strong` and leave dark text on dark navy.
-     ================================================================== */
-  [class$="-hero"] h1,
-  [class$="-hero"] h2,
-  [class$="-hero"] > p {
-    color: #fff;
-  }
-  [class$="-hero"] p,
-  [class$="-hero"] > span,
-  [class$="-hero"] .metric-label {
-    color: var(--color-slate-300);
-  }
-
-  [class$="-hero"] [class$="-network"] > div > strong,
-  [class$="-hero"] [class$="-command"] > div > strong,
-  [class$="-hero"] [class$="-alert"] > div > strong,
-  [class$="-hero"] [class$="-ga"] > div > strong,
-  [class$="-hero"] [class$="-main"] > div > strong,
-  [class$="-hero"] [class$="-today"] > div > strong,
-  [class$="-hero"] [class$="-fresh"] > strong {
-    color: #fff;
-  }
-
-  [class$="-hero"] [class$="-network"] > div > span,
-  [class$="-hero"] [class$="-network"] > div > small,
-  [class$="-hero"] [class$="-command"] > div > span,
-  [class$="-hero"] [class$="-command"] > div > small,
-  [class$="-hero"] [class$="-alert"] > div > small,
-  [class$="-hero"] [class$="-alert"] > div > p,
-  [class$="-hero"] [class$="-ga"] > div > small,
-  [class$="-hero"] [class$="-ga"] > div > p,
-  [class$="-hero"] [class$="-main"] > div > small,
-  [class$="-hero"] [class$="-main"] > div > p,
-  [class$="-hero"] [class$="-today"] > div > small,
-  [class$="-hero"] [class$="-fresh"] > span,
-  [class$="-hero"] [class$="-fresh"] > small,
-  [class$="-hero"] [class$="-fresh"] > i {
-    color: var(--color-slate-300);
-  }
-
-  /* full-width feature blocks inside a wrapping flex hero */
-  /* ==================================================================
-     3. PROGRESS BARS — <div class="*-progress"><i style="width:x%"/></div>
-     ================================================================== */
-  .progress,
-  [class$="-progress"] {
-    display: block;
-    height: 0.5rem;
-    width: 100%;
-    border-radius: 999px;
-    background: var(--color-slate-200);
-    overflow: hidden;
-    margin: 0.35rem 0;
-  }
-  .progress > span,
-  [class$="-progress"] > i,
-  [class$="-progress"] > span {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--color-accent-500), var(--color-teal-500));
-    transition: width 0.4s var(--ease-premium);
-  }
-  [class$="-hero"] [class$="-progress"] {
-    background: rgb(255 255 255 / 0.18);
-  }
-  [class$="-hero"] [class$="-progress"] > i {
-    background: linear-gradient(90deg, var(--color-accent-400), var(--color-teal-400));
-  }
-
-  /* good / mid / low percentage chips used in KPI headers */
-  b.good,
-  b.mid,
-  b.low {
-    font-size: 0.75rem;
-    font-weight: 800;
-    padding: 0.15rem 0.5rem;
-    border-radius: var(--radius-pill);
-  }
-  b.good {
-    background: var(--color-success-50);
-    color: var(--color-success-700);
-  }
-  b.mid {
-    background: var(--color-warning-50);
-    color: var(--color-warning-700);
-  }
-  b.low {
-    background: var(--color-danger-50);
-    color: var(--color-danger-700);
-  }
-
-  /* ==================================================================
-     4. KPI CARD HEAD — icon chip on the left,
-  .admin-v2-kpi > div:first-child {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.35rem;
-  }
-
-  .progress-card-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-top: 0.4rem;
-    padding-top: 0.4rem;
-    border-top: 1px solid var(--color-slate-100);
-    font-size: 0.72rem;
-    color: var(--color-slate-500);
-  }
-
-  .admin-v2-kpi,
-  .admin-kpi,
-  .admin-kpi-card,
-  .retailer-profile-kpi,
-  .detail-stat,
-  .accounts-v12-stat,
-  .perf-summary-card {
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 1rem 1.1rem;
-  }
-
-  /* ==================================================================
-     5. GRID WRAPPERS that hold the stat cards
-     ================================================================== */
-  .admin-v2-kpis {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.9rem;
-    margin-bottom: 1.1rem;
-  }
-
-  /* ==================================================================
-     7. PERF PAGE — head, period, filter{
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.1rem;
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-  /* ==================================================================
-     8. ANALYTICS CHARTS (AnalyticsCharts.tsx)
-     ================================================================== */
-  .analytics-card-v90 {
-    display: block;
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 1.25rem 1.4rem;
-    margin-bottom: 1.1rem;
-  }
-  .analytics-card-v90 > header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  .analytics-card-v90 > header span {
-    display: block;
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-accent-600);
-  }
-  .analytics-card-v90 > header h3 {
-    font-size: 1rem;
-    font-weight: 700;
-    margin-top: 0.15rem;
-  }
-  .analytics-card-v90 > header p {
-    font-size: 0.8rem;
-    color: var(--color-slate-500);
-    margin-top: 0.15rem;
-  }
-  .analytics-legend-v90 {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: 0.72rem;
-    color: var(--color-slate-500);
-    white-space: nowrap;
-  }
-  .analytics-legend-v90 > i {
-    display: inline-block;
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 999px;
-    background: var(--color-accent-500);
-    margin-right: 0.15rem;
-  }
-  .analytics-legend-v90 > i:last-of-type {
-    background: var(--color-teal-500);
-  }
-
-  .analytics-bars-v90,
-  .analytics-compare-v90 {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .analytics-bar-row-v90,
-  .analytics-compare-row-v90 {
-    display: grid;
-    grid-template-columns: minmax(8rem, 1.1fr) minmax(6rem, 2fr) auto;
-    align-items: center;
-    gap: 0.85rem;
-  }
-  .analytics-bar-label-v90,
-  .analytics-compare-row-v90 > div:first-child {
-    min-width: 0;
-  }
-  .analytics-bar-label-v90 > b,
-  .analytics-compare-row-v90 > div:first-child > b {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--color-slate-800);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .analytics-bar-label-v90 > small,
-  .analytics-compare-row-v90 > div:first-child > small {
-    display: block;
-    font-size: 0.72rem;
-    color: var(--color-slate-500);
-  }
-  .analytics-bar-track-v90 {
-    height: 0.55rem;
-    border-radius: 999px;
-    background: var(--color-slate-100);
-    overflow: hidden;
-  }
-  .analytics-bar-track-v90 > span {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--color-accent-500), var(--color-teal-500));
-  }
-  .analytics-dual-v90 {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  .analytics-dual-v90 > span {
-    display: block;
-    height: 0.4rem;
-    border-radius: 999px;
-    background: var(--color-slate-100);
-    overflow: hidden;
-  }
-  .analytics-dual-v90 > span > i {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--color-accent-500);
-  }
-  .analytics-dual-v90 > span.alt > i {
-    background: var(--color-teal-500);
-  }
-  .analytics-bar-row-v90 > strong,
-  .analytics-compare-row-v90 > strong {
-    font-size: 0.85rem;
-    font-weight: 800;
-    color: var(--color-slate-800);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-  .analytics-empty-v90 {
-    padding: 1.5rem;
-    text-align: center;
-    color: var(--color-slate-500);
-    font-size: 0.85rem;
-  }
-  .status-pill.status-mid {
-    background: var(--color-warning-50);
-    color: var(--color-warning-700);
-  }
-  .status-pill.status-low {
-    background: var(--color-danger-50);
-    color: var(--color-danger-700);
-  }
-
-  /* ==================================================================
-     10. Section heads whose content belongs on the LEFT
-     coverage.css gives every [class$="-head"] space-between, which is right
-     for a title/action bar but wrong where an icon leads into a title.
-     ================================================================== */
-  .premium-form-section-head,
-  .premium-page-head-copy {
-    justify-content: flex-start;
-  }
-  .premium-form-section-head > div:not([class]) {
-    flex: 1;
-    min-width: 0;
-  }
-  .premium-form-section-aside {
-    margin-left: auto;
-  }
 }
 
 /* ====================================================================
- * GA / C2C / C2S / OB upload pages (app/ga/page.tsx and siblings).
- * These pages predate the shared OperationsPremiumUI components and carry
- * their own `ga-*` class family, so they need their own rules.
+ * Table-cell idioms — the raw <table> pages (master-data, the ops
+ * screens). The kit's own Table has its own rules in kit.css.
  * ==================================================================== */
 @layer components {
-  .tone-cyan {
-    --tone-color: var(--color-teal-600);
-    --tone-bg: var(--color-teal-50);
-  }
-  .tone-orange,
-  .orange {
-    --tone-color: var(--color-warning-700);
-    --tone-bg: var(--color-warning-50);
-  }
-
-  /* GA table cells */
-  .person-name {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    justify-content: flex-start;
-  }
-}
-
-/* ====================================================================
- * Late overrides — these must out-specify earlier generic rules.
- * ==================================================================== */
-@layer components {
-  /* `.page button` (0,1,1) in components.css otherwise repaints these
-     primary buttons white. Match it with element+class. */
-  .page button.auth-v54-submit,
-  .page button.admin-primary,
-  .page button.btn-primary {
-    background: linear-gradient(135deg, var(--color-accent-600), var(--color-accent-700));
-    border: none;
-    color: #fff;
-    box-shadow: 0 6px 16px -4px rgb(37 99 235 / 0.4);
-  }
-
-  /* Table cell idiom: an unclassed <div> holding a code over a name.
-     Used by the retailer / employee columns on the GA and ops tables. */
+  /* An unclassed <div> holding a code over a name. */
   td > div:not([class]) > b,
   td > div:not([class]) > small {
     display: block;
@@ -538,7 +138,26 @@
     text-transform: none;
   }
 
-  /* File picker: keep the native input compact and unboxed. */
+  /* A name plus a quieter identifier underneath:
+     <td><strong>Rakib Hasan</strong><small>01711000000 · E-1042</small></td>.
+     <small> is inline by default, so the two ran together on one line. */
+  td > small,
+  th > small {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--color-slate-500);
+    line-height: 1.35;
+  }
+}
+
+/* ====================================================================
+ * Native elements the app uses bare.
+ * ==================================================================== */
+@layer components {
+  /* Keep the native file picker compact and unboxed — forms.css excludes
+     [type="file"] from its generic control rule so this one applies. */
   input[type="file"] {
     display: inline-block;
     width: auto;
@@ -566,62 +185,7 @@
     background: var(--color-slate-50);
     border-color: var(--color-slate-300);
   }
-}
 
-/* ====================================================================
- * Multi-class elements that attribute selectors miss.
- * `[class$="-alert"]` matches the WHOLE class attribute, so an element
- * written as class="supervisor-v6-alert active" is NOT matched — the
- * attribute ends in "active". Anything that can carry a state class needs
- * its real class name spelled out.
- * ==================================================================== */
-
-/* ====================================================================
- * MORE UNIVERSAL IDIOMS
- * The span→strong shape in §0 is not the only one this app uses. Two more
- * appear across the Upload Center, Employee Control Center, Permissions,
- * Activity Log and the retailer/attention cards:
- *
- *   <strong>Title</strong><span>Description</span>   (title first)
- *   <b>Name</b><span>ROLE</span>
- *
- * Same approach: match the shape, exclude prose, zero specificity so any
- * explicit rule still wins.
- * ==================================================================== */
-@layer components {
-  :where(
-      :not(p, h1, h2, h3, h4, h5, li, label, td, th, code):has(> :is(strong, b):first-child + :is(span, small, p, em))
-    )
-    > :where(strong:first-child, b:first-child, strong ~ span, strong ~ small, strong ~ p, b ~ span, b ~ small) {
-    display: block;
-  }
-  :where(
-      :not(p, h1, h2, h3, h4, h5, li, label, td, th, code):has(> :is(strong, b):first-child + :is(span, small, p, em))
-    )
-    > :where(strong:first-child, b:first-child) {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: var(--color-slate-900);
-    line-height: 1.3;
-  }
-  :where(
-      :not(p, h1, h2, h3, h4, h5, li, label, td, th, code):has(> :is(strong, b):first-child + :is(span, small, p, em))
-    )
-    > :where(strong ~ span, strong ~ small, strong ~ p, b ~ span, b ~ small) {
-    font-size: 0.79rem;
-    font-weight: 400;
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--color-slate-500);
-    line-height: 1.4;
-  }
-}
-
-/* ====================================================================
- * UPLOAD CENTER (app/admin/upload/page.tsx)
- * ==================================================================== */
-@layer components {
-  /* the two action buttons were overlapping — they had no row layout */
   code {
     display: inline-block;
     padding: 0.2rem 0.55rem;
@@ -631,98 +195,5 @@
     color: var(--color-slate-700);
     font-size: 0.75rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-}
-
-/* ====================================================================
- * RETAILER / ATTENTION OPPORTUNITY CARDS
- * (RetailerOpportunityViews.tsx — Attention Center, Retailer Performance)
- * ==================================================================== */
-@layer components {
-  /* the four figures belong in a row, not stacked down the card */
-  .tone-rose {
-    --tone-color: var(--color-danger-600);
-    --tone-bg: var(--color-danger-50);
-    --tone-grad: linear-gradient(135deg, #f43f5e, #fb7185);
-    --tone-glow: 244 63 94;
-  }
-  .tone-purple,
-  .tone-violet {
-    --tone-color: #7c3aed;
-    --tone-bg: #f5f3ff;
-    --tone-grad: linear-gradient(135deg, #7c3aed, #a78bfa);
-    --tone-glow: 124 58 237;
-  }
-}
-
-/* ====================================================================
- * EMPLOYEE CONTROL CENTER role cards + ACTIVITY LOG rows
- * ==================================================================== */
-@layer components {
-  /* --- Activity Log --- */
-}
-
-/* ====================================================================
- * PERMISSIONS CENTER / ATTENTION NOTE / ECC ACTIONS / AUTHORIZED USERS
- * ==================================================================== */
-@layer components {
-  /* --- the "How this works" note above the Attention KPI grid --- */
-  .info-banner {
-    display: block;
-    padding: 0.85rem 1.05rem;
-    margin-bottom: 1.1rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    border: 1px solid var(--color-accent-100);
-  }
-  /* head, select and button stack inside each tool — previously the select
-     and button landed on top of the description text */
-
-  /* --- ECC action buttons: the icon was sitting on top of the label --- */
-  .admin-v2-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    height: 2.6rem;
-    padding: 0 1.05rem;
-    border-radius: var(--radius-control);
-    font-size: 0.85rem;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-}
-
-/* ======================================================================
-   TARGETS PAGE
-   The targets page ships two renderings of the same data: a card list
-   (.target-mobile-list) and a table (.modern-table-wrap). Neither had any
-   CSS, so both rendered at once on every viewport — the page came out as
-   one very tall column. Below: show exactly one of them per breakpoint,
-   and lay out the pieces the cards are built from.
-   ================================================================== */
-
-/* Below 900px the nine-column target table stops being usable: swap to the
-   card list the page already renders. */
-
-/* ======================================================================
-   TWO MORE UNCLASSED IDIOMS
-   ================================================================== */
-@layer components {
-  /* The file drop zone is <label><input><b>headline</b><span>hint</span></label>.
-     The input is invisible, so without these the headline and hint render as
-     one run-on line ("Choose target Excel fileXLSX / XLS / XLSM"). */
-
-  /* Table cells carry a name plus a quieter identifier underneath:
-     <td><strong>Rakib Hasan</strong><small>01711000000 · E-1042</small></td>.
-     <small> is inline by default, so the two ran together on one line in every
-     table in the app. */
-  td > small,
-  th > small {
-    display: block;
-    margin-top: 0.1rem;
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--color-slate-500);
-    line-height: 1.35;
   }
 }

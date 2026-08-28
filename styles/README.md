@@ -1,41 +1,62 @@
-# Styling structure (Tailwind v4, Pass 4 redesign — 2026-08-27)
+# Styling structure
 
-The old 27-file, 30-version-layer CSS system (`-v84` through `-v99`, "polish",
-"repairs", etc.) has been replaced. `app/globals.css` now loads Tailwind and
-eight files, in this exact order:
+`app/globals.css` loads Tailwind v4 and then these files, in this exact order:
 
-1. `tokens.css` — the premium Deep Navy + Slate design system as a Tailwind
-   v4 `@theme` block (colors, radius, shadow, font, easing). Change the look
-   of the whole app here.
-2. `base.css` — resets, `body`/`h1`-`h4` defaults, scrollbar, `.page`.
-3. `coverage.css` — attribute-selector safety net (`[class$="-page"]`,
-   `[class$="-icon"]`, `[class$="-grid"]`, ...) so any page-specific class
-   name not explicitly styled elsewhere still renders on-theme instead of
-   unstyled. Loaded before the files below so their more specific rules win.
-4. `shell.css` — `AppShell.tsx`: sidebar nav, mobile topbar, bottom nav.
-5. `dashboard.css` — role dashboards + the admin performance dashboard
-   (`dash97-*` classes in `app/dashboard/page.tsx`).
-6. `tables.css` — data tables, `OperationsPremiumUI.tsx` (GA/C2C/C2S/OB),
-   import health cards, filter bars.
-7. `forms.css` — form controls, login/setup/sacool auth pages, employee and
-   permission editing forms.
-8. `components.css` — the shared `Premium*` component library (badges,
-   cards, dialogs, toasts, progress, empty/loading states) plus generic
-   `.card` / `.btn` / `.section` primitives used everywhere.
+1. `tokens.css` — the Deep Navy + Slate design system as a Tailwind v4
+   `@theme` block (colors, radius, shadow, font, easing). Change the look of
+   the whole app here.
+2. `base.css` — resets, `body` / `h1`–`h4` defaults, scrollbar, `.page`.
+3. `patterns.css`, `shell.css`, `tables.css`, `forms.css`, `components.css`,
+   `premium.css` — the app shell (sidebar, mobile topbar, bottom nav), the
+   generic `<table>` treatment, the auth pages, and what remains of the
+   pre-kit families.
+4. `kit.css` — **the role-UI kit**: the single design system for the role
+   pages, paired with `app/components/Kit.tsx`. Loaded last among the
+   component layers so a kit page always outranks the older sheets.
+5. `mobile.css` — phone overrides.
 
-## Why class names were kept
+## Where the migration stands
 
-~80 page files reference hundreds of class names, many of them the same
-visual pattern under a different role-prefixed alias (`.rso-v7-hero`,
-`.manager-v5-hero`, `.supervisor-v6-hero` were one design, three names).
-Rather than rewrite every page's JSX in one pass — high regression risk on
-a project whose business-rule correctness is the priority — every rule
-above groups all known synonym class names against one new, real design.
-Business logic, data-fetching, and API contracts were not touched.
+Every role page is on the kit, as are the error boundary, the 404 and all six
+route skeletons. What still uses the older sheets:
+
+- `app/login`, `app/setup`, `app/sacool` — the auth pages (`auth-v54-*`,
+  `sacool-v58-*`), which have their own full-page design.
+- `app/components/AppShell.tsx` — the shell chrome (`shell.css`).
+- `app/master-data` — a standalone tool with inline styles and a raw table.
+
+## The attribute-suffix safety net is gone (v115)
+
+`coverage.css` used to hold ~40 rules of the form
+
+```css
+[class$="-card"]:not([class*="kit-"]) { ... }
+```
+
+as a fallback for legacy class names nothing else styled. It was deleted once
+the audit showed only eight auth-page classes still depended on it; those eight
+declarations now live in `forms.css` beside the rules they belong to.
+
+Deleting it is worth understanding, because the file was never the harmless
+fallback its own header claimed:
+
+- `[class$=]` matches the **whole class attribute**, so a collision came and
+  went with how many classes an element had (`class="kit-card"` matched,
+  `class="kit-card kit-card-p"` did not).
+- Worse, `:not(...)` **adds the specificity of its argument**. So
+  `[class$="-card"]:not([class*="kit-"])` is (0,2,0), not (0,1,0) — it
+  outranked every single-class rule in the app, including the bespoke rule
+  written for that exact element. It was not a floor; it was a ceiling. The
+  login page had been rendering with the fallback's card padding, shadow, grid
+  and kicker colour instead of the ones `forms.css` defines for it.
+
+If you ever reach for an attribute selector again, check both of those before
+you do.
 
 ## Adding new styles
 
-Prefer Tailwind utility classes directly in new JSX. If a new shared
-pattern needs a named class, add it to the relevant file above inside its
-`@layer components { }` block and `@apply` Tailwind utilities/tokens rather
-than hand-rolled hex values — keeps the app on one palette.
+New role-UI work goes in `kit.css` and `Kit.tsx` — extend an existing atom
+rather than adding a near-duplicate class. Use the `--color-*` / `--radius-*`
+/ `--shadow-*` tokens, never raw hex. Keep selectors to one class where you
+can; the app's whole history of "why did my rule lose" traces back to
+selectors that were more specific than they looked.

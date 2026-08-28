@@ -298,7 +298,11 @@
     color: var(--color-accent-600);
   }
 
-  .skip-link-v73 {
+  /* The shell's own skip link. AppShell renders it as the first focusable
+     element and `.app-main` carries id="main-content"; it was previously a
+     standalone SkipLink component that no layout ever rendered, so keyboard
+     users had no way past the sidebar. */
+  .skip-link {
     position: fixed;
     top: -100px;
     left: 1rem;
@@ -311,7 +315,7 @@
     font-weight: 600;
     transition: top 0.15s var(--ease-premium);
   }
-  .skip-link-v73:focus {
+  .skip-link:focus {
     top: 1rem;
   }
 

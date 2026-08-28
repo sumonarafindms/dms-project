@@ -16,25 +16,7 @@
      import history), so the priorities are: a scannable sticky header,
      numbers that line up, a clear row-hover target, and horizontal scrolling
      that never breaks the page layout. */
-  .premium-table-shell,
-  .premium-table-shell-v71,
-  .table-wrap,
-  .data-table-wrap,
-  .admin-table-wrap {
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    overflow: hidden;
-    background: #fff;
-    box-shadow: var(--shadow-card);
-  }
-  .table-scroll {
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    max-height: 34rem;
-    overflow-y: auto;
-  }
 
-  .data-table,
   table {
     width: 100%;
     border-collapse: separate;
@@ -43,7 +25,6 @@
   }
 
   /* header — sticky so column meaning survives a long scroll */
-  .data-table thead th,
   table thead th {
     position: sticky;
     top: 0;
@@ -60,37 +41,29 @@
     white-space: nowrap;
   }
 
-  .data-table tbody td,
   table tbody td {
     padding: 0.72rem 1rem;
     border-bottom: 1px solid var(--color-slate-100);
     color: var(--color-slate-700);
     vertical-align: middle;
   }
-  .data-table tbody tr:last-child td,
   table tbody tr:last-child td {
     border-bottom: none;
   }
 
   /* row hover — a real target, not a tint you have to look for */
-  .data-table tbody tr,
   table tbody tr {
     transition: background-color 0.12s var(--ease-premium);
   }
-  .data-table tbody tr:hover,
   table tbody tr:hover {
     background: var(--color-accent-50);
   }
 
   /* breathing room at the table edges */
-  .data-table th:first-child,
-  .data-table td:first-child,
   table th:first-child,
   table td:first-child {
     padding-left: 1.25rem;
   }
-  .data-table th:last-child,
-  .data-table td:last-child,
   table th:last-child,
   table td:last-child {
     padding-right: 1.25rem;
@@ -98,50 +71,6 @@
   /* name over code, not run together on one line */
 
   /* ---------- Filter bars ---------- */
-  .admin-filter {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem;
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    padding: 0.85rem 1rem;
-    margin-bottom: 1.1rem;
-  }
-  .filter-search {
-    flex: 1;
-    min-width: 12rem;
-  }
-  .filter-date,
-  .filter-month {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-  .live-filter-status {
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-  }
 
   /* ---------- Employee / people directory rows ---------- */
-  .people-command,
-  .people-v3-command {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.9rem;
-  }
-  .admin-rank-row,
-  .admin-v2-rank-row,
-  .team-list,
-  .team-person {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--color-slate-100);
-  }
 }

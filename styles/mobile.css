@@ -23,7 +23,6 @@
      1. Touch input — never let iOS zoom the page on focus
      ================================================================== */
   @media (pointer: coarse) {
-    .control,
     input:not([type="checkbox"]):not([type="radio"]),
     select,
     textarea {
@@ -39,22 +38,9 @@
      2. Touch targets — 44px minimum for anything tappable
      ================================================================== */
   @media (pointer: coarse) {
-    .btn,
     .page button,
     .auth-v54-submit {
       min-height: 2.85rem;
-    }
-
-    .team-row {
-      min-height: 2.9rem;
-    }
-    /* back links and inline nav links get a real hit area */
-    .page-breadcrumb,
-    .section-link,
-    .section-head a {
-      min-height: 2.75rem;
-      display: inline-flex;
-      align-items: center;
     }
     .bottom-link {
       min-height: 3.25rem;
@@ -65,7 +51,6 @@
       min-height: 2.9rem;
     }
     /* table rows are tap targets on the pages that link out of them */
-    .data-table tbody td,
     table tbody td {
       padding-top: 0.85rem;
       padding-bottom: 0.85rem;
@@ -86,9 +71,8 @@
     body
       :not(p, h1, h2, h3, h4, h5, li, label, td, th, a):has(> :is(span, small):first-child + strong)
       > :is(span:first-child, small:first-child),
-    body .metric-label,
-    body [class$="-kicker"],
-    body [class$="-overline"],
+    body .auth-v54-kicker,
+    body .auth-v54-overline,
     body .sidebar-section,
     body .profile-role,
     body .brand-sub {
@@ -100,45 +84,23 @@
     body
       :not(p, h1, h2, h3, h4, h5, li, label, td, th, a):has(> :is(span, small):first-child + strong)
       > :is(strong ~ small, strong ~ p, strong ~ em),
-    body .person-meta,
-    body td > div:not([class]) > small,
-    body .section-head p,
-    body .analytics-compare-row-v90 small,
-    body .analytics-bar-label-v90 small {
+    body td > div:not([class]) > small {
       font-size: 0.8rem;
       letter-spacing: 0;
     }
 
     /* --- pills, badges, statuses --- */
-    body .status-pill,
-    body .result-count,
-    body .table-count,
-    body [class$="-tags"] > span,
-    body b.good,
-    body b.mid,
-    body b.low {
-      font-size: 0.75rem;
-    }
 
     /* --- tables --- */
-    body .data-table,
     body table {
       font-size: 0.88rem;
     }
-    body .data-table thead th,
     body table thead th {
       font-size: 0.75rem;
       letter-spacing: 0.04em;
     }
     body td > div:not([class]) > b {
       font-size: 0.88rem;
-    }
-
-    /* --- avatars: bigger circle so the initials are legible --- */
-    body .person-avatar {
-      width: 2.2rem;
-      height: 2.2rem;
-      font-size: 0.75rem;
     }
 
     body .bottom-link {
@@ -150,23 +112,7 @@
        without having to name each page's private class. --- */
     body small,
     body .auth-v58-team-badge,
-    body .sacool-v58-kicker,
-    body .auth-v54-overline,
-    body .analytics-legend-v90 {
-      font-size: 0.78rem;
-    }
-
-    /* --- the last stragglers. Each one is written to out-specify the exact
-       rule that was winning: e.g. patterns.css uses
-       `.ga-freshness-v96 > div:last-child > small` (0,2,2), so a plain
-       `body .ga-freshness-v96 small` (0,1,2) would lose. Matching the same
-       shape and adding the `body` prefix puts these one step higher, so they
-       win without needing !important. --- */
-    body .analytics-card-v90 > header span {
-      font-size: 0.75rem;
-    }
-    body .analytics-compare-row-v90 > div:first-child > small,
-    body .analytics-bar-label-v90 > small {
+    body .auth-v54-overline {
       font-size: 0.78rem;
     }
   }
@@ -178,45 +124,15 @@
     .page {
       padding: 1rem 0.9rem 5.5rem;
     }
-    /* heroes eat too much of a small screen at desktop padding */
-    [class$="-hero"],
-    .premium-page-head-v77 {
-      padding: 1.15rem 1.1rem;
-      border-radius: var(--radius-control);
-    }
-    [class$="-hero"] h1 {
-      font-size: 1.2rem;
-    }
-    .card,
-    .section,
-    .premium-form-section-v66 {
-      padding: 1rem 1.05rem;
-    }
     /* a card-edge table shouldn't hang off a narrower card */
     /* the date range block should fill the width, not sit in a corner */
 
     /* Card/section heads put a title and an action side by side. At 390px
        that squeezes the title into a 2-word-wide column. Stack them. */
-    .section-head,
-    .premium-data-header-v71,
-    .people-command,
-    .analytics-card-v90 > header,
-    .action-toolbar-v75,
-    .premium-page-head-v77,
-    .premium-form-section-head,
-    [class$="-card-head"],
-    [class$="-section-head"] {
+    .kit-section-head {
       flex-direction: column;
       align-items: flex-start;
       gap: 0.6rem;
-    }
-    /* keep the icon beside its title even when the head stacks */
-    .premium-page-head-copy {
-      flex-direction: row;
-      align-items: flex-start;
-    }
-    .premium-form-section-head {
-      flex-direction: row;
     }
   }
 
@@ -224,40 +140,12 @@
      5. Tables on a phone — horizontal scroll, no nested scroll trap
      ================================================================== */
   @media (max-width: 900px) {
-    .table-scroll {
-      /* A capped height inside a page that already scrolls creates two
-         competing scroll areas — awkward with a thumb. Let the page scroll. */
-      max-height: none;
-      overflow-y: visible;
-      -webkit-overflow-scrolling: touch;
-      scroll-snap-type: x proximity;
-    }
-    /* fade on the right edge so it's obvious there is more to the side */
-    .premium-table-shell,
-    .table-wrap,
-    .data-table-wrap {
-      position: relative;
-    }
-    .premium-table-shell::after,
-    .table-wrap::after,
-    .data-table-wrap::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: 1.75rem;
-      pointer-events: none;
-      background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.92));
-      border-radius: 0 var(--radius-card) var(--radius-card) 0;
-    }
     table thead th {
       position: static;
     }
     /* With horizontal scrolling available, a wide cell reads far better than
        an identifier broken across three lines. Let the row stay one line and
        let the user swipe. */
-    .data-table tbody td,
     table tbody td {
       white-space: nowrap;
     }
@@ -269,13 +157,10 @@
   @media (hover: none) {
     /* :hover latches after a tap on touch screens, so a lifted card stays
        lifted until you tap somewhere else. Drop the movement; keep colour. */
-    .admin-kpi:hover,
-    .btn:hover,
     .page button:hover {
       transform: none;
     }
     /* a row highlight that never clears reads as a selection bug */
-    .data-table tbody tr:hover,
     table tbody tr:hover {
       background: transparent;
     }
@@ -283,7 +168,6 @@
       box-shadow: none;
     }
     /* give a real press response instead */
-    .btn:active,
     .page button:active,
     .bottom-link:active,
     .sidebar-link:active {
