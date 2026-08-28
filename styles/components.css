@@ -381,7 +381,6 @@
      Only genuinely icon-beside-text blocks belong here. Stat cards that stack
      label / value / sub are laid out by styles/patterns.css — listing them here
      too would override that with a row layout and re-break them. */
-  .target-kpis > *,
   .retailer-v2-kpis > *,
   .premium-detail-stat-v68 {
     background: white;
@@ -393,10 +392,11 @@
     align-items: center;
     gap: 0.7rem;
   }
+  /* .target-kpis is sized in styles/patterns.css — it sits in a narrow side
+     rail where an 11rem minimum collapses it to a single column. */
   .admin-kpi-grid,
   .rso-v7-kpis,
   .supervisor-v6-kpis,
-  .target-kpis,
   .retailer-profile-kpis,
   .retailer-v2-kpis,
   .detail-stat-grid,

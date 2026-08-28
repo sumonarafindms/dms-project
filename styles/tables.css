@@ -219,9 +219,11 @@
   }
 
   /* ---------- Ops metrics / data cards ---------- */
+  /* .target-kpis is deliberately absent: it lives in the targets workspace's
+     narrow side rail, where an 11rem minimum can only ever fit one column.
+     styles/patterns.css sizes it. */
   .ops-metrics-grid,
-  .upload-top-stats,
-  .target-kpis {
+  .upload-top-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
     gap: 0.85rem;

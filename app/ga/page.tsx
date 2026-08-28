@@ -84,20 +84,30 @@ export default function GaPage() {
     load();
   }, [month, dataDate,fromDate,toDate]);
 
+  // Both handlers ignore an empty value. A native date input reports "" while the
+  // user is still typing a date by hand, and it also reported "" for any date the
+  // old min={fromDate} attribute rejected. Writing that "" into state cleared the
+  // range without ever moving dataDate, so the daily table silently kept showing
+  // the previously selected day — the "date select korle kaj hoi na" report.
   function changeFrom(value:string){
+    if(!value)return;
     setFromDate(value);
-    if(value?.length>=7)setMonth(value.slice(0,7));
+    if(value.length>=7)setMonth(value.slice(0,7));
+    // Moving the start past the end drags the end (and the selected day) with it.
     if(toDate<value){
       setToDate(value);
       setDataDate(value);
     }
   }
   function changeTo(value:string){
+    if(!value)return;
     setToDate(value);
-    if(value){
-      setDataDate(value);
-      if(value.length>=7)setMonth(value.slice(0,7));
-    }
+    setDataDate(value);
+    if(value.length>=7)setMonth(value.slice(0,7));
+    // Picking a day before the current start used to be rejected outright by the
+    // input's min attribute. Pull the start back instead, so every day the user
+    // picks is always reachable.
+    if(value<fromDate)setFromDate(value);
   }
 
   async function upload(e: FormEvent<HTMLFormElement>) {
@@ -186,7 +196,7 @@ export default function GaPage() {
         </div>
         <div className="ga-date-card">
           <label><span>FROM</span><input type="date" value={fromDate} onChange={e=>changeFrom(e.target.value)}/></label>
-          <label><span>TO / SELECTED DAY</span><input type="date" value={toDate} min={fromDate} onChange={e=>changeTo(e.target.value)}/></label>
+          <label><span>TO / SELECTED DAY</span><input type="date" value={toDate} onChange={e=>changeTo(e.target.value)}/></label>
         </div>
       </header>
 
