@@ -59,8 +59,7 @@
   .auth-submit,
   .login-submit,
   .sacool-submit,
-  .user-v3-submit,
-  .upload-sample-btn {
+  .user-v3-submit {
     background: linear-gradient(135deg, var(--color-accent-600), var(--color-accent-700));
     border-color: transparent;
     color: white;
@@ -1063,7 +1062,8 @@
   }
 
   /* ================= SIM swap — always shown distinct from Total GA ================= */
-  .tone-amber,
+  /* Scoped: `.tone-amber` is also used on upload/module cards, where a full
+     yellow fill is wrong. Only the SIM-swap KPI gets the amber surface. */
   .retailer-profile-kpi.tone-amber {
     --tone-color: var(--color-warning-700);
     --tone-bg: var(--color-warning-50);

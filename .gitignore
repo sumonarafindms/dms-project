@@ -9,6 +9,9 @@ node_modules/
 *.env
 !.env.example
 
+# TypeScript incremental build cache — a build artifact, not source
+*.tsbuildinfo
+next-env.d.ts.bak
+
 *.log
 .DS_Store
-node_modules

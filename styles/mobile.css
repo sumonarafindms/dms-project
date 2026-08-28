@@ -389,6 +389,49 @@
       flex-direction: row;
     }
 
+    /* icon + copy + action banners squeeze the copy into a narrow column at
+       390px — stack the action underneath instead */
+    .upload-guidance,
+    .premium-guidance,
+    .upload-v61-guidance {
+      flex-wrap: wrap;
+    }
+    .upload-guidance > div {
+      flex-basis: 100%;
+      order: 2;
+    }
+    .upload-guidance > .btn {
+      order: 3;
+      width: 100%;
+      justify-content: center;
+    }
+    .upload-guidance-icon {
+      order: 1;
+    }
+    .upload-module-actions {
+      flex-direction: column;
+    }
+    .retailer-result-metrics {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.6rem 0.5rem;
+    }
+    .audit-row {
+      flex-wrap: wrap;
+    }
+    .audit-meta {
+      align-items: flex-start;
+      text-align: left;
+      flex-basis: 100%;
+      padding-left: 1.25rem;
+      flex-direction: row;
+      gap: 0.5rem;
+    }
+    .upload-v61-group-head {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
     /* right-aligned meta reads badly once it is on its own line */
     .ga-freshness-v96 > div:last-child,
     .ops-freshness-v96 > div:last-child,
