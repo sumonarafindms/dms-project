@@ -33,12 +33,6 @@
     input[type="file"] {
       min-height: 0;
     }
-    .ga-date-card input,
-    .ops-date-card input,
-    .dash97-month input {
-      font-size: 16px;
-      min-height: 2.6rem;
-    }
   }
 
   /* ==================================================================
@@ -47,46 +41,17 @@
   @media (pointer: coarse) {
     .btn,
     .page button,
-    .ga-upload-btn,
-    .upload-process-btn,
-    .ops-upload-btn,
-    .auth-v54-submit,
-    .dash97-primary,
-    .dash97-panel-btn,
-    .ecc-v82-primary {
+    .auth-v54-submit {
       min-height: 2.85rem;
     }
-    .ga-sample-btn,
-    .ops-sample-btn,
-    .upload-sample-btn {
-      min-height: 2.75rem;
-    }
-    .ga-count-pill,
-    .ops-count-pill {
-      min-height: 2.25rem;
-    }
-    /* inline call-to-action links inside hero panels */
-    .manager-v5-command > a,
-    .supervisor-v6-alert,
-    .accounts-v12-action,
-    .bp-v8-action,
-    .dash97-report,
-    .dash97-admin-link,
-    .quick-action,
-    .role-quick,
-    .linked-row,
+
     .team-row {
       min-height: 2.9rem;
     }
     /* back links and inline nav links get a real hit area */
-    .ga-back-link,
-    .ops-back,
     .page-breadcrumb,
-    .perf-breadcrumb,
-    .retailer-profile-back,
     .section-link,
-    .section-head a,
-    .dash97-section-head a {
+    .section-head a {
       min-height: 2.75rem;
       display: inline-flex;
       align-items: center;
@@ -100,8 +65,6 @@
       min-height: 2.9rem;
     }
     /* table rows are tap targets on the pages that link out of them */
-    .ops-table tbody td,
-    .ga-premium-table tbody td,
     .data-table tbody td,
     table tbody td {
       padding-top: 0.85rem;
@@ -124,33 +87,8 @@
       :not(p, h1, h2, h3, h4, h5, li, label, td, th, a):has(> :is(span, small):first-child + strong)
       > :is(span:first-child, small:first-child),
     body .metric-label,
-    body .ga-metric-label,
-    body .ops-metric-label,
-    body .manager-v5-metric > small,
-    body .supervisor-v6-kpi > small,
-    body .rso-v7-kpi > small,
     body [class$="-kicker"],
     body [class$="-overline"],
-    body .admin-kicker,
-    body .eyebrow,
-    body .ga-upload-overline,
-    body .perf-money span,
-    body .ga-sso-cell span,
-    body .manager-v5-metric-foot > span,
-    body .progress-card-foot > span,
-    body .supervisor-v6-kpi > footer span,
-    body .rso-v7-kpi > footer span,
-    body .import-health-meta-v96 span,
-    body .import-health-file-v96 span,
-    body .import-health-counts-v96,
-    body .ga-freshness-v96 small,
-    body .ops-freshness-v96 small,
-    body .ga-upload-flow,
-    body .ops-upload-trust,
-    body .dash97-month span,
-    body .dash98-live,
-    body .dash98-refresh,
-    body .ga-status,
     body .sidebar-section,
     body .profile-role,
     body .brand-sub {
@@ -162,43 +100,20 @@
     body
       :not(p, h1, h2, h3, h4, h5, li, label, td, th, a):has(> :is(span, small):first-child + strong)
       > :is(strong ~ small, strong ~ p, strong ~ em),
-    body .metric-sub,
-    body .ga-metric small,
-    body .ops-metric > div > small,
     body .person-meta,
-    body .ga-person small,
-    body .ops-person > div > small,
     body td > div:not([class]) > small,
     body .section-head p,
-    body .ga-section-title p,
-    body .ga-card-head p,
-    body .ops-data-head p,
-    body .dash97-section-head p,
     body .analytics-compare-row-v90 small,
-    body .analytics-bar-label-v90 small,
-    body .perf-person-top span,
-    body .dash97-team-copy small,
-    body .dash97-report small {
+    body .analytics-bar-label-v90 small {
       font-size: 0.8rem;
       letter-spacing: 0;
     }
 
     /* --- pills, badges, statuses --- */
-    body .ga-count-pill,
-    body .ops-count-pill,
-    body .ga-neutral-pill,
-    body .premium-badge-v65,
     body .status-pill,
     body .result-count,
     body .table-count,
-    body .ga-swap-badge-v98,
-    body .ops-status,
-    body .import-health-status-v96,
-    body .ga-title-badge,
-    body .rso-v7-hero-top > span,
-    body .bp-v8-top > span,
     body [class$="-tags"] > span,
-    body .ops-head-chips .premium-badge-v65,
     body b.good,
     body b.mid,
     body b.low {
@@ -206,32 +121,21 @@
     }
 
     /* --- tables --- */
-    body .ops-table,
-    body .ga-premium-table,
     body .data-table,
     body table {
       font-size: 0.88rem;
     }
-    body .ops-table thead th,
-    body .ga-premium-table thead th,
     body .data-table thead th,
     body table thead th {
       font-size: 0.75rem;
       letter-spacing: 0.04em;
     }
-    body .ga-person b,
-    body .ops-person > div > b,
     body td > div:not([class]) > b {
       font-size: 0.88rem;
     }
 
     /* --- avatars: bigger circle so the initials are legible --- */
-    body .ga-person > span,
-    body .ops-person > span,
-    body .perf-avatar,
-    body .dash97-avatar,
-    body .person-avatar,
-    body .employee-avatar {
+    body .person-avatar {
       width: 2.2rem;
       height: 2.2rem;
       font-size: 0.75rem;
@@ -245,65 +149,25 @@
        prose, so a floor on it catches the long tail of one-off labels
        without having to name each page's private class. --- */
     body small,
-    body .perf-money b,
-    body .ga-sso-cell span,
-    body .import-health-counts-v96 span,
-    body .import-health-counts-v96 b,
-    body .activity-type,
-    body .ga-sample-btn,
-    body .ops-sample-btn,
-    body .upload-sample-btn,
-    body .ops-date-label,
-    body .ga-date-card label > span,
-    body .ops-date-card label > span,
     body .auth-v58-team-badge,
     body .sacool-v58-kicker,
     body .auth-v54-overline,
-    body .ops-title-row > span,
-    body .bp-v8-ring > small,
-    body .analytics-legend-v90,
-    body .dash97-legend,
-    body .dash97-legend span,
-    body .ga-upload-flow b,
-    body .ops-upload-trust b,
-    body .ga-file-field > small,
-    body .table-scroll-hint-v64 {
+    body .analytics-legend-v90 {
       font-size: 0.78rem;
     }
 
     /* --- the last stragglers. Each one is written to out-specify the exact
        rule that was winning: e.g. patterns.css uses
        `.ga-freshness-v96 > div:last-child > small` (0,2,2), so a plain
-       `body .ga-freshness-v96 small` (0,1,2) would lose. Matched shapes
-       plus the `body` prefix put these at 0,2,3. --- */
-    body .perf-search label,
-    body .perf-filter > label > span,
-    body .analytics-card-v90 > header span,
-    body .retailer-v2-panel-head > div > span {
+       `body .ga-freshness-v96 small` (0,1,2) would lose. Matching the same
+       shape and adding the `body` prefix puts these one step higher, so they
+       win without needing !important. --- */
+    body .analytics-card-v90 > header span {
       font-size: 0.75rem;
     }
     body .analytics-compare-row-v90 > div:first-child > small,
-    body .analytics-bar-label-v90 > small,
-    body .retailer-activity-row > div > small,
-    body .ga-freshness-v96 > div:last-child > small,
-    body .ops-freshness-v96 > div:last-child > small,
-    body .ga-freshness-v96 > div > small,
-    body .ops-freshness-v96 > div > small {
+    body .analytics-bar-label-v90 > small {
       font-size: 0.78rem;
-    }
-
-    /* the percentage inside a dashboard ring was 9.9px — grow the ring so
-       the number it exists to show is actually readable on a phone */
-    body .dash97-ring {
-      width: 3.75rem;
-      height: 3.75rem;
-    }
-    body .dash97-ring > div {
-      width: 2.9rem;
-      height: 2.9rem;
-    }
-    body .dash97-ring b {
-      font-size: 0.72rem;
     }
   }
 
@@ -316,57 +180,25 @@
     }
     /* heroes eat too much of a small screen at desktop padding */
     [class$="-hero"],
-    .ga-page-head,
-    .ops-page-head,
-    .ops-v3-head,
-    .page-header,
     .premium-page-head-v77 {
       padding: 1.15rem 1.1rem;
       border-radius: var(--radius-control);
     }
-    [class$="-hero"] h1,
-    .ga-page-head h1,
-    .ops-page-head h1 {
+    [class$="-hero"] h1 {
       font-size: 1.2rem;
     }
     .card,
     .section,
-    .ga-section,
-    .ga-data-card,
-    .ga-upload-card,
-    .ops-data-card,
-    .ops-upload-card,
-    .dash97-panel,
-    .dash97-block,
-    .premium-form-section-v66,
-    .workspace-section-v94 {
+    .premium-form-section-v66 {
       padding: 1rem 1.05rem;
     }
     /* a card-edge table shouldn't hang off a narrower card */
-    .ga-data-card > .ga-table-shell,
-    .ops-data-card > .ops-table-shell {
-      margin: 0 -1.05rem -1rem;
-    }
     /* the date range block should fill the width, not sit in a corner */
-    .ga-date-card,
-    .ops-date-card {
-      width: 100%;
-    }
 
     /* Card/section heads put a title and an action side by side. At 390px
        that squeezes the title into a 2-word-wide column. Stack them. */
-    .ga-upload-card-head,
-    .ga-card-head,
-    .ops-card-head,
-    .ops-data-head,
     .section-head,
-    .perf-v2-head,
-    .dash97-section-head,
     .premium-data-header-v71,
-    .workspace-section-head-v94,
-    .employee-list-toolbar,
-    .employee-v3-toolbar,
-    .users-v3-directory-head,
     .people-command,
     .analytics-card-v90 > header,
     .action-toolbar-v75,
@@ -379,8 +211,6 @@
       gap: 0.6rem;
     }
     /* keep the icon beside its title even when the head stacks */
-    .ga-section-title,
-    .ops-title,
     .premium-page-head-copy {
       flex-direction: row;
       align-items: flex-start;
@@ -388,66 +218,12 @@
     .premium-form-section-head {
       flex-direction: row;
     }
-
-    /* icon + copy + action banners squeeze the copy into a narrow column at
-       390px — stack the action underneath instead */
-    .upload-guidance,
-    .premium-guidance,
-    .upload-v61-guidance {
-      flex-wrap: wrap;
-    }
-    .upload-guidance > div {
-      flex-basis: 100%;
-      order: 2;
-    }
-    .upload-guidance > .btn {
-      order: 3;
-      width: 100%;
-      justify-content: center;
-    }
-    .upload-guidance-icon {
-      order: 1;
-    }
-    .upload-module-actions {
-      flex-direction: column;
-    }
-    .retailer-result-metrics {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.6rem 0.5rem;
-    }
-    .audit-row {
-      flex-wrap: wrap;
-    }
-    .audit-meta {
-      align-items: flex-start;
-      text-align: left;
-      flex-basis: 100%;
-      padding-left: 1.25rem;
-      flex-direction: row;
-      gap: 0.5rem;
-    }
-    .upload-v61-group-head {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.5rem;
-    }
-
-    /* right-aligned meta reads badly once it is on its own line */
-    .ga-freshness-v96 > div:last-child,
-    .ops-freshness-v96 > div:last-child,
-    .ops-freshness-file-v96,
-    .perf-v2-period {
-      text-align: left;
-      align-items: flex-start;
-    }
   }
 
   /* ==================================================================
      5. Tables on a phone — horizontal scroll, no nested scroll trap
      ================================================================== */
   @media (max-width: 900px) {
-    .ops-table-scroll,
-    .ga-table-scroll,
     .table-scroll {
       /* A capped height inside a page that already scrolls creates two
          competing scroll areas — awkward with a thumb. Let the page scroll. */
@@ -457,15 +233,11 @@
       scroll-snap-type: x proximity;
     }
     /* fade on the right edge so it's obvious there is more to the side */
-    .ops-table-shell,
-    .ga-table-shell,
     .premium-table-shell,
     .table-wrap,
     .data-table-wrap {
       position: relative;
     }
-    .ops-table-shell::after,
-    .ga-table-shell::after,
     .premium-table-shell::after,
     .table-wrap::after,
     .data-table-wrap::after {
@@ -479,16 +251,12 @@
       background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.92));
       border-radius: 0 var(--radius-card) var(--radius-card) 0;
     }
-    .ops-table thead th,
-    .ga-premium-table thead th,
     table thead th {
       position: static;
     }
     /* With horizontal scrolling available, a wide cell reads far better than
        an identifier broken across three lines. Let the row stay one line and
        let the user swipe. */
-    .ops-table tbody td,
-    .ga-premium-table tbody td,
     .data-table tbody td,
     table tbody td {
       white-space: nowrap;
@@ -501,38 +269,16 @@
   @media (hover: none) {
     /* :hover latches after a tap on touch screens, so a lifted card stays
        lifted until you tap somewhere else. Drop the movement; keep colour. */
-    .perf-summary-card:hover,
-    .ga-metric:hover,
-    .ops-metric:hover,
-    .manager-v5-metric:hover,
-    .supervisor-v6-kpi:hover,
-    .rso-v7-kpi:hover,
     .admin-kpi:hover,
-    .accounts-v12-stat:hover,
-    .retailer-profile-kpi:hover,
-    .role-metric:hover,
-    .bp-v8-info:hover,
-    .import-health-card-v96:hover,
-    .dash97-kpi:hover,
-    .perf-person-card:hover,
-    .dash97-report:hover,
-    .accounts-v12-action:hover,
-    .bp-v8-action:hover,
-    .employee-hub-card:hover,
-    .retailer-result-card:hover,
     .btn:hover,
     .page button:hover {
       transform: none;
     }
     /* a row highlight that never clears reads as a selection bug */
-    .ops-table tbody tr:hover,
-    .ga-premium-table tbody tr:hover,
     .data-table tbody tr:hover,
     table tbody tr:hover {
       background: transparent;
     }
-    .ops-table tbody tr:hover td:first-child,
-    .ga-premium-table tbody tr:hover td:first-child,
     table tbody tr:hover td:first-child {
       box-shadow: none;
     }
@@ -540,16 +286,10 @@
     .btn:active,
     .page button:active,
     .bottom-link:active,
-    .sidebar-link:active,
-    .dash97-report:active,
-    .perf-person-card:active,
-    .accounts-v12-action:active,
-    .bp-v8-action:active {
+    .sidebar-link:active {
       transform: scale(0.985);
       opacity: 0.9;
     }
-    .ops-table tbody tr:active,
-    .ga-premium-table tbody tr:active,
     table tbody tr:active {
       background: var(--color-accent-50);
     }

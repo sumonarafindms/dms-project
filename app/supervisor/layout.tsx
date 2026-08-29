@@ -1,2 +1,5 @@
-import {requireUser} from "../../lib/auth";
-export default async function Layout({children}:{children:React.ReactNode}){await requireUser(["SUPERVISOR"]);return <>{children}</>}
+import { requireUser } from "../../lib/auth";
+export default async function Layout({ children }: { children: React.ReactNode }) {
+  await requireUser(["SUPERVISOR"]);
+  return <>{children}</>;
+}

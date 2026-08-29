@@ -74,22 +74,9 @@
   /* ==================================================================
      2. Stat / KPI cards — gradient accent rail, tinted chip, lift
      ================================================================== */
-  .perf-summary-card,
-  .ga-metric,
-  .ops-metric,
-  .manager-v5-metric,
-  .supervisor-v6-kpi,
-  .rso-v7-kpi,
   .admin-kpi,
   .admin-kpi-card,
-  .admin-v2-kpi,
-  .accounts-v12-stat,
-  .retailer-profile-kpi,
-  .detail-stat,
-  .role-metric,
-  .bp-v8-info,
-  .import-health-card-v96,
-  .dash97-kpi {
+  .admin-v2-kpi {
     position: relative;
     overflow: hidden;
     background: linear-gradient(180deg, #fff, var(--color-slate-50));
@@ -103,22 +90,9 @@
       border-color 0.18s var(--ease-premium);
   }
   /* the accent rail */
-  .perf-summary-card::before,
-  .ga-metric::before,
-  .ops-metric::before,
-  .manager-v5-metric::before,
-  .supervisor-v6-kpi::before,
-  .rso-v7-kpi::before,
   .admin-kpi::before,
   .admin-kpi-card::before,
-  .admin-v2-kpi::before,
-  .accounts-v12-stat::before,
-  .retailer-profile-kpi::before,
-  .detail-stat::before,
-  .role-metric::before,
-  .bp-v8-info::before,
-  .import-health-card-v96::before,
-  .dash97-kpi::before {
+  .admin-v2-kpi::before {
     content: "";
     position: absolute;
     inset: 0 0 auto 0;
@@ -126,19 +100,7 @@
     background: var(--tone-grad, linear-gradient(135deg, #3b82f6, #6366f1));
     opacity: 0.95;
   }
-  .perf-summary-card:hover,
-  .ga-metric:hover,
-  .ops-metric:hover,
-  .manager-v5-metric:hover,
-  .supervisor-v6-kpi:hover,
-  .rso-v7-kpi:hover,
-  .admin-kpi:hover,
-  .accounts-v12-stat:hover,
-  .retailer-profile-kpi:hover,
-  .role-metric:hover,
-  .bp-v8-info:hover,
-  .import-health-card-v96:hover,
-  .dash97-kpi:hover {
+  .admin-kpi:hover {
     transform: translateY(-2px);
     border-color: rgb(var(--tone-glow, 100 116 139) / 0.35);
     box-shadow:
@@ -147,42 +109,14 @@
   }
 
   /* icon chips pick up the tone gradient */
-  .ga-metric-icon,
-  .ops-metric-icon,
-  .metric-icon,
   .premium-detail-stat-icon,
-  .import-health-icon-v96,
-  .dash97-critical-icon,
-  .manager-v5-metric-top > span,
-  .supervisor-v6-kpi > div:first-child > span,
-  .rso-v7-kpi > div:first-child > span,
-  .accounts-v12-action > span,
-  .bp-v8-action > span,
-  .bp-v8-info > span,
-  .ga-section-icon,
-  .ops-section-icon,
-  .premium-form-section-icon,
-  .dash97-report > span {
+  .premium-form-section-icon {
     background: var(--tone-grad, linear-gradient(135deg, #3b82f6, #6366f1));
     color: #fff;
     box-shadow: 0 4px 10px -3px rgb(var(--tone-glow, 59 130 246) / 0.5);
   }
-  .dash97-critical-icon {
-    --tone-grad: linear-gradient(135deg, #ef4444, #f87171);
-    --tone-glow: 239 68 68;
-  }
-
-  /* the value line gets a touch more presence */
-  .perf-summary-card > strong,
-  .ga-metric strong,
-  .ops-metric > div > strong,
-  .dash97-kpi strong {
-    letter-spacing: -0.02em;
-  }
 
   /* the small trailing accent bar some stat cards carry */
-  .perf-summary-card > i:empty,
-  .accounts-v12-stat > i:empty,
   .admin-kpi > i:empty {
     background: var(--tone-grad, linear-gradient(135deg, #3b82f6, #6366f1));
     height: 4px;
@@ -195,59 +129,17 @@
   .card,
   .panel,
   .section,
-  .ga-section,
-  .ga-data-card,
-  .ga-upload-card,
-  .ga-history-card,
-  .ops-data-card,
-  .ops-upload-card,
-  .dash97-panel,
-  .dash97-block,
-  .workspace-section-v94,
   .premium-form-section-v66,
-  .manager-v5-section,
-  .supervisor-v6-section,
-  .rso-v7-section,
-  .accounts-v12-section,
-  .admin-v2-section,
-  .bp-v8-section {
+  .admin-v2-section {
     box-shadow:
       0 1px 2px rgb(15 23 42 / 0.04),
       0 8px 24px -14px rgb(15 23 42 / 0.16);
-  }
-  .perf-person-card,
-  .dash97-report,
-  .accounts-v12-action,
-  .bp-v8-action,
-  .employee-hub-card,
-  .retailer-result-card {
-    transition:
-      box-shadow 0.18s var(--ease-premium),
-      transform 0.18s var(--ease-premium),
-      border-color 0.18s var(--ease-premium);
-  }
-  .perf-person-card:hover,
-  .dash97-report:hover,
-  .accounts-v12-action:hover,
-  .bp-v8-action:hover,
-  .employee-hub-card:hover,
-  .retailer-result-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--color-accent-200);
-    box-shadow:
-      0 2px 4px rgb(15 23 42 / 0.04),
-      0 14px 30px -12px rgb(37 99 235 / 0.28);
   }
 
   /* ==================================================================
      4. Heroes — deeper gradient with a light source
      ================================================================== */
   [class$="-hero"],
-  .ga-page-head,
-  .ops-page-head,
-  .ops-v3-head,
-  .upload-page-head,
-  .page-header,
   .premium-page-head-v77 {
     position: relative;
     overflow: hidden;
@@ -271,28 +163,19 @@
       transform 0.08s var(--ease-premium),
       border-color 0.15s var(--ease-premium);
   }
-  .page button.ga-upload-btn,
-  .page button.upload-process-btn,
-  .page button.ops-upload-btn,
   .page button.auth-v54-submit,
   .page button.admin-primary,
   .page button.btn-primary,
   .btn.admin-primary,
   .btn-primary,
-  .dash97-primary,
-  .ecc-v82-primary,
   .auth-v54-submit {
     background: linear-gradient(135deg, #2563eb, #4f46e5);
     box-shadow:
       0 1px 2px rgb(37 99 235 / 0.2),
       0 8px 20px -6px rgb(37 99 235 / 0.5);
   }
-  .page button.ga-upload-btn:hover,
-  .page button.upload-process-btn:hover,
-  .page button.ops-upload-btn:hover,
   .btn.admin-primary:hover,
   .btn-primary:hover,
-  .dash97-primary:hover,
   .auth-v54-submit:hover {
     background: linear-gradient(135deg, #1d4ed8, #4338ca);
     box-shadow:
@@ -307,22 +190,13 @@
       0 1px 2px rgb(220 38 38 / 0.2),
       0 8px 20px -6px rgb(220 38 38 / 0.45);
   }
-  .ga-sample-btn:hover,
-  .ops-sample-btn:hover,
-  .upload-sample-btn:hover {
-    background: var(--color-accent-100);
-  }
 
   /* ==================================================================
      6. Progress — gradient fill with a soft glow
      ================================================================== */
   .progress > span,
-  .perf-bar > span,
   [class$="-progress"] > i,
   [class$="-progress"] > span,
-  .dash97-progress-track > i,
-  .ga-progress-cell > div > span,
-  .ops-progress-cell > div span,
   .analytics-bar-track-v90 > span,
   .premium-progress-track span {
     background: linear-gradient(90deg, #3b82f6, #14b8a6);
@@ -334,38 +208,24 @@
   .analytics-dual-v90 > span.alt > i {
     background: linear-gradient(90deg, #14b8a6, #22d3ee);
   }
-  .dash97-dual span i {
-    background: linear-gradient(90deg, #3b82f6, #6366f1);
-  }
-  .dash97-dual span.alt i {
-    background: linear-gradient(90deg, #14b8a6, #22d3ee);
-  }
 
   /* ==================================================================
      7. Tables — tinted header, accent hover rail
      ================================================================== */
-  .ops-table thead th,
-  .ga-premium-table thead th,
   .data-table thead th,
   table thead th {
     background: linear-gradient(180deg, var(--color-slate-100), var(--color-slate-50));
     color: var(--color-slate-600);
     border-bottom-color: var(--color-slate-200);
   }
-  .ops-table tbody tr:hover,
-  .ga-premium-table tbody tr:hover,
   .data-table tbody tr:hover,
   table tbody tr:hover {
     background: linear-gradient(90deg, rgb(37 99 235 / 0.07), rgb(20 184 166 / 0.04));
   }
-  .ops-table tbody td:first-child,
-  .ga-premium-table tbody td:first-child,
   table tbody td:first-child {
     box-shadow: inset 3px 0 0 transparent;
     transition: box-shadow 0.14s var(--ease-premium);
   }
-  .ops-table tbody tr:hover td:first-child,
-  .ga-premium-table tbody tr:hover td:first-child,
   table tbody tr:hover td:first-child {
     box-shadow: inset 3px 0 0 var(--color-accent-500);
   }
@@ -373,9 +233,6 @@
   /* ==================================================================
      8. Badges, pills, statuses — richer tints
      ================================================================== */
-  .ga-count-pill,
-  .ops-count-pill,
-  .ga-neutral-pill,
   .result-count,
   .table-count,
   .filter-count {
@@ -383,25 +240,10 @@
     border: 1px solid var(--color-slate-200);
     color: var(--color-slate-600);
   }
-  .ga-sample-btn,
-  .ops-sample-btn,
-  .upload-sample-btn {
-    background: linear-gradient(135deg, var(--color-accent-50), #fff);
-    border: 1px solid var(--color-accent-100);
-  }
-  .ga-swap-badge-v98,
-  .premium-badge-v65.tone-gold {
-    background: linear-gradient(135deg, #fef3c7, #fffbeb);
-    border: 1px solid #fde68a;
-  }
-  .ops-status.completed,
-  .import-health-status-v96.completed,
   .status-success-v80 {
     background: linear-gradient(135deg, #d1fae5, #ecfdf5);
     border: 1px solid #a7f3d0;
   }
-  .ops-status.failed,
-  .import-health-status-v96.failed,
   .status-danger-v80 {
     background: linear-gradient(135deg, #fee2e2, #fef2f2);
     border: 1px solid #fecaca;
@@ -448,21 +290,8 @@
       radial-gradient(60% 40% at 0% 100%, rgb(20 184 166 / 0.05) 0%, transparent 60%), var(--color-slate-50);
     background-attachment: fixed;
   }
-  .ga-freshness-v96,
-  .ops-freshness-v96 {
-    background: linear-gradient(135deg, var(--color-accent-50), #fff 70%);
-    border-color: var(--color-accent-100);
-  }
-  .premium-feedback-v66.tone-success {
-    background: linear-gradient(135deg, #ecfdf5, #fff 70%);
-  }
-  .premium-feedback-v66.tone-error {
-    background: linear-gradient(135deg, #fef2f2, #fff 70%);
-  }
   /* A critical tile must read red, including its accent rail — it carries no
-     tone-* class of its own, so set the tone vars here rather than let it
-     fall through to the default blue. */
-  .dash97-kpi.critical,
+     tone-* class of its own,
   .attention-card,
   .warning-card,
   .premium-danger-note-v72 {
@@ -471,10 +300,7 @@
     --tone-grad: linear-gradient(135deg, #ef4444, #f87171);
     --tone-glow: 239 68 68;
   }
-  .dash97-kpi.critical {
-    background: linear-gradient(180deg, #fff5f5, #fef2f2);
-    border-color: #fecaca;
-  }
+
   .ga-file-field:hover,
   .ops-file-field:hover {
     border-color: var(--color-accent-400);
@@ -486,13 +312,6 @@
     * {
       transition-duration: 0.01ms !important;
       animation-duration: 0.01ms !important;
-    }
-    .perf-summary-card:hover,
-    .ga-metric:hover,
-    .dash97-kpi:hover,
-    .perf-person-card:hover,
-    .dash97-report:hover {
-      transform: none;
     }
   }
 }

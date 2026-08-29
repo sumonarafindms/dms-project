@@ -1,0 +1,2737 @@
+/**
+ * Role-UI kit — the approved design system from the six demo files.
+ *
+ * The demos (dms_admin/it/manager/supervisor/rso/bp_demo.jsx) are the visual
+ * source of truth. They are written in Tailwind utility classes; this file is
+ * the same design expressed as named classes, because this project styles
+ * markup with classes rather than utilities and Rule 8 of the master prompt
+ * requires ONE approach, not two side by side.
+ *
+ * The mapping is one-to-one and deliberate. Where a rule below looks arbitrary
+ * it is copying an exact utility from the demos:
+ *
+ *     bg-white rounded-xl border border-slate-200   ->  .kit-card
+ *     bg-teal-600 text-white hover:bg-teal-700      ->  .kit-btn.is-primary
+ *     text-[11px] uppercase tracking-wide           ->  .kit-label
+ *
+ * Ring/bar/badge colour follows the demos' single status rule:
+ *     >= 100%  achieved (teal)   >= 80%  near (amber)   else  behind (rose)
+ * That 80 line is ACHIEVEMENT_ON_TRACK_PERCENT in lib/achievement.ts — the
+ * band is decided in TypeScript and arrives here as a class, so the number
+ * lives in exactly one place.
+ *
+ * Loaded last (after premium.css, before mobile.css) so a page that has been
+ * migrated to the kit wins over the older per-page stylesheets. As each page
+ * is migrated its old classes are deleted — see the migration note in
+ * claude/v104.
+ */
+
+@layer components {
+  /* ==================================================================
+     1. Surfaces
+     ================================================================== */
+  .kit-card {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 0.75rem;
+  }
+  .kit-card.is-clickable {
+    cursor: pointer;
+    transition:
+      border-color 0.15s var(--ease-premium),
+      box-shadow 0.15s var(--ease-premium),
+      transform 0.15s var(--ease-premium);
+  }
+  .kit-card.is-clickable:hover {
+    border-color: var(--color-teal-300);
+    box-shadow: var(--shadow-panel);
+  }
+  /* Hover lift is a pointer affordance; a touch device has no hover state to
+     leave, so it would stick after a tap. */
+  @media (hover: hover) and (pointer: fine) {
+    .kit-card.is-clickable:hover {
+      transform: translateY(-1px);
+    }
+  }
+  .kit-card-p {
+    padding: 1rem;
+  }
+  .kit-card-p-lg {
+    padding: 1.25rem;
+  }
+
+  /* ==================================================================
+     2. Type
+     ================================================================== */
+  .kit-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-slate-500);
+  }
+  .kit-label-sm {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-slate-400);
+  }
+  .kit-num {
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-eyebrow {
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-teal-700);
+  }
+
+  /* The action wraps below the title rather than squeezing it. A month picker
+     is ~200px; on a 390px screen that left the title 150px and broke
+     "Monthly Target Control" across three lines. */
+  .kit-page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .kit-page-head > :first-child {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+  .kit-page-head h1 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--color-slate-900);
+  }
+  .kit-page-head p {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  @media (min-width: 640px) {
+    .kit-page-head h1 {
+      font-size: 1.25rem;
+    }
+    .kit-page-head p {
+      font-size: 0.875rem;
+    }
+  }
+
+  /* ==================================================================
+     3. Ring — the recurring visual identity across all six roles
+     ================================================================== *
+     Sized by --kit-ring-size / --kit-ring-stroke so one class covers the
+     demos' 40 / 46 / 54 / 56 / 104px instances. The band class paints the
+     stroke; the track is always slate-200. */
+  .kit-ring {
+    position: relative;
+    flex-shrink: 0;
+    width: var(--kit-ring-size, 46px);
+    height: var(--kit-ring-size, 46px);
+  }
+  .kit-ring > svg {
+    transform: rotate(-90deg);
+    display: block;
+  }
+  .kit-ring .kit-ring-track {
+    stroke: var(--band-track);
+    fill: none;
+  }
+  .kit-ring .kit-ring-value {
+    fill: none;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s var(--ease-premium);
+  }
+  .kit-ring.band-achieved .kit-ring-value {
+    stroke: var(--band-achieved);
+  }
+  .kit-ring.band-near .kit-ring-value {
+    stroke: var(--band-near);
+  }
+  .kit-ring.band-behind .kit-ring-value {
+    stroke: var(--band-behind);
+  }
+  .kit-ring > span {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--kit-ring-font, 0.75rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-700);
+  }
+
+  /* ==================================================================
+     4. Progress bars
+     ================================================================== */
+  .kit-bar {
+    height: 0.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-slate-100);
+    overflow: hidden;
+  }
+  .kit-bar.is-thin {
+    height: 0.375rem;
+  }
+  .kit-bar > i {
+    display: block;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    transition: width 0.5s var(--ease-premium);
+  }
+  /* Gradient fills, per the visual-elevation directive. */
+  .kit-bar.band-achieved > i {
+    background: linear-gradient(to right, var(--color-teal-500), var(--color-teal-400));
+  }
+  .kit-bar.band-near > i {
+    background: linear-gradient(to right, var(--color-amber-500), var(--color-amber-400));
+  }
+  .kit-bar.band-behind > i {
+    background: linear-gradient(to right, var(--color-rose-500), var(--color-rose-400));
+  }
+
+  /* label + "achieved / target  pct%" + bar */
+  .kit-metric-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+  }
+  /* patterns.css treats "<b>value</b><span>sub</span>" as a stacked stat block
+     and gives such children display:block. Here the three parts are one
+     sentence — "356 / 400  89%" — so they are pinned back to inline. */
+  .kit-metric-value,
+  .kit-metric-value > b,
+  .kit-metric-value > span,
+  .kit-metric-value > em {
+    display: inline;
+  }
+  .kit-metric-value {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .kit-metric-value > b {
+    font-weight: 700;
+    color: var(--color-slate-800);
+  }
+  .kit-metric-value > span {
+    color: var(--color-slate-400);
+  }
+  .kit-metric-value > em {
+    margin-left: 0.375rem;
+    font-style: normal;
+    font-weight: 600;
+  }
+  .band-achieved > .kit-metric-head .kit-metric-value > em,
+  .kit-metric-value > em.band-achieved {
+    color: var(--color-teal-700);
+  }
+  .band-near > .kit-metric-head .kit-metric-value > em,
+  .kit-metric-value > em.band-near {
+    color: var(--color-amber-700);
+  }
+  .band-behind > .kit-metric-head .kit-metric-value > em,
+  .kit-metric-value > em.band-behind {
+    color: var(--color-rose-700);
+  }
+
+  /* ==================================================================
+     5. Badges
+     ================================================================== */
+  .kit-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .kit-badge.tone-achieved,
+  .kit-badge.tone-active,
+  .kit-badge.tone-success,
+  .kit-badge.tone-complete,
+  .kit-badge.tone-online {
+    background: var(--color-teal-50);
+    color: var(--color-teal-700);
+    border-color: var(--color-teal-200);
+  }
+  .kit-badge.tone-near,
+  .kit-badge.tone-pending {
+    background: var(--color-amber-50);
+    color: var(--color-amber-700);
+    border-color: var(--color-amber-200);
+  }
+  .kit-badge.tone-behind,
+  .kit-badge.tone-failed {
+    background: var(--color-rose-50);
+    color: var(--color-rose-700);
+    border-color: var(--color-rose-200);
+  }
+  .kit-badge.tone-processing {
+    background: var(--color-sky-50);
+    color: var(--color-sky-700);
+    border-color: var(--color-sky-200);
+  }
+  .kit-badge.tone-inactive,
+  .kit-badge.tone-loggedout {
+    background: var(--color-slate-100);
+    color: var(--color-slate-500);
+    border-color: var(--color-slate-200);
+  }
+  .kit-badge.tone-neutral {
+    background: var(--color-slate-100);
+    color: var(--color-slate-600);
+    border-color: var(--color-slate-200);
+  }
+
+  /* ==================================================================
+     6. Buttons
+     ================================================================== */
+  .kit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background-color 0.15s var(--ease-premium),
+      box-shadow 0.15s var(--ease-premium),
+      transform 0.08s var(--ease-premium);
+  }
+  .kit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .kit-btn.size-sm {
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+  }
+  .kit-btn.size-lg {
+    padding: 0.625rem 1rem;
+  }
+  .kit-btn.is-primary {
+    background: var(--color-teal-600);
+    color: #fff;
+    box-shadow: 0 1px 2px rgb(13 148 136 / 0.2);
+  }
+  .kit-btn.is-primary:hover:not(:disabled) {
+    background: var(--color-teal-700);
+    box-shadow: 0 6px 16px -6px rgb(13 148 136 / 0.5);
+  }
+  .kit-btn.is-primary:active:not(:disabled) {
+    background: var(--color-teal-800);
+    transform: translateY(1px);
+  }
+  .kit-btn.is-secondary {
+    background: #fff;
+    color: var(--color-slate-700);
+    border-color: var(--color-slate-300);
+  }
+  .kit-btn.is-secondary:hover:not(:disabled) {
+    background: var(--color-slate-50);
+  }
+  .kit-btn.is-ghost {
+    color: var(--color-slate-600);
+  }
+  .kit-btn.is-ghost:hover:not(:disabled) {
+    background: var(--color-slate-100);
+  }
+  .kit-btn.is-danger {
+    background: var(--color-rose-600);
+    color: #fff;
+  }
+  .kit-btn.is-danger:hover:not(:disabled) {
+    background: var(--color-rose-700);
+  }
+  .kit-btn.is-block {
+    width: 100%;
+  }
+
+  .kit-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.25rem;
+    width: 2.25rem;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-slate-500);
+    cursor: pointer;
+  }
+  .kit-icon-btn:hover {
+    background: var(--color-slate-100);
+    color: var(--color-slate-700);
+  }
+
+  /* ==================================================================
+     7. Inputs
+     ================================================================== */
+  .kit-input,
+  .kit-select {
+    width: 100%;
+    border: 1px solid var(--color-slate-300);
+    border-radius: var(--radius-control);
+    background: #fff;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-slate-700);
+  }
+  .kit-input::placeholder {
+    color: var(--color-slate-400);
+  }
+  .kit-input:focus,
+  .kit-select:focus {
+    outline: none;
+    border-color: var(--color-teal-500);
+    box-shadow: 0 0 0 2px var(--color-teal-200);
+  }
+  .kit-field {
+    display: block;
+  }
+  .kit-field > span {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-slate-600);
+  }
+  .kit-search {
+    position: relative;
+    flex: 1;
+  }
+  .kit-search > svg {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-slate-400);
+    pointer-events: none;
+  }
+  .kit-search > input {
+    padding-left: 2.25rem;
+  }
+
+  /* ==================================================================
+     8. Chips, tabs, stat pills
+     ================================================================== */
+  .kit-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.375rem 0.25rem 0.625rem;
+    border: 1px solid var(--color-teal-200);
+    border-radius: var(--radius-pill);
+    background: var(--color-teal-50);
+    color: var(--color-teal-700);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .kit-chip > button {
+    display: inline-flex;
+    padding: 0.125rem;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .kit-chip > button:hover {
+    background: var(--color-teal-100);
+  }
+
+  .kit-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0 0.25rem;
+    border-bottom: 1px solid var(--color-slate-200);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .kit-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .kit-tabs > button {
+    flex-shrink: 0;
+    margin-bottom: -1px;
+    padding: 0.625rem 0.875rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-slate-500);
+    cursor: pointer;
+    transition: color 0.15s var(--ease-premium);
+  }
+  .kit-tabs > button:hover {
+    color: var(--color-slate-700);
+  }
+  .kit-tabs > button[aria-selected="true"] {
+    border-bottom-color: var(--color-teal-600);
+    color: var(--color-teal-700);
+  }
+
+  .kit-stat-pill {
+    border-radius: var(--radius-control);
+    background: var(--color-slate-50);
+    padding: 0.5rem;
+    text-align: center;
+  }
+  .kit-stat-pill > strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--color-slate-800);
+  }
+  .kit-stat-pill > span {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-slate-400);
+  }
+
+  /* ==================================================================
+     8b. Section heads and action tiles
+     ================================================================== *
+     The demos open each block with a small bold heading, and offer navigation
+     as tiles rather than plain links. Shared here so every role gets the same
+     rhythm rather than each page inventing its own heading size. */
+  .kit-section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.625rem;
+  }
+  .kit-section-head h2 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-slate-800);
+  }
+  .kit-section-head p {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+  .kit-section-head a {
+    flex-shrink: 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-teal-700);
+  }
+
+  .kit-tile {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    text-decoration: none;
+  }
+  .kit-tile > .kit-tile-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    height: 2.25rem;
+    width: 2.25rem;
+    border-radius: var(--radius-control);
+    background: var(--color-teal-50);
+    color: var(--color-teal-600);
+  }
+  .kit-tile > div {
+    min-width: 0;
+  }
+  .kit-tile strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-slate-800);
+  }
+  .kit-tile span {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  /* Indigo marks identity/administration surfaces, teal marks data ones —
+     the two-tone split from the visual-elevation directive. Never status. */
+  .kit-tile.is-admin > .kit-tile-icon {
+    background: var(--color-indigo-50);
+    color: var(--color-indigo-600);
+  }
+
+  /* ==================================================================
+     9. Grids
+     ================================================================== */
+  /* minmax(0, 1fr), not 1fr. A bare `1fr` is `minmax(auto, 1fr)`, and `auto`
+     resolves to min-content — so one card containing a `white-space: nowrap`
+     name (a long retailer, a long file name) pushed the single mobile column
+     wider than the viewport and gave the whole page a horizontal scrollbar.
+     The 640px and 1280px steps below already guarded against this; the
+     one-column base did not. */
+  .kit-card-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  @media (min-width: 640px) {
+    .kit-card-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1280px) {
+    .kit-card-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    /* For a grid whose contents are a fixed set of four — the four import
+       feeds, the four operational modules — 3-up strands the last card alone
+       on a second row. Opt-in, because a long list of entity cards genuinely
+       wants the wider 3-up. */
+    .kit-card-grid.is-quad {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  /* auto-fit, not a fixed column count. The strip is used with three, four,
+     five and six items; a fixed 4-up stranded the leftovers on a second row
+     and needed a per-count modifier for each case. auto-fit tiles any count
+     exactly and still drops to two columns on a phone. */
+  .kit-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  @media (min-width: 640px) {
+    .kit-summary-strip {
+      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    }
+  }
+  .kit-summary-strip > .kit-card {
+    padding: 0.875rem;
+  }
+  .kit-summary-strip strong {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+  }
+  .kit-summary-strip strong.tone-teal {
+    color: var(--color-teal-600);
+  }
+  .kit-summary-strip strong.tone-amber {
+    color: var(--color-amber-600);
+  }
+
+  /* ==================================================================
+     10. Empty + loading states
+     ================================================================== */
+  .kit-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 3.5rem 1rem;
+    text-align: center;
+  }
+  .kit-empty > .kit-empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 3rem;
+    width: 3rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-slate-100);
+    color: var(--color-slate-400);
+  }
+  /* The demos deliberately say "All SSO Complete", not "No data" — a positive
+     empty state gets the teal treatment so it does not read as an error. */
+  .kit-empty.is-positive > .kit-empty-icon {
+    background: var(--color-teal-50);
+    color: var(--color-teal-500);
+  }
+  .kit-empty > strong {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-700);
+  }
+  .kit-empty > p {
+    max-width: 20rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+
+  .kit-skeleton {
+    border-radius: var(--radius-control);
+    background: var(--color-slate-200);
+    animation: kit-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes kit-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  .kit-loading-bar {
+    position: fixed;
+    top: 0;
+    inset-inline: 0;
+    z-index: 70;
+    height: 2px;
+    background: var(--color-teal-100);
+    overflow: hidden;
+  }
+  .kit-loading-bar > i {
+    display: block;
+    height: 100%;
+    width: 33%;
+    background: var(--color-teal-600);
+    animation: kit-loadingbar 0.6s ease-in-out infinite;
+  }
+  @keyframes kit-loadingbar {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(300%);
+    }
+  }
+  /* Respect a reduced-motion preference for both looping animations. */
+  @media (prefers-reduced-motion: reduce) {
+    .kit-skeleton,
+    .kit-loading-bar > i {
+      animation: none;
+    }
+  }
+
+  /* ==================================================================
+     11. Filter panel — bottom sheet on mobile, right drawer on desktop
+     ================================================================== */
+  .kit-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgb(15 23 42 / 0.4);
+  }
+  .kit-sheet {
+    position: fixed;
+    z-index: 61;
+    bottom: 0;
+    inset-inline: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    border-radius: 1rem 1rem 0 0;
+    background: #fff;
+    box-shadow: var(--shadow-elevated);
+    animation: kit-sheet-up 0.24s var(--ease-premium);
+  }
+  @keyframes kit-sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @media (min-width: 768px) {
+    .kit-sheet {
+      inset-inline: auto 0;
+      top: 0;
+      bottom: 0;
+      width: 20rem;
+      max-height: none;
+      border-radius: 0;
+      animation-name: kit-sheet-in;
+    }
+    @keyframes kit-sheet-in {
+      from {
+        transform: translateX(100%);
+      }
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kit-sheet {
+      animation: none;
+    }
+  }
+  .kit-sheet-head,
+  .kit-sheet-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    padding: 0.75rem 1.25rem;
+  }
+  .kit-sheet-head {
+    justify-content: space-between;
+    padding-block: 1rem;
+    border-bottom: 1px solid var(--color-slate-100);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .kit-sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    overflow-y: auto;
+  }
+  .kit-sheet-foot {
+    border-top: 1px solid var(--color-slate-100);
+  }
+  .kit-sheet-foot > .kit-btn {
+    flex: 1;
+  }
+
+  /* ==================================================================
+     12. Print — reports only
+     ================================================================== */
+  /* Shown at every width. The demos hide this below 768px, but only because
+     their MobileHeader renders its own back button when canGoBack — this
+     project's AppShell has no back affordance at all, so hiding it left every
+     detail page (BP, supervisor, permission editor, employee form, each IT
+     report) with no way back on a phone except the browser chrome. */
+  .kit-detail-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    margin-bottom: 0.75rem;
+    border: 0;
+    background: none;
+    font-size: 0.875rem;
+    color: var(--color-slate-500);
+    cursor: pointer;
+  }
+  .kit-detail-back:hover {
+    color: var(--color-slate-700);
+  }
+  /* The shared `arrow` glyph points right (it reads "continue" after a label).
+     A back link is the same glyph reversed, so mirror it here rather than
+     minting a second icon that would then have to be swapped in at every
+     call site. */
+  .kit-detail-back > svg {
+    transform: scaleX(-1);
+  }
+}
+
+/* Outside @layer so it beats every component rule regardless of load order —
+   a report that prints with the sidebar still on it is a wasted sheet of
+   paper, and this must never lose a specificity fight. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .kit-card {
+    border-color: var(--color-slate-300);
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  .kit-tabs {
+    display: none;
+  }
+}
+
+/* ======================================================================
+   REPORTING CENTER
+   Date bar, action bar, and the report table (desktop table / mobile
+   cards). Everything here that is chrome carries .no-print.
+   ================================================================== */
+@layer components {
+  .kit-report-datebar {
+    margin-bottom: 1rem;
+  }
+  .kit-report-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .kit-report-dates .kit-field {
+    width: auto;
+  }
+  .kit-report-dates .kit-input {
+    width: auto;
+    min-width: 9.5rem;
+  }
+  .kit-report-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .kit-preset {
+    border: 1px solid var(--color-slate-300);
+    border-radius: var(--radius-pill);
+    background: #fff;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-slate-600);
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease-premium);
+  }
+  .kit-preset:hover {
+    background: var(--color-slate-50);
+  }
+  .kit-preset.is-active {
+    background: var(--color-teal-600);
+    border-color: var(--color-teal-600);
+    color: #fff;
+  }
+  .kit-report-period {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+  .kit-report-period b {
+    font-weight: 500;
+    color: var(--color-slate-600);
+  }
+
+  .kit-report-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .kit-copy-box {
+    position: fixed;
+    z-index: 61;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+    width: min(32rem, calc(100vw - 2rem));
+    padding: 1.25rem;
+    border-radius: var(--radius-card);
+    background: #fff;
+    box-shadow: var(--shadow-elevated);
+  }
+  .kit-copy-box textarea {
+    width: 100%;
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    resize: vertical;
+  }
+
+  /* Table on wide screens, one card per row on narrow ones. Only one is
+     ever displayed — rendering both was the targets-page bug in v102. */
+  .kit-report-table {
+    display: none;
+    overflow: hidden;
+  }
+  .kit-report-cards {
+    display: grid;
+    gap: 0.5rem;
+  }
+  @media (min-width: 768px) {
+    .kit-report-table {
+      display: block;
+    }
+    .kit-report-cards {
+      display: none;
+    }
+  }
+  .kit-report-scroll {
+    overflow-x: auto;
+  }
+  .kit-report-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .kit-report-table thead tr {
+    background: var(--color-slate-50);
+    border-bottom: 1px solid var(--color-slate-200);
+  }
+  .kit-report-table th {
+    padding: 0.625rem 1rem;
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-slate-500);
+    white-space: nowrap;
+  }
+  .kit-report-table td {
+    padding: 0.625rem 1rem;
+    color: var(--color-slate-700);
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  .kit-report-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .kit-report-table .is-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-report-table tbody tr:hover td {
+    background: var(--color-slate-50);
+  }
+
+  .kit-report-cardrow {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.125rem 0;
+  }
+  .kit-report-cardrow > span {
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+  .kit-report-cardrow > b {
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-700);
+    text-align: right;
+  }
+}
+
+/* On paper the card list is redundant with the table, and the table is the
+   readable one. Outside @layer so it cannot lose to the breakpoint rules. */
+@media print {
+  .kit-report-cards {
+    display: none !important;
+  }
+  .kit-report-table {
+    display: block !important;
+    border: 0;
+  }
+  .kit-report-scroll {
+    overflow: visible !important;
+  }
+  .kit-report-table tbody tr {
+    break-inside: avoid;
+  }
+}
+
+@layer components {
+  /* Inline note. Three tones: is-warn when a report's underlying feed is
+     missing, is-ok / is-bad for the result of a save. */
+  .kit-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    font-size: 0.75rem;
+  }
+  .kit-note > svg {
+    flex-shrink: 0;
+  }
+  .kit-note.is-warn {
+    border-color: var(--color-amber-200);
+    background: var(--color-amber-50);
+    color: var(--color-amber-700);
+  }
+  .kit-note.is-ok {
+    border-color: var(--color-teal-200);
+    background: var(--color-teal-50);
+    color: var(--color-teal-700);
+  }
+  .kit-note.is-bad {
+    border-color: var(--color-rose-200);
+    background: var(--color-rose-50);
+    color: var(--color-rose-700);
+  }
+}
+
+/* ======================================================================
+   ROLE PAGE PATTERNS
+   The hero ring card and the icon/title/value row. Both come straight from
+   the demos and recur across BP, RSO and Supervisor, so they live here
+   rather than in a per-role stylesheet.
+   ================================================================== */
+@layer components {
+  /* Centred ring + status badge + a row of figures. The BP demo's
+     "Monthly Target" card. */
+  .kit-hero-ring {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.5rem;
+  }
+  .kit-hero-ring > .kit-label {
+    margin-bottom: 0.75rem;
+  }
+  .kit-hero-ring > .kit-badge {
+    margin-top: 0.75rem;
+  }
+  .kit-hero-figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    width: 100%;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-slate-100);
+  }
+  .kit-hero-figures > div > strong {
+    display: block;
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+  }
+  .kit-hero-figures > div > span {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-slate-400);
+  }
+  .kit-hero-figures > div > strong.tone-teal {
+    color: var(--color-teal-600);
+  }
+  .kit-hero-figures > div > strong.tone-amber {
+    color: var(--color-amber-600);
+  }
+
+  /* icon · title/sub · value/sub — activation rows, recent activity, any
+     "one record per line" list. */
+  .kit-rows {
+    display: flex;
+    flex-direction: column;
+  }
+  .kit-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  .kit-row:last-child {
+    border-bottom: 0;
+  }
+  .kit-row > .kit-row-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    height: 2rem;
+    width: 2rem;
+    border-radius: var(--radius-control);
+    background: var(--color-teal-50);
+    color: var(--color-teal-600);
+  }
+  .kit-row > .kit-row-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .kit-row-main > strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kit-row-main > span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+  .kit-row > .kit-row-value {
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .kit-row-value > strong {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+  }
+  .kit-row-value > span {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-row-main > small {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-row.is-link {
+    text-decoration: none;
+    color: inherit;
+  }
+  @media (hover: hover) {
+    .kit-row.is-link:hover {
+      background: var(--color-slate-50);
+    }
+  }
+  .kit-row > .kit-row-chevron {
+    flex-shrink: 0;
+    font-size: 1.125rem;
+    line-height: 1;
+    color: var(--color-slate-300);
+  }
+  /* An is-link row needs breathing room inside its own hover background; a
+     plain row sits flush with the card padding. */
+  .kit-row.is-link {
+    padding-inline: 0.5rem;
+    margin-inline: -0.5rem;
+    border-radius: var(--radius-control);
+  }
+
+  /* On a phone the trailing column (a status badge plus a mobile number, or a
+     row of buttons) was taking ~180px of 390px and squeezing the record's own
+     name to an ellipsis. Below 640px it drops to its own full-width line,
+     left-aligned, and the chevron stays on the first line with the name. */
+  @media (max-width: 639px) {
+    .kit-row {
+      flex-wrap: wrap;
+      row-gap: 0.375rem;
+    }
+    .kit-row > .kit-row-chevron {
+      order: 2;
+    }
+    .kit-row > .kit-row-value,
+    .kit-row > .kit-row-actions {
+      order: 3;
+      flex: 1 0 100%;
+      justify-content: flex-start;
+      text-align: left;
+    }
+    .kit-row > .kit-row-value {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .kit-row-value > strong,
+    .kit-row-value > span {
+      display: inline;
+    }
+  }
+
+  /* Trailing controls on a directory row. Wraps under the record on a phone
+     rather than squeezing the name to nothing. */
+  .kit-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+    flex-shrink: 0;
+  }
+
+  .kit-avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    height: 2.25rem;
+    width: 2.25rem;
+    border-radius: var(--radius-control);
+    background: var(--color-slate-100);
+    color: var(--color-slate-600);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  /* Two-up stat cards, the demos' "Today / This Month" pair. */
+  .kit-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .kit-pair strong {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+  }
+  .kit-pair span {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+}
+
+@layer components {
+  /* Skeleton sizes used by the route loading states. Named rather than
+     inlined so a loading skeleton keeps matching its page's real shape. */
+  .kit-skel-ring {
+    height: 104px;
+    width: 104px;
+    border-radius: 50%;
+  }
+  .kit-skel-line {
+    height: 1rem;
+    width: 10rem;
+    margin-top: 0.75rem;
+  }
+  .kit-skel-num {
+    height: 2rem;
+    width: 5rem;
+  }
+  .kit-skel-row {
+    height: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .kit-skel-row:last-child {
+    margin-bottom: 0;
+  }
+}
+
+@layer components {
+  /* A row of StatPills inside a card. Two-up on phones, four-up from 640px —
+     the demos never squeeze four pills onto a 390px screen. */
+  .kit-pill-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  @media (min-width: 640px) {
+    .kit-pill-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  /* Long values (a mobile number, a person's name) must not overflow the pill. */
+  .kit-stat-pill > strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ======================================================================
+   KPI CARD + OPERATIONAL WORKLIST
+   The demos' "Target vs Achievement" tile and the SSO/LSO pending card.
+   ================================================================== */
+@layer components {
+  /* One column on the narrowest phones. Two-up leaves ~92px beside the ring
+     for the value, which is not enough for a taka figure at full size; one-up
+     gives it the whole card and every KPI keeps its 1.25rem. From 480px the
+     demo's 2-up composition returns. */
+  .kit-kpi-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  @media (min-width: 480px) {
+    .kit-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 640px) {
+    .kit-kpi-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1024px) {
+    .kit-kpi-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .kit-kpi-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  /* The text column is named, not "any div child": the Ring is also a direct
+     div child here, so `.kit-kpi-top > div > span` claimed the ring's own
+     percentage label and blockified it out of its centring flexbox. */
+  .kit-kpi-meta {
+    min-width: 0;
+  }
+  /* The value shares one flex row with the ring. A long currency figure
+     (৳12,480,900) is a single unbreakable token: at 1.25rem it measured 131px
+     inside a 92px box on a 390px screen and painted straight over the ring.
+     The room comes from the grid (a KPI card is one big number, so shrinking
+     the number to fit two per row defeats the card) — see .kit-kpi-grid. The
+     ellipsis here is only the backstop for a figure longer than any real one;
+     it truncates visibly instead of sitting on top of the ring. */
+  .kit-kpi-top strong {
+    display: block;
+    margin-top: 0.25rem;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+  }
+  .kit-kpi-meta > span:last-child {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-kpi-foot {
+    margin-top: 0.375rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-kpi-foot b {
+    font-weight: 500;
+    color: var(--color-slate-600);
+  }
+
+  /* Clickable status tile — the demo's "SSO Pending / LSO Pending" row.
+     Deep-links into the matching worklist, already filtered. */
+  .kit-status-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .kit-status-tile {
+    display: block;
+    padding: 0.875rem;
+    text-decoration: none;
+  }
+  .kit-status-tile strong {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-amber-600);
+  }
+  .kit-status-tile.tone-rose strong {
+    color: var(--color-rose-600);
+  }
+  .kit-status-tile.tone-teal strong {
+    color: var(--color-teal-600);
+  }
+  .kit-status-tile span {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--color-slate-500);
+  }
+
+  /* A worklist group heading: "Pending (8)" / "Completed (6)". */
+  .kit-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.625rem;
+  }
+  .kit-group-head h3 {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-slate-600);
+  }
+  .kit-group-dot {
+    display: inline-block;
+    height: 0.5rem;
+    width: 0.5rem;
+    border-radius: 50%;
+    background: var(--color-amber-500);
+  }
+  .kit-group-dot.is-done {
+    background: var(--color-teal-500);
+  }
+  /* Completed entries stay visible but recede — the demo de-emphasises them
+     rather than hiding them, so the count is still verifiable. */
+  .kit-card.is-done {
+    opacity: 0.7;
+  }
+  .kit-remaining {
+    margin-top: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--color-amber-700);
+  }
+}
+
+/* ======================================================================
+   ENTITY CARD
+   The demos' person/outlet card: ring, name, code, status badge, then a
+   stack of metric bars. Supervisor uses it for RSOs, Manager for
+   supervisors — one card, so the two roles cannot drift apart.
+   ================================================================== */
+@layer components {
+  .kit-entity-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .kit-entity-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .kit-entity-main > strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-slate-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kit-entity-main > span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kit-entity-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    margin-top: 1rem;
+  }
+}
+
+@layer components {
+  /* Footer strip on an entity card — used for the pace verdict, which is a
+     different question from achievement and so is shown as its own line. */
+  .kit-entity-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.875rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-slate-100);
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+}
+
+@layer components {
+  /* Search + date range on one line, wrapping on narrow screens. Wraps
+     LiveFilterForm, which debounces typing and submits date changes at once. */
+  .kit-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .kit-filter-bar > .kit-search {
+    flex: 1 1 16rem;
+  }
+  .kit-filter-bar .kit-field {
+    width: auto;
+  }
+  .kit-filter-bar .kit-field .kit-input {
+    width: auto;
+    min-width: 9.5rem;
+  }
+  .kit-filter-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-bottom: 0.5rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+}
+
+/* ======================================================================
+   Forms, dialogs and tables — the demos' SelectField / TextField /
+   Modal / SimpleTable, expressed as classes.
+
+   These arrived with the admin People & Access screens (v107), which are
+   the first kit pages that create records rather than only report on them.
+   ====================================================================== */
+@layer components {
+  .kit-field.is-wide {
+    grid-column: 1 / -1;
+  }
+  .kit-field > span > em {
+    margin-left: 0.25rem;
+    font-style: normal;
+    font-weight: 400;
+    color: var(--color-slate-400);
+  }
+  /* 1 / 2 / 3 columns, as the demos' create-user form does. Without the
+     third step a "PIN" field is 581px wide on a 1280px screen, which reads
+     as a text area rather than a four-digit code. A field marked is-wide
+     always spans the full row. */
+  .kit-form-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  @media (min-width: 640px) {
+    .kit-form-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1024px) {
+    .kit-form-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  /* Reporting chain: Manager -> Supervisor -> RSO -> BP. Wraps on a phone
+     rather than scrolling sideways. */
+  .kit-flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .kit-flow > span {
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-pill);
+    background: var(--color-slate-50);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-slate-700);
+  }
+  .kit-flow > b {
+    font-size: 0.875rem;
+    color: var(--color-slate-300);
+  }
+
+  .kit-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  /* A field whose value cannot be edited here — shown in place of the control
+     so the form does not silently lose the row. */
+  .kit-readonly {
+    padding: 0.5rem 0.75rem;
+    border: 1px dashed var(--color-slate-300);
+    border-radius: var(--radius-control);
+    background: var(--color-slate-50);
+  }
+  .kit-readonly > strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-700);
+  }
+  .kit-readonly > span {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+
+  /* Inline help beside a form. */
+  .kit-guide {
+    margin-top: 1rem;
+    padding: 0.75rem 0.875rem;
+    border-radius: var(--radius-control);
+    background: var(--color-slate-50);
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  .kit-guide > strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--color-slate-700);
+  }
+  .kit-guide > ol {
+    margin: 0.5rem 0;
+    padding-left: 1.1rem;
+    list-style: decimal;
+  }
+  .kit-guide > ol > li {
+    margin-bottom: 0.125rem;
+  }
+  .kit-guide > p + p {
+    margin-top: 0.25rem;
+  }
+
+  .kit-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  .kit-check > input[type="checkbox"] {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+    height: 1rem;
+    width: 1rem;
+    accent-color: var(--color-teal-600);
+    cursor: pointer;
+  }
+  .kit-check > input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .kit-check-copy > strong {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-slate-700);
+  }
+  .kit-check-copy > small {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-bulk-count {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-self: end;
+    padding-bottom: 0.5rem;
+  }
+  .kit-bulk-count > b {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-slate-500);
+    white-space: nowrap;
+  }
+
+  .kit-check-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 17rem;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+
+  /* Modal — bottom sheet on a phone, centred dialog from 640px. */
+  .kit-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgb(15 23 42 / 0.5);
+  }
+  @media (min-width: 640px) {
+    .kit-modal-backdrop {
+      align-items: center;
+      padding: 1rem;
+    }
+  }
+  .kit-modal {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background: #fff;
+    box-shadow: var(--shadow-elevated);
+    animation: kit-modal-up 0.2s var(--ease-premium);
+  }
+  /* Its own keyframes, not the filter sheet's: kit-sheet-in is deliberately
+     redefined at 768px to slide in from the right edge, which is drawer
+     behaviour and wrong for a centred dialog. */
+  @keyframes kit-modal-up {
+    from {
+      transform: translateY(1.5rem);
+      opacity: 0;
+    }
+  }
+  @media (min-width: 640px) {
+    .kit-modal {
+      max-width: 34rem;
+      border-radius: var(--radius-card);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kit-modal {
+      animation: none;
+    }
+  }
+
+  .kit-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  .kit-modal-head h2 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .kit-modal-head p {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+  .kit-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.25rem;
+  }
+  .kit-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--color-slate-100);
+  }
+  .kit-icon-btn {
+    display: grid;
+    place-items: center;
+    height: 1.75rem;
+    width: 1.75rem;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--color-slate-400);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .kit-icon-btn:hover {
+    background: var(--color-slate-100);
+    color: var(--color-slate-600);
+  }
+
+  /* Table on desktop, cards below 640px. Both are rendered; each breakpoint
+     hides the other. */
+  .kit-table-wrap {
+    display: none;
+    overflow-x: auto;
+  }
+  .kit-table-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  @media (min-width: 640px) {
+    .kit-table-wrap {
+      display: block;
+    }
+    .kit-table-cards {
+      display: none;
+    }
+  }
+  .kit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+  .kit-table th {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-slate-200);
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-slate-500);
+    white-space: nowrap;
+  }
+  .kit-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--color-slate-100);
+    color: var(--color-slate-700);
+    vertical-align: middle;
+  }
+  .kit-table tr:last-child > td {
+    border-bottom: 0;
+  }
+  .kit-table .is-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-table-cell {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.1875rem 0;
+  }
+  .kit-table-cell > span {
+    flex-shrink: 0;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-table-cell > div {
+    min-width: 0;
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--color-slate-700);
+  }
+}
+
+/* ======================================================================
+   Permission matrix — module x (view / add / edit / update)
+
+   A 5-column grid on desktop. Below 640px the columns would be ~40px wide
+   with a header far off the top of the visible rows, so each row becomes a
+   block and every checkbox carries its own visible label instead.
+   ====================================================================== */
+@layer components {
+  .kit-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .kit-matrix-head {
+    display: none;
+  }
+  .kit-matrix-row {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  .kit-matrix-row:last-child {
+    border-bottom: 0;
+  }
+  .kit-matrix-name > strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .kit-matrix-name > small {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-matrix-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0.5rem 1rem 0 0;
+  }
+  .kit-matrix-cell-label {
+    font-size: 0.75rem;
+    text-transform: capitalize;
+    color: var(--color-slate-500);
+  }
+
+  @media (min-width: 640px) {
+    .kit-matrix-head,
+    .kit-matrix-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) repeat(4, 4.5rem);
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .kit-matrix-head {
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--color-slate-200);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-slate-500);
+    }
+    .kit-matrix-head > span:not(:first-child),
+    .kit-matrix-cell {
+      justify-content: center;
+    }
+    .kit-matrix-cell {
+      display: flex;
+      margin: 0;
+    }
+    /* The column header carries the name from 640px, so the per-box label
+       would be a second copy of it on every row. */
+    .kit-matrix-cell-label {
+      display: none;
+    }
+  }
+}
+
+/* ======================================================================
+   Upload surfaces — drop zone, import module cards, feed freshness
+
+   Added with the Upload Center (v108). The drop zone is the demos' dashed
+   target; the module and freshness cards are this project's own, built from
+   the same vocabulary because the demos have no import-hub screen.
+   ====================================================================== */
+@layer components {
+  .kit-drop {
+    display: block;
+    /* Contains the absolutely-positioned input below; without it the input is
+       laid out against the page and can widen the document. */
+    position: relative;
+    padding: 1.5rem 1rem;
+    border: 2px dashed var(--color-slate-300);
+    border-radius: var(--radius-card);
+    text-align: center;
+    cursor: pointer;
+    transition:
+      border-color 0.15s var(--ease-premium),
+      background-color 0.15s var(--ease-premium);
+  }
+  @media (hover: hover) {
+    .kit-drop:hover {
+      border-color: var(--color-teal-400);
+      background: var(--color-teal-50);
+    }
+  }
+  /* :focus-within, not :focus — the focusable element is the input inside. */
+  .kit-drop:focus-within {
+    border-color: var(--color-teal-500);
+    background: var(--color-teal-50);
+  }
+  .kit-drop.is-filled {
+    border-style: solid;
+    border-color: var(--color-teal-400);
+    background: var(--color-teal-50);
+  }
+  /* Hidden from view but not from the accessibility tree or the keyboard —
+     display:none would make the field unreachable by tab. */
+  .kit-drop > input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .kit-drop > strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    color: var(--color-slate-700);
+  }
+  .kit-drop > span {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+
+  .kit-module {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+  .kit-module-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+  .kit-module-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    height: 2.25rem;
+    width: 2.25rem;
+    border-radius: var(--radius-control);
+    background: var(--color-teal-50);
+    color: var(--color-teal-600);
+  }
+  .kit-module-main {
+    min-width: 0;
+  }
+  .kit-module-main > strong {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .kit-module-main > span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+  .kit-module-note {
+    flex: 1;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--color-slate-500);
+  }
+  .kit-module .kit-form-actions {
+    margin-top: 0;
+  }
+
+  /* Feed freshness. The status word is the headline: an operator opens this
+     to answer "did today's file land", not to read row counts. */
+  .kit-feed-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .kit-feed-file {
+    margin-top: 0.625rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-600);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kit-feed-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--color-slate-100);
+    font-size: 0.6875rem;
+  }
+  .kit-feed-meta span {
+    display: block;
+    color: var(--color-slate-400);
+  }
+  .kit-feed-meta b {
+    display: block;
+    font-weight: 600;
+    color: var(--color-slate-700);
+  }
+  .kit-feed-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.625rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-feed-counts b {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-700);
+  }
+  .kit-feed-counts .is-warn b {
+    color: var(--color-rose-600);
+  }
+
+  /* Numbered steps — the safe-import pipeline, and any other ordered
+     explanation of what the system does before it writes. */
+  .kit-steps {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  @media (min-width: 640px) {
+    .kit-steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1024px) {
+    .kit-steps {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .kit-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+  .kit-step > b {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    height: 1.75rem;
+    width: 1.75rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-slate-100);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-600);
+  }
+  .kit-step strong {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .kit-step small {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+
+  /* Field-name reference: a wrapping list of code chips. */
+  .kit-codes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0.5rem 0;
+  }
+  .kit-codes > code {
+    padding: 0.1875rem 0.4375rem;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-control);
+    background: var(--color-slate-50);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.6875rem;
+    color: var(--color-slate-600);
+  }
+
+  /* Result counts after an import. */
+  .kit-result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  @media (min-width: 640px) {
+    .kit-result-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .kit-result-grid > div {
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-control);
+    background: var(--color-slate-50);
+  }
+  .kit-result-grid span {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-500);
+  }
+  .kit-result-grid strong {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+  }
+  .kit-result-grid > div.is-warn {
+    border-color: var(--color-rose-200);
+    background: var(--color-rose-50);
+  }
+  .kit-result-grid > div.is-warn strong {
+    color: var(--color-rose-700);
+  }
+}
+
+/* ======================================================================
+   Retailer surfaces — outlet cards, status words, figure cards
+
+   Added with the attention / retailer views (v109). These are shared by
+   five roles, so they live in the kit rather than in any role's sheet.
+   ====================================================================== */
+@layer components {
+  /* Status words carried by a <strong>. Named by meaning, not colour, so a
+     future palette change never needs a JSX edit.
+
+     Each container that sets its own text colour on <strong> is listed too:
+     `.kit-outlet-metrics strong` and `.kit-pair .kit-card > strong` are
+     (0,1,1) and (0,2,1), so the bare (0,1,0) status class lost to both and
+     "Done" rendered in the same slate as "Pending". */
+  .is-ok,
+  .kit-outlet-metrics strong.is-ok,
+  .kit-pair .kit-card > strong.is-ok {
+    color: var(--color-teal-700);
+  }
+  .is-warn,
+  .kit-outlet-metrics strong.is-warn,
+  .kit-pair .kit-card > strong.is-warn {
+    color: var(--color-rose-600);
+  }
+  .is-muted,
+  .kit-outlet-metrics strong.is-muted,
+  .kit-pair .kit-card > strong.is-muted {
+    color: var(--color-slate-400);
+  }
+
+  .kit-outlet {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    text-decoration: none;
+    color: inherit;
+  }
+  .kit-outlet-route {
+    font-size: 0.75rem;
+    color: var(--color-slate-400);
+  }
+  /* Four small figures. Two columns on a phone so the labels stay readable
+     rather than four ~55px columns. */
+  .kit-outlet-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--color-slate-100);
+  }
+  @media (min-width: 480px) {
+    .kit-outlet-metrics {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .kit-outlet-metrics span {
+    display: block;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-slate-400);
+  }
+  .kit-outlet-metrics strong {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The open reasons, verbatim from lib/retailer-opportunities. */
+  .kit-outlet-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .kit-outlet-reasons > span {
+    padding: 0.1875rem 0.4375rem;
+    border: 1px solid var(--color-amber-200);
+    border-radius: var(--radius-control);
+    background: var(--color-amber-50);
+    font-size: 0.6875rem;
+    color: var(--color-amber-700);
+  }
+
+  /* One headline figure with a label above and a note below. */
+  .kit-figure {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kit-figure-sub {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  /* The status pair uses the same shape, so its <strong> gets the same size
+     without needing the .kit-figure class on a word rather than a number. */
+  .kit-pair .kit-card > strong {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+
+  /* Audit timeline: a marker rail down the left of each event. */
+  .kit-timeline {
+    display: flex;
+    flex-direction: column;
+  }
+  .kit-timeline-row {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  .kit-timeline-row:last-child {
+    border-bottom: 0;
+  }
+  .kit-timeline-row::before {
+    content: "";
+    position: absolute;
+    left: 0.1875rem;
+    top: 1.125rem;
+    height: 0.5rem;
+    width: 0.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-teal-400);
+  }
+  /* The rail joins one event to the next but must not hang below the last. */
+  .kit-timeline-row::after {
+    content: "";
+    position: absolute;
+    left: 0.40625rem;
+    top: 1.625rem;
+    bottom: 0;
+    width: 1px;
+    background: var(--color-slate-200);
+  }
+  .kit-timeline-row:last-child::after {
+    display: none;
+  }
+  .kit-timeline-main {
+    min-width: 0;
+    /* Audit targets are file names and codes — single unbreakable tokens that
+       otherwise widen the page rather than wrapping. */
+    overflow-wrap: anywhere;
+  }
+  /* The actor name and their role are one line, not a stacked pair. The
+     coverage layer has a zero-specificity :where() rule that blockifies a
+     leading <strong> followed by a <span>/<small>/<em>; that fallback is
+     right for the "name over identifier" shape but wrong here, and any
+     explicit declaration outranks :where(). */
+  .kit-timeline-main > strong {
+    display: inline;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .kit-timeline-main > em {
+    margin-left: 0.375rem;
+    font-style: normal;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-timeline-main > p {
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
+    color: var(--color-slate-600);
+  }
+  .kit-timeline-main > small {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-timeline-meta {
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .kit-timeline-meta > b {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-slate-600);
+  }
+  .kit-timeline-meta > span {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+    white-space: nowrap;
+  }
+  @media (max-width: 639px) {
+    .kit-timeline-row {
+      flex-wrap: wrap;
+    }
+    .kit-timeline-meta {
+      flex: 1 0 100%;
+      text-align: left;
+    }
+    .kit-timeline-meta > b,
+    .kit-timeline-meta > span {
+      display: inline;
+      margin: 0;
+    }
+    .kit-timeline-meta > span::before {
+      content: " · ";
+    }
+  }
+}
+
+/* ======================================================================
+   Import-workspace surfaces (v111)
+
+   The four operator tables (/ga, /c2c, /c2s, /ob) are wide by nature —
+   supervisor, employee, retailer and up to six metric columns. They keep a
+   horizontal scroll on a phone rather than collapsing to one card per row,
+   which for a few hundred retailers would be unreadable; TableScrollHint is
+   what tells the user that is what is happening.
+   ====================================================================== */
+@layer components {
+  /* .kit-table-wrap hides itself below 640px because its default partner is a
+     card list. These tables have no card list, so this variant always shows. */
+  .kit-table-wrap.is-always {
+    display: block;
+    overflow-x: auto;
+  }
+  .kit-table-wrap.is-always > .kit-table {
+    /* min-width comes from the component; without table-layout the browser can
+       still shrink columns below it and reintroduce cramped wrapping. */
+    width: 100%;
+  }
+  .kit-table td > small {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-table td > strong,
+  .kit-table td > b {
+    font-weight: 700;
+    color: var(--color-slate-800);
+  }
+
+  .kit-cell-person {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .kit-cell-person > .kit-avatar {
+    height: 1.75rem;
+    width: 1.75rem;
+    font-size: 0.625rem;
+  }
+  .kit-cell-person b {
+    display: block;
+    font-weight: 600;
+    color: var(--color-slate-800);
+    white-space: nowrap;
+  }
+  .kit-cell-person small {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+    white-space: nowrap;
+  }
+
+  .kit-cell-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 7rem;
+  }
+  .kit-cell-progress > .kit-bar {
+    flex: 1;
+  }
+  /* A bare progress bar with no band class still needs a fill colour. */
+  .kit-cell-progress > .kit-bar > i {
+    background: linear-gradient(to right, var(--color-teal-500), var(--color-teal-400));
+  }
+  .kit-cell-progress > b {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-700);
+  }
+
+  /* Metrics row on an import workspace: 2 up on a phone, 3 then 4 wider. */
+  .kit-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  @media (min-width: 640px) {
+    .kit-metrics-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1024px) {
+    .kit-metrics-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+}
+
+@layer components {
+  /* Upload form inside a workspace card: the file field and the submit button
+     on one line from 640px, stacked on a phone. */
+  .kit-upload-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+  .kit-file-field {
+    flex: 1 1 18rem;
+    display: block;
+    padding: 0.75rem 0.875rem;
+    border: 2px dashed var(--color-slate-300);
+    border-radius: var(--radius-card);
+    cursor: pointer;
+  }
+  @media (hover: hover) {
+    .kit-file-field:hover {
+      border-color: var(--color-teal-400);
+      background: var(--color-teal-50);
+    }
+  }
+  .kit-file-field:focus-within {
+    border-color: var(--color-teal-500);
+    background: var(--color-teal-50);
+  }
+  .kit-file-field > span {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-slate-700);
+  }
+  .kit-file-field > small {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+
+  .kit-count-pill {
+    display: inline-block;
+    padding: 0.125rem 0.4375rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-slate-100);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-slate-600);
+  }
+
+  /* A date picker sitting in a section heading rather than a filter bar. */
+  .kit-inline-date {
+    flex-shrink: 0;
+  }
+  .kit-inline-date > .kit-input {
+    width: auto;
+    min-width: 9.5rem;
+  }
+
+  .kit-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-slate-100);
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  .kit-pagination > button {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--color-slate-300);
+    border-radius: var(--radius-control);
+    background: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-slate-700);
+    cursor: pointer;
+  }
+  .kit-pagination > button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+@layer components {
+  /* Shown only when its scroll container actually overflows — see
+     TableScrollHint, which measures rather than assuming. */
+  .kit-scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-400);
+  }
+  .kit-scroll-hint > svg {
+    flex-shrink: 0;
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+}
+
+@layer components {
+  /* Numeric input inside a table cell or a compact field. */
+  .kit-num-input {
+    width: 100%;
+    min-width: 4.5rem;
+    padding: 0.3125rem 0.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-table td .kit-num-input {
+    max-width: 6.5rem;
+  }
+
+  /* Sticky action bar for a screen that batches edits and saves once.
+
+     Below 900px the shell renders `.bottom-nav`, itself sticky at bottom:0
+     with z-index 30 — so a save bar at bottom:0 would sit underneath it and
+     the primary action of the page would be unreachable on a phone. It is
+     lifted clear of the nav until the breakpoint where the nav disappears. */
+  .kit-save-bar {
+    position: sticky;
+    bottom: 4.25rem;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-card);
+    background: #fff;
+    box-shadow: var(--shadow-elevated);
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  @media (min-width: 900px) {
+    .kit-save-bar {
+      bottom: 0;
+    }
+  }
+
+  .kit-details {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+  }
+  .kit-details > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--color-slate-700);
+  }
+  .kit-details > div {
+    margin-top: 0.25rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--color-rose-200);
+  }
+}

@@ -1,1 +1,24 @@
-export default function Loading(){return <main className="page manager-v5-page manager-loading-v5"><div className="manager-loading-hero"><span/><b/><i/></div><div className="manager-loading-metrics">{[1,2,3,4].map(x=><div key={x}><span/><b/><i/></div>)}</div><div className="manager-loading-panel">{[1,2,3,4,5].map(x=><div key={x}><span/><p><b/><i/></p><em/></div>)}</div></main>}
+import { Card, Skeleton } from "../components/Kit";
+
+/** Mirrors app/manager/page.tsx so the layout does not jump when data lands. */
+export default function Loading() {
+  return (
+    <main className="page">
+      <div className="kit-summary-strip">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} padded>
+            <Skeleton className="kit-skel-num" />
+          </Card>
+        ))}
+      </div>
+      <div className="kit-kpi-grid">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} padded>
+            <Skeleton className="kit-skel-num" />
+            <Skeleton className="kit-skel-row" />
+          </Card>
+        ))}
+      </div>
+    </main>
+  );
+}

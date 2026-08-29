@@ -1,96 +1,331 @@
 "use client";
-import {FormEvent,useState} from "react";
-import {useRouter} from "next/navigation";
+
+/**
+ * Authorized Users — migrated to the role-UI kit.
+ *
+ * Three parts, unchanged in behaviour: create a login, browse the directory,
+ * and edit one account in a dialog. Every write still goes through
+ * /api/admin/users (POST to create, PATCH to update or toggle), and the
+ * role-linking rules (RSO → employee, SUPERVISOR → supervisor, BP → retailer)
+ * are the API's, not this component's.
+ */
+
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import ConfirmActionButton from "../../components/ConfirmActionButton";
-import StatusToast from "../../components/StatusToast";
-import {Icon} from "../../components/icons";
+import { Icon } from "../../components/icons";
+import { Badge, Card, EmptyState, Field, Modal, PageHeader, Row, SectionHead, SummaryStrip } from "../../components/Kit";
 
-type Opt={id:string;name:string;meta?:string};
-type U={id:string;displayName:string;mobileNumber:string|null;role:string;active:boolean;employeeId?:string|null;supervisorId?:string|null;bpRetailerId?:string|null;link:string};
-const ROLES=["IT","MANAGER","SUPERVISOR","ACCOUNTS","RSO","BP"];
+type Opt = { id: string; name: string; meta?: string };
+type U = {
+  id: string;
+  displayName: string;
+  mobileNumber: string | null;
+  role: string;
+  active: boolean;
+  employeeId?: string | null;
+  supervisorId?: string | null;
+  bpRetailerId?: string | null;
+  link: string;
+};
+const ROLES = ["IT", "MANAGER", "SUPERVISOR", "ACCOUNTS", "RSO", "BP"];
 
-export default function UserManager({users,employees,supervisors,bps}:{users:U[];employees:Opt[];supervisors:Opt[];bps:Opt[]}){
- const router=useRouter();
- const [role,setRole]=useState("RSO");
- const [msg,setMsg]=useState("");
- const [msgTone,setMsgTone]=useState<"success"|"error">("success");
- const [q,setQ]=useState("");
- const [editing,setEditing]=useState<U|null>(null);
- const [saving,setSaving]=useState(false);
+export default function UserManager({
+  users,
+  employees,
+  supervisors,
+  bps,
+}: {
+  users: U[];
+  employees: Opt[];
+  supervisors: Opt[];
+  bps: Opt[];
+}) {
+  const router = useRouter();
+  const [role, setRole] = useState("RSO");
+  const [msg, setMsg] = useState("");
+  const [msgTone, setMsgTone] = useState<"ok" | "bad">("ok");
+  const [q, setQ] = useState("");
+  const [editing, setEditing] = useState<U | null>(null);
+  const [saving, setSaving] = useState(false);
 
- async function create(e:FormEvent<HTMLFormElement>){
-  e.preventDefault();setMsg("");setMsgTone("success");
-  const f=new FormData(e.currentTarget);const body=Object.fromEntries(f);body.role=role;
-  const r=await fetch("/api/admin/users",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-  const d=await r.json();if(!r.ok){setMsgTone("error");return setMsg(d.error||"Could not create user")}
-  setMsgTone("success");setMsg("User created successfully.");e.currentTarget.reset();router.refresh();
- }
+  async function create(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setMsg("");
+    setMsgTone("ok");
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    const body: Record<string, unknown> = Object.fromEntries(f);
+    body.role = role;
+    const r = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      setMsgTone("bad");
+      return setMsg(d.error || "Could not create user");
+    }
+    setMsgTone("ok");
+    setMsg("User created successfully.");
+    form.reset();
+    router.refresh();
+  }
 
- async function toggle(id:string,active:boolean){
-  const r=await fetch("/api/admin/users",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,active})});
-  const d=await r.json();if(!r.ok){setMsgTone("error");setMsg(d.error||"Could not update account");return}
-  router.refresh();
- }
+  async function toggle(id: string, active: boolean) {
+    const r = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, active }),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      setMsgTone("bad");
+      setMsg(d.error || "Could not update account");
+      return;
+    }
+    router.refresh();
+  }
 
- async function saveEdit(e:FormEvent<HTMLFormElement>){
-  e.preventDefault();if(!editing)return;
-  setSaving(true);setMsg("");
-  const f=new FormData(e.currentTarget);
-  const body=Object.fromEntries(f);body.id=editing.id;
-  try{
-   const r=await fetch("/api/admin/users",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-   const d=await r.json();
-   if(!r.ok){setMsgTone("error");setMsg(d.error||"Could not update account");return}
-   setMsgTone("success");setMsg("Account updated successfully. Active sessions were refreshed where required.");
-   setEditing(null);router.refresh();
-  }finally{setSaving(false)}
- }
+  async function saveEdit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editing) return;
+    setSaving(true);
+    setMsg("");
+    const f = new FormData(e.currentTarget);
+    const body: Record<string, unknown> = Object.fromEntries(f);
+    body.id = editing.id;
+    try {
+      const r = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        setMsgTone("bad");
+        setMsg(d.error || "Could not update account");
+        return;
+      }
+      setMsgTone("ok");
+      setMsg("Account updated successfully. Active sessions were refreshed where required.");
+      setEditing(null);
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
 
- const filtered=users.filter(u=>!q||`${u.displayName} ${u.mobileNumber||""} ${u.role} ${u.link}`.toLowerCase().includes(q.toLowerCase()));
- const editRole=editing?.role||"";
+  const needle = q.toLowerCase();
+  const filtered = users.filter(
+    (u) => !q || `${u.displayName} ${u.mobileNumber || ""} ${u.role} ${u.link}`.toLowerCase().includes(needle),
+  );
+  const editRole = editing?.role || "";
+  const activeCount = users.filter((u) => u.active).length;
 
- return <div className="users-v3-grid">
-  <section className="users-v3-create">
-   <div className="users-v3-card-head"><div><span>NEW LOGIN</span><h2>Create authorized account</h2><p>Mobile + PIN access linked to the correct DMS role.</p></div><b>{role}</b></div>
-   <form className="user-v3-form" onSubmit={create}>
-    <label><span>ROLE</span><select value={role} onChange={e=>setRole(e.target.value)}>{ROLES.map(x=><option key={x}>{x}</option>)}</select></label>
-    <label><span>DISPLAY NAME</span><input name="displayName" required/></label>
-    <label><span>MOBILE NUMBER</span><input name="mobileNumber" required inputMode="tel"/></label>
-    <label><span>PIN</span><input name="pin" required minLength={4} inputMode="numeric" type="password"/></label>
-    {role==="RSO"&&<label className="user-v3-wide"><span>LINK RSO EMPLOYEE</span><select name="employeeId" required><option value="">Select RSO</option>{employees.map(x=><option key={x.id} value={x.id}>{x.name} · {x.meta}</option>)}</select></label>}
-    {role==="SUPERVISOR"&&<label className="user-v3-wide"><span>LINK SUPERVISOR</span><select name="supervisorId" required><option value="">Select supervisor</option>{supervisors.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
-    {role==="BP"&&<label className="user-v3-wide"><span>LINK ASSIGNED BP RETAILER</span><select name="bpRetailerId" required><option value="">Select active BP</option>{bps.map(x=><option key={x.id} value={x.id}>{x.name} · {x.meta}</option>)}</select></label>}
-    <button className="btn admin-primary user-v3-submit">Create Login</button>
-   </form>
-   {msg&&<StatusToast message={msg} tone={msgTone}/>}
-   <div className="user-v3-help"><strong>Access safety</strong><span>PIN resets and deactivation revoke active sessions automatically.</span></div>
-  </section>
+  /** The link selector shown for a role, or null when that role links to nothing. */
+  const linkField = (r: string, current?: string | null) => {
+    const spec =
+      r === "RSO"
+        ? { name: "employeeId", label: "Link RSO employee", placeholder: "Select RSO", options: employees }
+        : r === "SUPERVISOR"
+          ? { name: "supervisorId", label: "Link supervisor", placeholder: "Select supervisor", options: supervisors }
+          : r === "BP"
+            ? { name: "bpRetailerId", label: "Link assigned BP retailer", placeholder: "Select active BP", options: bps }
+            : null;
+    if (!spec) return null;
+    return (
+      <Field label={spec.label} wide>
+        <select className="kit-select" name={spec.name} required defaultValue={current ?? ""} key={`${spec.name}-${r}`}>
+          <option value="">{spec.placeholder}</option>
+          {spec.options.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+              {x.meta ? ` · ${x.meta}` : ""}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+  };
 
-  <section className="users-v3-directory">
-   <div className="users-v3-directory-head"><div><span>AUTHORIZED USERS</span><h2>Login Accounts</h2><p>{users.filter(u=>u.active).length} active · {users.filter(u=>!u.active).length} disabled</p></div><div className="users-v3-search"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search users"/></div></div>
-   <div className="users-v3-list">{filtered.map(u=><article className="user-v3-row" key={u.id}>
-    <div className="user-v3-avatar">{u.displayName.slice(0,2).toUpperCase()}</div>
-    <div className="user-v3-main"><strong>{u.displayName}</strong><span>{u.role} · {u.mobileNumber||"Admin login"}</span><small>{u.link||"System account"}</small></div>
-    <button type="button" className="user-v91-edit" onClick={()=>setEditing(u)}><Icon name="edit"/>Edit / PIN</button>
-    <ConfirmActionButton className={`user-v3-status ${u.active?"active":"disabled"}`} message={u.active?`Disable login for ${u.displayName}? Active sessions will be revoked.`:`Enable login for ${u.displayName}?`} onConfirm={()=>toggle(u.id,!u.active)}><i/>{u.active?"Active":"Disabled"}</ConfirmActionButton>
-   </article>)}{!filtered.length&&<div className="admin-empty"><strong>No matching accounts</strong></div>}</div>
-  </section>
+  return (
+    <main className="page">
+      <PageHeader
+        title="Authorized Users"
+        subtitle="Create and edit mobile/PIN logins, update role mappings and control account status."
+      />
 
-  {editing&&<div className="user-edit-backdrop-v91" role="presentation" onMouseDown={e=>{if(e.currentTarget===e.target)setEditing(null)}}>
-   <section className="user-edit-dialog-v91" role="dialog" aria-modal="true" aria-labelledby="edit-login-title">
-    <header><div><span>ACCOUNT SETTINGS</span><h2 id="edit-login-title">Edit login account</h2><p>Update account details, role mapping or set a new PIN.</p></div><button type="button" onClick={()=>setEditing(null)} aria-label="Close">×</button></header>
-    <form onSubmit={saveEdit}>
-     <label><span>DISPLAY NAME</span><input name="displayName" defaultValue={editing.displayName} required/></label>
-     <label><span>MOBILE NUMBER</span><input name="mobileNumber" defaultValue={editing.mobileNumber||""} required inputMode="tel"/></label>
-     <label><span>ROLE</span><select name="role" value={editing.role} onChange={e=>setEditing({...editing,role:e.target.value})}>{ROLES.map(x=><option key={x}>{x}</option>)}</select></label>
-     <label><span>NEW PIN <small>optional</small></span><input name="pin" minLength={4} inputMode="numeric" type="password" placeholder="Leave blank to keep current PIN"/></label>
-     {editRole==="RSO"&&<label className="wide"><span>LINK RSO EMPLOYEE</span><select name="employeeId" defaultValue={editing.employeeId||""} required><option value="">Select RSO</option>{employees.map(x=><option key={x.id} value={x.id}>{x.name} · {x.meta}</option>)}</select></label>}
-     {editRole==="SUPERVISOR"&&<label className="wide"><span>LINK SUPERVISOR</span><select name="supervisorId" defaultValue={editing.supervisorId||""} required><option value="">Select supervisor</option>{supervisors.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
-     {editRole==="BP"&&<label className="wide"><span>LINK ACTIVE BP</span><select name="bpRetailerId" defaultValue={editing.bpRetailerId||""} required><option value="">Select active BP</option>{bps.map(x=><option key={x.id} value={x.id}>{x.name} · {x.meta}</option>)}</select></label>}
-     <div className="user-edit-note-v91"><strong>PIN security</strong><span>If a new PIN, role, mobile number or mapping is changed, existing sessions for this account will be signed out.</span></div>
-     <footer><button type="button" className="btn btn-ghost" onClick={()=>setEditing(null)}>Cancel</button><button disabled={saving} className="btn admin-primary">{saving?"Saving…":"Save changes"}</button></footer>
-    </form>
-   </section>
-  </div>}
- </div>
+      <SummaryStrip
+        items={[
+          { label: "Total Accounts", value: users.length.toLocaleString() },
+          { label: "Active", value: activeCount.toLocaleString(), tone: "teal" },
+          { label: "Disabled", value: (users.length - activeCount).toLocaleString(), tone: "amber" },
+          { label: "Roles", value: new Set(users.map((u) => u.role)).size.toLocaleString() },
+        ]}
+      />
+
+      {msg && (
+        <div className={`kit-note is-${msgTone}`} role="status">
+          <Icon name={msgTone === "ok" ? "check" : "alert"} />
+          <span>{msg}</span>
+        </div>
+      )}
+
+      <SectionHead title="Create authorized account" sub="Mobile + PIN access linked to the correct DMS role." />
+      <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+        <form onSubmit={create}>
+          <div className="kit-form-grid">
+            <Field label="Role">
+              <select className="kit-select" value={role} onChange={(e) => setRole(e.target.value)}>
+                {ROLES.map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Display name">
+              <input className="kit-input" name="displayName" required />
+            </Field>
+            <Field label="Mobile number">
+              <input className="kit-input" name="mobileNumber" required inputMode="tel" />
+            </Field>
+            <Field label="PIN">
+              <input className="kit-input" name="pin" required minLength={4} inputMode="numeric" type="password" />
+            </Field>
+            {linkField(role)}
+          </div>
+          <div className="kit-form-actions">
+            <button className="kit-btn is-primary size-md">Create Login</button>
+            <span className="kit-filter-note">PIN resets and deactivation revoke active sessions automatically.</span>
+          </div>
+        </form>
+      </Card>
+
+      <SectionHead title={`${users.length} login accounts`} sub={`${activeCount} active · ${users.length - activeCount} disabled`} />
+      <div className="kit-filter-bar no-print">
+        <div className="kit-search">
+          <Icon name="search" />
+          <input
+            className="kit-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Name, mobile, role or linked record"
+            autoComplete="off"
+            aria-label="Search users"
+          />
+        </div>
+        <span className="kit-filter-note">{filtered.length} results</span>
+      </div>
+
+      <Card padded>
+        {filtered.length ? (
+          <div className="kit-rows">
+            {filtered.map((u) => (
+              <Row
+                key={u.id}
+                avatar={u.displayName}
+                title={u.displayName}
+                sub={`${u.role} · ${u.mobileNumber || "Admin login"}`}
+                detail={u.link || "System account"}
+                after={
+                  <div className="kit-row-actions">
+                    {/* Status is shown, not clicked. The old row made the status
+                        pill itself the toggle, so the label named the current
+                        state while the click did the opposite. */}
+                    <Badge tone={u.active ? "active" : "inactive"}>{u.active ? "Active" : "Disabled"}</Badge>
+                    <button type="button" className="kit-btn is-secondary size-sm" onClick={() => setEditing(u)}>
+                      <Icon name="edit" /> Edit / PIN
+                    </button>
+                    <ConfirmActionButton
+                      className={`kit-btn size-sm ${u.active ? "is-danger" : "is-secondary"}`}
+                      message={
+                        u.active
+                          ? `Disable login for ${u.displayName}? Active sessions will be revoked.`
+                          : `Enable login for ${u.displayName}?`
+                      }
+                      onConfirm={() => toggle(u.id, !u.active)}
+                    >
+                      {u.active ? "Disable" : "Enable"}
+                    </ConfirmActionButton>
+                  </div>
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No matching accounts" hint="Try a different search term." icon={<Icon name="search" />} />
+        )}
+      </Card>
+
+      {editing && (
+        <Modal
+          title="Edit login account"
+          sub="Update account details, role mapping or set a new PIN."
+          onClose={() => setEditing(null)}
+          labelledBy="edit-login-title"
+          footer={
+            <>
+              <button type="button" className="kit-btn is-ghost size-md" onClick={() => setEditing(null)}>
+                Cancel
+              </button>
+              <button form="edit-login-form" disabled={saving} className="kit-btn is-primary size-md">
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </>
+          }
+        >
+          <form id="edit-login-form" onSubmit={saveEdit}>
+            <div className="kit-form-grid">
+              <Field label="Display name">
+                <input className="kit-input" name="displayName" defaultValue={editing.displayName} required />
+              </Field>
+              <Field label="Mobile number">
+                <input
+                  className="kit-input"
+                  name="mobileNumber"
+                  defaultValue={editing.mobileNumber || ""}
+                  required
+                  inputMode="tel"
+                />
+              </Field>
+              <Field label="Role">
+                <select
+                  className="kit-select"
+                  name="role"
+                  value={editing.role}
+                  onChange={(e) => setEditing({ ...editing, role: e.target.value })}
+                >
+                  {ROLES.map((x) => (
+                    <option key={x}>{x}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="New PIN" hint="optional">
+                <input
+                  className="kit-input"
+                  name="pin"
+                  minLength={4}
+                  inputMode="numeric"
+                  type="password"
+                  placeholder="Leave blank to keep current PIN"
+                />
+              </Field>
+              {linkField(
+                editRole,
+                editRole === "RSO" ? editing.employeeId : editRole === "SUPERVISOR" ? editing.supervisorId : editing.bpRetailerId,
+              )}
+            </div>
+            <div className="kit-guide">
+              <strong>PIN security</strong>
+              <p>
+                If a new PIN, role, mobile number or mapping is changed, existing sessions for this account will be
+                signed out.
+              </p>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </main>
+  );
 }

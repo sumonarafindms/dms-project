@@ -289,3 +289,21 @@ export const lsoCompleteMonthlySummaryWhere: Prisma.C2sMonthlySummaryWhereInput 
   totalAmount: { gte: LSO_MIN_MONTHLY_AMOUNT },
   transactionCount: { gte: LSO_MIN_MONTHLY_TRANSACTIONS },
 };
+
+/* ------------------------------------------------------------------ *
+ * Achievement and pace bands
+ * ------------------------------------------------------------------ *
+ * Defined in ./achievement so client components can import them without
+ * pulling @prisma/client into the browser bundle. Re-exported here so
+ * server code keeps getting every business rule from one module.
+ */
+export {
+  ACHIEVEMENT_ON_TRACK_PERCENT,
+  ACHIEVEMENT_WATCH_PERCENT,
+  PACE_AHEAD_MARGIN,
+  PACE_BEHIND_MARGIN,
+  achievementBand,
+  achievementTone,
+  paceBand,
+} from "./achievement";
+export type { AchievementBand, PaceBand } from "./achievement";

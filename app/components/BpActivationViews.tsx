@@ -1,25 +1,210 @@
-import Link from "next/link";
-import {FilterForm,LinkedList,StatStrip} from "./DrillUI";
-import {PageHead} from "./RoleUI";
-import type {BpViewer} from "../../lib/bp-activations";
-import {bpAssignmentDetail,listBpAssignments} from "../../lib/bp-activations";
+/**
+ * BP activation list and detail — migrated to the role-UI kit.
+ *
+ * Shared by the manager, supervisor and RSO routes; `basePath` / `backHref`
+ * are the only things that differ, and `user` decides scope inside
+ * lib/bp-activations rather than here.
+ *
+ * Every count and every row on these screens is standard GA only — the query
+ * applies withStandardGa/withSimSwap — so SIMWAP and EV-SWAP appear as their
+ * own figure and never inside the GA total.
+ */
 
-export async function BpActivationListView({user,basePath,month,q,from,to,eyebrow}:{user:BpViewer;basePath:string;month?:string;q?:string;from?:string;to?:string;eyebrow:string}){
- const data=await listBpAssignments(user,month,q,from,to);
- const manager=eyebrow==="Manager",supervisor=eyebrow==="Supervisor",rso=eyebrow.startsWith("RSO");return <main className={`page field-page ${manager?"manager-v5-page manager-bp-list-v5":supervisor?"supervisor-v6-page supervisor-bp-list-v6":rso?"rso-v7-page rso-bp-list-v7":""}`}><PageHead eyebrow={eyebrow} title="BP Activation Details" subtitle="View SIM activations by assigned BP retailer and effective assignment period."/>
-  <FilterForm q={q||""} month={data.month} from={from} to={to} dateRange placeholder="Search BP code, BP name or RSO"/>
-  <LinkedList title="BP assignments" empty="No BP assignment found for this month." items={data.assignments.map(a=>({href:`${basePath}/${a.id}?month=${data.month}${from?`&from=${from}`:""}${to?`&to=${to}`:""}`,name:`${a.retailer.retailerCode} · ${a.retailer.retailerName||"BP"}`,meta:`RSO: ${a.employee.name}${a.employee.supervisor?.name?` · Sup: ${a.employee.supervisor.name}`:""} · ${a.startDate.toISOString().slice(0,10)} → ${a.endDate?.toISOString().slice(0,10)||"Current"}`,right:`${a.monthGa} GA`,status:a.active?"Active":"History"}))}/>
- </main>
+import Link from "next/link";
+import { FilterForm } from "./DrillUI";
+import { Icon } from "./icons";
+import { Badge, Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";
+import type { BpViewer } from "../../lib/bp-activations";
+import { bpAssignmentDetail, listBpAssignments } from "../../lib/bp-activations";
+
+export async function BpActivationListView({
+  user,
+  basePath,
+  month,
+  q,
+  from,
+  to,
+}: {
+  user: BpViewer;
+  basePath: string;
+  month?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+  /** Ignored — the kit page header has no eyebrow. Kept so callers compile. */
+  eyebrow?: string;
+}) {
+  const data = await listBpAssignments(user, month, q, from, to);
+  const range = `month=${data.month}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`;
+
+  return (
+    <main className="page">
+      <PageHeader
+        title="BP Activation Details"
+        subtitle="SIM activations by assigned BP retailer, counted only within each assignment's effective period."
+      />
+      <FilterForm
+        q={q || ""}
+        month={data.month}
+        from={from}
+        to={to}
+        dateRange
+        placeholder="Search BP code, BP name or RSO"
+      />
+      <SectionHead
+        title={`${data.assignments.length} BP ${data.assignments.length === 1 ? "assignment" : "assignments"}`}
+        sub="Active assignments first."
+      />
+      <Card padded>
+        {data.assignments.length ? (
+          <div className="kit-rows">
+            {data.assignments.map((a) => (
+              <Row
+                key={a.id}
+                href={`${basePath}/${a.id}?${range}`}
+                avatar={a.retailer.retailerName || a.retailer.retailerCode}
+                title={a.retailer.retailerName || a.retailer.retailerCode}
+                sub={`${a.retailer.retailerCode} · RSO ${a.employee.name}${a.employee.supervisor?.name ? ` · ${a.employee.supervisor.name}` : ""}`}
+                detail={`${a.startDate.toISOString().slice(0, 10)} → ${a.endDate?.toISOString().slice(0, 10) || "current"}`}
+                // Wrapped in .kit-row-actions so the mobile rule moves it to
+                // its own line; a bare badge stays inline and squeezes the BP
+                // name to an ellipsis on a phone.
+                after={
+                  <div className="kit-row-actions">
+                    <Badge tone={a.active ? "active" : "neutral"}>{a.active ? "Active" : "History"}</Badge>
+                  </div>
+                }
+                value={a.monthGa}
+                valueSub="GA"
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No BP assignment found"
+            hint="Nothing was assigned in this period. Try another date range."
+            icon={<Icon name="sim" />}
+          />
+        )}
+      </Card>
+    </main>
+  );
 }
 
-export async function BpActivationDetailView({user,id,backHref,month,q,from,to,eyebrow}:{user:BpViewer;id:string;backHref:string;month?:string;q?:string;from?:string;to?:string;eyebrow:string}){
- const d=await bpAssignmentDetail(user,id,month,q,from,to);
- if(!d)return <main className="page field-page"><PageHead eyebrow={eyebrow} title="BP activation unavailable" subtitle="This BP assignment is outside your access scope or no longer exists."/><Link className="btn btn-soft" href={backHref}>Back</Link></main>;
- const manager=eyebrow.startsWith("Manager"),supervisor=eyebrow.startsWith("Supervisor"),rso=eyebrow.startsWith("RSO");return <main className={`page field-page ${manager?"manager-v5-page manager-bp-detail-v5":supervisor?"supervisor-v6-page supervisor-bp-detail-v6":rso?"rso-v7-page rso-bp-detail-v7":""}`}><PageHead eyebrow={eyebrow} title={d.assignment.retailer.retailerName||d.assignment.retailer.retailerCode} subtitle={`${d.assignment.retailer.retailerCode} · RSO ${d.assignment.employee.name} · ${d.assignment.employee.supervisor?.name||"No supervisor"}` } action={<Link className="btn btn-soft" href={`${backHref}?month=${d.month}`}>Back</Link>}/>
-  <StatStrip items={[{label:"Total GA",value:d.total},{label:"150",value:d.total150},{label:"300",value:d.total300},{label:"SIM SWAP",value:d.simSwap},{label:"GA Target",value:d.assignment.gaTarget||"—"}]}/>
-  <div className="info-banner"><div className="info-dot"/><div>Counting only activations during this BP assignment period: <strong>{d.effectiveStart.toISOString().slice(0,10)}</strong> to <strong>{new Date(d.effectiveEnd.getTime()-1).toISOString().slice(0,10)}</strong>.</div></div>
-  <FilterForm q={d.q} month={d.month} from={from} to={to} dateRange placeholder="Search SIM serial"/>
-  <section className="section"><div className="section-head"><h2 className="section-title">Activation details</h2><span className="section-link">{d.rows.length} shown</span></div><div className="card panel activity-list">{d.rows.length?d.rows.map(x=><div className="activity-row" key={x.simNo}><div><div className="activity-date">SIM {x.simNo}</div><div className="activity-meta">{x.activationDate.toISOString().slice(0,10)}{x.activationTime?` · ${x.activationTime}`:""}</div></div><div className="activity-value">৳{Number(x.sellingPrice).toLocaleString()}<div className="mini-label">{Number(x.sellingPrice)===170?"150":"300"}</div></div></div>):<div className="empty">No activation found for this filter.</div>}</div></section>
-  <section className="section"><div className="section-head"><h2 className="section-title">Daily GA</h2><span className="section-link">{d.daily.length} days</span></div><div className="card panel">{d.daily.length?d.daily.map(x=><div className="team-row" key={x.date.toISOString()}><div><div className="person-name">{x.date.toISOString().slice(0,10)}</div><div className="person-meta">BP activation count</div></div><div className="mini-value">{x.count} GA</div></div>):<div className="empty">No daily activity.</div>}</div></section>
- </main>
+export async function BpActivationDetailView({
+  user,
+  id,
+  backHref,
+  month,
+  q,
+  from,
+  to,
+}: {
+  user: BpViewer;
+  id: string;
+  backHref: string;
+  month?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+  /** Ignored — see BpActivationListView. */
+  eyebrow?: string;
+}) {
+  const d = await bpAssignmentDetail(user, id, month, q, from, to);
+
+  if (!d)
+    return (
+      <main className="page">
+        <Link href={backHref} className="kit-detail-back">
+          <Icon name="arrow" /> Back
+        </Link>
+        <PageHeader title="BP activation unavailable" />
+        <Card>
+          <EmptyState
+            title="Not available"
+            hint="This BP assignment is outside your access scope or no longer exists."
+            icon={<Icon name="shield" />}
+          />
+        </Card>
+      </main>
+    );
+
+  // effectiveEnd is exclusive, so the last counted day is the millisecond before it.
+  const lastDay = new Date(d.effectiveEnd.getTime() - 1).toISOString().slice(0, 10);
+
+  return (
+    <main className="page">
+      <Link href={`${backHref}?month=${d.month}`} className="kit-detail-back">
+        <Icon name="arrow" /> Back
+      </Link>
+      <PageHeader
+        title={d.assignment.retailer.retailerName || d.assignment.retailer.retailerCode}
+        subtitle={`${d.assignment.retailer.retailerCode} · RSO ${d.assignment.employee.name} · ${d.assignment.employee.supervisor?.name || "No supervisor"}`}
+      />
+
+      <SummaryStrip
+        items={[
+          { label: "Total GA", value: d.total.toLocaleString(), tone: "teal" },
+          { label: "150", value: d.total150.toLocaleString() },
+          { label: "300", value: d.total300.toLocaleString() },
+          { label: "SIM SWAP", value: d.simSwap.toLocaleString(), tone: "amber" },
+          { label: "GA Target", value: d.assignment.gaTarget || "—" },
+          { label: "Days with GA", value: d.daily.length.toLocaleString() },
+        ]}
+      />
+
+      <div className="kit-note is-warn" role="note">
+        <Icon name="info" />
+        <span>
+          Counting only activations during this BP assignment period:{" "}
+          <strong>{d.effectiveStart.toISOString().slice(0, 10)}</strong> to <strong>{lastDay}</strong>. SIM SWAP is
+          shown separately and is not part of Total GA.
+        </span>
+      </div>
+
+      <FilterForm q={d.q} month={d.month} from={from} to={to} dateRange placeholder="Search SIM serial" />
+
+      <SectionHead title="Activation details" sub={`${d.rows.length} shown, newest first.`} />
+      <Card padded style={{ marginBottom: "1.25rem" }}>
+        {d.rows.length ? (
+          <div className="kit-rows">
+            {d.rows.map((x) => (
+              <Row
+                key={x.simNo}
+                icon={<Icon name="sim" />}
+                title={`SIM ${x.simNo}`}
+                sub={`${x.activationDate.toISOString().slice(0, 10)}${x.activationTime ? ` · ${x.activationTime}` : ""}`}
+                value={`৳${Number(x.sellingPrice).toLocaleString()}`}
+                // These rows are standard GA only, so price maps cleanly onto
+                // the two packs: 170 is the 150 pack, everything else is 300.
+                valueSub={Number(x.sellingPrice) === 170 ? "150 pack" : "300 pack"}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No activation found" hint="Nothing matches this filter." icon={<Icon name="search" />} />
+        )}
+      </Card>
+
+      <SectionHead title="Daily GA" sub={`${d.daily.length} ${d.daily.length === 1 ? "day" : "days"} with activity.`} />
+      <Card padded>
+        {d.daily.length ? (
+          <div className="kit-rows">
+            {d.daily.map((x) => (
+              <Row
+                key={x.date.toISOString()}
+                icon={<Icon name="calendar" />}
+                title={x.date.toISOString().slice(0, 10)}
+                sub="BP activation count"
+                value={x.count}
+                valueSub="GA"
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No daily activity" icon={<Icon name="calendar" />} />
+        )}
+      </Card>
+    </main>
+  );
 }

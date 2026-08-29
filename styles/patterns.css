@@ -83,38 +83,9 @@
   /* ==================================================================
      1. STAT BLOCK — label / value / sub stacked
      ================================================================== */
-  .perf-summary-card,
-  .perf-v2-summary-card,
-  .perf-v2-period,
-  .accounts-v12-stat,
-  .accounts-v12-substat,
-  .accounts-v12-fresh,
-  .manager-v5-subhero-stat,
-  .manager-v5-metric,
-  .rso-v7-substat,
-  .rso-v7-kpi,
-  .supervisor-v6-substat,
-  .supervisor-v6-kpi,
   .admin-kpi,
   .admin-kpi-card,
-  .admin-v2-kpi,
-  .retailer-profile-kpi,
-  .detail-stat,
-  .role-metric,
-  .users-v3-hero-count,
-  .attention-v4-score,
-  .audit-v4-today,
-  .permissions-v3-state,
-  .manager-v5-command > div,
-  .manager-v5-network > div,
-  .supervisor-v6-network > div,
-  .rso-v7-network > div,
-  .rso-v7-ga > div:first-child,
-  .bp-v8-main > div:first-child,
-  .bp-v8-info > div,
-  .bp-v8-today > div,
-  .supervisor-v6-alert > div,
-  .ops-freshness-v96 > div:not([class]) {
+  .admin-v2-kpi {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
@@ -122,34 +93,9 @@
   }
 
   /* --- the label line (first span / small) --- */
-  .perf-summary-card > span,
-  .perf-v2-period > span,
-  .accounts-v12-stat > span,
-  .accounts-v12-substat > span,
-  .accounts-v12-fresh > span,
-  .manager-v5-subhero-stat > span,
-  .manager-v5-metric > small,
-  .rso-v7-substat > span,
-  .rso-v7-kpi > small,
-  .supervisor-v6-substat > span,
-  .supervisor-v6-kpi > small,
   .admin-kpi > span,
   .admin-kpi-card > span,
   .admin-v2-kpi > span,
-  .retailer-profile-kpi > span,
-  .detail-stat > span,
-  .users-v3-hero-count > span,
-  .attention-v4-score > span,
-  .audit-v4-today > span,
-  .manager-v5-command > div > span,
-  .manager-v5-network > div > span,
-  .supervisor-v6-network > div > small,
-  .rso-v7-network > div > small,
-  .rso-v7-ga > div > small,
-  .bp-v8-main > div > small,
-  .bp-v8-info > div > small,
-  .bp-v8-today > div > small,
-  .supervisor-v6-alert > div > small,
   .metric-label {
     display: block;
     font-size: 0.68rem;
@@ -161,38 +107,9 @@
   }
 
   /* --- the value line --- */
-  .perf-summary-card > strong,
-  .perf-v2-period > strong,
-  .accounts-v12-stat > strong,
-  .accounts-v12-substat > strong,
-  .accounts-v12-fresh > strong,
-  .manager-v5-subhero-stat > strong,
-  .manager-v5-metric > strong,
-  .rso-v7-substat > strong,
-  .rso-v7-kpi > strong,
-  .supervisor-v6-substat > strong,
-  .supervisor-v6-kpi > strong,
   .admin-kpi > strong,
   .admin-kpi-card > strong,
-  .admin-v2-kpi > strong,
-  .retailer-profile-kpi > strong,
-  .detail-stat > strong,
-  .users-v3-hero-count > strong,
-  .attention-v4-score > strong,
-  .audit-v4-today > strong,
-  .manager-v5-command > div > strong,
-  .manager-v5-network > div > strong,
-  .supervisor-v6-network > div > strong,
-  .rso-v7-network > div > strong,
-  .rso-v7-ga > div > strong,
-  .bp-v8-main > div > strong,
-  .bp-v8-info > div > strong,
-  .bp-v8-today > div > strong,
-  .supervisor-v6-alert > div > strong,
-  .metric-value,
-  .progress-number,
-  .detail-stat-value,
-  .mini-value {
+  .admin-v2-kpi > strong {
     display: block;
     font-size: 1.35rem;
     font-weight: 800;
@@ -210,26 +127,9 @@
   }
 
   /* --- the sub line --- */
-  .perf-summary-card > small,
-  .accounts-v12-stat > small,
-  .accounts-v12-substat > small,
-  .accounts-v12-fresh > small,
-  .accounts-v12-fresh > i,
-  .manager-v5-subhero-stat > small,
-  .rso-v7-substat > small,
-  .supervisor-v6-substat > small,
   .admin-kpi > small,
   .admin-kpi-card > small,
-  .admin-v2-kpi > small,
-  .retailer-profile-kpi > small,
-  .detail-stat > small,
-  .users-v3-hero-count > small,
-  .manager-v5-command > div > small,
-  .rso-v7-ga > div > p,
-  .bp-v8-main > div > p,
-  .bp-v8-info > div > p,
-  .supervisor-v6-alert > div > p,
-  .metric-sub {
+  .admin-v2-kpi > small {
     display: block;
     font-size: 0.75rem;
     font-weight: 500;
@@ -241,8 +141,6 @@
   }
 
   /* decorative trailing <i/> in stat cards — a thin accent bar, not text */
-  .perf-summary-card > i:empty,
-  .accounts-v12-stat > i:empty,
   .admin-kpi > i:empty {
     display: block;
     height: 3px;
@@ -262,8 +160,7 @@
      ================================================================== */
   [class$="-hero"] h1,
   [class$="-hero"] h2,
-  [class$="-hero"] > p,
-  [class$="-hero"] .metric-value {
+  [class$="-hero"] > p {
     color: #fff;
   }
   [class$="-hero"] p,
@@ -278,12 +175,7 @@
   [class$="-hero"] [class$="-ga"] > div > strong,
   [class$="-hero"] [class$="-main"] > div > strong,
   [class$="-hero"] [class$="-today"] > div > strong,
-  [class$="-hero"] [class$="-fresh"] > strong,
-  .accounts-v12-fresh > strong,
-  .manager-v5-subhero-stat > strong,
-  .rso-v7-substat > strong,
-  .supervisor-v6-substat > strong,
-  .accounts-v12-substat > strong {
+  [class$="-hero"] [class$="-fresh"] > strong {
     color: #fff;
   }
 
@@ -300,40 +192,15 @@
   [class$="-hero"] [class$="-today"] > div > small,
   [class$="-hero"] [class$="-fresh"] > span,
   [class$="-hero"] [class$="-fresh"] > small,
-  [class$="-hero"] [class$="-fresh"] > i,
-  .accounts-v12-fresh > span,
-  .accounts-v12-fresh > small,
-  .accounts-v12-fresh > i,
-  .manager-v5-subhero-stat > span,
-  .manager-v5-subhero-stat > small,
-  .rso-v7-substat > span,
-  .rso-v7-substat > small,
-  .supervisor-v6-substat > span,
-  .supervisor-v6-substat > small,
-  .accounts-v12-substat > span,
-  .accounts-v12-substat > small {
+  [class$="-hero"] [class$="-fresh"] > i {
     color: var(--color-slate-300);
   }
 
   /* full-width feature blocks inside a wrapping flex hero */
-  .rso-v7-ga,
-  .bp-v8-main,
-  .bp-v8-today,
-  .rso-v7-hero-progress,
-  .bp-v8-progress {
-    width: 100%;
-  }
-
   /* ==================================================================
      3. PROGRESS BARS — <div class="*-progress"><i style="width:x%"/></div>
      ================================================================== */
   .progress,
-  .perf-bar,
-  .manager-v5-progress,
-  .supervisor-v6-progress,
-  .rso-v7-progress,
-  .rso-v7-hero-progress,
-  .bp-v8-progress,
   [class$="-progress"] {
     display: block;
     height: 0.5rem;
@@ -344,7 +211,6 @@
     margin: 0.35rem 0;
   }
   .progress > span,
-  .perf-bar > span,
   [class$="-progress"] > i,
   [class$="-progress"] > span {
     display: block;
@@ -358,24 +224,6 @@
   }
   [class$="-hero"] [class$="-progress"] > i {
     background: linear-gradient(90deg, var(--color-accent-400), var(--color-teal-400));
-  }
-
-  /* percentage badge next to a bar */
-  .perf-bar-wrap {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-top: 0.75rem;
-  }
-  .perf-bar-wrap .perf-bar {
-    flex: 1;
-    margin: 0;
-  }
-  .perf-bar-wrap > b {
-    font-size: 0.8rem;
-    font-weight: 800;
-    color: var(--color-slate-700);
-    font-variant-numeric: tabular-nums;
   }
 
   /* good / mid / low percentage chips used in KPI headers */
@@ -401,12 +249,7 @@
   }
 
   /* ==================================================================
-     4. KPI CARD HEAD — icon chip on the left, % chip on the right
-     ================================================================== */
-  .manager-v5-metric-top,
-  .manager-v5-metric > .manager-v5-metric-top,
-  .supervisor-v6-kpi > div:first-child,
-  .rso-v7-kpi > div:first-child,
+     4. KPI CARD HEAD — icon chip on the left,
   .admin-v2-kpi > div:first-child {
     display: flex;
     align-items: center;
@@ -414,24 +257,7 @@
     gap: 0.5rem;
     margin-bottom: 0.35rem;
   }
-  .manager-v5-metric-top > span,
-  .supervisor-v6-kpi > div:first-child > span,
-  .rso-v7-kpi > div:first-child > span {
-    display: grid;
-    place-items: center;
-    width: 2.1rem;
-    height: 2.1rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    color: var(--color-accent-600);
-    flex-shrink: 0;
-    font-size: 0.95rem;
-  }
 
-  /* KPI / metric footers: "Target x" ... "y left" */
-  .manager-v5-metric-foot,
-  .supervisor-v6-kpi > footer,
-  .rso-v7-kpi > footer,
   .progress-card-foot {
     display: flex;
     align-items: center;
@@ -444,10 +270,6 @@
     color: var(--color-slate-500);
   }
 
-  /* stat cards themselves get card chrome */
-  .manager-v5-metric,
-  .supervisor-v6-kpi,
-  .rso-v7-kpi,
   .admin-v2-kpi,
   .admin-kpi,
   .admin-kpi-card,
@@ -465,254 +287,15 @@
   /* ==================================================================
      5. GRID WRAPPERS that hold the stat cards
      ================================================================== */
-  .perf-summary,
-  .perf-v2-summary,
-  .manager-v5-metrics,
-  .supervisor-v6-kpis,
-  .rso-v7-kpis,
-  .admin-v2-kpis,
-  .bp-v8-grid,
-  .manager-v5-subhero,
-  .accounts-v12-stats {
+  .admin-v2-kpis {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
     gap: 0.9rem;
     margin-bottom: 1.1rem;
   }
-  .perf-card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
-    gap: 1rem;
-  }
 
   /* ==================================================================
-     6. HERO INTERNALS — tag strips, network strips, side panels
-     ================================================================== */
-  .manager-v5-tags,
-  .supervisor-v6-tags,
-  .accounts-v12-tags,
-  .rso-v7-tags,
-  .bp-v8-tags,
-  .target-v3-chips,
-  .attention-v4-chips,
-  .audit-v4-chips,
-  .ops-head-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-top: 0.75rem;
-  }
-  .manager-v5-tags > span,
-  .supervisor-v6-tags > span,
-  .accounts-v12-tags > span,
-  .rso-v7-tags > span,
-  .bp-v8-tags > span {
-    display: inline-flex;
-    align-items: center;
-    height: 1.6rem;
-    padding: 0 0.65rem;
-    border-radius: var(--radius-pill);
-    background: rgb(255 255 255 / 0.12);
-    border: 1px solid rgb(255 255 255 / 0.14);
-    color: var(--color-slate-200);
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: none;
-    letter-spacing: 0;
-  }
-
-  .manager-v5-network,
-  .supervisor-v6-network,
-  .rso-v7-network {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    padding-top: 0.9rem;
-    margin-top: 0.9rem;
-    border-top: 1px solid rgb(255 255 255 / 0.12);
-    width: 100%;
-  }
-  .manager-v5-network > div > strong,
-  .supervisor-v6-network > div > strong,
-  .rso-v7-network > div > strong {
-    font-size: 1.15rem;
-  }
-  .rso-v7-network > div.alert > strong {
-    color: var(--color-warning-400, #fbbf24);
-  }
-
-  .manager-v5-command,
-  .supervisor-v6-alert,
-  .accounts-v12-fresh,
-  .rso-v7-ga,
-  .bp-v8-main,
-  .bp-v8-today {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    background: rgb(255 255 255 / 0.08);
-    border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: var(--radius-control);
-    padding: 0.85rem 1rem;
-  }
-  .manager-v5-command {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  .manager-v5-command > a,
-  .supervisor-v6-alert > b,
-  .bp-v8-today > b {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--color-accent-300);
-    white-space: nowrap;
-  }
-  .supervisor-v6-alert > span,
-  .bp-v8-today > span {
-    display: grid;
-    place-items: center;
-    width: 2.4rem;
-    height: 2.4rem;
-    border-radius: 999px;
-    background: rgb(255 255 255 / 0.14);
-    flex-shrink: 0;
-    font-weight: 800;
-  }
-  .supervisor-v6-alert.active > span {
-    background: var(--color-warning-500);
-    color: #fff;
-  }
-  .supervisor-v6-alert > b,
-  .bp-v8-today > b {
-    margin-left: auto;
-  }
-
-  /* circular progress rings in RSO / BP heroes */
-  .rso-v7-ring,
-  .bp-v8-ring {
-    --rso-p: 0deg;
-    display: grid;
-    place-items: center;
-    width: 4rem;
-    height: 4rem;
-    flex-shrink: 0;
-    margin-left: auto;
-    border-radius: 50%;
-    background: conic-gradient(var(--color-teal-400) var(--rso-p), rgb(255 255 255 / 0.15) 0);
-  }
-  .rso-v7-ring > span,
-  .bp-v8-ring {
-    font-weight: 800;
-  }
-  .rso-v7-ring > span {
-    display: grid;
-    place-items: center;
-    width: 3.1rem;
-    height: 3.1rem;
-    border-radius: 50%;
-    background: var(--color-navy-900);
-    color: #fff;
-    font-size: 0.85rem;
-  }
-  .bp-v8-ring {
-    background: rgb(255 255 255 / 0.12);
-    flex-direction: column;
-    gap: 0;
-  }
-  .bp-v8-ring > b {
-    font-size: 1rem;
-    color: #fff;
-  }
-  .bp-v8-ring > small {
-    font-size: 0.58rem;
-    letter-spacing: 0.08em;
-  }
-
-  .rso-v7-hero-top,
-  .bp-v8-top,
-  .accounts-v12-hero > div:first-child,
-  .manager-v5-copy {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    width: 100%;
-    flex-direction: column;
-  }
-  .rso-v7-hero-top,
-  .bp-v8-top {
-    flex-direction: row;
-  }
-  .rso-v7-hero-top > span,
-  .bp-v8-top > span {
-    flex-shrink: 0;
-    padding: 0.25rem 0.7rem;
-    border-radius: var(--radius-pill);
-    background: rgb(255 255 255 / 0.14);
-    font-size: 0.72rem;
-    font-weight: 700;
-  }
-
-  /* icon+text+chevron action rows */
-  .accounts-v12-action,
-  .bp-v8-action {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.8rem 0.95rem;
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-  }
-  .accounts-v12-action > span,
-  .bp-v8-action > span,
-  .bp-v8-info > span {
-    display: grid;
-    place-items: center;
-    width: 2.3rem;
-    height: 2.3rem;
-    border-radius: var(--radius-control);
-    background: var(--tone-bg, var(--color-accent-50));
-    color: var(--tone-color, var(--color-accent-600));
-    flex-shrink: 0;
-  }
-  .accounts-v12-action > div > strong,
-  .bp-v8-action > div > strong {
-    display: block;
-    font-size: 0.88rem;
-    color: var(--color-slate-900);
-  }
-  .accounts-v12-action > div > small,
-  .bp-v8-action > div > small {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-    text-transform: none;
-    letter-spacing: 0;
-    font-weight: 500;
-  }
-  .accounts-v12-action > b,
-  .bp-v8-action > b {
-    margin-left: auto;
-    color: var(--color-slate-300);
-  }
-  .bp-v8-info {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 0.95rem 1.05rem;
-  }
-
-  /* ==================================================================
-     7. PERF PAGE — head, period, filter, person cards
-     ================================================================== */
-  .perf-v2-head {
+     7. PERF PAGE — head, period, filter{
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -720,129 +303,22 @@
     gap: 1rem;
     margin-bottom: 1.1rem;
   }
-  .perf-v2-head h1 {
-    font-size: 1.4rem;
-    margin-top: 0.1rem;
-  }
-  .perf-v2-head p {
-    font-size: 0.85rem;
-    color: var(--color-slate-500);
-    margin-top: 0.15rem;
-  }
-  .perf-v2-period {
-    align-items: flex-end;
-    text-align: right;
-  }
-  .perf-v2-period > strong {
-    font-size: 0.92rem;
-    font-weight: 700;
-  }
-  .perf-v2-period > i {
-    display: none;
-  }
-  .perf-v2-period::after {
-    content: "";
-  }
 
-  .perf-search {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1;
-    min-width: 13rem;
-  }
-  .perf-search > span {
-    display: grid;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: var(--radius-control);
-    background: var(--color-slate-100);
-    color: var(--color-slate-500);
-    flex-shrink: 0;
-  }
-  .perf-search > div {
-    flex: 1;
-  }
-  .perf-search label,
-  .perf-filter > label > span {
-    display: block;
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-slate-400);
-    margin-bottom: 0.15rem;
-  }
-  .perf-filter > label {
-    margin: 0;
-  }
 
-  .perf-person-top {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-    margin-bottom: 0.85rem;
-  }
-  .perf-person-top > div:not([class]) {
-    min-width: 0;
-    flex: 1;
-  }
-  .perf-person-top strong {
-    display: block;
-    font-size: 0.95rem;
-    color: var(--color-slate-900);
-  }
-  .perf-person-top span {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-  }
-  .perf-person-top > em {
-    margin-left: auto;
-    font-style: normal;
-    font-size: 0.95rem;
-    font-weight: 800;
-    color: var(--color-accent-600);
-    font-variant-numeric: tabular-nums;
-  }
-  .perf-money {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--color-slate-100);
-  }
-  .perf-money > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-  }
-  .perf-money span {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-slate-400);
-  }
-  .perf-money b {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: var(--color-slate-900);
-    font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .perf-person-card {
-    display: block;
-  }
+
+
+
+
+
+
+
+
+
 
   /* ==================================================================
      8. ANALYTICS CHARTS (AnalyticsCharts.tsx)
      ================================================================== */
-  .analytics-card-v90,
-  .performance-chart-wrap-v90 > .analytics-card-v90 {
+  .analytics-card-v90 {
     display: block;
     background: #fff;
     border: 1px solid var(--color-slate-200);
@@ -976,20 +452,6 @@
     color: var(--color-slate-500);
     font-size: 0.85rem;
   }
-
-  /* ==================================================================
-     9. Progress card (RoleUI) + status pills
-     ================================================================== */
-  .progress-card-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-  .status-pill.status-good {
-    background: var(--color-success-50);
-    color: var(--color-success-700);
-  }
   .status-pill.status-mid {
     background: var(--color-warning-50);
     color: var(--color-warning-700);
@@ -998,16 +460,6 @@
     background: var(--color-danger-50);
     color: var(--color-danger-700);
   }
-  .metric-icon {
-    display: grid;
-    place-items: center;
-    width: 2.2rem;
-    height: 2.2rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    color: var(--color-accent-600);
-    margin-bottom: 0.5rem;
-  }
 
   /* ==================================================================
      10. Section heads whose content belongs on the LEFT
@@ -1015,10 +467,7 @@
      for a title/action bar but wrong where an icon leads into a title.
      ================================================================== */
   .premium-form-section-head,
-  .ops-title,
-  .premium-page-head-copy,
-  .perf-person-top,
-  .ops-person {
+  .premium-page-head-copy {
     justify-content: flex-start;
   }
   .premium-form-section-head > div:not([class]) {
@@ -1028,69 +477,6 @@
   .premium-form-section-aside {
     margin-left: auto;
   }
-
-  /* ==================================================================
-     11. Remaining label/value pairs that sit inside a row
-     ================================================================== */
-  .ops-metric > div > strong {
-    display: block;
-    font-size: 1.15rem;
-    font-weight: 800;
-    color: var(--color-slate-900);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-  }
-  .ops-metric > div > small {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-  }
-
-  .import-health-meta-v96 > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-  .import-health-meta-v96 span {
-    display: block;
-    font-size: 0.65rem;
-    color: var(--color-slate-400);
-  }
-  .import-health-meta-v96 b {
-    font-size: 0.78rem;
-    color: var(--color-slate-700);
-  }
-
-  /* retailer detail — recent GA / recharge activity rows */
-  .retailer-activity-row > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-  }
-  .retailer-activity-row > div:first-of-type {
-    flex: 1;
-  }
-  .retailer-activity-row > div:last-child {
-    margin-left: auto;
-    text-align: right;
-  }
-  .retailer-activity-row strong {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-slate-800);
-  }
-  .retailer-activity-row small {
-    display: block;
-    font-size: 0.72rem;
-    color: var(--color-slate-500);
-  }
-  .retailer-v2-panel-head > b {
-    font-size: 1.05rem;
-    font-weight: 800;
-    color: var(--color-slate-900);
-  }
 }
 
 /* ====================================================================
@@ -1099,375 +485,6 @@
  * their own `ga-*` class family, so they need their own rules.
  * ==================================================================== */
 @layer components {
-  .ga-premium-page,
-  .ops-premium-page,
-  .field-page {
-    display: flex;
-    flex-direction: column;
-    gap: 1.1rem;
-  }
-
-  .ga-page-head {
-    background: linear-gradient(135deg, var(--color-navy-900), var(--color-navy-700));
-    color: #fff;
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-panel);
-    padding: 1.5rem 1.6rem;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 1.25rem;
-  }
-  .ga-head-copy {
-    max-width: 40rem;
-  }
-  .ga-head-copy > p {
-    color: var(--color-slate-300);
-    font-size: 0.85rem;
-    margin-top: 0.4rem;
-  }
-  .ga-title-line {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-top: 0.35rem;
-  }
-  .ga-title-line h1 {
-    color: #fff;
-    font-size: 1.35rem;
-  }
-  .ga-title-badge {
-    padding: 0.2rem 0.6rem;
-    border-radius: var(--radius-pill);
-    background: rgb(255 255 255 / 0.14);
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-  }
-  .ga-date-card {
-    align-self: flex-start;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    background: rgb(255 255 255 / 0.07);
-    border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: var(--radius-control);
-    padding: 0.85rem 1rem;
-  }
-  .ga-date-card label {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin: 0;
-  }
-  .ga-date-card label > span {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--color-slate-300);
-  }
-  .ga-date-card input {
-    height: 2.1rem;
-    width: auto;
-    border: none;
-    font-size: 0.78rem;
-  }
-
-  /* latest-import strip */
-  .ga-freshness-v96 {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.85rem 1.05rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    border: 1px solid var(--color-accent-100);
-  }
-  .ga-freshness-v96 > span:first-child {
-    display: none;
-  }
-  .ga-freshness-v96 small {
-    display: block;
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--color-accent-600);
-  }
-  .ga-freshness-v96 strong {
-    display: block;
-    font-size: 0.98rem;
-    color: var(--color-slate-900);
-  }
-  .ga-freshness-v96 em {
-    display: block;
-    font-style: normal;
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-  }
-  .ga-freshness-v96 > div:last-child {
-    text-align: right;
-  }
-  .ga-freshness-v96 > div:last-child > b {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--color-slate-700);
-  }
-
-  /* upload workspace */
-  .ga-upload-card,
-  .ga-data-card,
-  .ga-section,
-  .ga-history-card {
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 1.25rem 1.4rem;
-  }
-  .ga-upload-card-head,
-  .ga-card-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.9rem;
-  }
-  .ga-section-title {
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 0.9rem;
-  }
-  .ga-card-head .ga-section-title {
-    margin-bottom: 0;
-  }
-  .ga-section-icon {
-    display: grid;
-    place-items: center;
-    width: 2.3rem;
-    height: 2.3rem;
-    flex-shrink: 0;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    color: var(--color-accent-600);
-    font-size: 1rem;
-  }
-  .ga-section-title h2,
-  .ga-card-head h2 {
-    font-size: 1rem;
-  }
-  .ga-section-title p,
-  .ga-card-head p,
-  .ga-subline {
-    font-size: 0.8rem;
-    color: var(--color-slate-500);
-    margin-top: 0.15rem;
-  }
-  .ga-upload-overline {
-    display: block;
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-accent-600);
-  }
-  .ga-sample-btn,
-  .ga-count-pill,
-  .ga-neutral-pill {
-    display: inline-flex;
-    align-items: center;
-    height: 1.75rem;
-    padding: 0 0.7rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.73rem;
-    font-weight: 700;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .ga-sample-btn {
-    background: var(--color-accent-50);
-    color: var(--color-accent-700);
-  }
-  .ga-count-pill,
-  .ga-neutral-pill {
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-  }
-  .ga-upload-flow {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.45rem;
-    font-size: 0.76rem;
-    color: var(--color-slate-500);
-    margin-bottom: 0.9rem;
-  }
-  .ga-upload-flow > span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .ga-upload-flow b {
-    display: inline-grid;
-    place-items: center;
-    width: 1.3rem;
-    height: 1.3rem;
-    border-radius: 50%;
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-    font-size: 0.68rem;
-  }
-  .ga-upload-flow > i {
-    font-style: normal;
-    color: var(--color-slate-300);
-  }
-  .ga-upload-form {
-    display: grid;
-    gap: 0.75rem;
-  }
-  .ga-file-field {
-    display: block;
-    border: 1.5px dashed var(--color-slate-300);
-    border-radius: var(--radius-control);
-    background: var(--color-slate-50);
-    padding: 1.1rem;
-    text-align: center;
-    cursor: pointer;
-    transition:
-      border-color 0.14s var(--ease-premium),
-      background-color 0.14s var(--ease-premium);
-  }
-  .ga-file-field:hover {
-    border-color: var(--color-accent-400);
-    background: var(--color-accent-50);
-  }
-  .ga-file-field > span {
-    display: block;
-    font-size: 0.86rem;
-    font-weight: 600;
-    color: var(--color-slate-700);
-  }
-  .ga-file-field > small {
-    display: block;
-    font-size: 0.73rem;
-    color: var(--color-slate-500);
-    margin-top: 0.1rem;
-  }
-  .ga-file-field input {
-    display: block;
-    margin: 0.6rem auto 0;
-    width: auto;
-    height: auto;
-    border: none;
-    background: none;
-    font-size: 0.78rem;
-  }
-  .ga-upload-btn,
-  .upload-process-btn {
-    height: 2.6rem;
-    border: none;
-    border-radius: var(--radius-control);
-    background: linear-gradient(135deg, var(--color-accent-600), var(--color-accent-700));
-    color: #fff;
-    font-size: 0.86rem;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 6px 16px -4px rgb(37 99 235 / 0.4);
-  }
-  .ga-rule-box,
-  .accounts-v12-rule {
-    display: flex;
-    gap: 0.6rem;
-    margin-top: 0.9rem;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--color-slate-100);
-    font-size: 0.78rem;
-    line-height: 1.6;
-    color: var(--color-slate-500);
-  }
-  .ga-rule-box b {
-    color: var(--color-slate-700);
-  }
-  .ga-info-dot,
-  .info-dot {
-    display: grid;
-    place-items: center;
-    width: 1.25rem;
-    height: 1.25rem;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--color-accent-50);
-    color: var(--color-accent-600);
-    font-size: 0.68rem;
-    font-weight: 800;
-  }
-  .ga-message {
-    margin-top: 0.85rem;
-    padding: 0.7rem 0.9rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    color: var(--color-accent-800);
-    font-size: 0.82rem;
-  }
-
-  /* GA metric tiles */
-  .ga-day-metrics,
-  .ga-performance-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.85rem;
-  }
-  .ga-metric {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 0.95rem 1.05rem;
-  }
-  .ga-metric-icon {
-    display: grid;
-    place-items: center;
-    width: 2.4rem;
-    height: 2.4rem;
-    flex-shrink: 0;
-    border-radius: var(--radius-control);
-    background: var(--tone-bg, var(--color-accent-50));
-    color: var(--tone-color, var(--color-accent-600));
-    font-size: 0.8rem;
-    font-weight: 800;
-  }
-  .ga-metric > div {
-    min-width: 0;
-  }
-  .ga-metric-label {
-    display: block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-slate-500);
-  }
-  .ga-metric strong {
-    display: block;
-    font-size: 1.3rem;
-    font-weight: 800;
-    color: var(--color-slate-900);
-    line-height: 1.2;
-    font-variant-numeric: tabular-nums;
-  }
-  .ga-metric small {
-    display: block;
-    font-size: 0.73rem;
-    color: var(--color-slate-500);
-  }
   .tone-cyan {
     --tone-color: var(--color-teal-600);
     --tone-bg: var(--color-teal-50);
@@ -1479,121 +496,11 @@
   }
 
   /* GA table cells */
-  .ga-person,
   .person-name {
     display: flex;
     align-items: center;
     gap: 0.55rem;
     justify-content: flex-start;
-  }
-  .ga-person > span {
-    display: grid;
-    place-items: center;
-    width: 1.9rem;
-    height: 1.9rem;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--color-accent-50);
-    color: var(--color-accent-700);
-    font-size: 0.64rem;
-    font-weight: 700;
-  }
-  .ga-person > div {
-    min-width: 0;
-  }
-  .ga-person b {
-    display: block;
-    font-size: 0.83rem;
-    font-weight: 600;
-    color: var(--color-slate-800);
-    white-space: nowrap;
-  }
-  .ga-person small {
-    display: block;
-    font-size: 0.7rem;
-    color: var(--color-slate-500);
-  }
-  .ga-number {
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
-    color: var(--color-slate-900);
-  }
-  .ga-number.blue {
-    color: var(--color-accent-600);
-  }
-  .ga-number.green {
-    color: var(--color-success-600);
-  }
-  .ga-number.orange {
-    color: var(--color-warning-700);
-  }
-  .ga-status {
-    display: block;
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--color-success-600);
-  }
-  .ga-swap-badge-v98 {
-    display: inline-flex;
-    align-items: center;
-    height: 1.4rem;
-    padding: 0 0.5rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-warning-50);
-    color: var(--color-warning-700);
-    font-size: 0.68rem;
-    font-weight: 800;
-  }
-  .ga-progress-cell,
-  .perf-row-numbers {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .ga-progress-cell > div {
-    width: 3.5rem;
-    height: 0.4rem;
-    border-radius: 999px;
-    background: var(--color-slate-100);
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .ga-progress-cell > div > span {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--color-accent-500), var(--color-teal-500));
-  }
-  .ga-progress-cell > b {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--color-slate-700);
-    font-variant-numeric: tabular-nums;
-  }
-  .ga-sso-cell {
-    display: flex;
-    align-items: baseline;
-    gap: 0.25rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .ga-sso-cell > b {
-    font-size: 0.9rem;
-    font-weight: 800;
-    color: var(--color-slate-900);
-  }
-  .ga-sso-cell > span {
-    font-size: 0.75rem;
-    color: var(--color-slate-400);
-  }
-  .ga-empty {
-    text-align: center;
-    padding: 2rem 1rem;
-    color: var(--color-slate-500);
-    border: 1px dashed var(--color-slate-300);
-    border-radius: var(--radius-card);
-    background: var(--color-slate-50);
   }
 }
 
@@ -1603,9 +510,6 @@
 @layer components {
   /* `.page button` (0,1,1) in components.css otherwise repaints these
      primary buttons white. Match it with element+class. */
-  .page button.ga-upload-btn,
-  .page button.upload-process-btn,
-  .page button.ops-upload-btn,
   .page button.auth-v54-submit,
   .page button.admin-primary,
   .page button.btn-primary {
@@ -1613,11 +517,6 @@
     border: none;
     color: #fff;
     box-shadow: 0 6px 16px -4px rgb(37 99 235 / 0.4);
-  }
-  .page button.ga-upload-btn:hover,
-  .page button.upload-process-btn:hover,
-  .page button.ops-upload-btn:hover {
-    background: linear-gradient(135deg, var(--color-accent-700), var(--color-accent-800));
   }
 
   /* Table cell idiom: an unclassed <div> holding a code over a name.
@@ -1639,20 +538,7 @@
     text-transform: none;
   }
 
-  /* Freshness strip: only the left block's <small> is an eyebrow label;
-     the right block's is a muted timestamp. */
-  .ga-freshness-v96 > div:last-child > small,
-  .ops-freshness-v96 > div:last-child > small {
-    font-size: 0.72rem;
-    font-weight: 400;
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--color-slate-500);
-  }
-
   /* File picker: keep the native input compact and unboxed. */
-  .ga-file-field input[type="file"],
-  .ops-file-field input[type="file"],
   input[type="file"] {
     display: inline-block;
     width: auto;
@@ -1689,27 +575,6 @@
  * attribute ends in "active". Anything that can carry a state class needs
  * its real class name spelled out.
  * ==================================================================== */
-@layer components {
-  .supervisor-v6-alert > div > strong,
-  .supervisor-v6-alert > div > small,
-  .supervisor-v6-alert > div > p,
-  .supervisor-v6-alert > b {
-    color: #fff;
-  }
-  .supervisor-v6-alert > div > small,
-  .supervisor-v6-alert > div > p {
-    color: var(--color-slate-300);
-  }
-  .supervisor-v6-alert > b {
-    color: var(--color-accent-300);
-  }
-  .rso-v7-network > div.alert > strong {
-    color: var(--color-warning-400);
-  }
-  .rso-v7-network > div.alert > small {
-    color: var(--color-slate-300);
-  }
-}
 
 /* ====================================================================
  * MORE UNIVERSAL IDIOMS
@@ -1756,251 +621,7 @@
  * UPLOAD CENTER (app/admin/upload/page.tsx)
  * ==================================================================== */
 @layer components {
-  .upload-v61-group {
-    margin-bottom: 1.25rem;
-  }
-  .upload-v61-group-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.9rem;
-  }
-  .upload-v61-group-head > div > span {
-    display: block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-accent-600);
-  }
-  .upload-v61-group-head h2 {
-    font-size: 1.02rem;
-    margin-top: 0.15rem;
-  }
-  .upload-v61-group-head p {
-    font-size: 0.82rem;
-    color: var(--color-slate-500);
-    margin-top: 0.15rem;
-  }
-  .upload-v61-group-head > b {
-    flex-shrink: 0;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--color-slate-500);
-    padding: 0.25rem 0.65rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
-  }
-
-  .premium-upload-grid,
-  .upload-v61-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: 1rem;
-  }
-  .upload-module {
-    display: flex;
-    flex-direction: column;
-    gap: 0.7rem;
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    padding: 1.1rem 1.2rem;
-  }
-  .upload-v61-card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-  .upload-card-number {
-    font-size: 0.95rem;
-    font-weight: 800;
-    color: var(--tone-color, var(--color-accent-600));
-    letter-spacing: -0.02em;
-  }
-  .upload-v61-tag {
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    padding: 0.2rem 0.55rem;
-    border-radius: var(--radius-pill);
-    background: var(--tone-bg, var(--color-accent-50));
-    color: var(--tone-color, var(--color-accent-700));
-  }
-  .upload-module-top {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.7rem;
-  }
-  .upload-module-top > div {
-    min-width: 0;
-  }
-  .upload-module-top strong {
-    display: block;
-    font-size: 0.95rem;
-    color: var(--color-slate-900);
-  }
-  .upload-module-top span {
-    display: block;
-    font-size: 0.78rem;
-    color: var(--color-slate-500);
-  }
-  .upload-module > p {
-    font-size: 0.78rem;
-    line-height: 1.5;
-    color: var(--color-slate-500);
-  }
-  .upload-v61-validation {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-  .upload-v61-validation > span {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.2rem 0.5rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-success-50);
-    color: var(--color-success-700);
-  }
   /* the two action buttons were overlapping — they had no row layout */
-  .upload-module-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: auto;
-    padding-top: 0.35rem;
-  }
-  .upload-module-actions > .btn {
-    flex: 1;
-    justify-content: center;
-  }
-
-  .upload-guidance {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.85rem;
-    background: linear-gradient(135deg, var(--color-accent-50), #fff 70%);
-    border: 1px solid var(--color-accent-100);
-    border-radius: var(--radius-card);
-    padding: 1.1rem 1.25rem;
-    margin-bottom: 1.25rem;
-  }
-  .upload-guidance > div {
-    flex: 1;
-    min-width: 0;
-  }
-  .upload-guidance strong {
-    display: block;
-    font-size: 0.95rem;
-    color: var(--color-slate-900);
-  }
-  .upload-guidance p {
-    font-size: 0.82rem;
-    line-height: 1.55;
-    color: var(--color-slate-600);
-    margin-top: 0.2rem;
-  }
-  .upload-guidance-icon {
-    display: grid;
-    place-items: center;
-    width: 2.4rem;
-    height: 2.4rem;
-    flex-shrink: 0;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-100);
-    color: var(--color-accent-700);
-  }
-  .upload-guidance > .btn {
-    flex-shrink: 0;
-    align-self: center;
-  }
-
-  .upload-checklist {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    gap: 0.85rem;
-  }
-  .upload-checklist > div {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.65rem;
-    padding: 0.85rem 0.95rem;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-control);
-    background: var(--color-slate-50);
-  }
-  .upload-checklist > div > b {
-    display: grid;
-    place-items: center;
-    width: 1.7rem;
-    height: 1.7rem;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--color-accent-600);
-    color: #fff;
-    font-size: 0.7rem;
-    font-weight: 800;
-  }
-  .upload-checklist > div > span {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-  }
-  .upload-checklist strong {
-    font-size: 0.85rem;
-    color: var(--color-slate-900);
-  }
-  .upload-checklist small {
-    font-size: 0.76rem;
-    color: var(--color-slate-500);
-  }
-
-  /* upload-page-head is a hero but does not end in "-hero" */
-  .upload-page-head h1,
-  .upload-page-head h2 {
-    color: #fff;
-    font-size: 1.35rem;
-  }
-  .upload-page-head p {
-    color: var(--color-slate-300);
-    font-size: 0.85rem;
-    margin-top: 0.3rem;
-  }
-  .upload-page-head .admin-kicker {
-    color: var(--color-accent-300);
-  }
-  .upload-page-head > div:first-child {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .upload-result-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-    gap: 0.7rem;
-    margin-top: 0.9rem;
-  }
-  .upload-result-grid > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    padding: 0.7rem 0.85rem;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-control);
-    background: #fff;
-  }
-
-  /* expected-field chips were running into one string */
-  .upload-format > div {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0.6rem 0;
-  }
-  .upload-format code,
   code {
     display: inline-block;
     padding: 0.2rem 0.55rem;
@@ -2011,13 +632,6 @@
     font-size: 0.75rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .upload-format > p {
-    font-size: 0.8rem;
-    color: var(--color-slate-500);
-  }
-  .upload-format {
-    text-align: left;
-  }
 }
 
 /* ====================================================================
@@ -2025,134 +639,7 @@
  * (RetailerOpportunityViews.tsx — Attention Center, Retailer Performance)
  * ==================================================================== */
 @layer components {
-  .opportunity-list,
-  .retailer-card-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
-    gap: 0.85rem;
-  }
-  .retailer-result-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    padding: 1rem 1.1rem;
-  }
-  .retailer-result-top {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-  }
-  .retailer-result-name {
-    display: flex;
-    flex-direction: column;
-    gap: 0.05rem;
-    min-width: 0;
-    flex: 1;
-  }
-  .retailer-result-name > span {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    color: var(--color-slate-400);
-  }
-  .retailer-result-name > strong {
-    font-size: 0.95rem;
-    color: var(--color-slate-900);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .retailer-result-name > small {
-    font-size: 0.76rem;
-    color: var(--color-slate-500);
-  }
-  .retailer-result-top > b {
-    color: var(--color-slate-300);
-    flex-shrink: 0;
-  }
-  .attention-v4-priority {
-    flex-shrink: 0;
-    font-size: 0.68rem;
-    font-weight: 800;
-    padding: 0.2rem 0.5rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-warning-50);
-    color: var(--color-warning-700);
-  }
-  .attention-v4-priority.p4,
-  .attention-v4-priority.p5 {
-    background: var(--color-danger-50);
-    color: var(--color-danger-700);
-  }
-  .retailer-result-route {
-    font-size: 0.76rem;
-    color: var(--color-slate-500);
-    padding-bottom: 0.55rem;
-    border-bottom: 1px solid var(--color-slate-100);
-  }
   /* the four figures belong in a row, not stacked down the card */
-  .retailer-result-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-  }
-  .retailer-result-metrics > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-  }
-  .retailer-result-metrics span {
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-slate-400);
-  }
-  .retailer-result-metrics strong {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: var(--color-slate-900);
-    font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .retailer-result-metrics strong.ok {
-    color: var(--color-success-600);
-  }
-  .retailer-result-metrics strong.warn {
-    color: var(--color-warning-700);
-  }
-  .retailer-result-alert {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding-top: 0.55rem;
-    border-top: 1px solid var(--color-slate-100);
-  }
-  .retailer-result-alert > span {
-    font-size: 0.74rem;
-    color: var(--color-warning-700);
-    background: var(--color-warning-50);
-    border-radius: var(--radius-control);
-    padding: 0.3rem 0.55rem;
-  }
-  .attention-v4-icon {
-    display: grid;
-    place-items: center;
-    width: 2.4rem;
-    height: 2.4rem;
-    flex-shrink: 0;
-    border-radius: var(--radius-control);
-    background: var(--tone-grad, linear-gradient(135deg, #3b82f6, #6366f1));
-    color: #fff;
-    font-size: 1.05rem;
-    font-weight: 800;
-    line-height: 1;
-  }
   .tone-rose {
     --tone-color: var(--color-danger-600);
     --tone-bg: var(--color-danger-50);
@@ -2172,175 +659,7 @@
  * EMPLOYEE CONTROL CENTER role cards + ACTIVITY LOG rows
  * ==================================================================== */
 @layer components {
-  .ecc-v82-roles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    gap: 0.85rem;
-    margin-bottom: 1.25rem;
-  }
-  .ecc-v82-role {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    background: #fff;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    padding: 1rem 1.1rem;
-    box-shadow: var(--shadow-card);
-  }
-  .ecc-v82-icon {
-    display: grid;
-    place-items: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    flex-shrink: 0;
-    border-radius: var(--radius-control);
-    background: var(--tone-grad, linear-gradient(135deg, #3b82f6, #6366f1));
-    color: #fff;
-  }
-  .ecc-v82-role-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 0.05rem;
-    min-width: 0;
-    flex: 1;
-  }
-  .ecc-v82-role-copy > strong {
-    font-size: 0.95rem;
-    color: var(--color-slate-900);
-  }
-  .ecc-v82-role-copy > small {
-    font-size: 0.76rem;
-    color: var(--color-slate-500);
-  }
-  .ecc-v82-role > b {
-    font-size: 1.25rem;
-    font-weight: 800;
-    color: var(--color-slate-900);
-    font-variant-numeric: tabular-nums;
-  }
-  .ecc-v82-arrow {
-    color: var(--color-slate-300);
-    flex-shrink: 0;
-  }
-  .ecc-v82-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-top: 0.75rem;
-  }
-  .ecc-v82-chips > span {
-    font-size: 0.74rem;
-    font-weight: 600;
-    padding: 0.25rem 0.65rem;
-    border-radius: var(--radius-pill);
-    background: rgb(255 255 255 / 0.12);
-    border: 1px solid rgb(255 255 255 / 0.14);
-    color: var(--color-slate-200);
-  }
-  .ecc-v82-flow {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.85rem;
-    color: var(--color-slate-700);
-  }
-  .ecc-v82-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  .ecc-v82-secondary {
-    display: inline-flex;
-    align-items: center;
-    height: 2.5rem;
-    padding: 0 1rem;
-    border-radius: var(--radius-control);
-    background: var(--color-slate-100);
-    color: var(--color-slate-700);
-    font-size: 0.84rem;
-    font-weight: 600;
-  }
-  .workspace-secure-v94 {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    color: var(--color-success-600);
-  }
-
   /* --- Activity Log --- */
-  .audit-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.85rem 1rem;
-    border-bottom: 1px solid var(--color-slate-100);
-  }
-  .audit-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    margin-top: 0.45rem;
-    flex-shrink: 0;
-    border-radius: 999px;
-    background: var(--color-accent-500);
-  }
-  .audit-main {
-    flex: 1;
-    min-width: 0;
-  }
-  .audit-main > div:first-child {
-    display: flex;
-    align-items: baseline;
-    gap: 0.4rem;
-  }
-  .audit-main > div:first-child > strong {
-    font-size: 0.88rem;
-    color: var(--color-slate-900);
-  }
-  .audit-main > div:first-child > span {
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    padding: 0.1rem 0.4rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
-    color: var(--color-slate-500);
-  }
-  .audit-main > p {
-    font-size: 0.82rem;
-    color: var(--color-slate-600);
-    margin-top: 0.2rem;
-  }
-  .audit-main > small {
-    display: block;
-    font-size: 0.76rem;
-    color: var(--color-slate-400);
-    margin-top: 0.15rem;
-  }
-  .audit-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.1rem;
-    flex-shrink: 0;
-    text-align: right;
-  }
-  .audit-meta > b {
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-accent-600);
-  }
-  .audit-meta > span {
-    font-size: 0.76rem;
-    color: var(--color-slate-500);
-    white-space: nowrap;
-  }
 }
 
 /* ====================================================================
@@ -2348,8 +667,6 @@
  * ==================================================================== */
 @layer components {
   /* --- the "How this works" note above the Attention KPI grid --- */
-  .attention-v4-note,
-  .ecc-v82-note,
   .info-banner {
     display: block;
     padding: 0.85rem 1.05rem;
@@ -2358,149 +675,11 @@
     background: var(--color-accent-50);
     border: 1px solid var(--color-accent-100);
   }
-  .attention-v4-note > b {
-    display: block;
-    font-size: 0.85rem;
-    color: var(--color-slate-900);
-  }
-  .attention-v4-note > span {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--color-slate-600);
-    margin-top: 0.15rem;
-  }
-
-  /* --- Bulk Permission Manager --- */
-  .permission-bulk {
-    display: block;
-  }
-  .permission-bulk-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.9rem;
-  }
-  .permission-bulk-head > div {
-    flex: 1;
-    min-width: 0;
-  }
-  .permission-bulk-head > .control {
-    width: auto;
-    min-width: 11rem;
-    flex-shrink: 0;
-  }
-  .permission-bulk-select {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.6rem 0;
-    border-top: 1px solid var(--color-slate-100);
-    border-bottom: 1px solid var(--color-slate-100);
-  }
-  .permission-bulk-select label,
-  .permission-bulk-users label {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    margin: 0;
-    cursor: pointer;
-  }
-  .permission-bulk-select label > span {
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: var(--color-slate-700);
-  }
-  .permission-bulk-select > b {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--color-slate-500);
-    white-space: nowrap;
-  }
-  .permission-bulk-users {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    max-height: 15rem;
-    overflow-y: auto;
-    padding: 0.5rem 0;
-  }
-  .permission-bulk-users label {
-    padding: 0.45rem 0.5rem;
-    border-radius: var(--radius-control);
-  }
-  .permission-bulk-users label:hover {
-    background: var(--color-slate-50);
-  }
-  .permission-bulk-users label > span {
-    display: flex;
-    flex-direction: column;
-    gap: 0.05rem;
-    min-width: 0;
-  }
-  .permission-bulk-users label strong {
-    font-size: 0.85rem;
-    color: var(--color-slate-900);
-  }
-  .permission-bulk-users label small {
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-  }
-  .permission-bulk-users input[type="checkbox"],
-  .permission-bulk-select input[type="checkbox"] {
-    width: 1.05rem;
-    height: 1.05rem;
-    min-height: 0;
-    flex-shrink: 0;
-    accent-color: var(--color-accent-600);
-  }
-  .permission-bulk-tools {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-    gap: 0.85rem;
-    margin-top: 0.9rem;
-  }
   /* head, select and button stack inside each tool — previously the select
      and button landed on top of the description text */
-  .permission-bulk-tool {
-    display: flex;
-    flex-direction: column;
-    gap: 0.55rem;
-    padding: 0.95rem 1.05rem;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    background: var(--color-slate-50);
-  }
-  .permission-bulk-tool > div:first-child > strong {
-    display: block;
-    font-size: 0.88rem;
-    color: var(--color-slate-900);
-  }
-  .permission-bulk-tool > div:first-child > span {
-    display: block;
-    font-size: 0.78rem;
-    color: var(--color-slate-500);
-    margin-top: 0.1rem;
-  }
-  .permission-bulk-tool > .btn {
-    align-self: flex-start;
-  }
-  .permission-bulk-msg {
-    margin-top: 0.85rem;
-    padding: 0.65rem 0.9rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    color: var(--color-accent-800);
-    font-size: 0.82rem;
-  }
 
   /* --- ECC action buttons: the icon was sitting on top of the label --- */
-  .ecc-v82-primary,
-  .ecc-v82-secondary,
-  .accounts-v12-side-actions > a,
-  .admin-v2-action,
-  .accounts-v12-action-btn {
+  .admin-v2-action {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
@@ -2510,50 +689,6 @@
     font-size: 0.85rem;
     font-weight: 600;
     white-space: nowrap;
-  }
-  .ecc-v82-primary .nav-icon,
-  .ecc-v82-secondary .nav-icon {
-    width: 1.05rem;
-    height: 1.05rem;
-    flex-shrink: 0;
-  }
-
-  /* --- Authorized Users (admin/users) --- */
-  .users-v3-hero-count {
-    text-align: right;
-  }
-  .users-v3-create,
-  .users-v3-directory {
-    display: block;
-  }
-  .users-v3-card-head,
-  .users-v3-directory-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.9rem;
-  }
-  .users-v3-search {
-    width: auto;
-    min-width: 11rem;
-    flex-shrink: 0;
-  }
-  .user-v3-status {
-    display: inline-flex;
-    align-items: center;
-    height: 1.7rem;
-    padding: 0 0.7rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-success-50);
-    color: var(--color-success-700);
-    font-size: 0.74rem;
-    font-weight: 700;
-  }
-  .user-v91-edit {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
   }
 }
 
@@ -2565,268 +700,9 @@
    one very tall column. Below: show exactly one of them per breakpoint,
    and lay out the pieces the cards are built from.
    ================================================================== */
-@layer components {
-  .target-mobile-list {
-    display: none;
-  }
-  .target-v3-hero {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-  }
-  .target-v3-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.9rem;
-  }
-  .target-v3-chips > span {
-    display: inline-flex;
-    align-items: center;
-    height: 1.75rem;
-    padding: 0 0.75rem;
-    border-radius: var(--radius-pill);
-    background: rgb(255 255 255 / 0.14);
-    color: rgb(255 255 255 / 0.92);
-    font-size: 0.74rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-  }
-  .target-month {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    flex-shrink: 0;
-  }
-  .target-month > span {
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-  }
-
-  /* forms.css owns the two-column grid for this workspace; only the spacing
-     above it belongs here. */
-  .target-premium-workspace {
-    margin-top: 1.1rem;
-  }
-  .target-upload-title {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.9rem;
-  }
-  .target-upload-title > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
-  .target-v3-overline {
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    color: var(--color-accent-600);
-  }
-  .target-upload-title strong {
-    font-size: 1.05rem;
-    font-weight: 750;
-    color: var(--color-navy-900);
-  }
-  .target-upload-title > div > span:last-child {
-    font-size: 0.82rem;
-    color: var(--color-slate-500);
-  }
-  .target-v3-flow {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 0.9rem;
-  }
-  .target-v3-flow > span {
-    display: inline-flex;
-    align-items: center;
-    height: 1.8rem;
-    padding: 0 0.7rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-    font-size: 0.76rem;
-    font-weight: 650;
-  }
-  .target-v3-flow > i {
-    font-style: normal;
-    color: var(--color-slate-400);
-  }
-  .target-import-result {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    margin-top: 0.85rem;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--color-slate-200);
-    font-size: 0.82rem;
-    color: var(--color-slate-600);
-  }
-  .target-import-result b {
-    color: var(--color-navy-900);
-    font-weight: 750;
-  }
-  .target-import-result details {
-    flex-basis: 100%;
-  }
-
-  /* The KPI strip sits in the workspace's 18rem side rail on wide screens, so
-     it packs two-up there rather than stretching six cards into a tall column. */
-  .target-kpis {
-    display: grid;
-    align-content: start;
-    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-    gap: 0.85rem;
-  }
-  .target-kpis > .card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-  }
-  .target-kpis > .card > span {
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--color-slate-500);
-  }
-  .target-kpis > .card > strong {
-    font-size: 1.45rem;
-    font-weight: 780;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-navy-900);
-  }
-
-  .target-section-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.9rem;
-  }
-  .target-section-head > div:first-child > span {
-    display: block;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    color: var(--color-accent-600);
-  }
-  .target-search {
-    flex-shrink: 0;
-  }
-  .target-search input {
-    min-width: 15rem;
-  }
-
-  .target-save-bar {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-top: 1.2rem;
-    padding: 0.85rem 1.1rem;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    background: rgb(255 255 255 / 0.94);
-    backdrop-filter: blur(8px);
-    box-shadow: var(--shadow-elevated);
-    font-size: 0.85rem;
-    color: var(--color-slate-600);
-  }
-}
 
 /* Below 900px the nine-column target table stops being usable: swap to the
    card list the page already renders. */
-@media (max-width: 900px) {
-  body .target-mobile-list {
-    display: grid;
-    gap: 0.75rem;
-  }
-  body .target-center .modern-table-wrap,
-  body .target-center .table-scroll-hint {
-    display: none;
-  }
-  body .target-mobile-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.7rem;
-    padding: 0.9rem;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    background: #fff;
-    box-shadow: var(--shadow-card);
-  }
-  body .target-mobile-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-  body .target-mobile-head > div {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-  }
-  body .target-mobile-head strong {
-    font-size: 0.95rem;
-    font-weight: 750;
-    color: var(--color-navy-900);
-  }
-  body .target-mobile-head > div > span {
-    font-size: 0.78rem;
-    color: var(--color-slate-500);
-  }
-  body .target-mobile-head > b {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    height: 1.6rem;
-    padding: 0 0.6rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-    font-size: 0.72rem;
-    font-weight: 700;
-  }
-  body .target-mobile-fields {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
-    gap: 0.6rem;
-  }
-  body .target-mobile-fields > label,
-  body .bp-target-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  body .target-mobile-fields > label > span,
-  body .bp-target-field > span {
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-slate-500);
-  }
-  body .target-mobile-fields input,
-  body .bp-target-field input {
-    width: 100%;
-  }
-}
 
 /* ======================================================================
    TWO MORE UNCLASSED IDIOMS
@@ -2835,24 +711,6 @@
   /* The file drop zone is <label><input><b>headline</b><span>hint</span></label>.
      The input is invisible, so without these the headline and hint render as
      one run-on line ("Choose target Excel fileXLSX / XLS / XLSM"). */
-  .upload-drop > b,
-  .upload-drop > span,
-  .upload-format > b,
-  .upload-format > span {
-    display: block;
-  }
-  .upload-drop > b,
-  .upload-format > b {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--color-navy-900);
-  }
-  .upload-drop > span,
-  .upload-format > span {
-    margin-top: 0.2rem;
-    font-size: 0.76rem;
-    color: var(--color-slate-500);
-  }
 
   /* Table cells carry a name plus a quieter identifier underneath:
      <td><strong>Rakib Hasan</strong><small>01711000000 · E-1042</small></td>.

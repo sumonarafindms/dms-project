@@ -1,11 +1,77 @@
-import {requireUser} from "../../../../lib/auth";
-import {employeePerformance,pct} from "../../../../lib/performance";
-import {normalizeMonth} from "../../../../lib/drilldown";
-import {PerfHead,PerfSummary,PerfBar,EmptyPerf} from "../../../components/AdminPerformanceUI";
-import Link from "next/link";
-export default async function Page({searchParams}:{searchParams:Promise<{q?:string;month?:string;from?:string;to?:string}>}){
- await requireUser(["ADMIN","IT"]);const s=await searchParams,q=(s.q||"").toLowerCase(),month=normalizeMonth(s.from?.slice(0,7)||s.month),all=await employeePerformance(`${month}-01`,undefined,s.from,s.to),rows=all.filter(r=>!q||`${r.name} ${r.employeeCode||""} ${r.rsoMsisdn} ${r.supervisor}`.toLowerCase().includes(q)).sort((a,b)=>pct(b.totalRechargeAchieved,b.totalRechargeTarget)-pct(a.totalRechargeAchieved,a.totalRechargeTarget));
- const t=rows.reduce((a,x)=>a+x.totalRechargeTarget,0),a=rows.reduce((n,x)=>n+x.totalRechargeAchieved,0);
- return <main className="page admin-performance"><PerfHead title="RSO Performance" subtitle="Every RSO, assigned retailers and execution across the selected dates." month={month} q={s.q||""} from={s.from} to={s.to} placeholder="RSO, code, mobile or supervisor"/><PerfSummary items={[{label:"RSOs",value:rows.length,sub:"Matching employees"},{label:"Retailers",value:rows.reduce((n,x)=>n+x.retailerCount,0),sub:"Assigned outlets"},{label:"Achievement",value:`৳${Math.round(a).toLocaleString()}`,sub:`${pct(a,t)}% of recharge target`},{label:"Remaining",value:`৳${Math.max(0,Math.round(t-a)).toLocaleString()}`,sub:"Recharge gap"}]}/>
- <div className="perf-card-grid">{rows.map(r=><Link href={`/admin/rsos/${r.employeeId}?month=${month}${s.from?`&from=${s.from}`:""}${s.to?`&to=${s.to}`:""}`} className="card perf-person-card" key={r.employeeId}><div className="perf-person-top"><div className="perf-avatar">{r.name.slice(0,2).toUpperCase()}</div><div><strong>{r.name}</strong><span>{r.employeeCode||r.rsoMsisdn} · {r.supervisor} · {r.retailerCount} retailers</span></div><em>{pct(r.totalRechargeAchieved,r.totalRechargeTarget)}%</em></div><div className="perf-money"><div><span>GA</span><b>{r.gaAchieved}/{r.gaTarget}</b></div><div><span>SSO</span><b>{r.ssoAchieved}/{r.ssoTarget}</b></div><div><span>LSO</span><b>{r.lsoAchieved}/{r.lsoTarget}</b></div></div><PerfBar achieved={r.totalRechargeAchieved} target={r.totalRechargeTarget}/></Link>)}{!rows.length&&<EmptyPerf text="No RSO performance found"/>}</div></main>
+import { requireUser } from "../../../../lib/auth";
+import { employeePerformance, pct } from "../../../../lib/performance";
+import { normalizeMonth } from "../../../../lib/drilldown";
+import { Card, EmptyState, EntityCard, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
+import { FilterForm } from "../../../components/DrillUI";
+import { Icon } from "../../../components/icons";
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string }>;
+}) {
+  await requireUser(["ADMIN", "IT"]);
+  const s = await searchParams,
+    q = (s.q || "").toLowerCase(),
+    month = normalizeMonth(s.from?.slice(0, 7) || s.month),
+    all = await employeePerformance(`${month}-01`, undefined, s.from, s.to),
+    rows = all
+      .filter((r) => !q || `${r.name} ${r.employeeCode || ""} ${r.rsoMsisdn} ${r.supervisor}`.toLowerCase().includes(q))
+      .sort(
+        (a, b) =>
+          pct(b.totalRechargeAchieved, b.totalRechargeTarget) - pct(a.totalRechargeAchieved, a.totalRechargeTarget),
+      );
+  const t = rows.reduce((a, x) => a + x.totalRechargeTarget, 0),
+    a = rows.reduce((n, x) => n + x.totalRechargeAchieved, 0);
+  return (
+    <main className="page">
+      <PageHeader
+        title="RSO Performance"
+        subtitle="Every RSO, assigned retailers and execution across the selected dates."
+      />
+      <FilterForm
+        dateRange
+        q={s.q || ""}
+        month={month}
+        from={s.from}
+        to={s.to}
+        placeholder="RSO, code, mobile or supervisor"
+      />
+      <SummaryStrip
+        items={[
+          { label: "RSOs", value: rows.length.toLocaleString() },
+          { label: "Retailers", value: rows.reduce((n, x) => n + x.retailerCount, 0).toLocaleString() },
+          { label: "Achieved", value: `৳${Math.round(a).toLocaleString()}`, tone: "teal" },
+          { label: "Remaining", value: `৳${Math.max(0, Math.round(t - a)).toLocaleString()}`, tone: "amber" },
+        ]}
+      />
+      <SectionHead title={`${rows.length} RSOs`} sub="Ranked by recharge achievement." />
+      {rows.length ? (
+        <div className="kit-card-grid">
+          {rows.map((r) => (
+            <EntityCard
+              key={r.employeeId}
+              href={`/admin/rsos/${r.employeeId}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`}
+              eyebrow="RSO"
+              name={r.name}
+              code={`${r.employeeCode || r.rsoMsisdn} · ${r.supervisor} · ${r.retailerCount} retailers`}
+              percent={pct(r.totalRechargeAchieved, r.totalRechargeTarget)}
+              metrics={[
+                { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
+                { label: "SSO", achieved: r.ssoAchieved, target: r.ssoTarget },
+                { label: "LSO", achieved: r.lsoAchieved, target: r.lsoTarget },
+              ]}
+            />
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <EmptyState
+            title="No RSO performance found"
+            hint="Try another period or search term."
+            icon={<Icon name="search" />}
+          />
+        </Card>
+      )}
+    </main>
+  );
 }

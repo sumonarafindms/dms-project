@@ -1,8 +1,21 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import {useCan} from "../components/PermissionContext";
-import {dhakaYesterdayYmd} from "../../lib/business-time";
+import { useCan } from "../components/PermissionContext";
+import { dhakaYesterdayYmd } from "../../lib/business-time";
+import {
+  OpsHeader,
+  OpsUpload,
+  OpsSectionTitle,
+  OpsMetric,
+  OpsDataCard,
+  OpsTable,
+  PersonCell,
+  ProgressCell,
+  EmptyState,
+  StatusPill,
+  OpsFreshness,
+} from "../components/OperationsPremiumUI";
 
 type EmployeeRow = {
   employeeId: string;
@@ -44,7 +57,9 @@ type History = {
   status: string;
 };
 
-function yesterday(){return dhakaYesterdayYmd()}
+function yesterday() {
+  return dhakaYesterdayYmd();
+}
 
 function prettyDate(value?: string | null) {
   if (!value) return "-";
@@ -54,21 +69,30 @@ function prettyDate(value?: string | null) {
 }
 
 export default function GaPage() {
-  const canView=useCan("ga","view");
-  const canAdd=useCan("ga","add");
+  const canView = useCan("ga", "view");
+  const canAdd = useCan("ga", "add");
   const [month, setMonth] = useState(() => yesterday().slice(0, 7));
   const [dataDate, setDataDate] = useState(yesterday());
-  const [fromDate,setFromDate]=useState(()=>`${yesterday().slice(0,7)}-01`);
-  const [toDate,setToDate]=useState(yesterday());
+  const [fromDate, setFromDate] = useState(() => `${yesterday().slice(0, 7)}-01`);
+  const [toDate, setToDate] = useState(yesterday());
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [retailerDaily, setRetailerDaily] = useState<RetailerDailyRow[]>([]);
   const [history, setHistory] = useState<History[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function load(overrides?:{month?:string;date?:string;from?:string;to?:string}) {
-    const nextMonth=overrides?.month||month,nextDate=overrides?.date||dataDate,nextFrom=overrides?.from||fromDate,nextTo=overrides?.to||toDate;
-    const params = new URLSearchParams({ month: `${nextMonth}-01`, date: nextDate, from:nextFrom, to:nextTo, _:String(Date.now()) });
+  async function load(overrides?: { month?: string; date?: string; from?: string; to?: string }) {
+    const nextMonth = overrides?.month || month,
+      nextDate = overrides?.date || dataDate,
+      nextFrom = overrides?.from || fromDate,
+      nextTo = overrides?.to || toDate;
+    const params = new URLSearchParams({
+      month: `${nextMonth}-01`,
+      date: nextDate,
+      from: nextFrom,
+      to: nextTo,
+      _: String(Date.now()),
+    });
     const res = await fetch(`/api/ga/summary?${params.toString()}`, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok) {
@@ -82,32 +106,32 @@ export default function GaPage() {
 
   useEffect(() => {
     load();
-  }, [month, dataDate,fromDate,toDate]);
+  }, [month, dataDate, fromDate, toDate]);
 
   // Both handlers ignore an empty value. A native date input reports "" while the
   // user is still typing a date by hand, and it also reported "" for any date the
   // old min={fromDate} attribute rejected. Writing that "" into state cleared the
   // range without ever moving dataDate, so the daily table silently kept showing
   // the previously selected day — the "date select korle kaj hoi na" report.
-  function changeFrom(value:string){
-    if(!value)return;
+  function changeFrom(value: string) {
+    if (!value) return;
     setFromDate(value);
-    if(value.length>=7)setMonth(value.slice(0,7));
+    if (value.length >= 7) setMonth(value.slice(0, 7));
     // Moving the start past the end drags the end (and the selected day) with it.
-    if(toDate<value){
+    if (toDate < value) {
       setToDate(value);
       setDataDate(value);
     }
   }
-  function changeTo(value:string){
-    if(!value)return;
+  function changeTo(value: string) {
+    if (!value) return;
     setToDate(value);
     setDataDate(value);
-    if(value.length>=7)setMonth(value.slice(0,7));
+    if (value.length >= 7) setMonth(value.slice(0, 7));
     // Picking a day before the current start used to be rejected outright by the
     // input's min attribute. Pull the start back instead, so every day the user
     // picks is always reachable.
-    if(value<fromDate)setFromDate(value);
+    if (value < fromDate) setFromDate(value);
   }
 
   async function upload(e: FormEvent<HTMLFormElement>) {
@@ -136,14 +160,14 @@ export default function GaPage() {
       setMessage(
         `GA import complete ${data.reportStartDate} → ${data.reportEndDate}: ${data.insertedRows} new SIM, ${data.updatedRows} corrected SIM, ${data.duplicateRows} duplicate SIM ignored, ${data.failedRows} failed row(s).`,
       );
-      if(data.reportStartDate&&data.reportEndDate){
-        const nextMonth=data.reportEndDate.slice(0,7);
+      if (data.reportStartDate && data.reportEndDate) {
+        const nextMonth = data.reportEndDate.slice(0, 7);
         setDataDate(data.reportEndDate);
         setMonth(nextMonth);
         setFromDate(data.reportStartDate);
         setToDate(data.reportEndDate);
-        input.value="";
-        await load({month:nextMonth,date:data.reportEndDate,from:data.reportStartDate,to:data.reportEndDate});
+        input.value = "";
+        await load({ month: nextMonth, date: data.reportEndDate, from: data.reportStartDate, to: data.reportEndDate });
         return;
       }
     }
@@ -152,102 +176,282 @@ export default function GaPage() {
     await load();
   }
 
-  const totals = useMemo(() => rows.reduce(
-    (a, r) => ({
-      target: a.target + r.gaTarget,
-      achieved: a.achieved + r.gaAchieved,
-      ga150: a.ga150 + r.ga150,
-      ga300: a.ga300 + r.ga300,
-      ssoT: a.ssoT + r.ssoTarget,
-      ssoA: a.ssoA + r.ssoAchieved,
-    }),
-    { target: 0, achieved: 0, ga150: 0, ga300: 0, ssoT: 0, ssoA: 0 },
-  ), [rows]);
+  const totals = useMemo(
+    () =>
+      rows.reduce(
+        (a, r) => ({
+          target: a.target + r.gaTarget,
+          achieved: a.achieved + r.gaAchieved,
+          ga150: a.ga150 + r.ga150,
+          ga300: a.ga300 + r.ga300,
+          ssoT: a.ssoT + r.ssoTarget,
+          ssoA: a.ssoA + r.ssoAchieved,
+        }),
+        { target: 0, achieved: 0, ga150: 0, ga300: 0, ssoT: 0, ssoA: 0 },
+      ),
+    [rows],
+  );
 
-  const dayTotals = useMemo(() => retailerDaily.reduce(
-    (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300 }),
-    { total: 0, ga150: 0, ga300: 0 },
-  ), [retailerDaily]);
-  const activeGaRetailers=useMemo(()=>retailerDaily.filter(r=>r.total>0).length,[retailerDaily]);
+  const dayTotals = useMemo(
+    () =>
+      retailerDaily.reduce(
+        (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300 }),
+        { total: 0, ga150: 0, ga300: 0 },
+      ),
+    [retailerDaily],
+  );
+  const activeGaRetailers = useMemo(() => retailerDaily.filter((r) => r.total > 0).length, [retailerDaily]);
 
   const uploadPanel = canAdd ? (
-    <section className="ga-upload-card">
-      <div className="ga-upload-card-head">
-        <div><span className="ga-section-icon">⇧</span><div><span className="ga-upload-overline">IMPORT WORKSPACE</span><h2>Upload Activation Details</h2><p>Import one activation workbook containing one or many activation dates.</p></div></div>
-        <a href="/api/samples/ga" className="ga-sample-btn">⇩ Download Sample File</a>
-      </div>
-      <div className="ga-upload-flow"><span><b>1</b> Choose file</span><i>→</i><span><b>2</b> Validate rows</span><i>→</i><span><b>3</b> Save by activation date</span></div><form onSubmit={upload} className="ga-upload-form ga-upload-form-multidate">
-        <label className="ga-file-field"><span>ActivationDetailsReport.xlsx</span><small>Excel · max 20 MB</small><input name="file" type="file" accept=".xlsx,.xlsm,.xls" required/></label>
-        <button disabled={loading} className="ga-upload-btn">{loading?"Processing...":"⇧  Upload GA"}</button>
+    <OpsUpload
+      title="Upload Activation Details"
+      subtitle="Import one activation workbook containing one or many activation dates."
+      sample="/api/samples/ga"
+      message={message}
+      rule={
+        <>
+          <b>GA counting rule:</b> PRODUCT_CODE <b>MMST / MMSTs</b> = 300 SIM, <b>MMSTC</b> = 170 SIM. <b>SIMWAP</b>{" "}
+          must have <b>SELLING_PRICE 350</b>; <b>EV-SWAP</b> must have <b>SELLING_PRICE 100</b>. Both are counted only
+          under <b>SIM SWAP</b> and are excluded from GA achievement, GA target progress and SSO. SIM_NO still prevents
+          duplicate import.
+        </>
+      }
+    >
+      <form onSubmit={upload} className="kit-upload-form">
+        <label className="kit-file-field">
+          <span>ActivationDetailsReport.xlsx</span>
+          <small>Excel · max 20 MB</small>
+          <input name="file" type="file" accept=".xlsx,.xlsm,.xls" required />
+        </label>
+        <button disabled={loading} className="kit-btn is-primary size-md">
+          {loading ? "Processing…" : "Upload GA"}
+        </button>
       </form>
-      <div className="ga-rule-box"><span className="ga-info-dot">i</span><div><b>GA counting rule:</b> PRODUCT_CODE <b>MMST / MMSTs</b> = 300 SIM, <b>MMSTC</b> = 170 SIM. <b>SIMWAP</b> must have <b>SELLING_PRICE 350</b>; <b>EV-SWAP</b> must have <b>SELLING_PRICE 100</b>. Both are counted only under <b>SIM SWAP</b> and are excluded from GA achievement, GA target progress and SSO. SIM_NO still prevents duplicate import.</div></div>
-      {message&&<div className="ga-message">{message}</div>}
-    </section>
+    </OpsUpload>
   ) : null;
 
-  if(!canView)return null;
+  if (!canView) return null;
   return (
-    <main className="page ga-premium-page">
-      <header className="ga-page-head">
-        <div className="ga-head-copy">
-          <a href="/admin/upload" className="ga-back-link">← Upload Center</a>
-          <div className="ga-title-line"><h1>GA Activation Upload &amp; SSO</h1><span className="ga-title-badge">GA</span></div>
-          <p>Upload one Activation Details report with one or many activation dates. Standard SIM sales count toward GA; replacement SIMs are tracked separately as SIM SWAP.</p>
-        </div>
-        <div className="ga-date-card">
-          <label><span>FROM</span><input type="date" value={fromDate} onChange={e=>changeFrom(e.target.value)}/></label>
-          <label><span>TO / SELECTED DAY</span><input type="date" value={toDate} onChange={e=>changeTo(e.target.value)}/></label>
-        </div>
-      </header>
+    <main className="page">
+      {/* changeFrom / changeTo carry the v102 empty-value guards, so the range
+          inputs stay wired to this page rather than to OpsHeader's own. */}
+      <OpsHeader
+        badge="GA"
+        title="GA Activation Upload & SSO"
+        subtitle="Upload one Activation Details report with one or many activation dates. Standard SIM sales count toward GA; replacement SIMs are tracked separately as SIM SWAP."
+        from={fromDate}
+        to={toDate}
+        onFrom={changeFrom}
+        onTo={changeTo}
+      />
 
-      <div className="ga-freshness-v96"><span/><div><small>LATEST GA IMPORT</small><strong>{history[0]?.businessDate?prettyDate(history[0].businessDate):"No import yet"}</strong><em>{fromDate} → {toDate}</em></div><div><b>{history[0]?.fileName||"Upload an activation file"}</b><small>{history[0]?.uploadedAt?`Imported ${new Date(history[0].uploadedAt).toLocaleString()}`:"No import history available"}</small></div></div>
+      <OpsFreshness
+        label="GA"
+        businessDate={history[0]?.businessDate}
+        uploadedAt={history[0]?.uploadedAt}
+        fileName={history[0]?.fileName}
+        range={`${fromDate} → ${toDate}`}
+      />
 
       {uploadPanel}
 
-      <section className="ga-section">
-        <div className="ga-section-title"><span className="ga-section-icon">▣</span><div><h2>Selected Day: {prettyDate(dataDate)}</h2><p>Daily activation snapshot · follows the TO / SELECTED DAY filter above</p></div></div>
-        <div className="ga-day-metrics">
-          <Metric tone="blue" icon="⌁" name="Total GA" value={dayTotals.total.toLocaleString()} note={`${dayTotals.ga150.toLocaleString()} + ${dayTotals.ga300.toLocaleString()} · standard GA only`}/>
-          <Metric tone="green" icon="150" name="150" value={dayTotals.ga150.toLocaleString()} note="MMSTC · selling price 170"/>
-          <Metric tone="orange" icon="300" name="300" value={dayTotals.ga300.toLocaleString()} note="MMST / MMSTs"/>
-          <Metric tone="purple" icon="●" name="Active Retailers" value={activeGaRetailers.toLocaleString()} note="Retailers with standard GA"/>
-        </div>
-      </section>
+      <OpsSectionTitle
+        title={`Selected day: ${prettyDate(dataDate)}`}
+        subtitle="Daily activation snapshot — follows the To date above."
+      />
+      <div className="kit-metrics-grid">
+        <OpsMetric
+          label="Total GA"
+          value={dayTotals.total.toLocaleString()}
+          note={`${dayTotals.ga150.toLocaleString()} + ${dayTotals.ga300.toLocaleString()} · standard GA only`}
+        />
+        <OpsMetric label="150" value={dayTotals.ga150.toLocaleString()} note="MMSTC · selling price 170" />
+        <OpsMetric label="300" value={dayTotals.ga300.toLocaleString()} note="MMST / MMSTs" />
+        <OpsMetric
+          label="Active Retailers"
+          value={activeGaRetailers.toLocaleString()}
+          note="Retailers with standard GA"
+        />
+      </div>
 
-      <section className="ga-data-card">
-        <div className="ga-card-head"><div className="ga-section-title"><span className="ga-section-icon">▤</span><div><h2>Retailer GA</h2><p>Retailer-wise activation for the selected day</p></div></div><span className="ga-count-pill">{retailerDaily.length} retailers</span></div>
-        {retailerDaily.length===0?<div className="ga-empty"><span>▤</span><strong>No retailer GA yet</strong><p>No GA data stored for {prettyDate(dataDate)}.</p></div>:
-        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailer</th><th>Total GA</th><th>SIM SWAP</th><th>150</th><th>300</th></tr></thead><tbody>{retailerDaily.map(r=><tr key={r.retailerCode}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.employee)}</span><div><b>{r.employee}</b><small>{r.rsoMsisdn}</small></div></div></td><td><b>{r.retailerCode}</b><small className="ga-subline">{r.retailerName}</small></td><td><strong className="ga-number blue">{r.total}</strong><small className="ga-subline">Standard GA only</small></td><td><span className="ga-swap-badge-v98" title="SIMWAP + EV-SWAP; excluded from Total GA">{r.simSwap}</span></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td></tr>)}</tbody></PremiumTable>}
-      </section>
+      <OpsDataCard
+        title="Retailer GA"
+        subtitle="Retailer-wise activation for the selected day."
+        count={`${retailerDaily.length} retailers`}
+      >
+        {retailerDaily.length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>Supervisor</th>
+                <th>Employee</th>
+                <th>Retailer</th>
+                <th className="is-right">Total GA</th>
+                <th className="is-right">SIM SWAP</th>
+                <th className="is-right">150</th>
+                <th className="is-right">300</th>
+              </tr>
+            </thead>
+            <tbody>
+              {retailerDaily.map((r) => (
+                <tr key={r.retailerCode}>
+                  <td>
+                    <PersonCell name={r.supervisor} sub="Supervisor" />
+                  </td>
+                  <td>
+                    <PersonCell name={r.employee} sub={r.rsoMsisdn} />
+                  </td>
+                  <td>
+                    <b>{r.retailerCode}</b>
+                    <small>{r.retailerName}</small>
+                  </td>
+                  <td className="is-right">
+                    <strong>{r.total}</strong>
+                    <small>Standard GA only</small>
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill" title="SIMWAP + EV-SWAP; excluded from Total GA">
+                      {r.simSwap}
+                    </span>
+                  </td>
+                  <td className="is-right">{r.ga150}</td>
+                  <td className="is-right">{r.ga300}</td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : (
+          <EmptyState
+            title="No retailer GA yet"
+            subtitle={`No GA data stored for ${prettyDate(dataDate)}.`}
+            icon="sim"
+          />
+        )}
+      </OpsDataCard>
 
-      <section className="ga-section ga-performance-section">
-        <div className="ga-section-title"><span className="ga-section-icon">↗</span><div><h2>Monthly Employee Performance</h2><p>Standard GA only. SIMWAP / EV-SWAP are excluded from every employee and target total.</p></div></div>
-        <div className="ga-performance-metrics">
-          <Metric tone="blue" name="GA Target" value={totals.target.toLocaleString()} note="Monthly target"/>
-          <Metric tone="green" name="GA Achieved" value={totals.achieved.toLocaleString()} note="Completed GA"/>
-          <Metric tone="cyan" name="150" value={totals.ga150.toLocaleString()} note="Price = 170"/>
-          <Metric tone="orange" name="300" value={totals.ga300.toLocaleString()} note="MMST / MMSTs"/>
-          <Metric tone="purple" name="GA %" value={totals.target?`${((totals.achieved/totals.target)*100).toFixed(1)}%`:"0%"} note="Achievement rate"/>
-          <Metric tone="rose" name="SSO" value={`${totals.ssoA.toLocaleString()} / ${totals.ssoT.toLocaleString()}`} note="Achieved / target"/>
-        </div>
-      </section>
+      <OpsSectionTitle
+        title="Monthly employee performance"
+        subtitle="Standard GA only. SIMWAP / EV-SWAP are excluded from every employee and target total."
+      />
+      <div className="kit-metrics-grid">
+        <OpsMetric label="GA Target" value={totals.target.toLocaleString()} note="Monthly target" />
+        <OpsMetric label="GA Achieved" value={totals.achieved.toLocaleString()} note="Completed GA" />
+        <OpsMetric label="150" value={totals.ga150.toLocaleString()} note="Price = 170" />
+        <OpsMetric label="300" value={totals.ga300.toLocaleString()} note="MMST / MMSTs" />
+        <OpsMetric
+          label="GA %"
+          value={totals.target ? `${((totals.achieved / totals.target) * 100).toFixed(1)}%` : "0%"}
+          note="Achievement rate"
+        />
+        <OpsMetric
+          label="SSO"
+          value={`${totals.ssoA.toLocaleString()} / ${totals.ssoT.toLocaleString()}`}
+          note="Achieved / target"
+        />
+      </div>
 
-      <section className="ga-data-card">
-        <div className="ga-card-head"><div><h2>Employee Performance</h2><p>Monthly RSO performance overview</p></div><span className="ga-count-pill">{rows.length} employees</span></div>
-        <PremiumTable><thead><tr><th>Supervisor</th><th>Employee</th><th>Retailers</th><th>150</th><th>300</th><th>GA Target</th><th>GA Achieved</th><th>GA Progress</th><th>SSO</th></tr></thead><tbody>{rows.map(r=><tr key={r.employeeId}><td><div className="ga-person"><span>{initials(r.supervisor)}</span><div><b>{r.supervisor}</b><small>Supervisor</small></div></div></td><td><div className="ga-person"><span>{initials(r.name)}</span><div><b>{r.name}</b><small>{r.employeeCode||r.rsoMsisdn}</small></div></div></td><td><span className="ga-neutral-pill">{r.retailerCount}</span></td><td><span className="ga-number green">{r.ga150}</span></td><td><span className="ga-number orange">{r.ga300}</span></td><td>{r.gaTarget}</td><td><strong className="ga-number blue">{r.gaAchieved}</strong></td><td><div className="ga-progress-cell"><div><span style={{width:`${Math.min(100,r.gaPercent)}%`}}/></div><b>{r.gaPercent}%</b></div></td><td><div className="ga-sso-cell"><b>{r.ssoAchieved}</b><span>/ {r.ssoTarget}</span></div></td></tr>)}</tbody></PremiumTable>
-      </section>
+      <OpsDataCard
+        title="Employee performance"
+        subtitle="Monthly RSO performance overview."
+        count={`${rows.length} employees`}
+      >
+        {rows.length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>Supervisor</th>
+                <th>Employee</th>
+                <th className="is-right">Retailers</th>
+                <th className="is-right">150</th>
+                <th className="is-right">300</th>
+                <th className="is-right">GA Target</th>
+                <th className="is-right">GA Achieved</th>
+                <th>GA Progress</th>
+                <th className="is-right">SSO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.employeeId}>
+                  <td>
+                    <PersonCell name={r.supervisor} sub="Supervisor" />
+                  </td>
+                  <td>
+                    <PersonCell name={r.name} sub={r.employeeCode || r.rsoMsisdn} />
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill">{r.retailerCount}</span>
+                  </td>
+                  <td className="is-right">{r.ga150}</td>
+                  <td className="is-right">{r.ga300}</td>
+                  <td className="is-right">{r.gaTarget}</td>
+                  <td className="is-right">
+                    <strong>{r.gaAchieved}</strong>
+                  </td>
+                  <td>
+                    <ProgressCell value={r.gaPercent} />
+                  </td>
+                  <td className="is-right">
+                    <strong>{r.ssoAchieved}</strong>
+                    <small>of {r.ssoTarget}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : (
+          <EmptyState
+            title="No employee performance yet"
+            subtitle="Upload an activation file to populate monthly GA performance."
+            icon="chart"
+          />
+        )}
+      </OpsDataCard>
 
-      <section className="ga-data-card ga-history-card">
-        <div className="ga-card-head"><div><h2>Recent GA Imports</h2><p>Latest activation files and import results</p></div><span className="ga-count-pill">{history.length} imports</span></div>
-        {history.length===0?<div className="ga-empty"><span>⇧</span><strong>No imports yet</strong><p>Your recent GA uploads will appear here.</p></div>:
-        <PremiumTable><thead><tr><th>Data Date</th><th>File</th><th>Uploaded</th><th>Saved / Total</th><th>Duplicates</th><th>Failed</th><th>Status</th></tr></thead><tbody>{history.map(h=><tr key={h.id}><td><b>{prettyDate(h.businessDate)}</b></td><td>{h.fileName}</td><td>{new Date(h.uploadedAt).toLocaleString()}</td><td><strong className="ga-number blue">{h.successRows}/{h.totalRows}</strong></td><td>{h.duplicateRows}</td><td>{h.failedRows}</td><td><span className={`ga-status ${h.status.toLowerCase()}`}>{h.status}</span></td></tr>)}</tbody></PremiumTable>}
-      </section>
+      <OpsDataCard
+        title="Recent GA imports"
+        subtitle="Latest activation files and import results."
+        count={`${history.length} imports`}
+      >
+        {history.length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>Data Date</th>
+                <th>File</th>
+                <th>Uploaded</th>
+                <th className="is-right">Saved / Total</th>
+                <th className="is-right">Duplicates</th>
+                <th className="is-right">Failed</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h) => (
+                <tr key={h.id}>
+                  <td>
+                    <b>{prettyDate(h.businessDate)}</b>
+                  </td>
+                  <td>{h.fileName}</td>
+                  <td>{new Date(h.uploadedAt).toLocaleString()}</td>
+                  <td className="is-right">
+                    <strong>
+                      {h.successRows}/{h.totalRows}
+                    </strong>
+                  </td>
+                  <td className="is-right">{h.duplicateRows}</td>
+                  <td className="is-right">{h.failedRows}</td>
+                  <td>
+                    <StatusPill value={h.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : (
+          <EmptyState title="No imports yet" subtitle="Your recent GA uploads will appear here." icon="upload" />
+        )}
+      </OpsDataCard>
     </main>
   );
 }
-
-function initials(value:string){return (value||"?").trim().split(/\s+/).slice(0,2).map(v=>v[0]).join("").toUpperCase()}
-function Metric({tone,icon,name,value,note}:{tone:string;icon?:string;name:string;value:string;note?:string}){
- return <article className={`ga-metric tone-${tone}`}><span className="ga-metric-icon">{icon||"•"}</span><div><span className="ga-metric-label">{name}</span><strong>{value}</strong>{note&&<small>{note}</small>}</div></article>
-}
-function PremiumTable({children}:{children:React.ReactNode}){return <div className="ga-table-shell"><div className="ga-table-scroll"><table className="ga-premium-table">{children}</table></div></div>}

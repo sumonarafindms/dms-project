@@ -1,1 +1,25 @@
-export default function Loading(){return <main className="page bp-v8-page bp-loading-v8"><div className="bp-loading-hero"><span/><b/><i/><em/></div><div className="bp-loading-cards">{[1,2,3].map(x=><div key={x}><span/><b/><i/></div>)}</div><div className="bp-loading-list">{[1,2,3].map(x=><div key={x}><span/><p><b/><i/></p><em/></div>)}</div></main>}
+import { Card, Skeleton } from "../components/Kit";
+
+/** Matches the shape of app/bp/page.tsx so the layout does not jump on load. */
+export default function Loading() {
+  return (
+    <main className="page">
+      <Card className="kit-hero-ring">
+        <Skeleton className="kit-skel-ring" />
+        <Skeleton className="kit-skel-line" />
+      </Card>
+      <div className="kit-pair" style={{ margin: "1rem 0" }}>
+        {[1, 2].map((i) => (
+          <Card key={i} padded>
+            <Skeleton className="kit-skel-num" />
+          </Card>
+        ))}
+      </div>
+      <Card padded>
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="kit-skel-row" />
+        ))}
+      </Card>
+    </main>
+  );
+}

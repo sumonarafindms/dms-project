@@ -1,6 +1,6 @@
 import { requireUser } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
-import { PageHead } from "../../components/RoleUI";
+import { PageHeader } from "../../components/Kit";
 import BpManager from "./BpManager";
 
 export default async function BpManagement() {
@@ -56,8 +56,7 @@ export default async function BpManagement() {
 
   return (
     <main className="page">
-      <PageHead
-        eyebrow="Admin"
+      <PageHeader
         title="BP Management"
         subtitle="Select a retailer code as BP, assign it under an RSO, and keep effective-date history when BP codes change."
       />

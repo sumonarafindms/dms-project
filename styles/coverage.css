@@ -1,7 +1,24 @@
 /**
+ * NOTE ON THE kit- EXCLUSION BELOW
+ *
+ * Every [class$="-suffix"] rule in this file carries :not([class*="kit-"]).
+ *
+ * These suffix selectors are a deliberate fallback for the app's ~360 legacy
+ * class names, but they also silently claim any new class that happens to end
+ * the same way: .kit-stat-pill ends in "-pill", .kit-card ends in "-card".
+ * Worse, [class$=] matches the WHOLE class attribute, so the collision comes
+ * and goes with how many classes an element has — .kit-card matched, while
+ * "kit-card kit-card-p" did not. That is the hardest kind of bug to trace.
+ *
+ * styles/kit.css is the deliberate, complete design system for the role UI;
+ * it never wants a guess. So the fallbacks skip it entirely, and every kit
+ * class is styled only by rules written for it.
+ */
+
+/**
  * Safety-net layer — every page family historically minted its own
  * versioned class name (`.rso-v7-page`, `.ga-section-icon`,
- * `.perf-card-grid`, ...) for a small set of repeating shapes: a page
+ * `.ops-stat-grid`, ...) for a small set of repeating shapes: a page
  * wrapper, an icon chip, a grid, a list, a row, a heading, a hero band, a
  * pill, an actions bar. Attribute selectors give every one of those a
  * sane, on-theme default from the pattern in its own name, so nothing on
@@ -11,14 +28,14 @@
  * where a real bespoke rule exists — this file only fills gaps.
  */
 @layer components {
-  [class$="-page"],
+  [class$="-page"]:not([class*="kit-"]),
   [class*="-page "],
   [class^="page-"] {
     display: block;
   }
 
-  [class$="-hero"],
-  [class$="-hero-v90"] {
+  [class$="-hero"]:not([class*="kit-"]),
+  [class$="-hero-v90"]:not([class*="kit-"]) {
     background: linear-gradient(135deg, var(--color-navy-900), var(--color-navy-700));
     color: white;
     border-radius: var(--radius-card);
@@ -26,15 +43,15 @@
     box-shadow: var(--shadow-panel);
     margin-bottom: 1rem;
   }
-  [class$="-hero"] h1,
-  [class$="-hero"] h2,
-  [class$="-hero"] strong {
+  [class$="-hero"]:not([class*="kit-"]) h1,
+  [class$="-hero"]:not([class*="kit-"]) h2,
+  [class$="-hero"]:not([class*="kit-"]) strong {
     color: white;
   }
 
-  [class$="-kicker"],
-  [class$="-overline"],
-  [class$="-subline"] {
+  [class$="-kicker"]:not([class*="kit-"]),
+  [class$="-overline"]:not([class*="kit-"]),
+  [class$="-subline"]:not([class*="kit-"]) {
     display: block;
     font-size: 0.68rem;
     font-weight: 700;
@@ -44,36 +61,42 @@
     margin-bottom: 0.25rem;
   }
 
-  [class$="-grid"],
-  [class$="-card-grid"],
-  [class$="-kpi-grid"],
-  [class$="-panels"],
-  [class$="-directory-grid"] {
+  [class$="-grid"]:not([class*="kit-"]),
+  [class$="-card-grid"]:not([class*="kit-"]),
+  [class$="-kpi-grid"]:not([class*="kit-"]),
+  [class$="-panels"]:not([class*="kit-"]),
+  [class$="-directory-grid"]:not([class*="kit-"]) {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
     gap: 0.9rem;
     margin-bottom: 1rem;
   }
 
-  [class$="-list"],
-  [class$="-list-grid"] {
+  [class$="-list"]:not([class*="kit-"]),
+  [class$="-list-grid"]:not([class*="kit-"]) {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
 
-  [class$="-row"] {
+  [class$="-row"]:not([class*="kit-"]) {
     display: flex;
     align-items: center;
     gap: 0.7rem;
     padding: 0.6rem 0.15rem;
     border-bottom: 1px solid var(--color-slate-100);
   }
-  [class$="-row"]:last-child {
+  [class$="-row"]:not([class*="kit-"]):last-child {
     border-bottom: none;
   }
 
-  [class$="-icon"] {
+  /* :not(svg) — this fallback paints a *chip* (a 2.2rem tinted square that a
+     glyph sits inside). An <svg> is the glyph, never the chip. Without this
+     guard the shared `<Icon>` (class "nav-icon") matched, so every icon in
+     the app grew to 2.2rem with an accent background: inside .kit-row-icon it
+     overflowed and hid the teal chip, and inside .kit-search it covered the
+     first characters of the field's own placeholder. */
+  [class$="-icon"]:not([class*="kit-"]):not(svg) {
     display: grid;
     place-items: center;
     width: 2.2rem;
@@ -84,8 +107,8 @@
     flex-shrink: 0;
   }
 
-  [class$="-head"],
-  [class$="-title-row"] {
+  [class$="-head"]:not([class*="kit-"]),
+  [class$="-title-row"]:not([class*="kit-"]) {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -93,16 +116,16 @@
     margin-bottom: 0.75rem;
   }
 
-  [class$="-actions"],
-  [class$="-action-row"] {
+  [class$="-actions"]:not([class*="kit-"]),
+  [class$="-action-row"]:not([class*="kit-"]) {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
   }
 
-  [class$="-empty"],
-  [class$="-empty-v90"] {
+  [class$="-empty"]:not([class*="kit-"]),
+  [class$="-empty-v90"]:not([class*="kit-"]) {
     text-align: center;
     color: var(--color-slate-500);
     padding: 1.75rem 1rem;
@@ -111,9 +134,9 @@
     background: var(--color-slate-50);
   }
 
-  [class$="-pill"],
-  [class$="-count"],
-  [class$="-badge"] {
+  [class$="-pill"]:not([class*="kit-"]),
+  [class$="-count"]:not([class*="kit-"]),
+  [class$="-badge"]:not([class*="kit-"]) {
     display: inline-flex;
     align-items: center;
     height: 1.55rem;
@@ -125,7 +148,7 @@
     font-weight: 700;
   }
 
-  [class$="-card"] {
+  [class$="-card"]:not([class*="kit-"]) {
     background: white;
     border: 1px solid var(--color-slate-200);
     border-radius: var(--radius-card);
@@ -133,28 +156,28 @@
     padding: 1rem 1.1rem;
   }
 
-  [class$="-number"],
-  [class$="-value"],
-  [class$="-money"] {
+  [class$="-number"]:not([class*="kit-"]),
+  [class$="-value"]:not([class*="kit-"]),
+  [class$="-money"]:not([class*="kit-"]) {
     font-variant-numeric: tabular-nums;
     font-weight: 700;
     color: var(--color-slate-900);
   }
 
-  [class$="-name"] {
+  [class$="-name"]:not([class*="kit-"]) {
     font-weight: 600;
     color: var(--color-slate-800);
   }
 
-  [class$="-progress"] {
+  [class$="-progress"]:not([class*="kit-"]) {
     height: 0.45rem;
     border-radius: 999px;
     background: var(--color-slate-100);
     overflow: hidden;
   }
 
-  [class$="-back"],
-  [class$="-breadcrumb"] {
+  [class$="-back"]:not([class*="kit-"]),
+  [class$="-breadcrumb"]:not([class*="kit-"]) {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -176,8 +199,7 @@
   .green {
     color: var(--color-success-600);
   }
-  .info-banner,
-  .info-dot {
+  .info-banner {
     background: var(--color-accent-50);
     color: var(--color-accent-700);
     border-radius: var(--radius-control);

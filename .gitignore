@@ -15,4 +15,3 @@ next-env.d.ts.bak
 
 *.log
 .DS_Store
-node_modules

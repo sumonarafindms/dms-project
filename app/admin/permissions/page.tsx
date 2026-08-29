@@ -1,15 +1,71 @@
-import Link from "next/link";
-import {requireUser} from "../../../lib/auth";
-import {prisma} from "../../../lib/prisma";
+import { requireUser } from "../../../lib/auth";
+import { prisma } from "../../../lib/prisma";
 import PermissionBulkManager from "../../components/PermissionBulkManager";
-export default async function Page(){
- await requireUser(["ADMIN","IT"]);
- // ADMIN and IT always hold full access (lib/permissions.ts permissionsFor/hasPermission),
- // and every write path rejects them. Listing them here produced rows that 404'd on click.
- const users=await prisma.user.findMany({where:{role:{notIn:["ADMIN","IT"]}},orderBy:[{role:"asc"},{displayName:"asc"}],include:{_count:{select:{permissions:true}}}});
- const custom=users.filter(u=>u._count.permissions>0).length,defaults=users.length-custom;
- return <main className="page admin-permissions premium-permissions"><section className="permissions-v3-hero"><div><div className="admin-kicker">ACCESS CONTROL</div><h1>Permissions Center</h1><p className="permissions-sub">Control individual access, apply safe role presets or copy an existing setup.</p></div><div className="permissions-v3-state"><span>CUSTOMIZED ACCESS</span><strong>{custom}</strong><small>{defaults} users on role default</small></div></section>
- <div className="perf-summary"><div className="card perf-summary-card"><span>Login Users</span><strong>{users.length}</strong><small>Editable accounts</small></div><div className="card perf-summary-card"><span>Role Default</span><strong>{defaults}</strong><small>No custom override</small></div><div className="card perf-summary-card"><span>Customized</span><strong>{custom}</strong><small>Individual access saved</small></div><div className="card perf-summary-card"><span>Roles</span><strong>{new Set(users.map(x=>x.role)).size}</strong><small>Active access groups</small></div></div>
- <div className="permission-workspace"><div className="permission-workspace-main"><PermissionBulkManager users={users.map(u=>({id:u.id,name:u.displayName,role:u.role,mobile:u.mobileNumber||"",custom:u._count.permissions}))}/></div>
- <section className="section permission-workspace-side"><div className="admin-section-head"><div><span>INDIVIDUAL ACCESS</span><h2>User permissions</h2></div></div><div className="card permission-user-list">{users.map(u=><Link href={`/admin/permissions/${u.id}`} key={u.id} className="permission-user-row"><div className="employee-avatar">{u.displayName.slice(0,2).toUpperCase()}</div><div><strong>{u.displayName}</strong><span>{u.role} · {u.mobileNumber||"No mobile"}</span></div><b>{u._count.permissions?`${u._count.permissions} custom`:"Role default"}</b><em>›</em></Link>)}</div></section></div></main>
+import { Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "../../components/Kit";
+import { Icon } from "../../components/icons";
+
+export default async function Page() {
+  await requireUser(["ADMIN", "IT"]);
+  // ADMIN and IT always hold full access (lib/permissions.ts permissionsFor/hasPermission),
+  // and every write path rejects them. Listing them here produced rows that 404'd on click.
+  const users = await prisma.user.findMany({
+    where: { role: { notIn: ["ADMIN", "IT"] } },
+    orderBy: [{ role: "asc" }, { displayName: "asc" }],
+    include: { _count: { select: { permissions: true } } },
+  });
+  const custom = users.filter((u) => u._count.permissions > 0).length,
+    defaults = users.length - custom;
+
+  return (
+    <main className="page">
+      <PageHeader
+        title="Permissions Center"
+        subtitle="Control individual access, apply safe role presets or copy an existing setup."
+      />
+
+      <SummaryStrip
+        items={[
+          { label: "Login Users", value: users.length.toLocaleString() },
+          { label: "Role Default", value: defaults.toLocaleString() },
+          { label: "Customized", value: custom.toLocaleString(), tone: "teal" },
+          { label: "Roles", value: new Set(users.map((x) => x.role)).size.toLocaleString() },
+        ]}
+      />
+
+      <PermissionBulkManager
+        users={users.map((u) => ({
+          id: u.id,
+          name: u.displayName,
+          role: u.role,
+          mobile: u.mobileNumber || "",
+          custom: u._count.permissions,
+        }))}
+      />
+
+      <SectionHead title="Individual access" sub="Open a user to set module permissions one by one." />
+      <Card padded>
+        {users.length ? (
+          <div className="kit-rows">
+            {users.map((u) => (
+              <Row
+                key={u.id}
+                href={`/admin/permissions/${u.id}`}
+                avatar={u.displayName}
+                title={u.displayName}
+                sub={`${u.role} · ${u.mobileNumber || "No mobile"}`}
+                value={u._count.permissions ? u._count.permissions : "—"}
+                valueSub={u._count.permissions ? "custom" : "role default"}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No editable accounts"
+            hint="ADMIN and IT always hold full access and are not listed here."
+            icon={<Icon name="shield" />}
+          />
+        )}
+      </Card>
+    </main>
+  );
 }

@@ -45,13 +45,61 @@
   --color-accent-700: #1d4ed8;
   --color-accent-800: #1e40af;
 
-  /* Secondary accent — recharge / secondary series */
+  /* Teal — the approved role-UI primary. In the six role demos teal is both
+     the brand colour and the "target achieved" colour, so every ring, bar,
+     badge and active nav item resolves to this scale. */
   --color-teal-50: #f0fdfa;
   --color-teal-100: #ccfbf1;
+  --color-teal-200: #99f6e4;
+  --color-teal-300: #5eead4;
   --color-teal-400: #2dd4bf;
   --color-teal-500: #14b8a6;
   --color-teal-600: #0d9488;
   --color-teal-700: #0f766e;
+  --color-teal-800: #115e59;
+
+  /* Amber — "near target" (80–99%). Warning semantics only, never decoration. */
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+
+  /* Rose — "behind target" (< 80%). */
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-200: #fecdd3;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+
+  /* Sky — "processing / info" only. */
+  --color-sky-50: #f0f9ff;
+  --color-sky-200: #bae6fd;
+  --color-sky-500: #0ea5e9;
+  --color-sky-600: #0284c7;
+  --color-sky-700: #0369a1;
+
+  /* Indigo — the second brand accent called for by the visual-elevation
+     directive. Used for identity surfaces only (sidebar brand mark, active
+     nav rail, gradient headers) so the product reads as two-tone rather than
+     a generic single-teal template. Never used for status. */
+  --color-indigo-50: #eef2ff;
+  --color-indigo-200: #c7d2fe;
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+
+  /* Ring / band colours, resolved once so JSX never hardcodes a hex. */
+  --band-achieved: var(--color-teal-600);
+  --band-near: var(--color-amber-600);
+  --band-behind: var(--color-rose-600);
+  --band-track: var(--color-slate-200);
 
   /* Semantic */
   --color-success-50: #ecfdf5;

@@ -4,292 +4,11 @@
  */
 @layer components {
   /* ---------- Ops page head (GA/C2C/C2S/OB) ---------- */
-  .ops-page-head,
-  .ops-v3-head,
-  .upload-page-head {
-    background: linear-gradient(135deg, var(--color-navy-900), var(--color-navy-700));
-    color: white;
-    border-radius: var(--radius-card);
-    padding: 1.5rem 1.6rem;
-    box-shadow: var(--shadow-panel);
-    margin-bottom: 1.1rem;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 1.25rem;
-  }
-  .ops-head-copy {
-    max-width: 34rem;
-  }
-  .ops-back {
-    color: var(--color-slate-300);
-  }
-  .ops-title-row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-top: 0.3rem;
-  }
-  .ops-title-row h1 {
-    color: white;
-    font-size: 1.3rem;
-  }
-  .ops-title-row span {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    padding: 0.2rem 0.55rem;
-    border-radius: var(--radius-pill);
-    background: rgb(255 255 255 / 0.12);
-    color: var(--color-slate-100);
-  }
-  .ops-page-head p,
-  .ops-subline {
-    color: var(--color-slate-300);
-    font-size: 0.85rem;
-    margin-top: 0.3rem;
-  }
-  .ops-head-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-  .ops-head-chips .premium-badge-v65 {
-    background: rgb(255 255 255 / 0.1);
-    color: white;
-  }
-  .ops-date-card {
-    background: rgb(255 255 255 / 0.07);
-    border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: var(--radius-control);
-    padding: 0.85rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    align-self: flex-start;
-  }
-  .ops-date-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--color-slate-300);
-  }
-  .ops-date-card label {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-  .ops-date-card label span {
-    font-size: 0.68rem;
-    color: var(--color-slate-300);
-  }
-  .ops-date-card input {
-    height: 2.1rem;
-    padding: 0 0.6rem;
-    border-radius: var(--radius-control);
-    border: none;
-    background: white;
-    font-size: 0.78rem;
-  }
-
-  /* ---------- Upload workspace ---------- */
-  .ops-upload-card,
-  .ops-v3-upload {
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 1.25rem 1.4rem;
-    margin-bottom: 1.1rem;
-  }
-  .ops-card-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.9rem;
-  }
-  .ops-title {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  .ops-section-icon {
-    display: grid;
-    place-items: center;
-    width: 2.3rem;
-    height: 2.3rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    color: var(--color-accent-600);
-    flex-shrink: 0;
-    font-size: 1.05rem;
-  }
-  .ops-title h2 {
-    font-size: 0.98rem;
-  }
-  .ops-title p {
-    font-size: 0.8rem;
-    color: var(--color-slate-500);
-    margin-top: 0.1rem;
-  }
-  .ops-sample-btn,
-  .upload-sample-btn {
-    align-self: flex-start;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--color-accent-600);
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    white-space: nowrap;
-  }
-  .ops-upload-trust {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-    margin-bottom: 0.85rem;
-  }
-  .ops-upload-trust b {
-    display: inline-grid;
-    place-items: center;
-    width: 1.3rem;
-    height: 1.3rem;
-    border-radius: 50%;
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-    font-size: 0.68rem;
-    margin-right: 0.25rem;
-  }
-  .ops-upload-trust i {
-    color: var(--color-slate-300);
-    font-style: normal;
-  }
-  .ops-upload-body,
-  .ops-upload-form,
-  .ops-upload {
-    display: grid;
-    gap: 0.85rem;
-  }
-  .ops-file-field {
-    border: 1.5px dashed var(--color-slate-300);
-    border-radius: var(--radius-control);
-    padding: 1.1rem;
-    background: var(--color-slate-50);
-    text-align: center;
-  }
-  .upload-drop,
-  .upload-format {
-    border: 1.5px dashed var(--color-slate-300);
-    border-radius: var(--radius-control);
-    padding: 1.25rem;
-    text-align: center;
-    color: var(--color-slate-500);
-    font-size: 0.8rem;
-  }
-  .ops-rule {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.85rem;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--color-slate-100);
-    font-size: 0.78rem;
-    color: var(--color-slate-500);
-  }
-  .ops-rule span {
-    display: grid;
-    place-items: center;
-    width: 1.2rem;
-    height: 1.2rem;
-    border-radius: 50%;
-    background: var(--color-slate-100);
-    flex-shrink: 0;
-    font-size: 0.68rem;
-    font-weight: 700;
-  }
-  .ops-message,
-  .target-import-result,
-  .upload-feedback {
-    margin-top: 0.75rem;
-  }
 
   /* ---------- Ops metrics / data cards ---------- */
   /* .target-kpis is deliberately absent: it lives in the targets workspace's
      narrow side rail, where an 11rem minimum can only ever fit one column.
      styles/patterns.css sizes it. */
-  .ops-metrics-grid,
-  .upload-top-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    gap: 0.85rem;
-    margin-bottom: 1.1rem;
-  }
-  .ops-metric {
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 0.95rem 1.05rem;
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-  }
-  .ops-metric-icon {
-    display: grid;
-    place-items: center;
-    width: 2.3rem;
-    height: 2.3rem;
-    border-radius: var(--radius-control);
-    background: var(--tone-bg, var(--color-accent-50));
-    color: var(--tone-color, var(--color-accent-600));
-    flex-shrink: 0;
-  }
-  .ops-metric-label {
-    display: block;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--color-slate-500);
-    text-transform: uppercase;
-  }
-  .ops-number {
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* The card stacks head over table; only the head itself is a row. */
-  .ops-data-card {
-    display: block;
-  }
-  .ops-data-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.9rem;
-  }
-  .ops-data-head h2 {
-    font-size: 1rem;
-  }
-  .ops-data-head p {
-    font-size: 0.8rem;
-    color: var(--color-slate-500);
-    margin-top: 0.15rem;
-  }
-  .ops-count-pill {
-    display: inline-flex;
-    align-items: center;
-    height: 1.6rem;
-    padding: 0 0.65rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-    font-size: 0.72rem;
-    font-weight: 700;
-  }
 
   /* ---------- Tables ----------
      One premium table treatment for every table in the app. Long tables are
@@ -297,10 +16,6 @@
      import history), so the priorities are: a scannable sticky header,
      numbers that line up, a clear row-hover target, and horizontal scrolling
      that never breaks the page layout. */
-  .ops-table-shell,
-  .ga-table-shell,
-  .modern-table-wrap,
-  .ops-table-wrap,
   .premium-table-shell,
   .premium-table-shell-v71,
   .table-wrap,
@@ -312,8 +27,6 @@
     background: #fff;
     box-shadow: var(--shadow-card);
   }
-  .ops-table-scroll,
-  .ga-table-scroll,
   .table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -321,8 +34,6 @@
     overflow-y: auto;
   }
 
-  .ops-table,
-  .ga-premium-table,
   .data-table,
   table {
     width: 100%;
@@ -332,8 +43,6 @@
   }
 
   /* header — sticky so column meaning survives a long scroll */
-  .ops-table thead th,
-  .ga-premium-table thead th,
   .data-table thead th,
   table thead th {
     position: sticky;
@@ -351,8 +60,6 @@
     white-space: nowrap;
   }
 
-  .ops-table tbody td,
-  .ga-premium-table tbody td,
   .data-table tbody td,
   table tbody td {
     padding: 0.72rem 1rem;
@@ -360,295 +67,38 @@
     color: var(--color-slate-700);
     vertical-align: middle;
   }
-  .ops-table tbody tr:last-child td,
-  .ga-premium-table tbody tr:last-child td,
   .data-table tbody tr:last-child td,
   table tbody tr:last-child td {
     border-bottom: none;
   }
 
   /* row hover — a real target, not a tint you have to look for */
-  .ops-table tbody tr,
-  .ga-premium-table tbody tr,
   .data-table tbody tr,
   table tbody tr {
     transition: background-color 0.12s var(--ease-premium);
   }
-  .ops-table tbody tr:hover,
-  .ga-premium-table tbody tr:hover,
   .data-table tbody tr:hover,
   table tbody tr:hover {
     background: var(--color-accent-50);
   }
 
-  /* numeric columns line up and read as figures */
-  .ops-table td:has(.ops-number),
-  .ops-table td:has(.ga-number),
-  .ga-premium-table td:has(.ga-number),
-  .ops-number,
-  .ga-number,
-  .perf-money b,
-  .mini-value {
-    font-variant-numeric: tabular-nums;
-  }
-
   /* breathing room at the table edges */
-  .ops-table th:first-child,
-  .ops-table td:first-child,
-  .ga-premium-table th:first-child,
-  .ga-premium-table td:first-child,
   .data-table th:first-child,
   .data-table td:first-child,
   table th:first-child,
   table td:first-child {
     padding-left: 1.25rem;
   }
-  .ops-table th:last-child,
-  .ops-table td:last-child,
-  .ga-premium-table th:last-child,
-  .ga-premium-table td:last-child,
   .data-table th:last-child,
   .data-table td:last-child,
   table th:last-child,
   table td:last-child {
     padding-right: 1.25rem;
   }
-
-  /* a table sitting directly inside a card should meet the card's edges */
-  .ga-data-card > .ga-table-shell,
-  .ops-data-card > .ops-table-shell {
-    margin: 0 -1.4rem -1.25rem;
-    border-radius: 0 0 var(--radius-card) var(--radius-card);
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    box-shadow: none;
-  }
-
-  .ops-person {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-  }
-  .ops-person > span {
-    display: grid;
-    place-items: center;
-    width: 1.9rem;
-    height: 1.9rem;
-    border-radius: 50%;
-    background: var(--color-accent-50);
-    color: var(--color-accent-700);
-    font-weight: 700;
-    font-size: 0.65rem;
-    flex-shrink: 0;
-  }
   /* name over code, not run together on one line */
-  .ops-person > div {
-    min-width: 0;
-  }
-  .ops-person > div > b {
-    display: block;
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: var(--color-slate-800);
-  }
-  .ops-person > div > small {
-    display: block;
-    font-size: 0.72rem;
-    color: var(--color-slate-500);
-  }
-  .ops-progress-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .ops-progress-cell > div {
-    width: 4.5rem;
-    height: 0.4rem;
-    border-radius: 999px;
-    background: var(--color-slate-100);
-    overflow: hidden;
-  }
-  .ops-progress-cell > div span {
-    display: block;
-    height: 100%;
-    background: linear-gradient(90deg, var(--color-accent-500), var(--color-teal-500));
-  }
-  .ops-status {
-    display: inline-flex;
-    align-items: center;
-    height: 1.5rem;
-    padding: 0 0.6rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: capitalize;
-  }
-  .ops-status.completed,
-  .ops-status.success {
-    background: var(--color-success-50);
-    color: var(--color-success-700);
-  }
-  .ops-status.failed,
-  .ops-status.error {
-    background: var(--color-danger-50);
-    color: var(--color-danger-700);
-  }
-  .ops-status.completed-with-errors,
-  .ops-status.processing {
-    background: var(--color-warning-50);
-    color: var(--color-warning-700);
-  }
-
-  .ops-freshness-v96 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    padding: 0.85rem 1.05rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    border: 1px solid var(--color-accent-100);
-    margin-bottom: 1.1rem;
-  }
-  .ops-freshness-v96 small {
-    display: block;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    color: var(--color-accent-600);
-  }
-  .ops-freshness-v96 strong {
-    font-size: 0.95rem;
-    color: var(--color-slate-900);
-  }
-  .ops-freshness-dot-v96 {
-    display: none;
-  }
-  .ops-freshness-file-v96 {
-    text-align: right;
-    font-size: 0.75rem;
-    color: var(--color-slate-500);
-  }
-  .ops-freshness-file-v96 span {
-    display: block;
-    color: var(--color-slate-700);
-    font-weight: 600;
-  }
-
-  /* ---------- Import health grid ---------- */
-  .import-health-grid-v96 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: 0.9rem;
-    margin-bottom: 1.1rem;
-  }
-  .import-health-card-v96 {
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 1rem 1.1rem;
-  }
-  .import-health-top-v96 {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 0.7rem;
-  }
-  .import-health-icon-v96 {
-    display: grid;
-    place-items: center;
-    width: 2.1rem;
-    height: 2.1rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    color: var(--color-accent-600);
-    flex-shrink: 0;
-  }
-  .import-health-top-v96 small {
-    display: block;
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: var(--color-slate-400);
-  }
-  .import-health-top-v96 strong {
-    font-size: 0.85rem;
-  }
-  .import-health-status-v96 {
-    margin-left: auto;
-    font-size: 0.65rem;
-    font-weight: 800;
-    padding: 0.2rem 0.5rem;
-    border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
-    color: var(--color-slate-500);
-    text-transform: uppercase;
-  }
-  .import-health-status-v96.completed {
-    background: var(--color-success-50);
-    color: var(--color-success-700);
-  }
-  .import-health-status-v96.failed {
-    background: var(--color-danger-50);
-    color: var(--color-danger-700);
-  }
-  .import-health-file-v96 {
-    font-size: 0.78rem;
-    margin-bottom: 0.6rem;
-  }
-  .import-health-file-v96 span {
-    display: block;
-    color: var(--color-slate-400);
-    font-size: 0.66rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-  }
-  .import-health-file-v96 strong {
-    display: block;
-    /* A filename, not a stat value — the universal stat rule in patterns.css
-       would otherwise render it at display size. */
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0;
-    margin-top: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--color-slate-700);
-  }
-  .import-health-meta-v96 {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.72rem;
-    color: var(--color-slate-500);
-    padding: 0.55rem 0;
-    border-top: 1px solid var(--color-slate-100);
-  }
-  .import-health-counts-v96 {
-    display: flex;
-    gap: 0.9rem;
-    font-size: 0.72rem;
-    color: var(--color-slate-500);
-    padding-top: 0.4rem;
-  }
-  .import-health-counts-v96 b {
-    color: var(--color-slate-800);
-  }
-  .import-health-counts-v96 .warn b {
-    color: var(--color-danger-600);
-  }
 
   /* ---------- Filter bars ---------- */
-  .premium-filter-bar,
-  .live-filter-v63,
-  .admin-filter,
-  .audit-filters,
-  .perf-filter,
-  .perf-v2-filter {
+  .admin-filter {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -659,13 +109,10 @@
     padding: 0.85rem 1rem;
     margin-bottom: 1.1rem;
   }
-  .premium-filter-search,
   .filter-search {
     flex: 1;
     min-width: 12rem;
   }
-  .premium-date-group,
-  .premium-month-filter,
   .filter-date,
   .filter-month {
     display: flex;
@@ -678,11 +125,8 @@
   }
 
   /* ---------- Employee / people directory rows ---------- */
-  .employee-list-toolbar,
-  .employee-v3-toolbar,
   .people-command,
-  .people-v3-command,
-  .users-v3-directory-head {
+  .people-v3-command {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -690,18 +134,6 @@
     gap: 0.75rem;
     margin-bottom: 0.9rem;
   }
-  .employee-list-command,
-  .users-v3-directory {
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    overflow: hidden;
-  }
-  .employee-list-row,
-  .audit-row,
-  .permission-row,
-  .permission-user-row,
   .admin-rank-row,
   .admin-v2-rank-row,
   .team-list,
@@ -711,15 +143,5 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--color-slate-100);
-  }
-  .employee-list-row:hover,
-  .audit-row:hover,
-  .permission-row:hover {
-    background: var(--color-slate-50);
-  }
-  .employee-list-row:last-child,
-  .audit-row:last-child,
-  .permission-row:last-child {
-    border-bottom: none;
   }
 }

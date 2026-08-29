@@ -25,6 +25,7 @@ const adminNav:NavItem[]=[
  {href:"/targets",label:"Targets",icon:"target",module:"targets"},
  {href:"/admin/attention",label:"Attention Center",icon:"target",module:"attention"},
 ];
+const itNav:NavItem[]=[adminNav[0],{href:"/it/reports",label:"Reporting Center",icon:"file",module:"dashboard"},...adminNav.slice(1)];
 const configs:Record<string,RoleConfig>={
  admin:{name:"DMS Admin",title:"Administrator",initials:"SA",home:"/dashboard",nav:adminNav,bottom:[adminNav[0],adminNav[2],adminNav[4],adminNav[5],adminNav[11]]},
  manager:{name:"Manager",title:"Monitoring & overview",initials:"MG",home:"/manager",nav:[
@@ -40,12 +41,19 @@ const configs:Record<string,RoleConfig>={
   {href:"/accounts/retailers",label:"Retailer Search",icon:"search",module:"retailers"},{href:"/accounts/attention",label:"Opportunity",icon:"target",module:"attention"},
   {href:"/accounts/people",label:"RSO & BP",icon:"users",module:"employees"},{href:"/accounts/operations/targets",label:"SC & Targets",icon:"target",module:"targets"}],bottom:[]},
  rso:{name:"RSO",title:"Field sales",initials:"RS",home:"/rso",nav:[
-  {href:"/rso",label:"Home",icon:"home",module:"dashboard"},{href:"/rso/attention",label:"Attention",icon:"target",module:"attention"},
+  {href:"/rso",label:"Home",icon:"home",module:"dashboard"},
+  // SSO and LSO are the RSO's daily worklists in the approved demo, so they sit
+  // above the general Attention page rather than buried under it.
+  {href:"/rso/sso",label:"SSO",icon:"phone",module:"attention"},{href:"/rso/lso",label:"LSO",icon:"chart",module:"attention"},
+  {href:"/rso/attention",label:"Attention",icon:"target",module:"attention"},
   {href:"/rso/retailers",label:"Retailers",icon:"shop",module:"retailers"},{href:"/rso/bp",label:"My BP",icon:"users",module:"bp"},
   {href:"/rso/bp/activations",label:"BP Activations",icon:"sim",module:"bp"}],bottom:[]},
  bp:{name:"BP",title:"SIM sales",initials:"BP",home:"/bp",nav:[
   {href:"/bp",label:"Home",icon:"home",module:"dashboard"},{href:"/bp/sales",label:"Sales",icon:"sim",module:"ga"}],bottom:[]},
- it:{name:"DMS IT",title:"IT Administration",initials:"IT",home:"/dashboard",nav:adminNav,bottom:[adminNav[0],adminNav[2],adminNav[4],adminNav[5],adminNav[11]]},
+ // IT is Admin plus the Reporting Center — the one thing that distinguishes
+ // the role in the approved demos. The route itself allows ADMIN too; only the
+ // nav entry is IT-only, so Admin can still reach it by URL.
+ it:{name:"DMS IT",title:"IT Administration",initials:"IT",home:"/dashboard",nav:itNav,bottom:[itNav[0],itNav[1],adminNav[2],adminNav[5],adminNav[11]]},
 };
 for(const key of ["manager","supervisor","accounts","rso","bp"]) configs[key].bottom=configs[key].nav.slice(0,4);
 configs.manager.bottom=configs.manager.nav;

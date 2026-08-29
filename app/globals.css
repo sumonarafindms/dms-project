@@ -9,4 +9,7 @@
 @import "../styles/forms.css";
 @import "../styles/components.css";
 @import "../styles/premium.css";
+/* Role-UI kit last among the component layers: a page migrated to the kit
+   must win over the older per-page stylesheets above it. */
+@import "../styles/kit.css";
 @import "../styles/mobile.css";

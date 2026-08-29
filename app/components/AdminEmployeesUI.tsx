@@ -1,23 +1,101 @@
 "use client";
-import {useState} from "react";
-import Link from "next/link";
-import {Icon} from "./icons";
 
-export type AdminEmployeeRow={
- id:string;name:string;mobile:string;role:string;active:boolean;
- meta:string;detail:string;editHref:string;
+/**
+ * The shared employee directory — migrated to the role-UI kit.
+ *
+ * One component behind all four role lists (managers / supervisors / rsos /
+ * bps). The search stays client-side because these lists are already fully
+ * loaded on the server; there is no request to debounce.
+ */
+
+import { useState } from "react";
+import Link from "next/link";
+import { Icon } from "./icons";
+import { Badge, Card, EmptyState, Row, SectionHead } from "./Kit";
+
+export type AdminEmployeeRow = {
+  id: string;
+  name: string;
+  mobile: string;
+  role: string;
+  active: boolean;
+  meta: string;
+  detail: string;
+  editHref: string;
 };
 
-export function EmployeeHubCard({href,icon,title,count,sub}:{href:string;icon:string;title:string;count:number;sub:string}){
- return <Link href={href} className="card employee-hub-card"><span className="employee-hub-icon"><Icon name={icon}/></span><div><strong>{title}</strong><span>{sub}</span></div><b>{count}</b><em>›</em></Link>
+export function EmployeeList({ title, rows, addHref }: { title: string; rows: AdminEmployeeRow[]; addHref: string }) {
+  const [q, setQ] = useState("");
+  const needle = q.toLowerCase();
+  const filtered = rows.filter(
+    (x) => !q || `${x.name} ${x.mobile} ${x.meta} ${x.detail}`.toLowerCase().includes(needle),
+  );
+  const active = rows.filter((x) => x.active).length;
+
+  return (
+    <>
+      <SectionHead
+        title={`${rows.length} ${title}`}
+        sub={`${active} active · ${rows.length - active} inactive`}
+        link={
+          <Link href={addHref} className="kit-btn is-primary size-sm">
+            <Icon name="users" /> Add New
+          </Link>
+        }
+      />
+
+      <div className="kit-filter-bar no-print">
+        <div className="kit-search">
+          <Icon name="search" />
+          <input
+            className="kit-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Name, mobile, code or assignment"
+            autoComplete="off"
+            aria-label={`Search ${title}`}
+          />
+        </div>
+        <span className="kit-filter-note">{filtered.length} results</span>
+      </div>
+
+      <Card padded>
+        {filtered.length ? (
+          <div className="kit-rows">
+            {filtered.map((x) => (
+              <Row
+                key={x.id}
+                href={x.editHref}
+                avatar={x.name}
+                title={x.name}
+                sub={x.meta}
+                detail={x.detail}
+                after={
+                  <div className="kit-row-value">
+                    <Badge tone={x.active ? "active" : "inactive"}>{x.active ? "Active" : "Inactive"}</Badge>
+                    <span>{x.mobile || "No login"}</span>
+                  </div>
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No matching records"
+            hint="Try a different search term."
+            icon={<Icon name="search" />}
+          />
+        )}
+      </Card>
+    </>
+  );
 }
 
-export function EmployeeList({title,rows,addHref}:{title:string;rows:AdminEmployeeRow[];addHref:string}){
- const [q,setQ]=useState("");
- const filtered=rows.filter(x=>!q||`${x.name} ${x.mobile} ${x.meta} ${x.detail}`.toLowerCase().includes(q.toLowerCase()));
- const active=rows.filter(x=>x.active).length;
- return <><section className="employee-list-command"><div><span>WORKFORCE DIRECTORY</span><h2>{title}</h2><p>{rows.length} total · {active} active · {rows.length-active} inactive</p></div><Link href={addHref} className="btn admin-primary"><Icon name="users"/>Add New</Link></section><div className="employee-list-toolbar employee-v3-toolbar"><div className="employee-search"><Icon name="search"/><div><label>SEARCH {title.toUpperCase()}</label><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`Name, mobile, code or assignment`}/></div></div><span>{filtered.length} results</span></div>
- <div className="employee-list-card employee-v3-list">{filtered.map(x=><Link href={x.editHref} className="employee-list-row employee-v3-row" key={x.id}><div className="employee-avatar">{x.name.slice(0,2).toUpperCase()}</div><div className="employee-main"><strong>{x.name}</strong><span>{x.meta}</span><small>{x.detail}</small></div><div className="employee-state"><b className={x.active?"active":"inactive"}>{x.active?"Active":"Inactive"}</b><span>{x.mobile||"No login"}</span></div><em>›</em></Link>)}{!filtered.length&&<div className="admin-empty"><Icon name="users"/><strong>No matching records</strong><span>Try a different search.</span></div>}</div></>
+export function SaveNotice({ message, ok }: { message: string; ok: boolean }) {
+  return message ? (
+    <div className={ok ? "kit-note is-ok" : "kit-note is-bad"} role="status">
+      <Icon name={ok ? "check" : "alert"} />
+      <span>{message}</span>
+    </div>
+  ) : null;
 }
-
-export function SaveNotice({message,ok}:{message:string;ok:boolean}){return message?<div className={`employee-notice ${ok?"ok":"bad"}`}>{message}</div>:null}

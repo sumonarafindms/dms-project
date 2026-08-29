@@ -3,17 +3,24 @@
  * heroes, KPI stats, empty/loading states, dialogs, toasts.
  *
  * Every role/page family historically invented its own class prefix for the
- * same visual pattern (e.g. `.rso-v7-hero`, `.manager-v5-hero`,
- * `.supervisor-v6-hero`, `.accounts-v12-hero` were four names for one
- * design). Rather than touch ~80 page files' markup, each rule below groups
- * every synonym so the whole app now renders through one real design system.
+ * same visual pattern (e.g. `.accounts-v12-hero` and `.admin-v2-hero` are
+ * two names for one design). Each rule below groups every surviving synonym so
+ * the not-yet-migrated pages still render through one design system.
+ *
+ * This file shrinks as pages move to styles/kit.css: BP, RSO, Supervisor and
+ * Manager are done and their names are gone from here entirely.
  */
 @layer components {
   /* ================= Buttons ================= */
+  /* `.kit-btn` is excluded from `.page button` on purpose. That bare-element
+     rule sets height/padding/background on every button inside a page, so a
+     kit button silently lost its own sizing: `.kit-btn.size-sm` only sets
+     padding and font-size, and nothing in the kit re-declares height, so
+     every small kit button rendered at the full 2.5rem and every ghost
+     button picked up this rule's white fill. Same shape as the .kit-input
+     exclusion in forms.css — the kit owns the classes it defines. */
   .btn,
-  .page button,
-  button.ops-primary,
-  button.ops-upload-btn {
+  .page button:not(.kit-btn):not(.kit-icon-btn) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -34,12 +41,12 @@
       transform 0.06s var(--ease-premium);
   }
   .btn:hover,
-  .page button:hover {
+  .page button:not(.kit-btn):not(.kit-icon-btn):hover {
     border-color: var(--color-slate-300);
     background: var(--color-slate-50);
   }
   .btn:active,
-  .page button:active {
+  .page button:not(.kit-btn):not(.kit-icon-btn):active {
     transform: translateY(1px);
   }
   .btn:disabled,
@@ -53,13 +60,9 @@
   .btn-primary,
   .admin-primary,
   .auth-v54-submit,
-  .ecc-v82-primary,
-  .ops-primary,
-  .ops-upload-btn,
   .auth-submit,
   .login-submit,
-  .sacool-submit,
-  .user-v3-submit {
+  .sacool-submit {
     background: linear-gradient(135deg, var(--color-accent-600), var(--color-accent-700));
     border-color: transparent;
     color: white;
@@ -69,7 +72,6 @@
   .btn-primary:hover,
   .admin-primary:hover,
   .auth-v54-submit:hover,
-  .ops-primary:hover,
   .auth-submit:hover,
   .login-submit:hover {
     background: linear-gradient(135deg, var(--color-accent-700), var(--color-accent-800));
@@ -111,32 +113,12 @@
   .section-card,
   .retainer-card,
   .performance-card,
-  .perf-card,
-  .perf-summary-card,
-  .perf-person-card,
   .admin-exec-v49-card,
   .admin-v2-focus-card,
   .admin-v2-ops-card,
   .admin-v2-table-card,
-  .rso-v7-focus-card,
-  .rso-v7-performance-card,
-  .manager-v5-list-card,
-  .manager-v5-team-card,
-  .supervisor-v6-rso-card,
-  .accounts-v12-person-card,
-  .upload-v61-card,
-  .target-upload-card,
-  .ops-upload-card,
-  .ops-data-card,
-  .ops-date-card,
-  .ga-upload-card,
-  .ga-data-card,
   .premium-layout-card-v79,
-  .employee-hub-card,
   .retailer-recent-card,
-  .retailer-result-card,
-  .retailer-status-card,
-  .retailer-activity-card,
   .attention-card,
   .warning-card,
   .premium-danger-note-v72,
@@ -165,13 +147,7 @@
   }
 
   .section,
-  .manager-v5-section,
-  .supervisor-v6-section,
-  .rso-v7-section,
-  .accounts-v12-section,
-  .admin-v2-section,
-  .bp-v8-section,
-  .ops-section {
+  .admin-v2-section {
     background: white;
     border: 1px solid var(--color-slate-200);
     border-radius: var(--radius-card);
@@ -184,49 +160,25 @@
 
   .section-head,
   .section-title,
-  .accounts-v12-section-head,
-  .admin-v2-section-head,
-  .bp-v8-section-head,
-  .manager-v5-section-head,
-  .rso-v7-section-head,
-  .supervisor-v6-section-head,
-  .workspace-section-head-v94,
-  .admin-section-head,
-  .ops-section-head,
-  .target-section-head,
-  .ecc-v82-section-label,
-  .dash97-section-head {
+  .admin-v2-section-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 0.9rem;
   }
-  .section-head h2,
-  .manager-v5-section-head h2,
-  .supervisor-v6-section-head h2,
-  .rso-v7-section-head h2,
-  .accounts-v12-section-head h2,
-  .workspace-section-head-v94 h2,
-  .dash97-section-head h2 {
+  .section-head h2 {
     font-size: 1rem;
     font-weight: 700;
     color: var(--color-slate-900);
   }
-  .section-head p,
-  .manager-v5-section-head p,
-  .supervisor-v6-section-head p,
-  .rso-v7-section-head p,
-  .accounts-v12-section-head p,
-  .workspace-section-head-v94 p,
-  .dash97-section-head p {
+  .section-head p {
     font-size: 0.8rem;
     color: var(--color-slate-500);
     margin-top: 0.15rem;
   }
   .section-link,
-  .section-head a,
-  .dash97-section-head a {
+  .section-head a {
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--color-accent-600);
@@ -239,21 +191,9 @@
   }
 
   /* ================= Kickers / eyebrows ================= */
-  .admin-kicker,
-  .rso-v7-kicker,
-  .manager-v5-kicker,
-  .supervisor-v6-kicker,
-  .accounts-v12-kicker,
-  .ops-kicker,
-  .ops-overline,
-  .eyebrow,
-  .target-v3-overline,
   .premium-page-kicker,
-  .dash97-kicker,
   .admin-sub,
-  .employees-sub,
   .permissions-sub,
-  .upload-hub-sub,
   .page-subtitle {
     display: inline-block;
     font-size: 0.68rem;
@@ -265,29 +205,8 @@
   }
 
   /* ================= Hero / subhero blocks ================= */
-  .accounts-v12-hero,
   .admin-v2-hero,
-  .attention-v4-hero,
-  .audit-v4-hero,
-  .bp-v8-hero,
-  .bp-v8-sales-hero,
-  .manager-v5-hero,
-  .manager-detail-hero,
-  .rso-v7-hero,
   .rso-detail-hero,
-  .supervisor-v6-hero,
-  .supervisor-detail-hero,
-  .employee-detail-hero,
-  .retailer-profile-hero,
-  .permissions-v3-hero,
-  .target-v3-hero,
-  .users-v3-hero,
-  .page-header,
-  .accounts-loading-hero,
-  .manager-loading-hero,
-  .supervisor-loading-hero,
-  .rso-loading-hero,
-  .bp-loading-hero,
   .loading-v4-hero,
   .premium-page-head-v77,
   .premium-page-header-v77 {
@@ -303,24 +222,12 @@
     justify-content: space-between;
     gap: 1rem;
   }
-  .accounts-v12-hero h1,
   .admin-v2-hero h1,
-  .manager-v5-hero h1,
-  .rso-v7-hero h1,
-  .supervisor-v6-hero h1,
-  .employee-detail-hero h1,
-  .retailer-profile-hero h1,
-  .page-header h1,
   .premium-page-head-v77 h1 {
     font-size: 1.35rem;
     color: white;
   }
-  .accounts-v12-hero p,
   .admin-v2-hero p,
-  .manager-v5-hero p,
-  .rso-v7-hero p,
-  .supervisor-v6-hero p,
-  .page-header p,
   .premium-page-head-v77 p {
     color: var(--color-slate-300);
     font-size: 0.85rem;
@@ -356,32 +263,10 @@
     flex-wrap: wrap;
   }
 
-  /* subhero stat rows sitting under a hero */
-  .manager-v5-subhero,
-  .rso-v7-subhero,
-  .supervisor-v6-subhero,
-  .accounts-v12-subhero {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    width: 100%;
-  }
-  .manager-v5-subhero-stat,
-  .accounts-v12-substat,
-  .rso-v7-substat,
-  .supervisor-v6-substat {
-    background: rgb(255 255 255 / 0.08);
-    border: 1px solid rgb(255 255 255 / 0.12);
-    border-radius: var(--radius-control);
-    padding: 0.6rem 0.9rem;
-    min-width: 7rem;
-  }
-
   /* ================= KPI / stat blocks =================
      Only genuinely icon-beside-text blocks belong here. Stat cards that stack
      label / value / sub are laid out by styles/patterns.css — listing them here
      too would override that with a row layout and re-break them. */
-  .retailer-v2-kpis > *,
   .premium-detail-stat-v68 {
     background: white;
     border: 1px solid var(--color-slate-200);
@@ -395,21 +280,13 @@
   /* .target-kpis is sized in styles/patterns.css — it sits in a narrow side
      rail where an 11rem minimum collapses it to a single column. */
   .admin-kpi-grid,
-  .rso-v7-kpis,
-  .supervisor-v6-kpis,
-  .retailer-profile-kpis,
-  .retailer-v2-kpis,
-  .detail-stat-grid,
-  .premium-kpi-grid-v70,
-  .role-metric-grid {
+  .premium-kpi-grid-v70 {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
     gap: 0.85rem;
     margin-bottom: 1.1rem;
   }
   .premium-detail-stat-icon,
-  .premium-state-icon,
-  .premium-feedback-icon,
   .premium-toast-icon-v78,
   .premium-dialog-icon-v78 {
     display: grid;
@@ -421,10 +298,6 @@
     color: var(--color-accent-600);
     flex-shrink: 0;
   }
-  .detail-stat-value,
-  .metric-value,
-  .mini-value,
-  .progress-number,
   .premium-detail-stat-v68 strong {
     font-size: 1.2rem;
     font-weight: 800;
@@ -432,8 +305,6 @@
     display: block;
   }
   .metric-label,
-  .mini-label,
-  .role-metric,
   .premium-detail-stat-v68 span:first-child {
     font-size: 0.72rem;
     font-weight: 600;
@@ -441,7 +312,6 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  .metric-sub,
   .person-meta,
   .premium-detail-stat-v68 small {
     font-size: 0.75rem;
@@ -475,16 +345,7 @@
     --tone-color: var(--color-danger-600);
     --tone-bg: var(--color-danger-50);
   }
-  [class*="tone-"] .premium-detail-stat-icon,
-  .dash97-kpi.tone-teal .dash97-ring,
-  .dash97-snapshot i.tone-green,
-  .dash97-snapshot i.tone-teal,
-  .dash97-snapshot i.tone-gold,
-  .dash97-snapshot i.tone-slate {
-    background: var(--tone-bg, var(--color-accent-50));
-    color: var(--tone-color, var(--color-accent-600));
-  }
-  .dash97-snapshot i {
+  [class*="tone-"] .premium-detail-stat-icon {
     display: inline-block;
     width: 0.5rem;
     height: 0.5rem;
@@ -496,9 +357,6 @@
   /* ================= Badges / status pills ================= */
   .admin-status,
   .filter-count,
-  .ops-status,
-  .permission-badge,
-  .premium-badge-v65,
   .result-count,
   .status-pill,
   .table-count {
@@ -512,28 +370,6 @@
     color: var(--color-slate-600);
     font-size: 0.72rem;
     font-weight: 700;
-  }
-  .premium-badge-v65 .nav-icon {
-    width: 0.85rem;
-    height: 0.85rem;
-  }
-  .premium-badge-v65.tone-indigo,
-  .premium-badge-v65.tone-blue {
-    background: var(--color-accent-50);
-    color: var(--color-accent-700);
-  }
-  .premium-badge-v65.tone-green {
-    background: var(--color-success-50);
-    color: var(--color-success-700);
-  }
-  .premium-badge-v65.tone-red,
-  .premium-badge-v65.tone-danger {
-    background: var(--color-danger-50);
-    color: var(--color-danger-700);
-  }
-  .premium-badge-v65.tone-gold {
-    background: var(--color-warning-50);
-    color: var(--color-warning-700);
   }
 
   .status-success-v80,
@@ -554,18 +390,8 @@
   }
 
   /* ================= Empty / loading states ================= */
-  .admin-empty,
-  .bp-v8-empty,
-  .employee-retry-v91,
   .empty,
-  .manager-v5-empty,
-  .ops-empty,
-  .supervisor-v6-empty,
-  .empty-state,
-  .premium-state-v72,
-  .shared-empty-v9,
-  .dash97-empty,
-  .dash97-good-state {
+  .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -578,8 +404,7 @@
     border-radius: var(--radius-card);
     background: var(--color-slate-50);
   }
-  .empty-state-icon,
-  .premium-state-icon {
+  .empty-state-icon {
     width: 2.75rem;
     height: 2.75rem;
     border-radius: 50%;
@@ -588,23 +413,11 @@
     background: var(--color-success-50);
     color: var(--color-success-600);
   }
-  .premium-state-v72.danger,
   .premium-danger-note-v72 {
     border-style: solid;
     border-color: var(--color-danger-200);
     background: var(--color-danger-50);
     color: var(--color-danger-700);
-  }
-  .premium-state-v72.danger .premium-state-icon {
-    background: var(--color-danger-100);
-    color: var(--color-danger-600);
-  }
-  .premium-state-v72 strong {
-    color: var(--color-slate-900);
-    font-size: 0.95rem;
-  }
-  .premium-state-action {
-    margin-top: 0.4rem;
   }
   .premium-spinner-v72,
   .loading-shimmer,
@@ -621,12 +434,7 @@
       transform: rotate(360deg);
     }
   }
-  .loading-v4-panel,
-  .accounts-loading-list,
-  .manager-loading-panel,
-  .supervisor-loading-list,
-  .rso-loading-actions,
-  .bp-loading-list {
+  .loading-v4-panel {
     background: var(--color-slate-100);
     border-radius: var(--radius-card);
     min-height: 4rem;
@@ -740,36 +548,6 @@
     background: var(--color-slate-100);
     flex-shrink: 0;
     font-weight: 800;
-  }
-
-  .premium-feedback-v66 {
-    display: flex;
-    gap: 0.65rem;
-    padding: 0.8rem 0.95rem;
-    border-radius: var(--radius-control);
-    background: var(--color-accent-50);
-    border: 1px solid var(--color-accent-100);
-  }
-  .premium-feedback-v66.tone-success {
-    background: var(--color-success-50);
-    border-color: var(--color-success-100);
-  }
-  .premium-feedback-v66.tone-error {
-    background: var(--color-danger-50);
-    border-color: var(--color-danger-100);
-  }
-  .premium-feedback-v66.tone-warning {
-    background: var(--color-warning-50);
-    border-color: var(--color-warning-100);
-  }
-  .premium-feedback-v66 strong {
-    display: block;
-    font-size: 0.78rem;
-    color: var(--color-slate-800);
-  }
-  .premium-feedback-v66 span {
-    font-size: 0.82rem;
-    color: var(--color-slate-600);
   }
 
   /* ================= Progress ================= */
@@ -895,22 +673,6 @@
     gap: 0.6rem;
   }
 
-  .workspace-section-v94 {
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    padding: 1.25rem 1.4rem;
-    box-shadow: var(--shadow-card);
-    margin-bottom: 1.1rem;
-  }
-  .workspace-section-head-v94 span {
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-accent-600);
-  }
-
   .field-group-v75 {
     padding: 1rem 1.1rem;
     border: 1px solid var(--color-slate-200);
@@ -967,25 +729,8 @@
     margin-bottom: 1rem;
   }
 
-  .table-scroll-hint-v64 {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.72rem;
-    color: var(--color-slate-400);
-    padding: 0.4rem 0;
-  }
-  .table-scroll-hint-v64 .nav-icon {
-    width: 0.9rem;
-    height: 0.9rem;
-  }
-
   /* ================= Breadcrumbs / avatars / misc rows ================= */
-  .ga-back-link,
-  .ops-back,
-  .page-breadcrumb,
-  .perf-breadcrumb,
-  .retailer-profile-back {
+  .page-breadcrumb {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -994,25 +739,13 @@
     color: var(--color-slate-500);
     margin-bottom: 0.75rem;
   }
-  .ga-back-link:hover,
-  .ops-back:hover,
-  .page-breadcrumb:hover,
-  .perf-breadcrumb:hover,
-  .retailer-profile-back:hover {
+  .page-breadcrumb:hover {
     color: var(--color-accent-600);
   }
 
   .admin-mini-icon,
   .admin-quick-icon,
-  .employee-avatar,
-  .employee-hub-icon,
-  .ops-section-icon,
-  .retailer-profile-avatar,
-  .retailer-result-avatar,
-  .upload-module-icon,
-  .perf-avatar,
-  .person-avatar,
-  .dash97-avatar {
+  .person-avatar {
     display: grid;
     place-items: center;
     width: 2.4rem;
@@ -1025,15 +758,7 @@
     flex-shrink: 0;
   }
 
-  .quick-action,
-  .role-quick,
-  .linked-row,
-  .team-row,
-  .dash97-team-row,
-  .dash97-watch-row,
-  .dash97-report,
-  .dash97-admin-link,
-  .dash97-panel-btn {
+  .team-row {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -1041,21 +766,10 @@
     border-radius: var(--radius-control);
     transition: background-color 0.14s var(--ease-premium);
   }
-  .quick-action:hover,
-  .role-quick:hover,
-  .linked-row:hover,
-  .team-row:hover,
-  .dash97-team-row:hover,
-  .dash97-watch-row:hover,
-  .dash97-report:hover,
-  .dash97-admin-link:hover,
-  .dash97-panel-btn:hover {
+  .team-row:hover {
     background: var(--color-slate-50);
   }
-  .linked-list,
-  .ranking-list,
-  .dash97-team-list,
-  .dash97-watch-list {
+  .ranking-list {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -1064,66 +778,4 @@
   /* ================= SIM swap — always shown distinct from Total GA ================= */
   /* Scoped: `.tone-amber` is also used on upload/module cards, where a full
      yellow fill is wrong. Only the SIM-swap KPI gets the amber surface. */
-  .retailer-profile-kpi.tone-amber {
-    --tone-color: var(--color-warning-700);
-    --tone-bg: var(--color-warning-50);
-    background: var(--color-warning-50);
-    border-color: var(--color-warning-100);
-  }
-  .retailer-profile-kpi.tone-amber > strong {
-    color: var(--color-warning-700);
-  }
-  .activity-type {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 3rem;
-    height: 1.5rem;
-    padding: 0 0.5rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    background: var(--color-accent-50);
-    color: var(--color-accent-700);
-  }
-  .activity-type.swap {
-    background: var(--color-warning-50);
-    color: var(--color-warning-700);
-  }
-  .retailer-v2-panel {
-    background: white;
-    border: 1px solid var(--color-slate-200);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
-    padding: 1.1rem 1.25rem;
-  }
-  .retailer-v2-panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.75rem;
-  }
-  .retailer-v2-panel-head span {
-    display: block;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--color-slate-400);
-  }
-  .retailer-activity-v2 {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-  .retailer-activity-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.55rem 0;
-    border-bottom: 1px solid var(--color-slate-100);
-  }
-  .retailer-activity-row:last-child {
-    border-bottom: none;
-  }
 }

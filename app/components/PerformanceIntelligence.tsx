@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type {PaceStatus} from "../../lib/intelligence";
+import {paceBand} from "../../lib/achievement";
 
 export function PaceCard({label,achieved,target,expected,unit=""}:{label:string;achieved:number;target:number;expected:number;unit?:string}){
- const progress=target?Math.round(achieved/target*100):0,gap=progress-expected;
- const status:PaceStatus=!target?"No target":gap>=8?"Ahead":gap>=-5?"On track":"Behind";
+ const progress=target?Math.round(achieved/target*100):0;
+ const status:PaceStatus=!target?"No target":paceBand(progress,expected);
  const cls=status==="Ahead"?"pace-ahead":status==="On track"?"pace-track":status==="Behind"?"pace-behind":"pace-none";
  return <div className="card pace-card"><div className="pace-card-head"><div><div className="metric-label">{label}</div><div className="pace-value">{unit}{Math.round(achieved).toLocaleString()}</div></div><span className={`pace-pill ${cls}`}>{status}</span></div><div className="progress"><span style={{width:`${Math.min(100,progress)}%`}}/></div><div className="pace-foot"><span>{progress}% achieved</span><span>{target?`${unit}${Math.max(0,target-achieved).toLocaleString()} remaining`:"Target not set"}</span></div></div>
 }

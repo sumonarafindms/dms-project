@@ -1,14 +1,74 @@
-import {requireUser} from "../../../../../lib/auth";
-import {bpAssignmentDetail} from "../../../../../lib/bp-activations";
-import {normalizeMonth} from "../../../../../lib/drilldown";
-import {notFound} from "next/navigation";
-import {Breadcrumb,PerfSummary,PerfBar} from "../../../../components/AdminPerformanceUI";
-import {FilterForm} from "../../../../components/DrillUI";
-export default async function Page({params,searchParams}:{params:Promise<{id:string}>;searchParams:Promise<{month?:string;from?:string;to?:string}>}){
- const u=await requireUser(["ADMIN","IT"]),{id}=await params,s=await searchParams,month=normalizeMonth(s.from?.slice(0,7)||s.month),d=await bpAssignmentDetail(u,id,month,undefined,s.from,s.to);if(!d)notFound();const a=d.assignment;
- return <main className="page admin-performance"><Breadcrumb items={[{label:"Performance",href:"/admin/performance/bps"},{label:"BP",href:"/admin/performance/bps"},{label:a.retailer.retailerName||a.retailer.retailerCode}]}/><div className="perf-profile-head"><div className="perf-avatar large">{a.retailer.retailerCode.slice(-2)}</div><div><div className="admin-kicker">BP PERFORMANCE</div><h1>{a.retailer.retailerName||a.retailer.retailerCode}</h1><p>{a.retailer.retailerCode} · RSO {a.employee.name} · {a.employee.supervisor?.name||"No supervisor"}</p></div></div>
- <FilterForm month={month} from={s.from} to={s.to} dateRange showMonth placeholder=""/>
- <PerfSummary items={[{label:"GA Target",value:a.gaTarget,sub:"Target across selected months"},{label:"GA Achieved",value:d.total,sub:`${a.gaTarget?Math.round(d.total/a.gaTarget*100):0}% complete`},{label:"GA Remaining",value:Math.max(0,a.gaTarget-d.total),sub:"To target"},{label:"SIM Mix",value:`${d.total150} / ${d.total300}`,sub:"170 / 300 GA only"},{label:"SIM SWAP",value:d.simSwap,sub:"Replacement SIM · excluded from achievement"}]}/>
- <section className="section"><div className="card perf-detail-progress"><div><span>Selected-range GA progress</span><strong>{d.total} / {a.gaTarget}</strong></div><PerfBar achieved={d.total} target={a.gaTarget}/></div></section>
- <section className="section"><div className="admin-section-head"><div><span>ACTIVATIONS</span><h2>Recent SIM activations</h2></div></div><div className="perf-list card">{d.rows.slice(0,100).map(x=><div className="perf-list-row" key={x.simNo}><div><strong>{x.simNo}</strong><span>{x.activationDate.toISOString().slice(0,10)} · {x.activationTime||""}</span></div><div className="perf-row-numbers"><span>Price <b>৳{Number(x.sellingPrice)}</b></span></div></div>)}</div></section></main>
+import { requireUser } from "../../../../../lib/auth";
+import { bpAssignmentDetail } from "../../../../../lib/bp-activations";
+import { normalizeMonth } from "../../../../../lib/drilldown";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { Card, EmptyState, MetricBar, PageHeader, Row, SectionHead, SummaryStrip } from "../../../../components/Kit";
+import { Icon } from "../../../../components/icons";
+import { FilterForm } from "../../../../components/DrillUI";
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string }>;
+}) {
+  const u = await requireUser(["ADMIN", "IT"]),
+    { id } = await params,
+    s = await searchParams,
+    month = normalizeMonth(s.from?.slice(0, 7) || s.month),
+    d = await bpAssignmentDetail(u, id, month, undefined, s.from, s.to);
+  if (!d) notFound();
+  const a = d.assignment;
+  return (
+    <main className="page">
+      <Link href="/admin/performance/bps" className="kit-detail-back">
+        <Icon name="arrow" /> BP Performance
+      </Link>
+      <PageHeader
+        title={a.retailer.retailerName || a.retailer.retailerCode}
+        subtitle={`${a.retailer.retailerCode} · RSO ${a.employee.name} · ${a.employee.supervisor?.name || "No supervisor"}`}
+      />
+      <div className="no-print" style={{ marginBottom: "1rem" }}>
+        <FilterForm month={month} from={s.from} to={s.to} dateRange showMonth placeholder="" />
+      </div>
+      <SummaryStrip
+        items={[
+          { label: "GA Target", value: a.gaTarget.toLocaleString() },
+          { label: "GA Achieved", value: d.total.toLocaleString(), tone: "teal" },
+          { label: "GA Remaining", value: Math.max(0, a.gaTarget - d.total).toLocaleString(), tone: "amber" },
+          // Shown, never added: a replacement SIM is not a new activation.
+          { label: "SIM Swap", value: d.simSwap.toLocaleString() },
+        ]}
+      />
+      <Card padded style={{ marginBottom: "1.25rem" }}>
+        <MetricBar label="Selected-range GA progress" achieved={d.total} target={a.gaTarget} />
+        <p style={{ fontSize: "0.75rem", color: "var(--color-slate-400)", marginTop: "0.5rem" }}>
+          170 GA {d.total150} · 300 GA {d.total300} · SIM swap {d.simSwap} (excluded from achievement)
+        </p>
+      </Card>
+      <SectionHead title="Recent SIM activations" sub={`${Math.min(d.rows.length, 100)} of ${d.rows.length} shown.`} />
+      <Card padded>
+        {d.rows.length ? (
+          <div className="kit-rows">
+            {d.rows.slice(0, 100).map((x) => (
+              <Row
+                key={x.simNo}
+                icon={<Icon name="sim" />}
+                title={`SIM ${x.simNo}`}
+                sub={`${x.activationDate.toISOString().slice(0, 10)}${x.activationTime ? ` · ${x.activationTime}` : ""}`}
+                value={`৳${Number(x.sellingPrice)}`}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No activations in this period"
+            hint="Widen the date range, or check the GA feed on the Upload Center."
+            icon={<Icon name="sim" />}
+          />
+        )}
+      </Card>
+    </main>
+  );
 }

@@ -1,16 +1,160 @@
-import Link from "next/link";
-import {FilterForm} from "./DrillUI";
-import type {RetailerOpportunity} from "../../lib/retailer-opportunities";
+/**
+ * Shared retailer search and attention views — migrated to the role-UI kit.
+ *
+ * One component behind twelve pages: the retailer list and the attention
+ * worklist for admin, RSO, supervisor, manager and accounts. `attentionOnly`
+ * is the only difference between the two — it drops retailers with no open
+ * reason and shows the priority.
+ *
+ * Scope is decided by the caller (which employeeIds it passed to
+ * retailerOpportunities), never here.
+ */
 
-const fmt=(n:number)=>new Intl.NumberFormat("en-BD",{maximumFractionDigits:0}).format(n);
-export function RetailerSearchView({rows,month,q,base,from,to,attentionOnly=false}:{rows:RetailerOpportunity[];month:string;q:string;base:string;from?:string;to?:string;attentionOnly?:boolean}){
- const filtered=rows.filter(r=>{
-   if(attentionOnly&&!r.reasons.length)return false;
-   if(!q)return true;const x=q.toLowerCase();return `${r.retailerCode} ${r.retailerName} ${r.employeeName} ${r.supervisor} ${r.route} ${r.category}`.toLowerCase().includes(x);
- });
- return <><FilterForm q={q} month={month} from={from} to={to} dateRange placeholder="Retailer code, name, RSO, supervisor or route"/><section className="section"><div className="section-head"><h2 className="section-title">{attentionOnly?"Needs attention":"Retailers"}</h2><span className="section-link">{filtered.length} results</span></div><div className="opportunity-list retailer-card-list">{filtered.length?filtered.map(r=><Link key={r.id} href={`${base}/${r.id}?month=${month}${from?`&from=${from}`:""}${to?`&to=${to}`:""}`} className="retailer-result-card"><div className="retailer-result-top"><div className="retailer-result-avatar">{(r.retailerName||r.retailerCode).slice(0,2).toUpperCase()}</div><div className="retailer-result-name"><span>{r.retailerCode}</span><strong>{r.retailerName}</strong><small>{r.employeeName} · {r.supervisor}</small></div>{attentionOnly?<span className={`attention-v4-priority p${Math.min(5,r.priority)}`}>P{r.priority}</span>:null}<b>›</b></div><div className="retailer-result-route">{r.route||"No route"}{r.category?` · ${r.category}`:""}</div><div className="retailer-result-metrics"><div><span>GA</span><strong>{r.ga}</strong></div><div><span>C2S</span><strong>৳{fmt(r.c2s)}</strong></div><div><span>SSO</span><strong className={r.ssoComplete?"ok":"warn"}>{r.ssoComplete?"Done":"Pending"}</strong></div><div><span>LSO</span><strong className={r.lsoComplete?"ok":"warn"}>{r.lsoComplete?"Done":"Pending"}</strong></div></div>{r.reasons.length>0&&<div className="retailer-result-alert">{r.reasons.slice(0,2).map(x=><span key={x}>{x}</span>)}</div>}</Link>):<div className="empty card shared-empty-v9"><span>○</span><strong>No retailers match these filters.</strong><small>Try another search or date range.</small></div>}</div></section></>
+import Link from "next/link";
+import { FilterForm } from "./DrillUI";
+import { Icon } from "./icons";
+import { Badge, Card, EmptyState, Row, SectionHead } from "./Kit";
+import type { RetailerOpportunity } from "../../lib/retailer-opportunities";
+
+const fmt = (n: number) => new Intl.NumberFormat("en-BD", { maximumFractionDigits: 0 }).format(n);
+
+export function RetailerSearchView({
+  rows,
+  month,
+  q,
+  base,
+  from,
+  to,
+  attentionOnly = false,
+}: {
+  rows: RetailerOpportunity[];
+  month: string;
+  q: string;
+  base: string;
+  from?: string;
+  to?: string;
+  attentionOnly?: boolean;
+}) {
+  const needle = q.toLowerCase();
+  const filtered = rows.filter((r) => {
+    if (attentionOnly && !r.reasons.length) return false;
+    if (!q) return true;
+    return `${r.retailerCode} ${r.retailerName} ${r.employeeName} ${r.supervisor} ${r.route} ${r.category}`
+      .toLowerCase()
+      .includes(needle);
+  });
+  const range = `month=${month}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`;
+
+  return (
+    <>
+      <FilterForm
+        q={q}
+        month={month}
+        from={from}
+        to={to}
+        dateRange
+        placeholder="Retailer code, name, RSO, supervisor or route"
+      />
+      <SectionHead
+        title={attentionOnly ? "Needs attention" : "Retailers"}
+        sub={`${filtered.length} ${filtered.length === 1 ? "result" : "results"}`}
+      />
+      {filtered.length ? (
+        <div className="kit-card-grid">
+          {filtered.map((r) => (
+            <Link key={r.id} href={`${base}/${r.id}?${range}`} className="kit-card kit-card-p is-clickable kit-outlet">
+              <div className="kit-entity-top">
+                <span className="kit-avatar" aria-hidden="true">
+                  {(r.retailerName || r.retailerCode).slice(0, 2).toUpperCase()}
+                </span>
+                <div className="kit-entity-main">
+                  <p className="kit-eyebrow">{r.retailerCode}</p>
+                  <strong>{r.retailerName || r.retailerCode}</strong>
+                  <span>
+                    {r.employeeName} · {r.supervisor}
+                  </span>
+                </div>
+                {attentionOnly ? <Badge tone={r.priority >= 3 ? "failed" : "pending"}>P{r.priority}</Badge> : null}
+              </div>
+
+              <p className="kit-outlet-route">
+                {r.route || "No route"}
+                {r.category ? ` · ${r.category}` : ""}
+              </p>
+
+              <div className="kit-outlet-metrics">
+                <div>
+                  <span>GA</span>
+                  <strong>{r.ga}</strong>
+                </div>
+                <div>
+                  <span>C2S</span>
+                  <strong>৳{fmt(r.c2s)}</strong>
+                </div>
+                <div>
+                  <span>SSO</span>
+                  {/* SSO only applies to a SIM seller; "Pending" on a retailer
+                      that can never complete it would read as a failure. */}
+                  <strong className={!r.simSeller ? "is-muted" : r.ssoComplete ? "is-ok" : "is-warn"}>
+                    {!r.simSeller ? "N/A" : r.ssoComplete ? "Done" : "Pending"}
+                  </strong>
+                </div>
+                <div>
+                  <span>LSO</span>
+                  <strong className={r.lsoComplete ? "is-ok" : "is-warn"}>{r.lsoComplete ? "Done" : "Pending"}</strong>
+                </div>
+              </div>
+
+              {r.reasons.length > 0 && (
+                <div className="kit-outlet-reasons">
+                  {r.reasons.slice(0, 2).map((x) => (
+                    <span key={x}>{x}</span>
+                  ))}
+                </div>
+              )}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <EmptyState
+            positive={attentionOnly}
+            title={attentionOnly ? "Nothing needs attention" : "No retailers match these filters"}
+            hint={
+              attentionOnly
+                ? "Every retailer in scope has completed SSO and LSO for this period."
+                : "Try another search term or date range."
+            }
+            icon={<Icon name={attentionOnly ? "check" : "search"} />}
+          />
+        </Card>
+      )}
+    </>
+  );
 }
-export function AttentionSummary({rows}:{rows:RetailerOpportunity[]}){
- const sso=rows.filter(r=>r.simSeller&&!r.ssoComplete).length,lso=rows.filter(r=>!r.lsoComplete).length,noC2s=rows.filter(r=>r.c2s===0).length,unassigned=rows.filter(r=>!r.employeeId).length;
- return <div className="detail-stat-grid attention-v4-summary"><div className="card detail-stat tone-rose"><span className="attention-v4-icon">S</span><div><div className="metric-label">SSO Pending</div><div className="detail-stat-value">{sso}</div><small>SIM seller gap</small></div></div><div className="card detail-stat tone-orange"><span className="attention-v4-icon">L</span><div><div className="metric-label">LSO Pending</div><div className="detail-stat-value">{lso}</div><small>Retail sales gap</small></div></div><div className="card detail-stat tone-blue"><span className="attention-v4-icon">C</span><div><div className="metric-label">No C2S</div><div className="detail-stat-value">{noC2s}</div><small>Zero sales outlets</small></div></div><div className="card detail-stat tone-purple"><span className="attention-v4-icon">?</span><div><div className="metric-label">Unassigned</div><div className="detail-stat-value">{unassigned}</div><small>Ownership missing</small></div></div></div>
+
+/**
+ * The four attention counts. Each one is a distinct gap, not a severity band:
+ * a retailer can appear in more than one, so these never sum to the row count.
+ */
+export function AttentionSummary({ rows }: { rows: RetailerOpportunity[] }) {
+  const sso = rows.filter((r) => r.simSeller && !r.ssoComplete).length,
+    lso = rows.filter((r) => !r.lsoComplete).length,
+    noC2s = rows.filter((r) => r.c2s === 0).length,
+    unassigned = rows.filter((r) => !r.employeeId).length;
+  const items = [
+    { label: "SSO Pending", value: sso, sub: "SIM seller gap", icon: "sim" },
+    { label: "LSO Pending", value: lso, sub: "Retail sales gap", icon: "chart" },
+    { label: "No C2S", value: noC2s, sub: "Zero sales outlets", icon: "wallet" },
+    { label: "Unassigned", value: unassigned, sub: "Ownership missing", icon: "users" },
+  ];
+  return (
+    <div className="kit-card-grid is-quad" style={{ marginBottom: "1.25rem" }}>
+      {items.map((x) => (
+        <Card padded key={x.label}>
+          <Row icon={<Icon name={x.icon} />} title={x.label} sub={x.sub} value={x.value.toLocaleString()} />
+        </Card>
+      ))}
+    </div>
+  );
 }
