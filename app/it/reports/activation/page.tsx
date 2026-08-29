@@ -99,7 +99,7 @@ export default async function ActivationReport({
         }
       />
       <ReportDateBar range={range} />
-      <div className="kit-report-presets no-print" style={{ marginBottom: "0.75rem" }}>
+      <div className="kit-report-presets no-print kit-mb-12">
         {GROUPS.map((g) => (
           <Link
             key={g.key}

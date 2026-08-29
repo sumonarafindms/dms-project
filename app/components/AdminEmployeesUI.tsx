@@ -80,11 +80,7 @@ export function EmployeeList({ title, rows, addHref }: { title: string; rows: Ad
             ))}
           </div>
         ) : (
-          <EmptyState
-            title="No matching records"
-            hint="Try a different search term."
-            icon={<Icon name="search" />}
-          />
+          <EmptyState title="No matching records" hint="Try a different search term." icon={<Icon name="search" />} />
         )}
       </Card>
     </>

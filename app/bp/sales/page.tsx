@@ -17,8 +17,8 @@ import { normalizeMonth } from "../../../lib/drilldown";
 import { parseYmd, monthStartsInRange } from "../../../lib/date-range";
 import { classifyGaActivation, withGa170, withGa300, withSimSwap, withStandardGa } from "../../../lib/business-rules";
 import { targetPercent } from "../../../lib/achievement";
-import { FilterForm } from "../../components/DrillUI";
-import { Card, EmptyState, MetricBar, PageHeader, Row, SectionHead, SummaryStrip } from "../../components/Kit";
+import { SimActivationList } from "../../components/SimActivationList";
+import { Card, EmptyState, MetricBar, PageHeader, SummaryStrip } from "../../components/Kit";
 import { Icon } from "../../components/icons";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ function Notice({ title, subtitle }: { title: string; subtitle: string }) {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string }>;
 }) {
   const u = await requirePagePermission(["BP"], "ga");
   if (!u.bpRetailerId)
@@ -45,7 +45,6 @@ export default async function Page({
 
   const s = await searchParams;
   const month = normalizeMonth(s.from?.slice(0, 7) || s.month);
-  const q = (s.q || "").trim();
   const { start, end } = monthBounds(`${month}-01`);
   const rs = parseYmd(s.from) || start;
   const to = parseYmd(s.to);
@@ -79,7 +78,9 @@ export default async function Page({
   const effectiveEnd = aEnd < re ? aEnd : re;
 
   const rangeWhere = { retailerId: u.bpRetailerId, activationDate: { gte: effectiveStart, lt: effectiveEnd } };
-  const where = { ...rangeWhere, ...(q ? { simNo: { contains: q, mode: "insensitive" as const } } : {}) };
+  // No server-side SIM filter: the list below searches the loaded rows as
+  // the BP types, and tells them when the 300-row window is the limit.
+  const where = rangeWhere;
 
   const [rows, total, ga150, ga300, simSwap] = await Promise.all([
     prisma.gaActivation.findMany({
@@ -119,56 +120,37 @@ export default async function Page({
       />
 
       {target > 0 && (
-        <Card padded style={{ marginBottom: "1rem" }}>
+        <Card className="kit-mb-16" padded>
           <MetricBar label="Target progress" achieved={total} target={target} />
-          <p style={{ fontSize: "0.75rem", color: "var(--color-slate-400)", marginTop: "0.5rem" }}>
+          <p className="kit-hint kit-mt-8">
             {Math.max(0, target - total).toLocaleString()} remaining · {targetPercent(total, target)}% achieved
           </p>
         </Card>
       )}
 
-      <div className="no-print" style={{ marginBottom: "1rem" }}>
-        <FilterForm q={q} month={month} from={s.from} to={s.to} dateRange placeholder="Search SIM serial" />
-      </div>
-
-      <SectionHead
-        title="SIM activations"
-        sub="Only records inside your BP assignment and the selected date range."
-        link={<span className="kit-label">{rows.length} shown</span>}
+      <SimActivationList
+        rows={rows.map((x) => {
+          const category = classifyGaActivation(x);
+          return {
+            simNo: x.simNo,
+            date: x.activationDate.toISOString().slice(0, 10),
+            time: x.activationTime || "",
+            price: Number(x.sellingPrice),
+            category:
+              category === "GA_170"
+                ? "170 GA"
+                : category === "GA_300"
+                  ? "300 GA"
+                  : category === "SIM_SWAP"
+                    ? "SIM swap"
+                    : "Not counted",
+          };
+        })}
+        month={month}
+        from={s.from}
+        to={s.to}
+        capped={rows.length >= 300}
       />
-      <Card padded>
-        {rows.length ? (
-          <div className="kit-rows">
-            {rows.map((x) => {
-              const category = classifyGaActivation(x);
-              return (
-                <Row
-                  key={x.simNo}
-                  icon={<Icon name="sim" />}
-                  title={`SIM ${x.simNo}`}
-                  sub={`${x.activationDate.toISOString().slice(0, 10)}${x.activationTime ? ` · ${x.activationTime}` : ""}`}
-                  value={`৳${Number(x.sellingPrice)}`}
-                  valueSub={
-                    category === "GA_170"
-                      ? "170 GA"
-                      : category === "GA_300"
-                        ? "300 GA"
-                        : category === "SIM_SWAP"
-                          ? "SIM swap"
-                          : "Not counted"
-                  }
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState
-            title="No GA found"
-            hint="Change the date range or the SIM search."
-            icon={<Icon name="search" />}
-          />
-        )}
-      </Card>
     </main>
   );
 }

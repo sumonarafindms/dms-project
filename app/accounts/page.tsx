@@ -86,13 +86,13 @@ export default async function Accounts() {
         title="Data freshness"
         sub="Checked against the latest import's business date, not its upload time."
       />
-      <div className="kit-card-grid is-quad" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-card-grid is-quad kit-mb-20">
         {feeds.map((f) => {
           const state = freshness(f.batch?.businessDate);
           return (
             <Card key={f.key} padded>
               <div className="kit-feed-head">
-                <div style={{ minWidth: 0 }}>
+                <div className="kit-min0">
                   <span className="kit-label">{f.key}</span>
                   <strong className="kit-figure">{state.date}</strong>
                 </div>
@@ -107,7 +107,7 @@ export default async function Accounts() {
       </div>
 
       <SectionHead title="Import workspaces" sub="Each feed validates before anything reaches the database." />
-      <div className="kit-card-grid" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-card-grid kit-mb-20">
         <Tile
           href="/accounts/operations/ga"
           icon={<Icon name="sim" />}

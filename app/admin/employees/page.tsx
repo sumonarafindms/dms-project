@@ -14,8 +14,14 @@ import { Card, PageHeader, Row, SectionHead, SummaryStrip } from "../../componen
 
 export default async function Page() {
   await requireUser(["ADMIN", "IT"]);
-  let counts: { managers: number; supervisors: number; rsos: number; bps: number; logins: number; itUsers: number } | null =
-    null;
+  let counts: {
+    managers: number;
+    supervisors: number;
+    rsos: number;
+    bps: number;
+    logins: number;
+    itUsers: number;
+  } | null = null;
   try {
     counts = await withDatabaseRetry(async () => {
       const [managers, supervisors, rsos, bps, logins, itUsers] = await Promise.all([
@@ -40,7 +46,7 @@ export default async function Page() {
           subtitle="The page retried the database connection automatically. No employee, login or assignment data was changed."
         />
         <Card padded>
-          <div className="kit-form-actions" style={{ marginTop: 0 }}>
+          <div className="kit-form-actions is-flush">
             <Link className="kit-btn is-primary size-md" href="/admin/employees">
               Try again
             </Link>
@@ -54,7 +60,13 @@ export default async function Page() {
 
   const { managers, supervisors, rsos, bps, logins, itUsers } = counts;
   const roles = [
-    { href: "/admin/employees/managers", icon: "users", label: "Managers", count: managers, sub: "Monitoring & overview" },
+    {
+      href: "/admin/employees/managers",
+      icon: "users",
+      label: "Managers",
+      count: managers,
+      sub: "Monitoring & overview",
+    },
     {
       href: "/admin/employees/supervisors",
       icon: "users",
@@ -84,7 +96,7 @@ export default async function Page() {
       />
 
       <SectionHead title="Directories" sub="Open a role to add, edit or deactivate its records." />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         <div className="kit-rows">
           {roles.map((r) => (
             <Row
@@ -103,7 +115,7 @@ export default async function Page() {
         title="Organization structure"
         sub="Assignments follow this reporting chain. IT stays outside the field hierarchy."
       />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         <div className="kit-flow">
           <span>Manager</span>
           <b aria-hidden="true">→</b>
@@ -117,7 +129,7 @@ export default async function Page() {
 
       <SectionHead title="Access management" sub="Authorized accounts and module-level permissions." />
       <Card padded>
-        <div className="kit-form-actions" style={{ marginTop: 0 }}>
+        <div className="kit-form-actions is-flush">
           <Link className="kit-btn is-primary size-md" href="/admin/permissions">
             <Icon name="shield" /> Manage Permissions
           </Link>

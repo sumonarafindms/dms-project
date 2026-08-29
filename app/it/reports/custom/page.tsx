@@ -147,19 +147,19 @@ export default async function CustomReport({
       emptyTitle="No rows for this period"
       emptyHint="Widen the date range, or check Data Readiness on the Reporting Center."
     >
-      <Card padded className="no-print" style={{ marginBottom: "0.75rem" }}>
+      <Card padded className="no-print kit-mb-12">
         <SectionHead title="Build the report" sub="Choices are stored in the link, so this view can be shared." />
-        <p className="kit-label" style={{ marginBottom: "0.375rem" }}>
+        <p className="kit-label kit-mb-6">
           Level
         </p>
-        <div className="kit-report-presets" style={{ marginBottom: "0.75rem" }}>
+        <div className="kit-report-presets kit-mb-12">
           {LEVELS.map((l) => (
             <Link key={l.key} href={linkFor(l.key, [])} className={`kit-preset${level === l.key ? " is-active" : ""}`}>
               {l.label}
             </Link>
           ))}
         </div>
-        <p className="kit-label" style={{ marginBottom: "0.375rem" }}>
+        <p className="kit-label kit-mb-6">
           Columns
         </p>
         <div className="kit-report-presets">

@@ -57,18 +57,18 @@ function WorklistCard({
       href={`/rso/retailers/${row.id}?month=${month}`}
       className={`kit-card kit-card-p is-clickable${row.complete ? " is-done" : ""}`}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem" }}>
-        <div style={{ minWidth: 0 }}>
-          <strong style={{ display: "block", fontSize: "0.875rem", fontWeight: 700, color: "var(--color-slate-800)" }}>
+      <div className="kit-row-between is-top">
+        <div className="kit-min0">
+          <strong className="kit-rowtitle is-block">
             {row.name}
           </strong>
-          <span style={{ fontSize: "0.75rem", color: "var(--color-slate-400)" }}>
+          <span className="kit-hint">
             {row.code} · BP: {row.bpName}
           </span>
         </div>
         <Badge tone={row.complete ? "complete" : "pending"}>{row.complete ? "Complete" : "Pending"}</Badge>
       </div>
-      <div style={{ marginTop: "0.75rem" }}>
+      <div className="kit-mt-12">
         <ProgressLine label={progressLabel} current={row.current} target={required} />
       </div>
       {!row.complete && <p className="kit-remaining">Remaining: {row.remaining}</p>}
@@ -137,7 +137,7 @@ export function OperationalWorklist({
         ]}
       />
 
-      <div className="kit-report-presets" style={{ marginBottom: "0.5rem" }}>
+      <div className="kit-report-presets kit-mb-8">
         {(["all", "pending", "complete"] as const).map((s) => (
           <Link
             key={s}
@@ -148,7 +148,7 @@ export function OperationalWorklist({
           </Link>
         ))}
       </div>
-      <div className="kit-report-presets" style={{ marginBottom: "1rem" }}>
+      <div className="kit-report-presets kit-mb-16">
         {SORTS.map((s) => (
           <Link
             key={s.key}
@@ -179,13 +179,13 @@ export function OperationalWorklist({
             <h3>Pending ({pending.length})</h3>
           </div>
           {pending.length ? (
-            <div className="kit-card-grid" style={{ marginBottom: "1.5rem" }}>
+            <div className="kit-card-grid kit-mb-24">
               {pending.map((r) => (
                 <WorklistCard key={r.id} row={r} progressLabel={progressLabel} required={required} month={month} />
               ))}
             </div>
           ) : (
-            <Card style={{ marginBottom: "1.5rem" }}>
+            <Card className="kit-mb-24">
               <EmptyState
                 positive
                 title={`No pending ${title} retailers`}

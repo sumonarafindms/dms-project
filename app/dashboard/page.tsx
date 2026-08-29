@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../components/icons";
 import { dhakaMonth } from "../../lib/business-time";
 import { ACHIEVEMENT_ON_TRACK_PERCENT, ACHIEVEMENT_WATCH_PERCENT } from "../../lib/achievement";
+import { pacing } from "../../lib/pacing";
 import {
   Card,
   EmptyState,
@@ -57,6 +58,10 @@ const pct = (a: number, t: number) => (t ? Math.round((a / t) * 100) : 0);
 
 export default function Dashboard() {
   const [month, setMonth] = useState(() => dhakaMonth());
+  // Held in state, not read on every render: the month above is derived from
+  // the clock the same way, and pinning one instant keeps the two consistent
+  // and stops the pacing figures shifting when the month picker re-renders.
+  const [nowIso] = useState(() => new Date().toISOString());
   const [rows, setRows] = useState<ApiRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -159,13 +164,18 @@ export default function Dashboard() {
   const watchlist = [...scored].filter((r) => r.score < ACHIEVEMENT_ON_TRACK_PERCENT).sort((a, b) => a.score - b.score);
   const firstLoad = loading && rows.length === 0;
 
+  // The dashboard shows whichever month the picker selects, so pacing handles
+  // a past or future month on its own; there is no from/to here, so the view
+  // is always a whole month.
+  const paceFor = (target: number, achieved: number) => pacing(target, achieved, month, new Date(nowIso));
+
   return (
     <main className="page">
       <PageHeader
         title="Performance Dashboard"
         subtitle={`${month} · Month-to-date operational snapshot`}
         action={
-          <div className="kit-report-dates no-print" style={{ marginBottom: 0 }}>
+          <div className="kit-report-dates no-print kit-mb-0">
             <label className="kit-field">
               <span>Reporting month</span>
               <input
@@ -206,15 +216,21 @@ export default function Dashboard() {
       )}
 
       <SectionHead title="Monthly targets" sub="Company-wide completion for the selected month." />
-      <div className="kit-kpi-grid" style={{ marginBottom: "1.25rem" }}>
-        <KpiCard label="GA" achieved={totals.gaA} target={totals.gaT} />
-        <KpiCard label="SSO" achieved={totals.ssoA} target={totals.ssoT} />
-        <KpiCard label="LSO" achieved={totals.lsoA} target={totals.lsoT} />
-        <KpiCard label="Total Recharge" achieved={totals.trA} target={totals.trT} unit="৳" />
+      <div className="kit-kpi-grid kit-mb-20">
+        <KpiCard label="GA" achieved={totals.gaA} target={totals.gaT} pace={paceFor(totals.gaT, totals.gaA)} />
+        <KpiCard label="SSO" achieved={totals.ssoA} target={totals.ssoT} pace={paceFor(totals.ssoT, totals.ssoA)} />
+        <KpiCard label="LSO" achieved={totals.lsoA} target={totals.lsoT} pace={paceFor(totals.lsoT, totals.lsoA)} />
+        <KpiCard
+          label="Total Recharge"
+          achieved={totals.trA}
+          target={totals.trT}
+          unit="৳"
+          pace={paceFor(totals.trT, totals.trA)}
+        />
       </div>
 
       <SectionHead title="Needs attention" sub="Tap a count to open the work behind it." />
-      <div className="kit-status-tiles" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-status-tiles kit-mb-20">
         <StatusTile
           href="/admin/attention"
           count={behind}
@@ -230,7 +246,7 @@ export default function Dashboard() {
         sub="Recharge and GA progress by team."
         link={<Link href={`/admin/performance/supervisors?month=${month}`}>View all →</Link>}
       />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {supervisors.length ? (
           <div className="kit-rows">
             {supervisors.slice(0, 6).map((x) => (
@@ -243,7 +259,7 @@ export default function Dashboard() {
                   <span>
                     {x.rsos} RSOs · {fmt(x.retailers)} retailers
                   </span>
-                  <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                  <div className="kit-stack-6 kit-mt-8">
                     <MetricBar label="Recharge" achieved={x.achieved} target={x.target} unit="৳" />
                     <MetricBar label="GA" achieved={x.ga} target={x.gaTarget} />
                   </div>
@@ -265,7 +281,7 @@ export default function Dashboard() {
         sub="Lowest composite execution scores first."
         link={<Link href="/admin/attention">Open list →</Link>}
       />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {watchlist.length ? (
           <div className="kit-rows">
             {watchlist.slice(0, 6).map((r) => (
@@ -290,7 +306,7 @@ export default function Dashboard() {
       </Card>
 
       <SectionHead title="Team snapshot" />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         <div className="kit-pill-grid">
           <StatPill value={fmt(rows.length)} label="Active RSO" />
           <StatPill value={fmt(supervisors.length)} label="Supervisors" />
@@ -300,7 +316,7 @@ export default function Dashboard() {
       </Card>
 
       <SectionHead title="Quick reports" sub="The daily workspaces you use most." />
-      <div className="kit-card-grid" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-card-grid kit-mb-20">
         <Tile href="/ga" icon={<Icon name="sim" />} title="GA & SSO" sub="Activations and SIM swap" />
         <Tile href="/c2c" icon={<Icon name="wallet" />} title="C2C Recharge" sub="Stock lifting performance" />
         <Tile href="/c2s" icon={<Icon name="chart" />} title="C2S & LSO" sub="Retail sales execution" />

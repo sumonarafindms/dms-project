@@ -97,7 +97,7 @@ export function RetailerDetailView({ d, month, backHref }: { d: RetailerDetail; 
 
       <SectionHead title="Period totals" sub="Everything below is for the selected date range." />
       {/* Five figures: 3-up leaves one gap on the second row, 4-up leaves three. */}
-      <div className="kit-card-grid" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-card-grid kit-mb-20">
         <Figure label="GA Total" value={d.gaTotal} sub={`${d.ga150} × 170 · ${d.ga300} × 300`} />
         <Figure label="SIM Swap" value={d.simSwap} sub="Replacement · not counted in GA" />
         <Figure label="C2C" value={money(d.c2cAmount)} sub={`${d.c2cTrx} transactions`} />
@@ -106,7 +106,7 @@ export function RetailerDetailView({ d, month, backHref }: { d: RetailerDetail; 
       </div>
 
       <SectionHead title="Execution status" />
-      <div className="kit-pair" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-pair kit-mb-20">
         <Card padded>
           <span className="kit-label">SSO status</span>
           <strong className={statusClass(simSeller, d.ssoComplete)}>
@@ -126,7 +126,7 @@ export function RetailerDetailView({ d, month, backHref }: { d: RetailerDetail; 
       </div>
 
       <SectionHead title="Recent GA" sub={`${d.gaTotal} activations in this period.`} />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {d.ga.length ? (
           <div className="kit-rows">
             {d.ga.slice(0, 20).map((x) => (

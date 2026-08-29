@@ -101,7 +101,7 @@ export default async function Page() {
         ]}
       />
 
-      <Card padded style={{ margin: "1rem 0" }}>
+      <Card className="kit-my-16" padded>
         <div className="kit-pill-grid">
           <StatPill value={current.retailer.retailerCode} label="BP Code" />
           <StatPill value={target || "—"} label="GA Target" />
@@ -120,7 +120,7 @@ export default async function Page() {
         </div>
       </Link>
 
-      <div style={{ marginTop: "1.25rem" }}>
+      <div className="kit-mt-20">
         <SectionHead title="Previous BP codes" />
         <Card padded>
           {history.length ? (

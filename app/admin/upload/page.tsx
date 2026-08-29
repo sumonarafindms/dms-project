@@ -124,19 +124,19 @@ export default async function Page() {
         title="Data freshness"
         sub="Confirm the newest source file reached DMS before reviewing performance."
       />
-      <div style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-mb-20">
         <ImportHealthGrid items={health} />
       </div>
 
       <SectionHead title="Operational feeds" sub="Field execution source files that feed performance calculations." />
-      <div className="kit-card-grid is-quad" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-card-grid is-quad kit-mb-20">
         {operational.map(({ key, icon, ...x }, i) => (
           <ModuleCard key={key} index={`0${i + 1}`} icon={<Icon name={icon} />} {...x} />
         ))}
       </div>
 
       <SectionHead title="Control data" sub="Reference records that control ownership, mapping and monthly goals." />
-      <div className="kit-card-grid" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-card-grid kit-mb-20">
         {control.map(({ key, icon, ...x }, i) => (
           <ModuleCard key={key} index={`0${i + 5}`} icon={<Icon name={icon} />} {...x} />
         ))}

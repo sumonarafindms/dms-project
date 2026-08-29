@@ -1,5 +1,33 @@
-import {requireUser} from "../../../../lib/auth";
-import {prisma} from "../../../../lib/prisma";
-import {EmployeeList} from "../../../components/AdminEmployeesUI";
-import {PageHeader} from "../../../components/Kit";
-export default async function Page(){await requireUser(["ADMIN","IT"]);const rows=await prisma.employee.findMany({orderBy:{name:"asc"},include:{user:true,supervisor:true,_count:{select:{retailers:true}}}});return <main className="page"><PageHeader title="RSOs" subtitle="Manage field employees, supervisor assignment, login and retailer ownership."/><EmployeeList title="RSOs" addHref="/admin/employees/rsos/new" rows={rows.map(x=>({id:x.id,name:x.name,mobile:x.user?.mobileNumber||"",role:"RSO",active:x.active&&Boolean(x.user?.active??true),meta:`${x.employeeCode||x.rsoMsisdn} · ${x.supervisor?.name||"No supervisor"}`,detail:`${x._count.retailers} retailers · ${x.user?.mobileNumber?"Login active":"No login"}`,editHref:`/admin/employees/rsos/${x.id}`}))}/></main>}
+import { requireUser } from "../../../../lib/auth";
+import { prisma } from "../../../../lib/prisma";
+import { EmployeeList } from "../../../components/AdminEmployeesUI";
+import { PageHeader } from "../../../components/Kit";
+export default async function Page() {
+  await requireUser(["ADMIN", "IT"]);
+  const rows = await prisma.employee.findMany({
+    orderBy: { name: "asc" },
+    include: { user: true, supervisor: true, _count: { select: { retailers: true } } },
+  });
+  return (
+    <main className="page">
+      <PageHeader
+        title="RSOs"
+        subtitle="Manage field employees, supervisor assignment, login and retailer ownership."
+      />
+      <EmployeeList
+        title="RSOs"
+        addHref="/admin/employees/rsos/new"
+        rows={rows.map((x) => ({
+          id: x.id,
+          name: x.name,
+          mobile: x.user?.mobileNumber || "",
+          role: "RSO",
+          active: x.active && Boolean(x.user?.active ?? true),
+          meta: `${x.employeeCode || x.rsoMsisdn} · ${x.supervisor?.name || "No supervisor"}`,
+          detail: `${x._count.retailers} retailers · ${x.user?.mobileNumber ? "Login active" : "No login"}`,
+          editHref: `/admin/employees/rsos/${x.id}`,
+        }))}
+      />
+    </main>
+  );
+}

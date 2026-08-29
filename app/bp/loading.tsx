@@ -8,7 +8,7 @@ export default function Loading() {
         <Skeleton className="kit-skel-ring" />
         <Skeleton className="kit-skel-line" />
       </Card>
-      <div className="kit-pair" style={{ margin: "1rem 0" }}>
+      <div className="kit-pair kit-my-16">
         {[1, 2].map((i) => (
           <Card key={i} padded>
             <Skeleton className="kit-skel-num" />

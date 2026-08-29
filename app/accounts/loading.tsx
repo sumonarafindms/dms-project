@@ -11,7 +11,7 @@ export default function Loading() {
           </Card>
         ))}
       </div>
-      <div className="kit-card-grid" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-card-grid kit-mb-20">
         {[1, 2, 3, 4].map((i) => (
           <Card key={i} padded>
             <Skeleton className="kit-skel-num" />

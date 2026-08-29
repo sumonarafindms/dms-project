@@ -267,7 +267,7 @@ export default function TargetsPage() {
               </a>
             }
           />
-          <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+          <Card className="kit-mb-20" padded="lg">
             <DropZone
               file={file}
               accept=".xlsx,.xls,.xlsm"
@@ -287,7 +287,7 @@ export default function TargetsPage() {
             </div>
             {uploadResult && (
               <>
-                <div className="kit-result-grid" style={{ marginTop: "0.75rem" }}>
+                <div className="kit-result-grid kit-mt-12">
                   <div>
                     <span>Total rows</span>
                     <strong>{Number(uploadResult.totalRows || 0).toLocaleString()}</strong>
@@ -329,7 +329,7 @@ export default function TargetsPage() {
           />
         </div>
       </div>
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {loading ? (
           <p className="kit-filter-note">Loading targets…</p>
         ) : visible.length ? (
@@ -379,7 +379,7 @@ export default function TargetsPage() {
                     <p className="kit-figure-sub">
                       {r.employeeCode || r.rsoMsisdn} · {r.supervisor} · {r.retailerCount} retailers
                     </p>
-                    <div className="kit-form-grid" style={{ marginTop: "0.625rem" }}>
+                    <div className="kit-form-grid kit-mt-10">
                       {numericFields.map((k) => (
                         <Field key={k} label={FIELD_LABEL[k]}>
                           {cell(r, i, k)}
@@ -403,7 +403,7 @@ export default function TargetsPage() {
       </Card>
 
       <SectionHead title="BP monthly GA targets" sub={`${bpRows.length} active BP assignments.`} />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {bpRows.length ? (
           <>
             <div className="kit-table-wrap">
@@ -440,7 +440,7 @@ export default function TargetsPage() {
                   <p className="kit-figure-sub">
                     {r.bpCode} · RSO {r.rsoName}
                   </p>
-                  <div style={{ marginTop: "0.625rem" }}>
+                  <div className="kit-mt-10">
                     <Field label="GA target">{bpCell(r, i)}</Field>
                   </div>
                 </div>

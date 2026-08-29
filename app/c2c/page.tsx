@@ -233,7 +233,7 @@ export default function C2cPage() {
         count={`${rows.length} employees`}
       >
         {rows.length ? (
-          <OpsTable minWidth={1120}>
+          <OpsTable wide>
             <thead>
               <tr>
                 <th>Supervisor</th>

@@ -55,7 +55,7 @@ export default async function LowC2s({
   const zero = all.filter((r) => r.c2s === 0).length;
   return (
     <>
-      <div className="kit-report-presets no-print" style={{ marginBottom: "0.75rem" }}>
+      <div className="kit-report-presets no-print kit-mb-12">
         {VIEWS.map((v) => (
           <Link
             key={v.key}

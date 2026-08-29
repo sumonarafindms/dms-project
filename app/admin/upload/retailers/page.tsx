@@ -113,7 +113,7 @@ export default function Page() {
               </a>
             }
           />
-          <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+          <Card className="kit-mb-20" padded="lg">
             <DropZone
               file={file}
               accept=".xlsx,.xls,.xlsm"
@@ -133,14 +133,17 @@ export default function Page() {
             </div>
 
             {message && (
-              <div className={`kit-note is-${tone}`} role={tone === "bad" ? "alert" : "status"} style={{ margin: "1rem 0 0" }}>
+              <div
+                className={`kit-note is-${tone} is-last`}
+                role={tone === "bad" ? "alert" : "status"}
+              >
                 <Icon name={tone === "ok" ? "check" : tone === "bad" ? "alert" : "info"} />
                 <span>{message}</span>
               </div>
             )}
 
             {result && (
-              <div className="kit-result-grid" style={{ marginTop: "0.75rem" }}>
+              <div className="kit-result-grid kit-mt-12">
                 <Result label="Total Rows" value={result.totalRows} />
                 <Result label="New" value={result.newRows} />
                 <Result label="Updated" value={result.updatedRows} />

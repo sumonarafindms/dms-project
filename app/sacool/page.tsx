@@ -126,7 +126,7 @@ export default function AdminAccess() {
             </div>
           )}
 
-          <button className="auth-v54-submit" disabled={busy} aria-busy={busy}>
+          <button type="submit" className="auth-v54-submit" disabled={busy} aria-busy={busy}>
             {busy ? "Authenticating…" : "Continue securely"}
           </button>
 

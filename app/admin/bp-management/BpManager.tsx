@@ -142,7 +142,7 @@ export default function BpManager({
         sub="Choose the RSO first, then one of that RSO's retailer codes. A new assignment automatically closes the previous active BP for that RSO."
       />
       <form onSubmit={submit}>
-        <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+        <Card className="kit-mb-20" padded="lg">
           <div className="kit-form-grid">
             <Field label="RSO / Employee">
               <select
@@ -220,7 +220,7 @@ export default function BpManager({
         title="Current BP assignments"
         sub={`${current.length} ${current.length === 1 ? "assignment is" : "assignments are"} active.`}
       />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {current.length ? (
           <div className="kit-rows">
             {current.map((x) => (

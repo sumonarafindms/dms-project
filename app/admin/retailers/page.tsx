@@ -6,7 +6,7 @@ import { PageHeader } from "../../components/Kit";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const s = await searchParams,
@@ -15,7 +15,7 @@ export default async function Page({
   return (
     <main className="page">
       <PageHeader title="Retailer search" subtitle="Search the full retailer base and review exact-date performance." />
-      <RetailerSearchView rows={rows} month={month} q={s.q || ""} from={s.from} to={s.to} base="/admin/retailers" />
+      <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/admin/retailers" />
     </main>
   );
 }

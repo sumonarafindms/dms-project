@@ -72,13 +72,13 @@ export default async function ReportsHome({ searchParams }: { searchParams: Prom
       <div className="kit-summary-strip">
         {feeds.map((f) => (
           <Card key={f.feed} padded>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-              <strong style={{ fontSize: "0.875rem", color: "var(--color-slate-800)" }}>
+            <div className="kit-row-between">
+              <strong className="kit-rowtitle">
                 {FEED_LABEL[f.feed] ?? f.feed}
               </strong>
               <Badge tone={f.ready ? "complete" : "pending"}>{f.ready ? "Ready" : "Missing"}</Badge>
             </div>
-            <p style={{ fontSize: "0.6875rem", color: "var(--color-slate-400)", marginTop: "0.375rem" }}>
+            <p className="kit-hint is-xs kit-mt-6">
               {f.ready && f.uploadedAt
                 ? `Imported ${f.uploadedAt.toISOString().slice(0, 16).replace("T", " ")}`
                 : "No import covering this period"}

@@ -4,7 +4,7 @@ import { PageHeader } from "../../components/Kit";
 import BpManager from "./BpManager";
 
 export default async function BpManagement() {
-  await requireUser(["ADMIN","IT"]);
+  await requireUser(["ADMIN", "IT"]);
 
   const [employees, retailers, current, history] = await Promise.all([
     prisma.employee.findMany({
@@ -86,7 +86,8 @@ export default async function BpManagement() {
           startDate: a.startDate.toISOString().slice(0, 10),
           gaTarget: a.gaTarget,
           login: a.retailer.bpUser?.active && a.retailer.bpUser.role === "BP" ? a.retailer.bpUser.displayName : "",
-          mobile: a.retailer.bpUser?.active && a.retailer.bpUser.role === "BP" ? a.retailer.bpUser.mobileNumber || "" : "",
+          mobile:
+            a.retailer.bpUser?.active && a.retailer.bpUser.role === "BP" ? a.retailer.bpUser.mobileNumber || "" : "",
         }))}
         history={history.map((a) => ({
           id: a.id,

@@ -28,7 +28,7 @@ export default function Loading() {
           </Card>
         ))}
       </div>
-      <Card padded style={{ marginTop: "1.25rem" }}>
+      <Card className="kit-mt-20" padded>
         {[1, 2, 3, 4, 5].map((i) => (
           <Skeleton key={i} className="kit-skel-row" />
         ))}

@@ -63,20 +63,10 @@
     color: var(--color-slate-600);
     margin-bottom: 0.3rem;
   }
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    gap: 0.85rem;
-  }
-  .form-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.6rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-slate-100);
-  }
+  /* .form-grid and .form-actions were removed in v124: every form in the app
+     now uses the kit's .kit-form-grid / .kit-form-actions, and these two were
+     matched by nothing. Named here so a search for them lands on the reason
+     rather than on nothing. */
 
   /* ---------- Login / auth ---------- */
   .auth-v54,

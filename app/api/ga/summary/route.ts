@@ -1,11 +1,20 @@
-import {apiUser,apiPermission} from "@/lib/auth";
+import { apiUser, apiPermission } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
-import {monthStartsInRange,monthStartUtc} from "@/lib/date-range";
-import {dhakaMonth} from "@/lib/business-time";
-import {apiError} from "@/lib/http-errors";
-import {GA_CLASSIFICATION_SELECT,addGaActivation,emptyGaBreakdown,isSsoComplete,withGa170,withGa300,withSimSwap,withStandardGa} from "@/lib/business-rules";
+import { monthStartsInRange, monthStartUtc } from "@/lib/date-range";
+import { dhakaMonth } from "@/lib/business-time";
+import { apiError } from "@/lib/http-errors";
+import {
+  GA_CLASSIFICATION_SELECT,
+  addGaActivation,
+  emptyGaBreakdown,
+  isSsoComplete,
+  withGa170,
+  withGa300,
+  withSimSwap,
+  withStandardGa,
+} from "@/lib/business-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -18,29 +27,48 @@ function dateOnly(value: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if(!(await apiUser(["ADMIN","IT","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
-  if(!(await apiPermission("ga","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
+  if (!(await apiUser(["ADMIN", "IT", "ACCOUNTS"])))
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await apiPermission("ga", "view"))) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {
-    const month = req.nextUrl.searchParams.get("month") || dhakaMonth()+"-01";
+    const month = req.nextUrl.searchParams.get("month") || dhakaMonth() + "-01";
     const requestedDate = req.nextUrl.searchParams.get("date");
     const { start, end } = monthBounds(month);
-    const fromDate=dateOnly(req.nextUrl.searchParams.get("from")||"")||start;
-    const toDateRaw=dateOnly(req.nextUrl.searchParams.get("to")||"");
-    const rangeEnd=toDateRaw?new Date(toDateRaw.getTime()+86400000):end;
-    if(rangeEnd<=fromDate) return NextResponse.json({error:"End date must be on or after start date."},{status:400});
-    const targetMonths=monthStartsInRange(fromDate,rangeEnd),targetStart=targetMonths[0]||monthStartUtc(fromDate),targetEnd=new Date(Date.UTC((targetMonths.at(-1)||targetStart).getUTCFullYear(),(targetMonths.at(-1)||targetStart).getUTCMonth()+1,1));
+    const fromDate = dateOnly(req.nextUrl.searchParams.get("from") || "") || start;
+    const toDateRaw = dateOnly(req.nextUrl.searchParams.get("to") || "");
+    const rangeEnd = toDateRaw ? new Date(toDateRaw.getTime() + 86400000) : end;
+    if (rangeEnd <= fromDate)
+      return NextResponse.json({ error: "End date must be on or after start date." }, { status: 400 });
+    const targetMonths = monthStartsInRange(fromDate, rangeEnd),
+      targetStart = targetMonths[0] || monthStartUtc(fromDate),
+      targetEnd = new Date(
+        Date.UTC(
+          (targetMonths.at(-1) || targetStart).getUTCFullYear(),
+          (targetMonths.at(-1) || targetStart).getUTCMonth() + 1,
+          1,
+        ),
+      );
 
     const dailyStart = requestedDate ? dateOnly(requestedDate) : null;
     const dailyEnd = dailyStart ? new Date(dailyStart.getTime() + 24 * 60 * 60 * 1000) : null;
 
-    const [employees, retailers, ga170Groups, ga300Groups, swapGroups, monthlyStandardByDay, dailyActivations, importHistory] = await Promise.all([
+    const [
+      employees,
+      retailers,
+      ga170Groups,
+      ga300Groups,
+      swapGroups,
+      monthlyStandardByDay,
+      dailyActivations,
+      importHistory,
+    ] = await Promise.all([
       prisma.employee.findMany({
         where: { active: true },
         orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
         include: {
           supervisor: { select: { name: true } },
           _count: { select: { retailers: true } },
-          targets: { where: { month: {gte:targetStart,lt:targetEnd} } },
+          targets: { where: { month: { gte: targetStart, lt: targetEnd } } },
         },
       }),
       prisma.retailer.findMany({
@@ -163,7 +191,10 @@ export async function GET(req: NextRequest) {
 
     const rows = employees.map((employee) => {
       const ga = employeeAgg.get(employee.id) || emptyGaBreakdown();
-      const target = employee.targets.reduce((a,x)=>({ga:a.ga+x.gaTarget,sso:a.sso+x.ssoTarget}),{ga:0,sso:0});
+      const target = employee.targets.reduce((a, x) => ({ ga: a.ga + x.gaTarget, sso: a.sso + x.ssoTarget }), {
+        ga: 0,
+        sso: 0,
+      });
       return {
         employeeId: employee.id,
         employeeCode: employee.employeeCode,
@@ -208,14 +239,14 @@ export async function GET(req: NextRequest) {
     // API contract unchanged: the 170 bucket is still published as `ga150`.
     const retailerDaily = [...dailyMap.values()]
       .map(({ ga170, unknown, ...rest }) => ({ ...rest, ga150: ga170, unknown }))
-      .sort(
-        (a, b) =>
-          b.total - a.total || b.simSwap - a.simSwap || a.retailerCode.localeCompare(b.retailerCode),
-      );
+      .sort((a, b) => b.total - a.total || b.simSwap - a.simSwap || a.retailerCode.localeCompare(b.retailerCode));
 
     return NextResponse.json({
       month: start,
-      range:{from:fromDate.toISOString().slice(0,10),to:new Date(rangeEnd.getTime()-86400000).toISOString().slice(0,10)},
+      range: {
+        from: fromDate.toISOString().slice(0, 10),
+        to: new Date(rangeEnd.getTime() - 86400000).toISOString().slice(0, 10),
+      },
       selectedDate: dailyStart?.toISOString().slice(0, 10) || null,
       rows,
       retailerDaily,
@@ -223,7 +254,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error(error);
-    const e=apiError(error,"Failed to load GA summary.");
-    return NextResponse.json({error:e.error},{status:e.status});
+    const e = apiError(error, "Failed to load GA summary.");
+    return NextResponse.json({ error: e.error }, { status: e.status });
   }
 }

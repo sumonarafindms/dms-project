@@ -18,7 +18,8 @@ import { monthBounds } from "../../lib/month";
 import { dhakaMonth, dhakaTodayYmd } from "../../lib/business-time";
 import { classifyGaActivation, withStandardGa } from "../../lib/business-rules";
 import { targetPercent } from "../../lib/achievement";
-import { Btn, Card, EmptyState, HeroRing, PageHeader, Row, SectionHead, StatPill } from "../components/Kit";
+import { pacing } from "../../lib/pacing";
+import { Btn, Card, EmptyState, HeroRing, PaceFoot, PageHeader, Row, SectionHead, StatPill } from "../components/Kit";
 import { Icon } from "../components/icons";
 import Link from "next/link";
 
@@ -94,6 +95,9 @@ export default async function BP() {
 
   const target = assignment.monthlyTargets[0]?.gaTarget ?? assignment.gaTarget ?? 0;
   const remaining = Math.max(0, target - monthlyGa);
+  // A BP's whole question is "how many more today", so the pacing line matters
+  // more here than anywhere else in the app.
+  const pace = pacing(target, monthlyGa, monthText);
 
   return (
     <main className="page">
@@ -112,7 +116,13 @@ export default async function BP() {
         ]}
       />
 
-      <div className="kit-pair" style={{ margin: "1rem 0" }}>
+      {pace.status !== "No target" && (
+        <Card className="kit-mt-16" padded>
+          <PaceFoot pace={pace} />
+        </Card>
+      )}
+
+      <div className="kit-pair kit-my-16">
         <Card padded>
           <strong>{todayGa}</strong>
           <span>Today&apos;s Activation</span>
@@ -126,7 +136,7 @@ export default async function BP() {
       <SectionHead title="My team" sub="Who to contact about this BP code." />
       {/* StatPill is a slate-50 tile, which is nearly the page background —
           in the demos it always sits inside a card, so it does here too. */}
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         <div className="kit-pill-grid">
           <StatPill value={retailer.employee?.name || "—"} label="RSO" />
           <StatPill value={retailer.employee?.rsoMsisdn || "Not assigned"} label="RSO Mobile" />
@@ -174,7 +184,7 @@ export default async function BP() {
         )}
       </Card>
 
-      <div style={{ marginTop: "1.25rem" }}>
+      <div className="kit-mt-20">
         <Link href="/bp/sales">
           <Btn size="lg" block>
             View Activation History <Icon name="arrow" />

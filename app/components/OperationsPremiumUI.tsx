@@ -116,7 +116,7 @@ export function OpsUpload({
           </a>
         }
       />
-      <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded="lg">
         {children}
         <div className="kit-guide">
           <strong>Before anything is written</strong>
@@ -130,9 +130,8 @@ export function OpsUpload({
         </div>
         {message && tone && (
           <div
-            className={`kit-note is-${tone}`}
+            className={`kit-note is-${tone} is-last`}
             role={tone === "bad" ? "alert" : "status"}
-            style={{ margin: "1rem 0 0" }}
           >
             <Icon name={tone === "ok" ? "check" : tone === "bad" ? "alert" : "info"} />
             <span>{message}</span>
@@ -196,7 +195,7 @@ export function OpsDataCard({
         sub={subtitle}
         link={count ? <span className="kit-filter-note">{count}</span> : undefined}
       />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {children}
       </Card>
     </>
@@ -209,11 +208,17 @@ export function OpsDataCard({
  * per row, which for a few hundred rows would be unreadable; TableScrollHint is
  * what tells a phone user that is what is happening.
  */
-export function OpsTable({ children, minWidth = 900 }: { children: ReactNode; minWidth?: number }) {
+/**
+ * The operator tables scroll horizontally by design. `wide` picks the width
+ * below which scrolling starts: the default suits the four-to-six column
+ * feeds, and `wide` is for /c2c, which carries more. It is a class rather
+ * than an inline min-width so the page ships no style attribute.
+ */
+export function OpsTable({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
     <>
       <div className="kit-table-wrap is-always">
-        <table className="kit-table" style={{ minWidth }}>
+        <table className={`kit-table ${wide ? "is-w1120" : "is-w900"}`}>
           {children}
         </table>
       </div>
@@ -295,9 +300,9 @@ export function OpsFreshness({
   range?: string;
 }) {
   return (
-    <Card padded style={{ marginBottom: "1.25rem" }}>
+    <Card className="kit-mb-20" padded>
       <div className="kit-feed-head">
-        <div style={{ minWidth: 0 }}>
+        <div className="kit-min0">
           <span className="kit-label">Latest {label} data</span>
           <strong className="kit-figure">
             {businessDate ? new Date(businessDate).toLocaleDateString() : "No import yet"}

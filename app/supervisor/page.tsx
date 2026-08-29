@@ -17,9 +17,11 @@ import { retailerOpportunities } from "../../lib/retailer-opportunities";
 import { prisma } from "../../lib/prisma";
 import { latestDailySnapshot, monthPace } from "../../lib/intelligence";
 import { dhakaMonth } from "../../lib/business-time";
+import { pacing } from "../../lib/pacing";
 import { ACHIEVEMENT_ON_TRACK_PERCENT } from "../../lib/achievement";
 import {
   Card,
+  ComparisonCard,
   EmptyState,
   EntityCard,
   KpiCard,
@@ -30,10 +32,12 @@ import {
   Tile,
 } from "../components/Kit";
 import { Icon } from "../components/icons";
+import { performanceComparison } from "../../lib/comparison-data";
+import type { ComparisonKind } from "../../lib/comparison";
 
 export const dynamic = "force-dynamic";
 
-export default async function Supervisor() {
+export default async function Supervisor({ searchParams }: { searchParams: Promise<{ compare?: string }> }) {
   const u = await requirePagePermission(["SUPERVISOR"], "dashboard");
   const ids = u.supervisorId
     ? (
@@ -52,10 +56,19 @@ export default async function Supervisor() {
     latestDailySnapshot(ids),
   ]);
 
+  const sp = await searchParams;
+  const compareKind: ComparisonKind = sp.compare === "week" || sp.compare === "month" ? sp.compare : "day";
+  const comparison = await performanceComparison(compareKind, ids);
+
   const attention = attentionRows.filter((x) => x.priority > 0).length;
   const retailers = rows.reduce((a, r) => a + r.retailerCount, 0);
   const expected = monthPace(month);
   const sum = (k: keyof (typeof rows)[number]) => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
+  // One clock read for the whole page, so four cards cannot straddle a Dhaka
+  // midnight and disagree about how many days are left.
+  const now = new Date();
+  const paceFor = (targetKey: keyof (typeof rows)[number], achievedKey: keyof (typeof rows)[number]) =>
+    pacing(sum(targetKey), sum(achievedKey), monthKey, now);
 
   // Shared band, not a local number — see lib/achievement.ts.
   const lowPerformers = rows
@@ -85,16 +98,63 @@ export default async function Supervisor() {
         ]}
       />
 
-      <SectionHead title="Team targets" sub={`Expected pace is ${expected}% for this month.`} />
-      <div className="kit-kpi-grid" style={{ marginBottom: "1.25rem" }}>
-        <KpiCard label="GA" achieved={sum("gaAchieved")} target={sum("gaTarget")} />
-        <KpiCard label="SSO" achieved={sum("ssoAchieved")} target={sum("ssoTarget")} />
-        <KpiCard label="LSO" achieved={sum("lsoAchieved")} target={sum("lsoTarget")} />
-        <KpiCard label="C2C" achieved={sum("c2cAchieved")} target={sum("c2cTarget")} unit="৳" />
+      <SectionHead
+        title="Team targets"
+        sub={`Expected pace is ${expected}% for this month. Projections are estimates from the team's current rate.`}
+      />
+      <div className="kit-kpi-grid kit-mb-20">
+        <KpiCard
+          label="GA"
+          achieved={sum("gaAchieved")}
+          target={sum("gaTarget")}
+          pace={paceFor("gaTarget", "gaAchieved")}
+        />
+        <KpiCard
+          label="SSO"
+          achieved={sum("ssoAchieved")}
+          target={sum("ssoTarget")}
+          pace={paceFor("ssoTarget", "ssoAchieved")}
+        />
+        <KpiCard
+          label="LSO"
+          achieved={sum("lsoAchieved")}
+          target={sum("lsoTarget")}
+          pace={paceFor("lsoTarget", "lsoAchieved")}
+        />
+        <KpiCard
+          label="C2C"
+          achieved={sum("c2cAchieved")}
+          target={sum("c2cTarget")}
+          unit="৳"
+          pace={paceFor("c2cTarget", "c2cAchieved")}
+        />
+      </div>
+
+      <SectionHead
+        title="Compared with the previous period"
+        sub="Each figure names the two dates it was measured between, because the feeds do not always arrive together."
+        link={
+          <span className="kit-period-switch">
+            {(["day", "week", "month"] as const).map((k) => (
+              <Link
+                key={k}
+                href={`/supervisor?compare=${k}`}
+                className={`kit-btn size-sm ${k === compareKind ? "is-primary" : "is-ghost"}`}
+              >
+                {k === "day" ? "Day" : k === "week" ? "Week" : "Month"}
+              </Link>
+            ))}
+          </span>
+        }
+      />
+      <div className="kit-card-grid kit-mb-20">
+        {comparison.metrics.map((m) => (
+          <ComparisonCard key={m.metric} item={m} />
+        ))}
       </div>
 
       <SectionHead title="Needs attention" sub="Tap a count to open the work behind it." />
-      <div className="kit-status-tiles" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-status-tiles kit-mb-20">
         <StatusTile href="/supervisor/attention" count={attention} label="Retailer follow-ups" />
         <StatusTile
           href="/supervisor/rsos"
@@ -112,7 +172,7 @@ export default async function Supervisor() {
             sub={`Below ${ACHIEVEMENT_ON_TRACK_PERCENT}% of recharge target.`}
             link={<Link href="/supervisor/rsos">View all →</Link>}
           />
-          <div className="kit-card-grid" style={{ marginBottom: "1.25rem" }}>
+          <div className="kit-card-grid kit-mb-20">
             {lowPerformers.slice(0, 3).map((r) => (
               <EntityCard
                 key={r.employeeId}
@@ -137,7 +197,7 @@ export default async function Supervisor() {
         link={<Link href="/supervisor/rsos">View all →</Link>}
       />
       {ranked.length ? (
-        <div className="kit-card-grid" style={{ marginBottom: "1.25rem" }}>
+        <div className="kit-card-grid kit-mb-20">
           {ranked.slice(0, 6).map((r) => (
             <EntityCard
               key={r.employeeId}
@@ -154,7 +214,7 @@ export default async function Supervisor() {
           ))}
         </div>
       ) : (
-        <Card style={{ marginBottom: "1.25rem" }}>
+        <Card className="kit-mb-20">
           <EmptyState
             title="No RSOs assigned"
             hint="Ask Admin to assign RSOs to your supervisor record."

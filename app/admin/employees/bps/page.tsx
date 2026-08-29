@@ -1,5 +1,33 @@
-import {requireUser} from "../../../../lib/auth";
-import {prisma} from "../../../../lib/prisma";
-import {EmployeeList} from "../../../components/AdminEmployeesUI";
-import {PageHeader} from "../../../components/Kit";
-export default async function Page(){await requireUser(["ADMIN","IT"]);const rows=await prisma.bpAssignment.findMany({orderBy:[{active:"desc"},{createdAt:"desc"}],include:{retailer:{include:{bpUser:true}},employee:{include:{supervisor:true}}}});return <main className="page"><PageHeader title="BPs" subtitle="BP is a dynamic retailer-code assignment under an RSO. Change the retailer code without rebuilding the whole employee structure."/><EmployeeList title="BPs" addHref="/admin/employees/bps/new" rows={rows.map(x=>({id:x.id,name:x.retailer.retailerName||x.retailer.retailerCode,mobile:x.retailer.bpUser?.mobileNumber||"",role:"BP",active:x.active&&Boolean(x.retailer.bpUser?.active??true),meta:`${x.retailer.retailerCode} · RSO ${x.employee.name}`,detail:`${x.employee.supervisor?.name||"No supervisor"} · GA target ${x.gaTarget}`,editHref:`/admin/employees/bps/${x.id}`}))}/></main>}
+import { requireUser } from "../../../../lib/auth";
+import { prisma } from "../../../../lib/prisma";
+import { EmployeeList } from "../../../components/AdminEmployeesUI";
+import { PageHeader } from "../../../components/Kit";
+export default async function Page() {
+  await requireUser(["ADMIN", "IT"]);
+  const rows = await prisma.bpAssignment.findMany({
+    orderBy: [{ active: "desc" }, { createdAt: "desc" }],
+    include: { retailer: { include: { bpUser: true } }, employee: { include: { supervisor: true } } },
+  });
+  return (
+    <main className="page">
+      <PageHeader
+        title="BPs"
+        subtitle="BP is a dynamic retailer-code assignment under an RSO. Change the retailer code without rebuilding the whole employee structure."
+      />
+      <EmployeeList
+        title="BPs"
+        addHref="/admin/employees/bps/new"
+        rows={rows.map((x) => ({
+          id: x.id,
+          name: x.retailer.retailerName || x.retailer.retailerCode,
+          mobile: x.retailer.bpUser?.mobileNumber || "",
+          role: "BP",
+          active: x.active && Boolean(x.retailer.bpUser?.active ?? true),
+          meta: `${x.retailer.retailerCode} · RSO ${x.employee.name}`,
+          detail: `${x.employee.supervisor?.name || "No supervisor"} · GA target ${x.gaTarget}`,
+          editHref: `/admin/employees/bps/${x.id}`,
+        }))}
+      />
+    </main>
+  );
+}

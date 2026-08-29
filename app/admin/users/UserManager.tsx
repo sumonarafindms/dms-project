@@ -14,7 +14,17 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmActionButton from "../../components/ConfirmActionButton";
 import { Icon } from "../../components/icons";
-import { Badge, Card, EmptyState, Field, Modal, PageHeader, Row, SectionHead, SummaryStrip } from "../../components/Kit";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  Field,
+  Modal,
+  PageHeader,
+  Row,
+  SectionHead,
+  SummaryStrip,
+} from "../../components/Kit";
 
 type Opt = { id: string; name: string; meta?: string };
 type U = {
@@ -132,7 +142,12 @@ export default function UserManager({
         : r === "SUPERVISOR"
           ? { name: "supervisorId", label: "Link supervisor", placeholder: "Select supervisor", options: supervisors }
           : r === "BP"
-            ? { name: "bpRetailerId", label: "Link assigned BP retailer", placeholder: "Select active BP", options: bps }
+            ? {
+                name: "bpRetailerId",
+                label: "Link assigned BP retailer",
+                placeholder: "Select active BP",
+                options: bps,
+              }
             : null;
     if (!spec) return null;
     return (
@@ -174,7 +189,7 @@ export default function UserManager({
       )}
 
       <SectionHead title="Create authorized account" sub="Mobile + PIN access linked to the correct DMS role." />
-      <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded="lg">
         <form onSubmit={create}>
           <div className="kit-form-grid">
             <Field label="Role">
@@ -202,7 +217,10 @@ export default function UserManager({
         </form>
       </Card>
 
-      <SectionHead title={`${users.length} login accounts`} sub={`${activeCount} active · ${users.length - activeCount} disabled`} />
+      <SectionHead
+        title={`${users.length} login accounts`}
+        sub={`${activeCount} active · ${users.length - activeCount} disabled`}
+      />
       <div className="kit-filter-bar no-print">
         <div className="kit-search">
           <Icon name="search" />
@@ -313,7 +331,11 @@ export default function UserManager({
               </Field>
               {linkField(
                 editRole,
-                editRole === "RSO" ? editing.employeeId : editRole === "SUPERVISOR" ? editing.supervisorId : editing.bpRetailerId,
+                editRole === "RSO"
+                  ? editing.employeeId
+                  : editRole === "SUPERVISOR"
+                    ? editing.supervisorId
+                    : editing.bpRetailerId,
               )}
             </div>
             <div className="kit-guide">

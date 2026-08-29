@@ -40,7 +40,9 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
   function change(i: number, key: Perm, value: boolean) {
     setRows((v) =>
       v.map((r, n) =>
-        n === i ? { ...r, [key]: value, ...(key === "view" && !value ? { add: false, edit: false, update: false } : {}) } : r,
+        n === i
+          ? { ...r, [key]: value, ...(key === "view" && !value ? { add: false, edit: false, update: false } : {}) }
+          : r,
       ),
     );
   }
@@ -89,11 +91,11 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
       </Link>
       <PageHeader title={name} subtitle={`${role} · Individual module access`} />
 
-      <Card padded style={{ marginBottom: "1.25rem" }}>
-        <p className="kit-filter-note" style={{ marginBottom: "0.625rem" }}>
+      <Card className="kit-mb-20" padded>
+        <p className="kit-filter-note kit-mb-10">
           <Icon name="shield" /> View controls visibility. Add, Edit and Update only take effect when View is on.
         </p>
-        <div className="kit-form-actions" style={{ marginTop: 0 }}>
+        <div className="kit-form-actions is-flush">
           <button type="button" className="kit-btn is-secondary size-sm" onClick={() => localPreset("VIEW_ONLY")}>
             View Only
           </button>
@@ -106,7 +108,7 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
         </div>
       </Card>
 
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {!loaded ? (
           <div className="kit-rows">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -162,7 +164,7 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
         </div>
       )}
 
-      <div className="kit-form-actions" style={{ marginTop: 0 }}>
+      <div className="kit-form-actions is-flush">
         <button className="kit-btn is-primary size-md" disabled={busy} onClick={save}>
           {busy ? "Working…" : "Save Permissions"}
         </button>

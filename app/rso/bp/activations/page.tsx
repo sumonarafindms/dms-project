@@ -3,7 +3,7 @@ import { BpActivationListView } from "../../../components/BpActivationViews";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ month?: string; q?: string; from?: string; to?: string; sort?: string }>;
 }) {
   const u = await requirePagePermission(["RSO"], "bp"),
     s = await searchParams;
@@ -15,6 +15,7 @@ export default async function Page({
       q={s.q}
       from={s.from}
       to={s.to}
+      sort={s.sort}
       eyebrow="RSO · My BP"
     />
   );

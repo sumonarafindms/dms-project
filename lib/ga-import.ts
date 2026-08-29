@@ -1,8 +1,9 @@
 import crypto from "crypto";
+import { assertRowLimit } from "./upload-safety";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {expectedSimSwapPrice} from "@/lib/ga-product";
+import { expectedSimSwapPrice } from "@/lib/ga-product";
 
 type Cell = string | number | boolean | Date | null | undefined;
 
@@ -60,8 +61,18 @@ function parseDate(value: Cell): Date | null {
     const monthToken = dmy[2];
     const year = Number(dmy[3]);
     const monthNames: Record<string, number> = {
-      JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
-      JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11,
+      JAN: 0,
+      FEB: 1,
+      MAR: 2,
+      APR: 3,
+      MAY: 4,
+      JUN: 5,
+      JUL: 6,
+      AUG: 7,
+      SEP: 8,
+      OCT: 9,
+      NOV: 10,
+      DEC: 11,
     };
     const monthIndex = /^[A-Za-z]/.test(monthToken)
       ? monthNames[monthToken.slice(0, 3).toUpperCase()]
@@ -80,7 +91,6 @@ function parseDate(value: Cell): Date | null {
   }
   return null;
 }
-
 
 function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -103,26 +113,26 @@ function normalizeTime(value: Cell): string | null {
   return asText(value) || null;
 }
 
-export async function importGaActivationWorkbook(
-  fileName: string,
-  bytes: Buffer,
-) {
+export async function importGaActivationWorkbook(fileName: string, bytes: Buffer) {
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("No worksheet found in Excel file.");
 
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json<Cell[]>(sheet, { header: 1, raw: true, defval: null });
+  assertRowLimit(rows.length, "GA workbook");
   if (rows.length < 2) throw new Error("The activation file is empty.");
 
   const headers = (rows[0] ?? []).map(normalizeHeader);
   const required = ["RETAILER_CODE", "SIM_NO", "PRODUCT_CODE", "SELLING_PRICE", "ACTIVATION_DATE", "ACTIVATION_TIME"];
   const index: Record<string, number> = {};
-  const missingHeaders=required.filter(header=>!headers.includes(header));
-  if(missingHeaders.length){
-    throw new Error(`Required heading${missingHeaders.length>1?"s":""} missing: ${missingHeaders.join(", ")}. Found headings: ${headers.filter(Boolean).join(", ")||"none"}.`);
+  const missingHeaders = required.filter((header) => !headers.includes(header));
+  if (missingHeaders.length) {
+    throw new Error(
+      `Required heading${missingHeaders.length > 1 ? "s" : ""} missing: ${missingHeaders.join(", ")}. Found headings: ${headers.filter(Boolean).join(", ") || "none"}.`,
+    );
   }
-  for (const header of required) index[header]=headers.indexOf(header);
+  for (const header of required) index[header] = headers.indexOf(header);
 
   const parsedRows: ParsedActivation[] = [];
   const preErrors: Array<{ rowNumber: number; message: string; rawData: object }> = [];
@@ -156,7 +166,7 @@ export async function importGaActivationWorkbook(
       preErrors.push({ rowNumber: i + 1, message: "SELLING_PRICE is invalid", rawData: { retailerCode, simNo } });
       continue;
     }
-    const expectedSwapPrice=expectedSimSwapPrice(productCode);
+    const expectedSwapPrice = expectedSimSwapPrice(productCode);
     if (expectedSwapPrice !== null && sellingPrice !== expectedSwapPrice) {
       preErrors.push({
         rowNumber: i + 1,
@@ -170,19 +180,32 @@ export async function importGaActivationWorkbook(
       continue;
     }
 
-    parsedRows.push({ rowNumber: i + 1, retailerCode, simNo, productCode, sellingPrice, activationDate, activationTime });
+    parsedRows.push({
+      rowNumber: i + 1,
+      retailerCode,
+      simNo,
+      productCode,
+      sellingPrice,
+      activationDate,
+      activationTime,
+    });
   }
 
   if (!sourceRows) throw new Error("No activation rows were found in the uploaded file.");
   if (preErrors.length) {
-    const preview=preErrors.slice(0,8).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
-    throw new Error(`Data validation failed: ${preErrors.length} invalid row(s). ${preview}${preErrors.length>8?" …":""}`);
+    const preview = preErrors
+      .slice(0, 8)
+      .map((e) => `Row ${e.rowNumber}: ${e.message}`)
+      .join("; ");
+    throw new Error(
+      `Data validation failed: ${preErrors.length} invalid row(s). ${preview}${preErrors.length > 8 ? " …" : ""}`,
+    );
   }
   if (!parsedRows.length) throw new Error("No valid activation rows were found in the uploaded file.");
 
-  const activationDates=parsedRows.map(row=>row.activationDate.getTime());
-  const reportStartDate=new Date(Math.min(...activationDates));
-  const reportEndDate=new Date(Math.max(...activationDates));
+  const activationDates = parsedRows.map((row) => row.activationDate.getTime());
+  const reportStartDate = new Date(Math.min(...activationDates));
+  const reportEndDate = new Date(Math.max(...activationDates));
 
   const hash = crypto.createHash("sha256").update(bytes).digest("hex");
   const duplicateFile = await prisma.importBatch.findUnique({ where: { hash } });
@@ -206,9 +229,13 @@ export async function importGaActivationWorkbook(
     select: { id: true, retailerCode: true },
   });
   const retailerMap = new Map(retailers.map((r) => [r.retailerCode.toUpperCase(), r.id]));
-  const missingRetailers=[...new Set(parsedRows.filter(row=>!retailerMap.has(row.retailerCode)).map(row=>row.retailerCode))];
-  if(missingRetailers.length){
-    throw new Error(`Data validation failed: retailer code${missingRetailers.length>1?"s":""} not found in Retailer Master: ${missingRetailers.slice(0,12).join(", ")}${missingRetailers.length>12?" …":""}`);
+  const missingRetailers = [
+    ...new Set(parsedRows.filter((row) => !retailerMap.has(row.retailerCode)).map((row) => row.retailerCode)),
+  ];
+  if (missingRetailers.length) {
+    throw new Error(
+      `Data validation failed: retailer code${missingRetailers.length > 1 ? "s" : ""} not found in Retailer Master: ${missingRetailers.slice(0, 12).join(", ")}${missingRetailers.length > 12 ? " …" : ""}`,
+    );
   }
 
   const simNumbers = [...new Set(parsedRows.map((row) => row.simNo))];
@@ -267,25 +294,28 @@ export async function importGaActivationWorkbook(
     const old = existingMap.get(row.simNo);
     if (!old) {
       insertedRows++;
-      operations.push(prisma.gaActivation.create({
-        data: {
-          simNo: row.simNo,
-          retailerId,
-          activationDate: row.activationDate,
-          activationTime: row.activationTime,
-          sellingPrice: new Prisma.Decimal(row.sellingPrice),
-          productCode: row.productCode,
-          batchId: batch.id,
-        },
-      }));
+      operations.push(
+        prisma.gaActivation.create({
+          data: {
+            simNo: row.simNo,
+            retailerId,
+            activationDate: row.activationDate,
+            activationTime: row.activationTime,
+            sellingPrice: new Prisma.Decimal(row.sellingPrice),
+            productCode: row.productCode,
+            batchId: batch.id,
+          },
+        }),
+      );
       continue;
     }
 
-    const unchanged = old.retailerId === retailerId
-      && isoDate(old.activationDate) === isoDate(row.activationDate)
-      && (old.activationTime ?? "") === (row.activationTime ?? "")
-      && Number(old.sellingPrice) === row.sellingPrice
-      && (old.productCode ?? "") === row.productCode;
+    const unchanged =
+      old.retailerId === retailerId &&
+      isoDate(old.activationDate) === isoDate(row.activationDate) &&
+      (old.activationTime ?? "") === (row.activationTime ?? "") &&
+      Number(old.sellingPrice) === row.sellingPrice &&
+      (old.productCode ?? "") === row.productCode;
 
     if (unchanged) {
       duplicateRows++;
@@ -293,17 +323,19 @@ export async function importGaActivationWorkbook(
     }
 
     updatedRows++;
-    operations.push(prisma.gaActivation.update({
-      where: { simNo: row.simNo },
-      data: {
-        retailerId,
-        activationDate: row.activationDate,
-        activationTime: row.activationTime,
-        sellingPrice: new Prisma.Decimal(row.sellingPrice),
-        productCode: row.productCode,
-        batchId: batch.id,
-      },
-    }));
+    operations.push(
+      prisma.gaActivation.update({
+        where: { simNo: row.simNo },
+        data: {
+          retailerId,
+          activationDate: row.activationDate,
+          activationTime: row.activationTime,
+          sellingPrice: new Prisma.Decimal(row.sellingPrice),
+          productCode: row.productCode,
+          batchId: batch.id,
+        },
+      }),
+    );
   }
 
   try {

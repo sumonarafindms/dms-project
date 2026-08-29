@@ -37,7 +37,13 @@ export function ComparisonChart({ data }: { data: ChartDatum[] }) {
   const rows = data.slice(0, MAX_ROWS);
 
   if (!rows.length)
-    return <EmptyState title="No team data available" hint="Nothing to compare in this range." icon={<Icon name="chart" />} />;
+    return (
+      <EmptyState
+        title="No team data available"
+        hint="Nothing to compare in this range."
+        icon={<Icon name="chart" />}
+      />
+    );
 
   return (
     <div className="kit-compare">

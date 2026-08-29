@@ -5,7 +5,10 @@ import UserManager from "./UserManager";
 export default async function Users() {
   await requireUser(["ADMIN", "IT"]);
   const [users, employees, supervisors, bps] = await Promise.all([
-    prisma.user.findMany({ orderBy: { createdAt: "asc" }, include: { employee: true, supervisor: true, bpRetailer: true } }),
+    prisma.user.findMany({
+      orderBy: { createdAt: "asc" },
+      include: { employee: true, supervisor: true, bpRetailer: true },
+    }),
     prisma.employee.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.supervisor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.bpAssignment.findMany({

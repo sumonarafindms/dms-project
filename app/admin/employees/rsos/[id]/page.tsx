@@ -1,5 +1,28 @@
-import {requireUser} from "../../../../../lib/auth";
-import {prisma} from "../../../../../lib/prisma";
+import { requireUser } from "../../../../../lib/auth";
+import { prisma } from "../../../../../lib/prisma";
 import AdminEmployeeForm from "../../../../components/AdminEmployeeForm";
-import {notFound} from "next/navigation";
-export default async function Page({params}:{params:Promise<{id:string}>}){await requireUser(["ADMIN","IT"]);const {id}=await params,[e,supervisors]=await Promise.all([prisma.employee.findUnique({where:{id},include:{user:true}}),prisma.supervisor.findMany({where:{active:true},orderBy:{name:"asc"}})]);if(!e)notFound();return <AdminEmployeeForm role="rsos" supervisors={supervisors.map(x=>({id:x.id,name:x.name}))} initial={{id:e.id,name:e.name,mobile:e.user?.mobileNumber||"",active:e.active&&Boolean(e.user?.active??true),rsoMsisdn:e.rsoMsisdn,employeeCode:e.employeeCode||"",supervisorId:e.supervisorId||""}}/>}
+import { notFound } from "next/navigation";
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  await requireUser(["ADMIN", "IT"]);
+  const { id } = await params,
+    [e, supervisors] = await Promise.all([
+      prisma.employee.findUnique({ where: { id }, include: { user: true } }),
+      prisma.supervisor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    ]);
+  if (!e) notFound();
+  return (
+    <AdminEmployeeForm
+      role="rsos"
+      supervisors={supervisors.map((x) => ({ id: x.id, name: x.name }))}
+      initial={{
+        id: e.id,
+        name: e.name,
+        mobile: e.user?.mobileNumber || "",
+        active: e.active && Boolean(e.user?.active ?? true),
+        rsoMsisdn: e.rsoMsisdn,
+        employeeCode: e.employeeCode || "",
+        supervisorId: e.supervisorId || "",
+      }}
+    />
+  );
+}

@@ -1,6 +1,42 @@
-import {requireUser} from "../../../../../lib/auth";
-import {prisma} from "../../../../../lib/prisma";
+import { requireUser } from "../../../../../lib/auth";
+import { prisma } from "../../../../../lib/prisma";
 import AdminEmployeeForm from "../../../../components/AdminEmployeeForm";
 import SupervisorTeamEditor from "../../../../components/SupervisorTeamEditor";
-import {notFound} from "next/navigation";
-export default async function Page({params}:{params:Promise<{id:string}>}){await requireUser(["ADMIN","IT"]);const {id}=await params,[s,employees]=await Promise.all([prisma.supervisor.findUnique({where:{id},include:{user:true,employees:{select:{id:true}}}}),prisma.employee.findMany({where:{active:true},orderBy:{name:"asc"},select:{id:true,name:true,rsoMsisdn:true,employeeCode:true,supervisor:{select:{name:true}}}})]);if(!s)notFound();return <><AdminEmployeeForm role="supervisors" initial={{id:s.id,name:s.name,mobile:s.user?.mobileNumber||"",active:s.active&&Boolean(s.user?.active??true)}}/><div className="page" style={{paddingTop:0}}><SupervisorTeamEditor supervisorId={s.id} selected={s.employees.map(x=>x.id)} employees={employees.map(x=>({id:x.id,name:x.name,meta:`${x.employeeCode||x.rsoMsisdn} · ${x.supervisor?.name||"Unassigned"}`}))}/></div></>}
+import { notFound } from "next/navigation";
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  await requireUser(["ADMIN", "IT"]);
+  const { id } = await params,
+    [s, employees] = await Promise.all([
+      prisma.supervisor.findUnique({ where: { id }, include: { user: true, employees: { select: { id: true } } } }),
+      prisma.employee.findMany({
+        where: { active: true },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, rsoMsisdn: true, employeeCode: true, supervisor: { select: { name: true } } },
+      }),
+    ]);
+  if (!s) notFound();
+  return (
+    <>
+      <AdminEmployeeForm
+        role="supervisors"
+        initial={{
+          id: s.id,
+          name: s.name,
+          mobile: s.user?.mobileNumber || "",
+          active: s.active && Boolean(s.user?.active ?? true),
+        }}
+      />
+      <div className="page is-flush">
+        <SupervisorTeamEditor
+          supervisorId={s.id}
+          selected={s.employees.map((x) => x.id)}
+          employees={employees.map((x) => ({
+            id: x.id,
+            name: x.name,
+            meta: `${x.employeeCode || x.rsoMsisdn} · ${x.supervisor?.name || "Unassigned"}`,
+          }))}
+        />
+      </div>
+    </>
+  );
+}

@@ -21,6 +21,7 @@
  */
 
 import * as XLSX from "xlsx";
+import { assertRowLimit } from "./upload-safety";
 import crypto from "crypto";
 import { phoneKey } from "./phone";
 
@@ -170,16 +171,23 @@ export function parseTabText(bytes: Buffer): Matrix | null {
 
 export function readMatrix(bytes: Buffer, kind: C2Kind): Matrix {
   const tab = parseTabText(bytes);
-  if (tab) return tab;
+  if (tab) {
+    // The tab-separated export returns before the workbook path below, so it
+    // needs the same cap — a .txt file is not smaller by nature.
+    assertRowLimit(tab.length, `${kind} text export`);
+    return tab;
+  }
 
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error(`No worksheet found in ${kind} file.`);
-  return XLSX.utils.sheet_to_json<Cell[]>(workbook.Sheets[sheetName], {
+  const rows = XLSX.utils.sheet_to_json<Cell[]>(workbook.Sheets[sheetName], {
     header: 1,
     raw: true,
     defval: null,
   });
+  assertRowLimit(rows.length, `${kind} workbook`);
+  return rows;
 }
 
 export function findHeaderRow(matrix: Matrix, required: readonly string[]) {

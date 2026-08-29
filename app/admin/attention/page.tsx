@@ -16,7 +16,7 @@ import { Icon } from "../../components/icons";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const s = await searchParams,
@@ -51,15 +51,7 @@ export default async function Page({
 
       <AttentionSummary rows={all} />
 
-      <RetailerSearchView
-        rows={rows}
-        month={month}
-        q={s.q || ""}
-        from={s.from}
-        to={s.to}
-        base="/admin/retailers"
-        attentionOnly
-      />
+      <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/admin/retailers" attentionOnly />
     </main>
   );
 }

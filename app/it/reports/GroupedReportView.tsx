@@ -32,7 +32,7 @@ export function GroupSwitch({
   param?: string;
 }) {
   return (
-    <div className="kit-report-presets no-print" style={{ marginBottom: "0.75rem" }}>
+    <div className="kit-report-presets no-print kit-mb-12">
       {options.map((o) => (
         <Link
           key={o.key}

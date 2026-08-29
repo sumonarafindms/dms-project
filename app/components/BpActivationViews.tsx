@@ -13,7 +13,9 @@
 import Link from "next/link";
 import { FilterForm } from "./DrillUI";
 import { Icon } from "./icons";
-import { Badge, Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";
+import { Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";
+import { BpAssignmentList } from "./BpAssignmentList";
+import { SimActivationList } from "./SimActivationList";
 import type { BpViewer } from "../../lib/bp-activations";
 import { bpAssignmentDetail, listBpAssignments } from "../../lib/bp-activations";
 
@@ -21,20 +23,22 @@ export async function BpActivationListView({
   user,
   basePath,
   month,
-  q,
   from,
   to,
 }: {
   user: BpViewer;
   basePath: string;
   month?: string;
-  q?: string;
   from?: string;
   to?: string;
+  /** Ignored — search and sort are local to the list now. */
+  q?: string;
+  sort?: string;
   /** Ignored — the kit page header has no eyebrow. Kept so callers compile. */
   eyebrow?: string;
 }) {
-  const data = await listBpAssignments(user, month, q, from, to);
+  // No `q`: the server no longer narrows the list, the browser does.
+  const data = await listBpAssignments(user, month, undefined, from, to);
   const range = `month=${data.month}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`;
 
   return (
@@ -43,50 +47,27 @@ export async function BpActivationListView({
         title="BP Activation Details"
         subtitle="SIM activations by assigned BP retailer, counted only within each assignment's effective period."
       />
-      <FilterForm
-        q={q || ""}
+      <BpAssignmentList
+        // Serialised here rather than in the client component: the query, the
+        // scope and the date arithmetic all stay on the server.
+        rows={data.assignments.map((a) => ({
+          id: a.id,
+          active: a.active,
+          gaTarget: a.gaTarget,
+          monthGa: a.monthGa,
+          startDate: a.startDate.toISOString().slice(0, 10),
+          endDate: a.endDate?.toISOString().slice(0, 10) ?? null,
+          retailerCode: a.retailer.retailerCode,
+          retailerName: a.retailer.retailerName || "",
+          rsoName: a.employee.name,
+          supervisorName: a.employee.supervisor?.name || "",
+        }))}
+        basePath={basePath}
+        range={range}
         month={data.month}
         from={from}
         to={to}
-        dateRange
-        placeholder="Search BP code, BP name or RSO"
       />
-      <SectionHead
-        title={`${data.assignments.length} BP ${data.assignments.length === 1 ? "assignment" : "assignments"}`}
-        sub="Active assignments first."
-      />
-      <Card padded>
-        {data.assignments.length ? (
-          <div className="kit-rows">
-            {data.assignments.map((a) => (
-              <Row
-                key={a.id}
-                href={`${basePath}/${a.id}?${range}`}
-                avatar={a.retailer.retailerName || a.retailer.retailerCode}
-                title={a.retailer.retailerName || a.retailer.retailerCode}
-                sub={`${a.retailer.retailerCode} · RSO ${a.employee.name}${a.employee.supervisor?.name ? ` · ${a.employee.supervisor.name}` : ""}`}
-                detail={`${a.startDate.toISOString().slice(0, 10)} → ${a.endDate?.toISOString().slice(0, 10) || "current"}`}
-                // Wrapped in .kit-row-actions so the mobile rule moves it to
-                // its own line; a bare badge stays inline and squeezes the BP
-                // name to an ellipsis on a phone.
-                after={
-                  <div className="kit-row-actions">
-                    <Badge tone={a.active ? "active" : "neutral"}>{a.active ? "Active" : "History"}</Badge>
-                  </div>
-                }
-                value={a.monthGa}
-                valueSub="GA"
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="No BP assignment found"
-            hint="Nothing was assigned in this period. Try another date range."
-            icon={<Icon name="sim" />}
-          />
-        )}
-      </Card>
     </main>
   );
 }
@@ -162,29 +143,27 @@ export async function BpActivationDetailView({
         </span>
       </div>
 
-      <FilterForm q={d.q} month={d.month} from={from} to={to} dateRange placeholder="Search SIM serial" />
+      {/* The date range still navigates — it selects a different dataset — but
+          the SIM search does not: SimActivationList filters the rows already
+          on the page, so typing a serial costs no request at all. */}
+      <FilterForm month={d.month} from={from} to={to} dateRange />
 
-      <SectionHead title="Activation details" sub={`${d.rows.length} shown, newest first.`} />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
-        {d.rows.length ? (
-          <div className="kit-rows">
-            {d.rows.map((x) => (
-              <Row
-                key={x.simNo}
-                icon={<Icon name="sim" />}
-                title={`SIM ${x.simNo}`}
-                sub={`${x.activationDate.toISOString().slice(0, 10)}${x.activationTime ? ` · ${x.activationTime}` : ""}`}
-                value={`৳${Number(x.sellingPrice).toLocaleString()}`}
-                // These rows are standard GA only, so price maps cleanly onto
-                // the two packs: 170 is the 150 pack, everything else is 300.
-                valueSub={Number(x.sellingPrice) === 170 ? "150 pack" : "300 pack"}
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="No activation found" hint="Nothing matches this filter." icon={<Icon name="search" />} />
-        )}
-      </Card>
+      <SimActivationList
+        title="Activation details"
+        rows={d.rows.map((x) => ({
+          simNo: x.simNo,
+          date: x.activationDate.toISOString().slice(0, 10),
+          time: x.activationTime || "",
+          price: Number(x.sellingPrice),
+          // These rows are standard GA only, so price maps cleanly onto the
+          // two packs: 170 is the 150 pack, everything else is 300.
+          category: Number(x.sellingPrice) === 170 ? "150 pack" : "300 pack",
+        }))}
+        month={d.month}
+        from={from}
+        to={to}
+        capped={d.capped}
+      />
 
       <SectionHead title="Daily GA" sub={`${d.daily.length} ${d.daily.length === 1 ? "day" : "days"} with activity.`} />
       <Card padded>

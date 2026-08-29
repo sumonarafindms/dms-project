@@ -33,7 +33,9 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
   }
   function toggleAll() {
     const ids = visible.map((x) => x.id);
-    setSelected((v) => (ids.every((id) => v.includes(id)) ? v.filter((id) => !ids.includes(id)) : [...new Set([...v, ...ids])]));
+    setSelected((v) =>
+      ids.every((id) => v.includes(id)) ? v.filter((id) => !ids.includes(id)) : [...new Set([...v, ...ids])],
+    );
   }
   function report(ok: boolean, text: string) {
     setMsgTone(ok ? "ok" : "bad");
@@ -78,7 +80,7 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
         title="Bulk permission manager"
         sub="Apply presets or copy one user's access to multiple accounts."
       />
-      <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded="lg">
         <div className="kit-form-grid">
           <Field label="Filter by role">
             <select className="kit-select" value={role} onChange={(e) => setRole(e.target.value)}>
@@ -94,7 +96,7 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
           </div>
         </div>
 
-        <div className="kit-check-list" style={{ marginTop: "0.75rem" }}>
+        <div className="kit-check-list kit-mt-12">
           {visible.map((u) => (
             <Check
               key={u.id}
@@ -107,7 +109,7 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
           {!visible.length && <p className="kit-filter-note">No users in this role.</p>}
         </div>
 
-        <div className="kit-form-grid" style={{ marginTop: "1rem" }}>
+        <div className="kit-form-grid kit-mt-16">
           <div>
             <Field label="Apply preset" hint="replaces effective access">
               <select className="kit-select" value={preset} onChange={(e) => setPreset(e.target.value)}>
@@ -143,7 +145,7 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
         </div>
 
         {msg && (
-          <div className={`kit-note is-${msgTone}`} role="status" style={{ margin: "1rem 0 0" }}>
+          <div className={`kit-note is-${msgTone} is-last`} role="status">
             <Icon name={msgTone === "ok" ? "check" : "alert"} />
             <span>{msg}</span>
           </div>

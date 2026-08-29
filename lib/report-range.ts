@@ -17,17 +17,16 @@
  * end-of-day arithmetic.
  */
 
+import { parseYmd } from "./date-range";
 import { dhakaTodayYmd, dhakaYesterdayYmd } from "./business-time";
 
 export type ReportRange = { from: string; to: string };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Re-exported from date-range so the app has exactly one strict YMD parser. */
 export function parseYmdUtc(value: string): Date | null {
-  if (!YMD.test(value)) return null;
-  const [y, m, d] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return Number.isNaN(date.getTime()) ? null : date;
+  return parseYmd(value);
 }
 
 export const toYmd = (d: Date) => d.toISOString().slice(0, 10);
@@ -69,6 +68,18 @@ export function rangeLabel(range: ReportRange) {
   return range.from === range.to ? range.from : `${range.from} to ${range.to}`;
 }
 
+const monthStart = (ymd: string) => `${ymd.slice(0, 7)}-01`;
+
+/** The whole of the calendar month before the one `ymd` falls in. */
+function previousMonthRange(ymd: string): ReportRange {
+  const [y, m] = ymd.split("-").map(Number);
+  const prevYear = m === 1 ? y - 1 : y,
+    prevMonth = m === 1 ? 12 : m - 1;
+  const from = `${prevYear}-${String(prevMonth).padStart(2, "0")}-01`;
+  const lastDay = new Date(Date.UTC(prevYear, prevMonth, 0)).getUTCDate();
+  return { from, to: `${from.slice(0, 8)}${String(lastDay).padStart(2, "0")}` };
+}
+
 export function rangePresets(): { label: string; range: ReportRange }[] {
   const today = dhakaTodayYmd();
   const yesterday = dhakaYesterdayYmd();
@@ -76,8 +87,32 @@ export function rangePresets(): { label: string; range: ReportRange }[] {
     { label: "Yesterday", range: { from: yesterday, to: yesterday } },
     { label: "Today", range: { from: today, to: today } },
     { label: "Last 7 Days", range: { from: addDaysYmd(yesterday, -6), to: yesterday } },
-    { label: "This Month", range: { from: `${today.slice(0, 7)}-01`, to: yesterday } },
+    // On the 1st, month-to-date has no completed days yet: `from` would be
+    // today and `to` yesterday, i.e. last month — resolveRange() would then
+    // swap them into an unintended cross-month range. Fall back to today.
+    {
+      label: "This Month",
+      range: monthStart(today) > yesterday ? { from: today, to: today } : { from: monthStart(today), to: yesterday },
+    },
+    { label: "Last Month", range: previousMonthRange(today) },
   ];
+}
+
+/**
+ * Month-to-date ending on this range's last day.
+ *
+ * A monthly target only means something against a month of activity. The daily
+ * report's default range is yesterday, so `yesterday's GA / monthly target` is
+ * a number that looks like failure by construction; the honest comparison is
+ * month-to-date against the same target.
+ */
+export function monthToDate(range: ReportRange): ReportRange {
+  return { from: `${range.to.slice(0, 7)}-01`, to: range.to };
+}
+
+/** True when the range already covers its month from the 1st. */
+export function isMonthToDate(range: ReportRange) {
+  return range.from === `${range.to.slice(0, 7)}-01`;
 }
 
 /** Query string for links that must carry the current range. */

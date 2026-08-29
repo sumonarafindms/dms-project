@@ -18,18 +18,21 @@
     "format": "prettier --write \"eslint.config.mjs\" \"vitest.config.ts\" \"postcss.config.mjs\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\" \"lib/c2-import-core.ts\" \"lib/c2c-import.ts\" \"lib/c2s-import.ts\" \"styles/*.css\" \"app/globals.css\"",
     "format:check": "prettier --check \"eslint.config.mjs\" \"vitest.config.ts\" \"postcss.config.mjs\" \"tests/**/*.{ts,tsx}\" \"lib/login-policy.ts\" \"lib/ga-parse.ts\" \"lib/business-rules.ts\" \"lib/c2-import-core.ts\" \"lib/c2c-import.ts\" \"lib/c2s-import.ts\" \"styles/*.css\" \"app/globals.css\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:public": "playwright test e2e/public.spec.ts",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",
-    "next": "^15.4.6",
+    "next": "^15.5.24",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "xlsx": "^0.18.5",
-    "zod": "^4.0.17"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.14.1",
     "@types/react": "^19.1.10",

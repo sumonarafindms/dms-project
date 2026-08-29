@@ -16,6 +16,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { TARGET_BAND_LABEL, targetBand, targetPercent } from "../../lib/achievement";
 import type { TargetBand } from "../../lib/achievement";
+import { perDayLabel, riskTone } from "../../lib/pacing";
+import { changeLabel, changeTone } from "../../lib/comparison";
+import type { MetricComparison } from "../../lib/comparison-data";
+import type { Pacing } from "../../lib/pacing";
 
 export const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("en-US");
 export { targetPercent as pct };
@@ -89,14 +93,19 @@ export function MetricBar({
       <div className="kit-metric-head">
         <span className="kit-label">{label}</span>
         <span className="kit-metric-value">
+          {/* The unit goes in FRONT and the figure is rounded, matching
+              KpiCard. These two sit on the same screens, and until now one
+              printed "৳6,478,558" while the other printed "6,478,558.37৳" for
+              the very same number. Taka is a prefix currency, and money on a
+              performance card is never shown to the paisa. */}
           <b>
-            {fmt(achieved)}
             {unit}
+            {fmt(Math.round(achieved))}
           </b>
           <span>
             {" "}
-            / {fmt(target)}
-            {unit}
+            / {unit}
+            {fmt(Math.round(target))}
           </span>
           <em className={`band-${band}`}>{p}%</em>
         </span>
@@ -125,9 +134,9 @@ export function ProgressLine({
         <span className="kit-label">{label}</span>
         <span className="kit-metric-value">
           <b>
-            {current}
-            {unit} / {target}
             {unit}
+            {current} / {unit}
+            {target}
           </b>
         </span>
       </div>
@@ -575,11 +584,21 @@ export function KpiCard({
   achieved,
   target,
   unit = "",
+  pace,
 }: {
   label: string;
   achieved: number;
   target: number;
   unit?: string;
+  /**
+   * Optional pacing, computed by the CALLER rather than here.
+   *
+   * `pacing()` reads the clock, and this file has no "use client", so a client
+   * component importing KpiCard would evaluate it in the browser and could
+   * disagree with the server across a day boundary. Passing the finished
+   * object keeps the card pure and the clock read on the server, once.
+   */
+  pace?: Pacing;
 }) {
   const p = targetPercent(achieved, target);
   return (
@@ -598,7 +617,7 @@ export function KpiCard({
         </div>
         <Ring value={p} size={40} stroke={4} />
       </div>
-      <div style={{ marginTop: "0.625rem" }}>
+      <div className="kit-mt-10">
         <Bar value={p} thin />
       </div>
       <p className="kit-kpi-foot">
@@ -608,7 +627,102 @@ export function KpiCard({
           {fmt(Math.max(0, Math.round(target - achieved)))}
         </b>
       </p>
+      {pace && <PaceFoot pace={pace} unit={unit} />}
     </Card>
+  );
+}
+
+/**
+ * One period-over-period comparison: the figure, the change, and — always —
+ * the two dates it was measured between.
+ *
+ * The dates are not decoration. Each metric anchors on the last day IT has
+ * data for, so GA may be comparing the 29th while C2S compares the 28th.
+ * Printing "Today" over that would be a false claim; printing the real dates
+ * costs one line and is true.
+ */
+export function ComparisonCard({ item }: { item: MetricComparison }) {
+  const c = item.comparison;
+  const tone = changeTone(c);
+  const money = (n: number) => `${item.unit}${fmt(Math.round(n))}`;
+  return (
+    <Card padded>
+      <span className="kit-label">{item.label}</span>
+      {item.windows ? (
+        <>
+          <div className="kit-compare-top">
+            <strong>{money(c.current)}</strong>
+            <span className={`kit-delta tone-${tone}`}>{changeLabel(c)}</span>
+          </div>
+          <p className="kit-compare-foot">
+            {item.windows.current.label} vs {item.windows.previous.label} ({money(c.previous)})
+          </p>
+        </>
+      ) : (
+        // No rows at all yet — say so rather than showing a confident zero.
+        <>
+          <div className="kit-compare-top">
+            <strong>—</strong>
+          </div>
+          <p className="kit-compare-foot">No {item.label} data uploaded yet</p>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * The pacing line under a KPI: what today needs, what the month is doing, and
+ * where it lands if nothing changes.
+ *
+ * Deliberately hidden when there is no target and when the month has not
+ * produced a day of data yet — a required-per-day figure against a zero target
+ * is noise, and a projection from nothing is a guess dressed as a number.
+ */
+export function PaceFoot({ pace, unit = "" }: { pace: Pacing; unit?: string }) {
+  if (pace.status === "No target") return null;
+  const tone = riskTone(pace.status);
+  const done = pace.status === "Achieved" || pace.status === "Missed";
+  return (
+    <div className={`kit-pace tone-${tone}`}>
+      <div className="kit-pace-head">
+        <span className="kit-pace-status">{pace.status}</span>
+        {pace.window.phase === "current" && (
+          <span className="kit-pace-days">
+            {pace.window.daysRemaining} day{pace.window.daysRemaining === 1 ? "" : "s"} left
+          </span>
+        )}
+      </div>
+      {!done && pace.requiredPerDay !== null && (
+        <p className="kit-pace-line">
+          Need{" "}
+          <b>
+            {unit}
+            {perDayLabel(pace.requiredPerDay)}
+          </b>
+          /day
+          {pace.currentPerDay !== null && (
+            <>
+              {" · now "}
+              <b>
+                {unit}
+                {perDayLabel(pace.currentPerDay)}
+              </b>
+              /day
+            </>
+          )}
+        </p>
+      )}
+      {pace.projected !== null && !done && (
+        // "Projected", never "will be": this is an estimate from the current
+        // rate, and the wording should not let anyone forget that.
+        <p className="kit-pace-line is-muted">
+          Projected {unit}
+          {fmt(Math.round(pace.projected))}
+          {pace.gap !== null && pace.gap < 0 && <> · short by {fmt(Math.round(-pace.gap))}</>}
+        </p>
+      )}
+    </div>
   );
 }
 

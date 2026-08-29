@@ -128,6 +128,13 @@ model ImportBatch {
   c2cRecords   C2cRecord[]
   c2sRecords   C2sRecord[]
   obRecords    ObRecord[]
+
+  // Data Readiness asks "is there a COMPLETED batch of this type with a
+  // businessDate in the report range?" on every Reporting Centre page load,
+  // and the Upload Center lists batches of one type newest-first. Both were
+  // sequential scans.
+  @@index([type, businessDate, status])
+  @@index([type, uploadedAt])
 }
 
 model ImportError {

@@ -4,20 +4,38 @@ import { prisma } from "../../../../lib/prisma";
 import { normalizeMonth } from "../../../../lib/drilldown";
 import { monthBounds } from "../../../../lib/month";
 import { parseYmd } from "../../../../lib/date-range";
-import { Card, EmptyState, EntityCard, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
-import { FilterForm } from "../../../components/DrillUI";
-import { Icon } from "../../../components/icons";
-import Link from "next/link";
+import { Card, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
 import { ComparisonChart } from "../../../components/AnalyticsCharts";
+import { EntityGrid } from "../../../components/EntityGrid";
+
+type SupervisorRow = {
+  id: string;
+  name: string;
+  rsos: number;
+  bps: Set<string>;
+  target: number;
+  achieved: number;
+  gaT: number;
+  gaA: number;
+  retailers: number;
+};
+
+// A plain description, not comparators: functions cannot be passed from a
+// Server Component to a Client Component.
+const SORT_FIELDS = [
+  { key: "recharge", label: "Recharge %" },
+  { key: "ga", label: "GA %" },
+  { key: "rsos", label: "RSOs", bothWays: false },
+  { key: "retailers", label: "Retailers", bothWays: false },
+];
 
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const s = await searchParams,
-    q = (s.q || "").trim().toLowerCase(),
     month = normalizeMonth(s.from?.slice(0, 7) || s.month),
     rows = await employeePerformance(`${month}-01`, undefined, s.from, s.to),
     { start, end } = monthBounds(`${month}-01`),
@@ -28,20 +46,7 @@ export default async function Page({
     where: { startDate: { lt: re }, OR: [{ endDate: null }, { endDate: { gte: rs } }] },
     include: { employee: { select: { supervisorId: true } } },
   });
-  const map = new Map<
-    string,
-    {
-      id: string;
-      name: string;
-      rsos: number;
-      bps: Set<string>;
-      target: number;
-      achieved: number;
-      gaT: number;
-      gaA: number;
-      retailers: number;
-    }
-  >();
+  const map = new Map<string, SupervisorRow>();
   const sups = await prisma.supervisor.findMany({ where: { active: true }, select: { id: true, name: true } });
   for (const x of sups)
     map.set(x.id, {
@@ -56,9 +61,11 @@ export default async function Page({
       retailers: 0,
     });
   for (const r of rows) {
-    const sup = sups.find((x) => x.name === r.supervisor);
-    if (!sup) continue;
-    const x = map.get(sup.id)!;
+    // Group on the supervisor's id. Matching on the name merged two
+    // supervisors who happen to share one, and silently dropped every RSO
+    // whose supervisor is inactive or unset.
+    const x = r.supervisorId ? map.get(r.supervisorId) : undefined;
+    if (!x) continue;
     x.rsos++;
     x.retailers += r.retailerCount;
     x.target += r.totalRechargeTarget;
@@ -72,15 +79,12 @@ export default async function Page({
       x.bps.add(b.retailerId); /* BP target is tracked separately from RSO GA; do not add it to employee GA target. */
     }
   }
-  const data = [...map.values()]
-    .filter((x) => !q || x.name.toLowerCase().includes(q))
-    .sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
+  const data = [...map.values()];
   const totalT = data.reduce((a, x) => a + x.target, 0),
     totalA = data.reduce((a, x) => a + x.achieved, 0);
   return (
     <main className="page">
       <PageHeader title="Supervisor Performance" subtitle="Team-level target, achievement, RSO and BP overview." />
-      <FilterForm dateRange q={s.q || ""} month={month} from={s.from} to={s.to} placeholder="Search supervisor" />
       <SummaryStrip
         items={[
           { label: "Supervisors", value: data.length.toLocaleString() },
@@ -93,7 +97,7 @@ export default async function Page({
         title="Team execution comparison"
         sub="Recharge and GA achievement across active supervisor teams."
       />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         <ComparisonChart
           data={data.map((x) => ({
             label: x.name,
@@ -103,33 +107,35 @@ export default async function Page({
           }))}
         />
       </Card>
-      <SectionHead title={`${data.length} supervisors`} sub="Ranked by recharge achievement." />
-      {data.length ? (
-        <div className="kit-card-grid">
-          {data.map((x) => (
-            <EntityCard
-              key={x.id}
-              href={`/admin/performance/supervisors/${x.id}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`}
-              eyebrow="Supervisor"
-              name={x.name}
-              code={`${x.rsos} RSOs · ${x.bps.size} BPs · ${x.retailers.toLocaleString()} retailers`}
-              percent={pct(x.achieved, x.target)}
-              metrics={[
-                { label: "GA", achieved: x.gaA, target: x.gaT },
-                { label: "Recharge", achieved: x.achieved, target: x.target, unit: "৳" },
-              ]}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <EmptyState
-            title="No supervisor performance found"
-            hint="Try another period or search term."
-            icon={<Icon name="search" />}
-          />
-        </Card>
-      )}
+      <EntityGrid
+        rows={data.map((x) => ({
+          id: x.id,
+          href: `/admin/performance/supervisors/${x.id}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`,
+          eyebrow: "Supervisor",
+          name: x.name,
+          code: `${x.rsos} RSOs · ${x.bps.size} BPs · ${x.retailers.toLocaleString()} retailers`,
+          percent: pct(x.achieved, x.target),
+          metrics: [
+            { label: "GA", achieved: x.gaA, target: x.gaT },
+            { label: "Recharge", achieved: x.achieved, target: x.target, unit: "৳" },
+          ],
+          search: x.name.toLowerCase(),
+          sortKeys: {
+            recharge: pct(x.achieved, x.target),
+            ga: pct(x.gaA, x.gaT),
+            rsos: x.rsos,
+            retailers: x.retailers,
+          },
+        }))}
+        sortFields={SORT_FIELDS}
+        placeholder="Search supervisor"
+        noun="supervisor"
+        month={month}
+        from={s.from}
+        to={s.to}
+        emptyTitle="No supervisor performance found"
+        emptyHint="Try another period."
+      />
     </main>
   );
 }

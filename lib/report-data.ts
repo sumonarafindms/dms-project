@@ -14,7 +14,8 @@
 import { prisma } from "./prisma";
 import { rangeBounds } from "./report-range";
 import type { ReportRange } from "./report-range";
-import { withStandardGa } from "./business-rules";
+import { withSimSwap, withStandardGa } from "./business-rules";
+import { coversDate, overlapsRange } from "./bp-period";
 import type { ImportType } from "@prisma/client";
 import { retailerOpportunities } from "./retailer-opportunities";
 import type { RetailerOpportunity } from "./retailer-opportunities";
@@ -70,6 +71,8 @@ export async function dataReadiness(range: ReportRange): Promise<FeedReadiness[]
 export type RangeTotals = {
   standardGa: number;
   simSwap: number;
+  /** Rows whose product code matches neither a standard GA pack nor a swap. */
+  unknownGa: number;
   c2cAmount: number;
   c2sAmount: number;
   c2sTransactions: number;
@@ -79,23 +82,34 @@ export async function rangeTotals(range: ReportRange): Promise<RangeTotals> {
   const { start, endExclusive } = rangeBounds(range);
   const window = { gte: start, lt: endExclusive };
 
-  const [standardGa, allGa, c2c, c2s] = await Promise.all([
+  const [standardGa, simSwap, allGa, c2c, c2s] = await Promise.all([
     // Standard GA only — SIMWAP and EV-SWAP are replacements and never count
     // toward GA (lib/business-rules.ts).
     prisma.gaActivation.count({ where: withStandardGa({ activationDate: window }) }),
+    // Actual swaps, by the same centralized rule. This used to be computed as
+    // `allGa - standardGa`, which quietly counted every unrecognised product
+    // code as a SIM swap — the UI labels the number "SIM Swap", so an import
+    // carrying one new product code inflated it.
+    prisma.gaActivation.count({ where: withSimSwap({ activationDate: window }) }),
     prisma.gaActivation.count({ where: { activationDate: window } }),
     prisma.c2cRecord.aggregate({ where: { date: window }, _sum: { amount: true } }),
-    prisma.c2sRecord.aggregate({ where: { date: window }, _sum: { amount: true }, _count: { _all: true } }),
+    // `transactionCount` is the business transaction total; `_count._all`
+    // counts retailer-day ROWS. The daily report prints this as "… trx", so
+    // summing rows understated every C2S transaction figure in the Reporting
+    // Center — a retailer-day with 12 transactions counted as 1.
+    prisma.c2sRecord.aggregate({
+      where: { date: window },
+      _sum: { amount: true, transactionCount: true },
+    }),
   ]);
 
   return {
     standardGa,
-    // Everything that is not standard GA in the window: swaps plus any row
-    // whose product code we do not recognise. Shown separately, never folded in.
-    simSwap: allGa - standardGa,
+    simSwap,
+    unknownGa: Math.max(0, allGa - standardGa - simSwap),
     c2cAmount: Number(c2c._sum.amount ?? 0),
     c2sAmount: Number(c2s._sum.amount ?? 0),
-    c2sTransactions: c2s._count._all,
+    c2sTransactions: Number(c2s._sum.transactionCount ?? 0),
   };
 }
 
@@ -202,18 +216,32 @@ function monthStartOf(d: Date) {
 export type RetailerReportRow = RetailerOpportunity & { bpName: string };
 
 export async function retailerReport(range: ReportRange): Promise<RetailerReportRow[]> {
+  const { start, endExclusive } = rangeBounds(range);
   const [rows, assignments] = await Promise.all([
     // retailerOpportunities is month-anchored with an optional range overlay;
     // the range's own start month is the correct anchor for the SSO/LSO
     // per-calendar-month rules.
     retailerOpportunities(range.from.slice(0, 7), undefined, range.from, range.to),
+    // Assignments that were in force during the REPORT PERIOD, not whichever
+    // one happens to be active today. A retailer moved from BP A to BP B last
+    // week was previously reported under B for every historical date — which
+    // is exactly backwards for a Reporting Center whose whole job is history.
     prisma.bpAssignment.findMany({
-      where: { active: true },
-      select: { retailerId: true, employee: { select: { name: true } } },
+      where: overlapsRange(start, endExclusive),
+      orderBy: { startDate: "desc" },
+      select: { retailerId: true, startDate: true, endDate: true, employee: { select: { name: true } } },
     }),
   ]);
-  const bpByRetailer = new Map(assignments.map((a) => [a.retailerId, a.employee.name]));
-  return rows.map((r) => ({ ...r, bpName: bpByRetailer.get(r.id) ?? "—" }));
+  // Newest-first above, so the first assignment seen for a retailer is the one
+  // that covers the latest part of the period; a retailer with two in the same
+  // range is reported under the later BP and the earlier one is named too.
+  const bpByRetailer = new Map<string, string[]>();
+  for (const a of assignments) {
+    const list = bpByRetailer.get(a.retailerId) ?? [];
+    if (!list.includes(a.employee.name)) list.push(a.employee.name);
+    bpByRetailer.set(a.retailerId, list);
+  }
+  return rows.map((r) => ({ ...r, bpName: bpByRetailer.get(r.id)?.join(" → ") ?? "—" }));
 }
 
 /* ------------------------------------------------------------------ *
@@ -244,7 +272,7 @@ export async function rsoActivation(range: ReportRange): Promise<ActivationRow[]
       orderBy: { name: "asc" },
     }),
     prisma.gaActivation.groupBy({
-      by: ["retailerId"],
+      by: ["retailerId", "activationDate"],
       where: withStandardGa({ activationDate: { gte: start, lt: endExclusive } }),
       _count: { _all: true },
     }),
@@ -273,18 +301,23 @@ export async function rsoActivation(range: ReportRange): Promise<ActivationRow[]
 export async function bpActivation(range: ReportRange): Promise<ActivationRow[]> {
   const { start, endExclusive } = rangeBounds(range);
   const [assignments, gaGroups, monthlyTargets] = await Promise.all([
+    // Same rule as retailerReport: the assignments effective during the report
+    // period. `active: true` reported yesterday's activations against today's
+    // BP and omitted a BP whose assignment had since ended.
     prisma.bpAssignment.findMany({
-      where: { active: true },
+      where: overlapsRange(start, endExclusive),
       select: {
         id: true,
         retailerId: true,
         gaTarget: true,
+        startDate: true,
+        endDate: true,
         retailer: { select: { retailerCode: true, retailerName: true } },
         employee: { select: { name: true } },
       },
     }),
     prisma.gaActivation.groupBy({
-      by: ["retailerId"],
+      by: ["retailerId", "activationDate"],
       where: withStandardGa({ activationDate: { gte: start, lt: endExclusive } }),
       _count: { _all: true },
     }),
@@ -295,19 +328,25 @@ export async function bpActivation(range: ReportRange): Promise<ActivationRow[]>
     }),
   ]);
 
-  const gaByRetailer = new Map(gaGroups.map((g) => [g.retailerId, g._count._all]));
   const monthlyByAssignment = new Map<string, number>();
   for (const t of monthlyTargets) {
     monthlyByAssignment.set(t.assignmentId, (monthlyByAssignment.get(t.assignmentId) ?? 0) + t.gaTarget);
   }
 
+  // Each activation counts for the assignment that was in force on its own
+  // date. Summing per retailer would double-count a retailer that changed BP
+  // inside the period, and would credit the wrong BP for the earlier days.
   return assignments
     .map((a) => ({
       id: a.id,
       name: a.retailer.retailerName || a.retailer.retailerCode,
       code: a.retailer.retailerCode,
       sub: a.employee.name,
-      activation: gaByRetailer.get(a.retailerId) ?? 0,
+      activation: gaGroups.reduce(
+        (n, g) =>
+          g.retailerId === a.retailerId && coversDate(a, g.activationDate, start, endExclusive) ? n + g._count._all : n,
+        0,
+      ),
       target: monthlyByAssignment.get(a.id) ?? a.gaTarget,
     }))
     .sort((x, y) => x.name.localeCompare(y.name));

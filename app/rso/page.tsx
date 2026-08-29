@@ -19,9 +19,11 @@ import { employeePerformance } from "../../lib/performance";
 import { prisma } from "../../lib/prisma";
 import { latestDailySnapshot } from "../../lib/intelligence";
 import { dhakaMonth } from "../../lib/business-time";
+import { pacing } from "../../lib/pacing";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
 import {
   Card,
+  ComparisonCard,
   EmptyState,
   KpiCard,
   PageHeader,
@@ -32,10 +34,12 @@ import {
   SummaryStrip,
 } from "../components/Kit";
 import { Icon } from "../components/icons";
+import { performanceComparison } from "../../lib/comparison-data";
+import type { ComparisonKind } from "../../lib/comparison";
 
 export const dynamic = "force-dynamic";
 
-export default async function RSO() {
+export default async function RSO({ searchParams }: { searchParams: Promise<{ compare?: string }> }) {
   const u = await requirePagePermission(["RSO"], "dashboard");
   if (!u.employeeId)
     return (
@@ -61,6 +65,19 @@ export default async function RSO() {
   const r = perf[0];
   if (!r) return null;
 
+  // "day" unless asked otherwise. An unknown value falls back rather than
+  // throwing, because this arrives from the URL.
+  const sp = await searchParams;
+  const compareKind: ComparisonKind = sp.compare === "week" || sp.compare === "month" ? sp.compare : "day";
+  const comparison = await performanceComparison(compareKind, [u.employeeId]);
+
+  // The clock is read ONCE here, on the server, and the same instant is used
+  // for every card — otherwise five cards could straddle a Dhaka midnight and
+  // disagree about how many days are left.
+  const now = new Date();
+  const paceFor = (target: number, achieved: number) => pacing(target, achieved, monthKey, now);
+  const pace = paceFor(r.gaTarget, r.gaAchieved);
+
   // Same rules as the worklists, so the counts on this page and the counts on
   // /rso/sso and /rso/lso can never disagree.
   const sellers = retailers.filter((x) => x.simSeller);
@@ -81,24 +98,66 @@ export default async function RSO() {
         ]}
       />
 
-      <SectionHead title="Target vs Achievement" sub="Your monthly targets at a glance." />
-      <div className="kit-kpi-grid" style={{ marginBottom: "1.25rem" }}>
-        <KpiCard label="GA" achieved={r.gaAchieved} target={r.gaTarget} />
-        <KpiCard label="SSO" achieved={r.ssoAchieved} target={r.ssoTarget} />
-        <KpiCard label="LSO" achieved={r.lsoAchieved} target={r.lsoTarget} />
-        <KpiCard label="C2C" achieved={r.c2cAchieved} target={r.c2cTarget} unit="৳" />
-        <KpiCard label="Recharge" achieved={r.totalRechargeAchieved} target={r.totalRechargeTarget} unit="৳" />
+      <SectionHead
+        title="Target vs Achievement"
+        sub={
+          pace.window.phase === "current"
+            ? `${pace.window.daysRemaining} day${pace.window.daysRemaining === 1 ? "" : "s"} left this month. Projections are estimates from your current rate, not promises.`
+            : "Your monthly targets at a glance."
+        }
+      />
+      <div className="kit-kpi-grid kit-mb-20">
+        <KpiCard label="GA" achieved={r.gaAchieved} target={r.gaTarget} pace={paceFor(r.gaTarget, r.gaAchieved)} />
+        <KpiCard label="SSO" achieved={r.ssoAchieved} target={r.ssoTarget} pace={paceFor(r.ssoTarget, r.ssoAchieved)} />
+        <KpiCard label="LSO" achieved={r.lsoAchieved} target={r.lsoTarget} pace={paceFor(r.lsoTarget, r.lsoAchieved)} />
+        <KpiCard
+          label="C2C"
+          achieved={r.c2cAchieved}
+          target={r.c2cTarget}
+          unit="৳"
+          pace={paceFor(r.c2cTarget, r.c2cAchieved)}
+        />
+        <KpiCard
+          label="Recharge"
+          achieved={r.totalRechargeAchieved}
+          target={r.totalRechargeTarget}
+          unit="৳"
+          pace={paceFor(r.totalRechargeTarget, r.totalRechargeAchieved)}
+        />
+      </div>
+
+      <SectionHead
+        title="Compared with the previous period"
+        sub="Each figure names the two dates it was measured between, because the feeds do not always arrive together."
+        link={
+          <span className="kit-period-switch">
+            {(["day", "week", "month"] as const).map((k) => (
+              <Link
+                key={k}
+                href={`/rso?compare=${k}`}
+                className={`kit-btn size-sm ${k === compareKind ? "is-primary" : "is-ghost"}`}
+              >
+                {k === "day" ? "Day" : k === "week" ? "Week" : "Month"}
+              </Link>
+            ))}
+          </span>
+        }
+      />
+      <div className="kit-card-grid kit-mb-20">
+        {comparison.metrics.map((m) => (
+          <ComparisonCard key={m.metric} item={m} />
+        ))}
       </div>
 
       <SectionHead title="Quick status" sub="Tap a count to open the work behind it." />
-      <div className="kit-status-tiles" style={{ marginBottom: "1.25rem" }}>
+      <div className="kit-status-tiles kit-mb-20">
         <StatusTile href={`/rso/sso?month=${monthKey}&status=pending`} count={ssoPending} label="SSO Pending" />
         <StatusTile href={`/rso/lso?month=${monthKey}&status=pending`} count={lsoPending} label="LSO Pending" />
         <StatusTile href="/rso/bp" count={bp ? 1 : 0} label="My BP" tone={bp ? "teal" : "rose"} />
       </div>
 
       <SectionHead title="Team snapshot" />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         <div className="kit-pill-grid">
           <StatPill value={r.retailerCount} label="Retailers" />
           <StatPill value={sellers.length} label="SIM Sellers" />

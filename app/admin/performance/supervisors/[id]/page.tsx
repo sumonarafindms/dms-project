@@ -4,12 +4,21 @@ import { employeePerformance, pct } from "../../../../../lib/performance";
 import { normalizeMonth } from "../../../../../lib/drilldown";
 import { monthBounds } from "../../../../../lib/month";
 import { parseYmd, monthStartsInRange } from "../../../../../lib/date-range";
-import { withStandardGa } from "../../../../../lib/business-rules";
+import { assignmentWindow, standardGaByAssignment } from "../../../../../lib/bp-activations";
 import { notFound } from "next/navigation";
+import { EntityGrid } from "../../../../components/EntityGrid";
 import Link from "next/link";
 import { Card, EmptyState, KpiCard, PageHeader, Row, SectionHead, SummaryStrip } from "../../../../components/Kit";
 import { Icon } from "../../../../components/icons";
-import { FilterForm } from "../../../../components/DrillUI";
+import { pacingForView } from "../../../../../lib/pacing";
+
+// A plain description, not comparators: functions cannot cross the
+// Server-to-Client boundary.
+const SORT_FIELDS = [
+  { key: "recharge", label: "Recharge %" },
+  { key: "ga", label: "GA %" },
+  { key: "retailers", label: "Retailers", bothWays: false },
+];
 
 export default async function Page({
   params,
@@ -41,43 +50,38 @@ export default async function Page({
       monthlyTargets: true,
     },
   });
-  const bpStats = await Promise.all(
-    bps.map(async (b) => {
-      const es = b.startDate > rs ? b.startDate : rs,
-        ae = b.endDate ? new Date(b.endDate.getTime() + 86400000) : re,
-        ee = ae < re ? ae : re;
-      const targetMap = new Map(b.monthlyTargets.map((x) => [x.month.toISOString().slice(0, 7), x.gaTarget]));
-      const target =
-        es < ee
-          ? monthStartsInRange(es, ee).reduce(
-              (n, m) => n + (targetMap.get(m.toISOString().slice(0, 7)) ?? b.gaTarget),
-              0,
-            )
-          : 0;
-      const achieved =
-        es < ee
-          ? await prisma.gaActivation.count({
-              where: withStandardGa({ retailerId: b.retailerId, activationDate: { gte: es, lt: ee } }),
-            })
-          : 0;
-      return { ...b, target, achieved };
-    }),
-  );
+  // One grouped query for the whole team's BPs, not one count each: a
+  // supervisor with 40 BP assignments was issuing 41 database round trips to
+  // render this page.
+  const gaByAssignment = await standardGaByAssignment(bps, rs, re);
+  const bpStats = bps.map((b) => {
+    const { effectiveStart: es, effectiveEnd: ee } = assignmentWindow(b, rs, re);
+    const targetMap = new Map(b.monthlyTargets.map((x) => [x.month.toISOString().slice(0, 7), x.gaTarget]));
+    const target =
+      es < ee
+        ? monthStartsInRange(es, ee).reduce((n, m) => n + (targetMap.get(m.toISOString().slice(0, 7)) ?? b.gaTarget), 0)
+        : 0;
+    return { ...b, target, achieved: gaByAssignment.get(b.id) ?? 0 };
+  });
+  const range = `month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`;
   const rechargeTarget = rows.reduce((a, x) => a + x.totalRechargeTarget, 0),
     rechargeAchieved = rows.reduce((a, x) => a + x.totalRechargeAchieved, 0),
     rsoGaT = rows.reduce((a, x) => a + x.gaTarget, 0),
     rsoGaA = rows.reduce((a, x) => a + x.gaAchieved, 0),
     bpGaT = bpStats.reduce((a, x) => a + x.target, 0),
     bpGaA = bpStats.reduce((a, x) => a + x.achieved, 0);
+  // pacingForView, not pacing: this page accepts from/to, so the figures may
+  // describe a narrowed window rather than the month. It returns null there
+  // and the pacing line is simply not shown.
+  const now = new Date();
+  const paceFor = (target: number, achieved: number) =>
+    pacingForView(target, achieved, month, { from: s.from, to: s.to, now }) ?? undefined;
   return (
     <main className="page">
       <Link href="/admin/performance/supervisors" className="kit-detail-back">
         <Icon name="arrow" /> Supervisor Performance
       </Link>
       <PageHeader title={sup.name} subtitle={`${rows.length} RSOs · ${bpStats.length} BP assignments`} />
-      <div className="no-print" style={{ marginBottom: "1rem" }}>
-        <FilterForm month={month} from={s.from} to={s.to} dateRange showMonth placeholder="" />
-      </div>
       <SummaryStrip
         items={[
           { label: "Recharge", value: `${pct(rechargeAchieved, rechargeTarget)}%`, tone: "teal" },
@@ -88,30 +92,44 @@ export default async function Page({
         ]}
       />
       <SectionHead title="Team execution" sub="Every metric is the sum of this team's RSO targets." />
-      <div className="kit-kpi-grid" style={{ marginBottom: "1.25rem" }}>
-        <KpiCard label="RSO GA" achieved={rsoGaA} target={rsoGaT} />
-        <KpiCard label="BP GA" achieved={bpGaA} target={bpGaT} />
-        <KpiCard label="Recharge" achieved={rechargeAchieved} target={rechargeTarget} unit="৳" />
+      <div className="kit-kpi-grid kit-mb-20">
+        <KpiCard label="RSO GA" achieved={rsoGaA} target={rsoGaT} pace={paceFor(rsoGaT, rsoGaA)} />
+        <KpiCard label="BP GA" achieved={bpGaA} target={bpGaT} pace={paceFor(bpGaT, bpGaA)} />
+        <KpiCard
+          label="Recharge"
+          achieved={rechargeAchieved}
+          target={rechargeTarget}
+          unit="৳"
+          pace={paceFor(rechargeTarget, rechargeAchieved)}
+        />
       </div>
-      <SectionHead title="Assigned RSOs" />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
-        {rows.length ? (
-          <div className="kit-rows">
-            {rows.map((r) => (
-              <Row
-                key={r.employeeId}
-                icon={<Icon name="users" />}
-                title={r.name}
-                sub={`${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount} retailers · GA ${r.gaAchieved}/${r.gaTarget}`}
-                value={`${pct(r.totalRechargeAchieved, r.totalRechargeTarget)}%`}
-                valueSub="recharge"
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="No RSOs in this team" icon={<Icon name="users" />} />
-        )}
-      </Card>
+      <EntityGrid
+        rows={rows.map((r) => ({
+          id: r.employeeId,
+          href: `/admin/rsos/${r.employeeId}?${range}`,
+          eyebrow: "RSO",
+          name: r.name,
+          code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount.toLocaleString()} retailers`,
+          percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
+          metrics: [
+            { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
+            { label: "Recharge", achieved: r.totalRechargeAchieved, target: r.totalRechargeTarget, unit: "৳" },
+          ],
+          search: `${r.name} ${r.employeeCode || ""} ${r.rsoMsisdn}`.toLowerCase(),
+          sortKeys: {
+            recharge: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
+            ga: pct(r.gaAchieved, r.gaTarget),
+            retailers: r.retailerCount,
+          },
+        }))}
+        sortFields={SORT_FIELDS}
+        placeholder="Search this team"
+        noun="RSO"
+        month={month}
+        from={s.from}
+        to={s.to}
+        emptyTitle="No RSOs in this team"
+      />
       <SectionHead title="Assigned BPs" sub="Effective within the selected dates." />
       <Card padded>
         {bpStats.length ? (
@@ -119,6 +137,7 @@ export default async function Page({
             {bpStats.map((b) => (
               <Row
                 key={b.id}
+                href={`/admin/performance/bps/${b.id}?${range}`}
                 icon={<Icon name="sim" />}
                 title={b.retailer.retailerName || b.retailer.retailerCode}
                 sub={`${b.retailer.retailerCode} · RSO ${b.employee.name}`}

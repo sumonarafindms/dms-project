@@ -7,7 +7,7 @@ import { Card, PageHeader, SectionHead, SummaryStrip } from "../../components/Ki
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
 }) {
   const u = await requirePagePermission(["RSO"], "retailers"),
     s = await searchParams,
@@ -28,7 +28,7 @@ export default async function Page({
       />
       <SectionHead title="Search & review" sub="Open any retailer for full sales and activity detail." />
       <Card padded>
-        <RetailerSearchView rows={rows} month={month} q={s.q || ""} from={s.from} to={s.to} base="/rso/retailers" />
+        <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/rso/retailers" />
       </Card>
     </main>
   );

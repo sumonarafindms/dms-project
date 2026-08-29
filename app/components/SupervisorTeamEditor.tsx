@@ -56,7 +56,7 @@ export default function SupervisorTeamEditor({
     <>
       <SectionHead title="Assigned RSOs" sub={`${ids.length} selected of ${employees.length}`} />
       <Card padded="lg">
-        <div className="kit-search" style={{ marginBottom: "0.75rem" }}>
+        <div className="kit-search kit-mb-12">
           <Icon name="search" />
           <input
             className="kit-input"
@@ -73,7 +73,7 @@ export default function SupervisorTeamEditor({
           {!filtered.length && <p className="kit-filter-note">No RSO matches that search.</p>}
         </div>
         {msg && (
-          <div className={ok ? "kit-note is-ok" : "kit-note is-bad"} role="status" style={{ margin: "1rem 0 0" }}>
+          <div className={`${ok ? "kit-note is-ok" : "kit-note is-bad"} is-last`} role="status">
             <Icon name={ok ? "check" : "alert"} />
             <span>{msg}</span>
           </div>

@@ -1,5 +1,34 @@
-import {requireUser} from "../../../../lib/auth";
-import {prisma} from "../../../../lib/prisma";
-import {EmployeeList} from "../../../components/AdminEmployeesUI";
-import {PageHeader} from "../../../components/Kit";
-export default async function Page(){await requireUser(["ADMIN","IT"]);const rows=await prisma.user.findMany({where:{role:"MANAGER"},orderBy:{displayName:"asc"},include:{_count:{select:{managedSupervisors:true}}}});return <main className="page"><PageHeader title="Managers" subtitle="Create Manager accounts and assign the Supervisors they are responsible for."/><EmployeeList title="Managers" addHref="/admin/employees/managers/new" rows={rows.map(x=>({id:x.id,name:x.displayName,mobile:x.mobileNumber||"",role:x.role,active:x.active,meta:`${x._count.managedSupervisors} assigned supervisors`,detail:x.mobileNumber||"No login mobile",editHref:`/admin/employees/managers/${x.id}`}))}/></main>}
+import { requireUser } from "../../../../lib/auth";
+import { prisma } from "../../../../lib/prisma";
+import { EmployeeList } from "../../../components/AdminEmployeesUI";
+import { PageHeader } from "../../../components/Kit";
+export default async function Page() {
+  await requireUser(["ADMIN", "IT"]);
+  const rows = await prisma.user.findMany({
+    where: { role: "MANAGER" },
+    orderBy: { displayName: "asc" },
+    include: { _count: { select: { managedSupervisors: true } } },
+  });
+  return (
+    <main className="page">
+      <PageHeader
+        title="Managers"
+        subtitle="Create Manager accounts and assign the Supervisors they are responsible for."
+      />
+      <EmployeeList
+        title="Managers"
+        addHref="/admin/employees/managers/new"
+        rows={rows.map((x) => ({
+          id: x.id,
+          name: x.displayName,
+          mobile: x.mobileNumber || "",
+          role: x.role,
+          active: x.active,
+          meta: `${x._count.managedSupervisors} assigned supervisors`,
+          detail: x.mobileNumber || "No login mobile",
+          editHref: `/admin/employees/managers/${x.id}`,
+        }))}
+      />
+    </main>
+  );
+}

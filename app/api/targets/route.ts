@@ -1,24 +1,26 @@
-import {apiUser,apiPermission} from "@/lib/auth";
+import { apiUser, apiPermission } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
-import {audit} from "@/lib/audit";
+import { audit } from "@/lib/audit";
 
 function monthFromParam(value: string | null) {
   const fallback = new Date();
-  const text = value && /^\d{4}-\d{2}$/.test(value)
-    ? `${value}-01T00:00:00.000Z`
-    : `${fallback.getUTCFullYear()}-${String(fallback.getUTCMonth() + 1).padStart(2, "0")}-01T00:00:00.000Z`;
+  const text =
+    value && /^\d{4}-\d{2}$/.test(value)
+      ? `${value}-01T00:00:00.000Z`
+      : `${fallback.getUTCFullYear()}-${String(fallback.getUTCMonth() + 1).padStart(2, "0")}-01T00:00:00.000Z`;
   return monthBounds(text).start;
 }
 
 export async function GET(request: NextRequest) {
-  if(!(await apiUser(["ADMIN","IT","ACCOUNTS"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
-  if(!(await apiPermission("targets","view"))) return NextResponse.json({error:"Unauthorized"},{status:403});
+  if (!(await apiUser(["ADMIN", "IT", "ACCOUNTS"])))
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await apiPermission("targets", "view"))) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   const month = monthFromParam(request.nextUrl.searchParams.get("month"));
 
-  const {end}=monthBounds(month.toISOString());
-  const [employees,bpAssignments] = await Promise.all([
+  const { end } = monthBounds(month.toISOString());
+  const [employees, bpAssignments] = await Promise.all([
     prisma.employee.findMany({
       where: { active: true },
       include: {
@@ -30,15 +32,26 @@ export async function GET(request: NextRequest) {
       orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
     }),
     prisma.bpAssignment.findMany({
-      where:{startDate:{lt:end},OR:[{endDate:null},{endDate:{gte:month}}]},
-      include:{retailer:{select:{retailerCode:true,retailerName:true}},employee:{select:{name:true,rsoMsisdn:true}},monthlyTargets:{where:{month},take:1}},
-      orderBy:{createdAt:"asc"},
-    })
+      where: { startDate: { lt: end }, OR: [{ endDate: null }, { endDate: { gte: month } }] },
+      include: {
+        retailer: { select: { retailerCode: true, retailerName: true } },
+        employee: { select: { name: true, rsoMsisdn: true } },
+        monthlyTargets: { where: { month }, take: 1 },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   return NextResponse.json({
     month: month.toISOString().slice(0, 7),
-    bpRows:bpAssignments.map(a=>({assignmentId:a.id,bpCode:a.retailer.retailerCode,bpName:a.retailer.retailerName||"",rsoName:a.employee.name,rsoMsisdn:a.employee.rsoMsisdn,gaTarget:a.monthlyTargets[0]?.gaTarget??a.gaTarget})),
+    bpRows: bpAssignments.map((a) => ({
+      assignmentId: a.id,
+      bpCode: a.retailer.retailerCode,
+      bpName: a.retailer.retailerName || "",
+      rsoName: a.employee.name,
+      rsoMsisdn: a.employee.rsoMsisdn,
+      gaTarget: a.monthlyTargets[0]?.gaTarget ?? a.gaTarget,
+    })),
     rows: employees.map((employee) => {
       const target = employee.targets[0];
       const manual = employee.manualMetrics[0];
@@ -62,8 +75,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const actor=await apiUser(["ADMIN","IT","ACCOUNTS"]);if(!actor)return NextResponse.json({error:"Unauthorized"},{status:401});
-  if(!(await apiPermission("targets","update"))) return NextResponse.json({error:"You do not have permission to update targets."},{status:403});
+  const actor = await apiUser(["ADMIN", "IT", "ACCOUNTS"]);
+  if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await apiPermission("targets", "update")))
+    return NextResponse.json({ error: "You do not have permission to update targets." }, { status: 403 });
   const body = await request.json();
   if (!body?.month || !/^\d{4}-\d{2}$/.test(body.month) || !Array.isArray(body.rows)) {
     return NextResponse.json({ error: "Invalid month or rows" }, { status: 400 });
@@ -101,16 +116,24 @@ export async function POST(request: NextRequest) {
       });
       saved += 1;
     }
-    if(Array.isArray(body.bpRows)){
-      for(const row of body.bpRows){
-        const assignmentId=String(row.assignmentId||"");if(!assignmentId)continue;
-        const exists=await tx.bpAssignment.findUnique({where:{id:assignmentId},select:{id:true}});
-        if(!exists)continue;
-        await tx.bpMonthlyTarget.upsert({where:{assignmentId_month:{assignmentId,month}},update:{gaTarget:Math.max(0,Math.trunc(Number(row.gaTarget)||0))},create:{assignmentId,month,gaTarget:Math.max(0,Math.trunc(Number(row.gaTarget)||0))}});
+    if (Array.isArray(body.bpRows)) {
+      for (const row of body.bpRows) {
+        const assignmentId = String(row.assignmentId || "");
+        if (!assignmentId) continue;
+        const exists = await tx.bpAssignment.findUnique({ where: { id: assignmentId }, select: { id: true } });
+        if (!exists) continue;
+        await tx.bpMonthlyTarget.upsert({
+          where: { assignmentId_month: { assignmentId, month } },
+          update: { gaTarget: Math.max(0, Math.trunc(Number(row.gaTarget) || 0)) },
+          create: { assignmentId, month, gaTarget: Math.max(0, Math.trunc(Number(row.gaTarget) || 0)) },
+        });
       }
     }
   });
 
-  await audit(actor,"UPDATE_TARGETS","targets",{detail:`Updated ${saved} RSO target row(s) for ${body.month}`,metadata:{month:body.month,saved}});
+  await audit(actor, "UPDATE_TARGETS", "targets", {
+    detail: `Updated ${saved} RSO target row(s) for ${body.month}`,
+    metadata: { month: body.month, saved },
+  });
   return NextResponse.json({ saved, month: body.month });
 }

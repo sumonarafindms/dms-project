@@ -16,7 +16,7 @@ import { Icon } from "../../components/icons";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
 }) {
   await requirePagePermission(["ACCOUNTS"], "attention");
   const s = await searchParams,
@@ -54,15 +54,7 @@ export default async function Page({
 
       <AttentionSummary rows={all} />
 
-      <RetailerSearchView
-        rows={rows}
-        month={month}
-        q={s.q || ""}
-        from={s.from}
-        to={s.to}
-        base="/accounts/retailers"
-        attentionOnly
-      />
+      <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/accounts/retailers" attentionOnly />
     </main>
   );
 }

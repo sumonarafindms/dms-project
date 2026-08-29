@@ -84,7 +84,8 @@ export default function AdminEmployeeForm({
     } else router.refresh();
   }
 
-  const title = role === "managers" ? "Manager" : role === "supervisors" ? "Supervisor" : role === "rsos" ? "RSO" : "BP";
+  const title =
+    role === "managers" ? "Manager" : role === "supervisors" ? "Supervisor" : role === "rsos" ? "RSO" : "BP";
 
   return (
     <main className="page">
@@ -101,7 +102,7 @@ export default function AdminEmployeeForm({
       />
 
       <form onSubmit={submit}>
-        <Card padded="lg" style={{ marginBottom: "1.25rem" }}>
+        <Card className="kit-mb-20" padded="lg">
           <div className="kit-form-grid">
             {role !== "bps" && (
               <Field label={`${title} Name`}>
@@ -185,7 +186,13 @@ export default function AdminEmployeeForm({
                   </Field>
                 )}
                 <Field label="BP GA Target">
-                  <input className="kit-input" type="number" min="0" name="gaTarget" defaultValue={initial.gaTarget || 0} />
+                  <input
+                    className="kit-input"
+                    type="number"
+                    min="0"
+                    name="gaTarget"
+                    defaultValue={initial.gaTarget || 0}
+                  />
                 </Field>
                 <Field label="BP Display Name">
                   <input className="kit-input" name="name" defaultValue={initial.name || ""} />
@@ -196,7 +203,7 @@ export default function AdminEmployeeForm({
         </Card>
 
         <Card padded="lg">
-          <h2 className="kit-label" style={{ marginBottom: "0.75rem" }}>
+          <h2 className="kit-label kit-mb-12">
             Login &amp; Access
           </h2>
           <div className="kit-form-grid">
@@ -221,7 +228,7 @@ export default function AdminEmployeeForm({
               />
             </Field>
           </div>
-          <div style={{ marginTop: "0.875rem" }}>
+          <div className="kit-mt-14">
             <Check
               checked={active}
               onChange={setActive}

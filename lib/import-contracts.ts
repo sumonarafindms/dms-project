@@ -15,7 +15,7 @@ export type NormalizedMoneyRow = {
   amount: number;
 };
 
-import {LSO_MIN_MONTHLY_AMOUNT,LSO_MIN_MONTHLY_TRANSACTIONS} from "./business-rules";
+import { LSO_MIN_MONTHLY_AMOUNT, LSO_MIN_MONTHLY_TRANSACTIONS } from "./business-rules";
 
 export const IMPORT_RULES = {
   GA: "Retailer-level GA is imported. Employee achievement is the monthly sum of standard GA (MMSTC + MMST/MMSTS) across all linked retailers. SIMWAP and EV-SWAP are replacements and are excluded.",

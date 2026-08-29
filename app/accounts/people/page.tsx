@@ -56,7 +56,7 @@ export default async function Page() {
       />
 
       <SectionHead title="Active BP assignments" sub="Retailer code, RSO ownership and current GA target." />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         {bps.length ? (
           <div className="kit-rows">
             {bps.map((x) => (

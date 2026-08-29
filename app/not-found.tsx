@@ -12,7 +12,7 @@ export default function NotFound() {
           hint="The link may be outdated, or your role may use a different workspace."
           icon={<Icon name="search" />}
         />
-        <div className="kit-form-actions" style={{ justifyContent: "center" }}>
+        <div className="kit-form-actions is-center">
           <Link className="kit-btn is-primary size-md" href="/">
             Go to home
           </Link>

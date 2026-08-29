@@ -29,8 +29,8 @@ export default async function Page({
         title={a.retailer.retailerName || a.retailer.retailerCode}
         subtitle={`${a.retailer.retailerCode} · RSO ${a.employee.name} · ${a.employee.supervisor?.name || "No supervisor"}`}
       />
-      <div className="no-print" style={{ marginBottom: "1rem" }}>
-        <FilterForm month={month} from={s.from} to={s.to} dateRange showMonth placeholder="" />
+      <div className="no-print kit-mb-16">
+        <FilterForm month={month} from={s.from} to={s.to} dateRange showMonth />
       </div>
       <SummaryStrip
         items={[
@@ -41,9 +41,9 @@ export default async function Page({
           { label: "SIM Swap", value: d.simSwap.toLocaleString() },
         ]}
       />
-      <Card padded style={{ marginBottom: "1.25rem" }}>
+      <Card className="kit-mb-20" padded>
         <MetricBar label="Selected-range GA progress" achieved={d.total} target={a.gaTarget} />
-        <p style={{ fontSize: "0.75rem", color: "var(--color-slate-400)", marginTop: "0.5rem" }}>
+        <p className="kit-hint kit-mt-8">
           170 GA {d.total150} · 300 GA {d.total300} · SIM swap {d.simSwap} (excluded from achievement)
         </p>
       </Card>

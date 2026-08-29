@@ -1,27 +1,82 @@
+"use client";
+
 /**
- * Shared retailer search and attention views — migrated to the role-UI kit.
+ * Shared retailer search and attention views.
  *
- * One component behind twelve pages: the retailer list and the attention
+ * One component behind nine pages: the retailer list and the attention
  * worklist for admin, RSO, supervisor, manager and accounts. `attentionOnly`
  * is the only difference between the two — it drops retailers with no open
  * reason and shows the priority.
  *
  * Scope is decided by the caller (which employeeIds it passed to
- * retailerOpportunities), never here.
+ * retailerOpportunities), never here. This component only ever sees rows the
+ * server already decided the signed-in user may see, so filtering them in the
+ * browser cannot widen anyone's access.
+ *
+ * A client component on purpose: search and sort are filtering over rows that
+ * are already here, so they run locally and instantly. Only the date range
+ * navigates, because only the date range changes which rows exist.
  */
 
+import { useMemo } from "react";
 import Link from "next/link";
-import { FilterForm } from "./DrillUI";
+import { ListControls, useListControls } from "./ListControls";
 import { Icon } from "./icons";
 import { Badge, Card, EmptyState, Row, SectionHead } from "./Kit";
 import type { RetailerOpportunity } from "../../lib/retailer-opportunities";
+import { matchesRetailerQuery } from "../../lib/retailer-search";
+import { activeSort, applySort, byNumberAsc, byNumberDesc, byText, sortOptions, type SortSpec } from "../../lib/sort";
 
 const fmt = (n: number) => new Intl.NumberFormat("en-BD", { maximumFractionDigits: 0 }).format(n);
+
+const name = (r: RetailerOpportunity) => r.retailerName || r.retailerCode;
+
+/**
+ * Cards rendered at once. The retailer base runs to a few thousand rows, and
+ * every card carries a ring, four figures and up to two reason chips — past
+ * this many the browser spends longer laying the page out than the server does
+ * producing it. The count above the list always reports the true total, and
+ * the search narrows the set rather than paging through it.
+ */
+const MAX_CARDS = 300;
+
+/**
+ * Orders for a retailer list. The attention view leads with priority; the
+ * plain directory leads with the highest sellers, which is what the first
+ * entry of each list below encodes.
+ */
+const COMMON: SortSpec<RetailerOpportunity>[] = [
+  { value: "ga-desc", label: "GA — high to low", compare: byNumberDesc((r) => r.ga, name) },
+  { value: "ga-asc", label: "GA — low to high", compare: byNumberAsc((r) => r.ga, name) },
+  { value: "c2s-desc", label: "C2S sales — high to low", compare: byNumberDesc((r) => r.c2s, name) },
+  { value: "c2s-asc", label: "C2S sales — low to high", compare: byNumberAsc((r) => r.c2s, name) },
+  { value: "trx-desc", label: "C2S transactions — most first", compare: byNumberDesc((r) => r.c2sTransactions, name) },
+  { value: "name-asc", label: "Retailer name — A to Z", compare: (a, b) => byText(name(a), name(b)) },
+  { value: "code-asc", label: "Retailer code — A to Z", compare: (a, b) => byText(a.retailerCode, b.retailerCode) },
+  {
+    value: "rso-asc",
+    label: "RSO — A to Z",
+    compare: (a, b) => byText(a.employeeName, b.employeeName) || byText(name(a), name(b)),
+  },
+  {
+    value: "route-asc",
+    label: "Route — A to Z",
+    compare: (a, b) => byText(a.route || "", b.route || "") || byText(name(a), name(b)),
+  },
+];
+
+const PRIORITY: SortSpec<RetailerOpportunity> = {
+  value: "priority-desc",
+  label: "Priority — highest first",
+  compare: byNumberDesc((r) => r.priority, name),
+};
+
+const DIRECTORY_SORTS = COMMON;
+const ATTENTION_SORTS: SortSpec<RetailerOpportunity>[] = [PRIORITY, ...COMMON];
 
 export function RetailerSearchView({
   rows,
   month,
-  q,
   base,
   from,
   to,
@@ -29,39 +84,49 @@ export function RetailerSearchView({
 }: {
   rows: RetailerOpportunity[];
   month: string;
-  q: string;
   base: string;
   from?: string;
   to?: string;
   attentionOnly?: boolean;
 }) {
-  const needle = q.toLowerCase();
-  const filtered = rows.filter((r) => {
-    if (attentionOnly && !r.reasons.length) return false;
-    if (!q) return true;
-    return `${r.retailerCode} ${r.retailerName} ${r.employeeName} ${r.supervisor} ${r.route} ${r.category}`
-      .toLowerCase()
-      .includes(needle);
-  });
+  const SORTS = attentionOnly ? ATTENTION_SORTS : DIRECTORY_SORTS;
+  const { query, setQuery, deferredQuery, sort, setSort } = useListControls(SORTS[0].value);
+
+  const ordered = useMemo(() => {
+    const filtered = rows.filter((r) => {
+      if (attentionOnly && !r.reasons.length) return false;
+      return matchesRetailerQuery(r, deferredQuery);
+    });
+    return applySort(filtered, SORTS, sort);
+  }, [rows, attentionOnly, deferredQuery, sort, SORTS]);
+
+  const shown = ordered.slice(0, MAX_CARDS);
   const range = `month=${month}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`;
 
   return (
     <>
-      <FilterForm
-        q={q}
+      <ListControls
+        query={query}
+        onQuery={setQuery}
+        placeholder="Retailer code, name, RSO, supervisor or route"
+        sort={sortOptions(SORTS)}
+        sortValue={sort}
+        onSort={setSort}
         month={month}
         from={from}
         to={to}
-        dateRange
-        placeholder="Retailer code, name, RSO, supervisor or route"
+        resultCount={ordered.length}
+        resultNoun="retailer"
       />
       <SectionHead
         title={attentionOnly ? "Needs attention" : "Retailers"}
-        sub={`${filtered.length} ${filtered.length === 1 ? "result" : "results"}`}
+        sub={`${ordered.length} ${ordered.length === 1 ? "result" : "results"}${
+          ordered.length > shown.length ? ` · showing the first ${shown.length}` : ""
+        } · sorted by ${activeSort(SORTS, sort).label}`}
       />
-      {filtered.length ? (
+      {shown.length ? (
         <div className="kit-card-grid">
-          {filtered.map((r) => (
+          {shown.map((r) => (
             <Link key={r.id} href={`${base}/${r.id}?${range}`} className="kit-card kit-card-p is-clickable kit-outlet">
               <div className="kit-entity-top">
                 <span className="kit-avatar" aria-hidden="true">
@@ -118,14 +183,22 @@ export function RetailerSearchView({
       ) : (
         <Card>
           <EmptyState
-            positive={attentionOnly}
-            title={attentionOnly ? "Nothing needs attention" : "No retailers match these filters"}
-            hint={
-              attentionOnly
-                ? "Every retailer in scope has completed SSO and LSO for this period."
-                : "Try another search term or date range."
+            positive={attentionOnly && !deferredQuery}
+            title={
+              attentionOnly && !deferredQuery
+                ? "Nothing needs attention"
+                : deferredQuery
+                  ? `No retailer matches “${query.trim()}”`
+                  : "No retailers in this period"
             }
-            icon={<Icon name={attentionOnly ? "check" : "search"} />}
+            hint={
+              deferredQuery
+                ? "Clear the search to see the whole list again."
+                : attentionOnly
+                  ? "Every retailer in scope has completed SSO and LSO for this period."
+                  : "Try another date range."
+            }
+            icon={<Icon name={attentionOnly && !deferredQuery ? "check" : "search"} />}
           />
         </Card>
       )}
@@ -149,7 +222,7 @@ export function AttentionSummary({ rows }: { rows: RetailerOpportunity[] }) {
     { label: "Unassigned", value: unassigned, sub: "Ownership missing", icon: "users" },
   ];
   return (
-    <div className="kit-card-grid is-quad" style={{ marginBottom: "1.25rem" }}>
+    <div className="kit-card-grid is-quad kit-mb-20">
       {items.map((x) => (
         <Card padded key={x.label}>
           <Row icon={<Icon name={x.icon} />} title={x.label} sub={x.sub} value={x.value.toLocaleString()} />

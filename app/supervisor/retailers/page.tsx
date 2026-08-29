@@ -8,7 +8,7 @@ import { Card, PageHeader, SectionHead, SummaryStrip } from "../../components/Ki
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
 }) {
   const u = await requirePagePermission(["SUPERVISOR"], "retailers"),
     s = await searchParams,
@@ -34,14 +34,7 @@ export default async function Page({
       />
       <SectionHead title="Search & review" sub="GA, C2S, SSO and LSO status for the selected dates." />
       <Card padded>
-        <RetailerSearchView
-          rows={rows}
-          month={month}
-          q={s.q || ""}
-          from={s.from}
-          to={s.to}
-          base="/supervisor/retailers"
-        />
+        <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/supervisor/retailers" />
       </Card>
     </main>
   );

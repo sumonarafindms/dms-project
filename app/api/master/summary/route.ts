@@ -1,17 +1,17 @@
-import {apiUser} from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-function pagination(req:Request){
-  const url=new URL(req.url);
-  const page=Math.max(1,Number.parseInt(url.searchParams.get("page")||"1",10)||1);
-  const pageSize=Math.min(100,Math.max(1,Number.parseInt(url.searchParams.get("pageSize")||"50",10)||50));
-  return {page,pageSize,skip:(page-1)*pageSize};
+function pagination(req: Request) {
+  const url = new URL(req.url);
+  const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(url.searchParams.get("pageSize") || "50", 10) || 50));
+  return { page, pageSize, skip: (page - 1) * pageSize };
 }
 
-export async function GET(req:Request) {
-  if(!(await apiUser(["ADMIN","IT"]))) return NextResponse.json({error:"Unauthorized"},{status:401});
-  const {page,pageSize,skip}=pagination(req);
+export async function GET(req: Request) {
+  if (!(await apiUser(["ADMIN", "IT"]))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { page, pageSize, skip } = pagination(req);
   const [supervisors, employees, retailers, mappedRetailers, unassignedRetailers, employeeRows] = await Promise.all([
     prisma.supervisor.count({ where: { active: true } }),
     prisma.employee.count({ where: { active: true } }),
@@ -29,10 +29,11 @@ export async function GET(req:Request) {
         _count: { select: { retailers: { where: { active: true } } } },
       },
       orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
-      skip,take:pageSize,
+      skip,
+      take: pageSize,
     }),
   ]);
-  const totalPages=Math.max(1,Math.ceil(employees/pageSize));
+  const totalPages = Math.max(1, Math.ceil(employees / pageSize));
 
   return NextResponse.json({
     supervisors,
@@ -48,6 +49,6 @@ export async function GET(req:Request) {
       supervisor: row.supervisor?.name ?? "Unassigned",
       retailerCount: row._count.retailers,
     })),
-    pagination:{page,pageSize,total:employees,totalPages,hasNext:page<totalPages,hasPrevious:page>1},
+    pagination: { page, pageSize, total: employees, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
   });
 }

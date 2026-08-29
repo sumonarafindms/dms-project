@@ -7,10 +7,11 @@
  */
 
 import Link from "next/link";
-import { LiveFilterForm } from "../../components/LiveFilterForm";
+import { ServerSearchBar, ServerSelect } from "../../components/ServerSearchBar";
 import { Icon } from "../../components/icons";
 import { requireUser } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
+import { ASSIGNMENT_MODULE } from "../../../lib/assignment-history";
 import { Card, EmptyState, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
 import type { Prisma } from "@prisma/client";
 
@@ -45,7 +46,14 @@ export default async function Page({
     actionFilter = (sp.action || "").trim();
 
   const where: Prisma.AuditLogWhereInput = {};
+  // Assignment history is excluded from the default view on purpose. One
+  // retailer master upload can move thousands of retailers, and each move is
+  // its own row — left in, a single upload would fill all 250 shown rows and
+  // bury the login, permission and account events this page exists for. It is
+  // one click away in the Module filter, and the count is shown below so it is
+  // never hidden, only separated.
   if (moduleFilter) where.module = moduleFilter;
+  else where.module = { not: ASSIGNMENT_MODULE };
   if (actionFilter) where.action = actionFilter;
   if (q)
     where.OR = [
@@ -55,11 +63,12 @@ export default async function Page({
       { action: { contains: q, mode: "insensitive" } },
     ];
 
-  const [rows, total, today, logins] = await Promise.all([
+  const [rows, total, today, logins, assignmentEvents] = await Promise.all([
     prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: SHOWN_LIMIT }),
     prisma.auditLog.count(),
     prisma.auditLog.count({ where: { createdAt: { gte: dhakaDayStartUtc() } } }),
     prisma.auditLog.count({ where: { action: "LOGIN", createdAt: { gte: dhakaDayStartUtc() } } }),
+    prisma.auditLog.count({ where: { module: ASSIGNMENT_MODULE } }),
   ]);
   const modules = await prisma.auditLog.findMany({
     distinct: ["module"],
@@ -90,45 +99,31 @@ export default async function Page({
         ]}
       />
 
-      <LiveFilterForm className="kit-filter-bar no-print">
-        <div className="kit-search">
-          <Icon name="search" />
-          <input
-            className="kit-input"
-            name="q"
-            defaultValue={q}
-            placeholder="Search user, target or activity"
-            autoComplete="off"
-            aria-label="Search activity"
-          />
+      {assignmentEvents > 0 && moduleFilter !== ASSIGNMENT_MODULE && (
+        <div className="kit-note is-info kit-mb-20" role="note">
+          <Icon name="info" />
+          <span>
+            {assignmentEvents.toLocaleString()} assignment change
+            {assignmentEvents === 1 ? "" : "s"} recorded (retailer &rarr; RSO, RSO &rarr; supervisor, supervisor &rarr;
+            manager). Kept out of this list so one master upload cannot bury everything else.{" "}
+            <Link href={`/admin/audit?module=${ASSIGNMENT_MODULE}`}>View assignment history</Link>
+          </span>
         </div>
-        <label className="kit-field">
-          <span>Module</span>
-          <select className="kit-select" name="module" defaultValue={moduleFilter}>
-            <option value="">All modules</option>
-            {modules.map((x) => (
-              <option key={x.module}>{x.module}</option>
-            ))}
-          </select>
-        </label>
-        <label className="kit-field">
-          <span>Action</span>
-          <select className="kit-select" name="action" defaultValue={actionFilter}>
-            <option value="">All actions</option>
-            {actions.map((x) => (
-              <option key={x.action}>{x.action}</option>
-            ))}
-          </select>
-        </label>
-        <span className="kit-filter-note">
-          <Icon name="filter" /> Live filter
-        </span>
+      )}
+
+      {/* Server-side search, because the Activity Log can hold years of rows
+          and filtering only the 250 on screen would quietly miss the entry
+          someone came here to find. The navigation is soft, so the input keeps
+          focus and the page does not reload — see ServerSearchBar. */}
+      <ServerSearchBar placeholder="Search user, target or activity" resultCount={rows.length} resultNoun="event">
+        <ServerSelect paramName="module" label="Module" allLabel="All modules" options={modules.map((x) => x.module)} />
+        <ServerSelect paramName="action" label="Action" allLabel="All actions" options={actions.map((x) => x.action)} />
         {filtered && (
           <Link className="kit-btn is-ghost size-sm" href="/admin/audit">
             Clear
           </Link>
         )}
-      </LiveFilterForm>
+      </ServerSearchBar>
 
       <SectionHead
         title={filtered ? `${rows.length} matching events` : "Recent activity"}

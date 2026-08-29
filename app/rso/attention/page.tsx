@@ -39,7 +39,7 @@ export default async function Page({
             <span>To</span>
             <input className="kit-input" type="date" name="to" defaultValue={end} />
           </label>
-          <button className="kit-btn is-primary" style={{ alignSelf: "flex-end" }}>
+          <button className="kit-btn is-primary is-end">
             Apply
           </button>
         </div>

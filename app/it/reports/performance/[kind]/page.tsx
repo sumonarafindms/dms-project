@@ -76,7 +76,7 @@ export default async function Performance({
       c2c: r.c2c,
       c2s: r.c2s,
       extra: (
-        <span style={{ display: "inline-flex", gap: "0.25rem" }}>
+        <span className="kit-inline-group">
           <Badge tone={r.ssoComplete ? "complete" : "pending"}>SSO</Badge>
           <Badge tone={r.lsoComplete ? "complete" : "pending"}>LSO</Badge>
         </span>

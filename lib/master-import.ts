@@ -1,4 +1,8 @@
-import {phoneKey} from "./phone";
+import { phoneKey } from "./phone";
+import { assertRowLimit } from "./upload-safety";
+import { recordAssignmentChanges, type AssignmentChange } from "./assignment-history";
+import type { AuditActor } from "./audit";
+import { normalizeHeader } from "./sheet-headers";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 
@@ -9,9 +13,6 @@ const text = (value: unknown) => {
   if (typeof value === "number" && Number.isFinite(value)) return String(Math.trunc(value));
   return String(value).trim();
 };
-
-const normalizeHeader = (value: string) =>
-  value.trim().toUpperCase().replace(/\s+/g, " ").replace(/[^A-Z0-9_ ]/g, "");
 
 const normalizedRow = (row: ExcelRow) => {
   const out: Record<string, unknown> = {};
@@ -26,114 +27,342 @@ function rowsFromWorkbook(buffer: Buffer, requiredHeaders: string[], preferredSh
     ? [preferredSheet, ...workbook.SheetNames.filter((n) => n !== preferredSheet)]
     : workbook.SheetNames;
 
-  let best:{sheetName:string;keys:Set<string>;score:number}|null=null;
+  let best: { sheetName: string; keys: Set<string>; score: number } | null = null;
   for (const name of names) {
     const sheet = workbook.Sheets[name];
     if (!sheet) continue;
     const rows = XLSX.utils.sheet_to_json<ExcelRow>(sheet, { defval: "", raw: true });
+    assertRowLimit(rows.length, "master data sheet");
     if (!rows.length) continue;
     const keys = new Set(Object.keys(normalizedRow(rows[0])));
-    const score=normalizedRequired.filter(header=>keys.has(header)).length;
-    if(!best||score>best.score)best={sheetName:name,keys,score};
+    const score = normalizedRequired.filter((header) => keys.has(header)).length;
+    if (!best || score > best.score) best = { sheetName: name, keys, score };
     if (normalizedRequired.every((header) => keys.has(header))) {
       return { sheetName: name, rows: rows.map(normalizedRow) };
     }
   }
-  const missing=normalizedRequired.filter(header=>!best?.keys.has(header));
-  throw new Error(`Required headings missing: ${missing.join(", ")}. ${best?`Best matching sheet: ${best.sheetName}. Found headings: ${[...best.keys].join(", ")}.`:"No readable worksheet with data was found."}`);
+  const missing = normalizedRequired.filter((header) => !best?.keys.has(header));
+  throw new Error(
+    `Required headings missing: ${missing.join(", ")}. ${best ? `Best matching sheet: ${best.sheetName}. Found headings: ${[...best.keys].join(", ")}.` : "No readable worksheet with data was found."}`,
+  );
 }
 
-export async function importEmployees(buffer: Buffer, fileName: string) {
+export async function importEmployees(buffer: Buffer, fileName: string, actor: AuditActor | null = null) {
   const { rows, sheetName } = rowsFromWorkbook(buffer, ["RSO Code", "RS0 MSISDN", "RSO Name", "Supervisor"], "RSO");
   const batch = await prisma.importBatch.create({ data: { type: "EMPLOYEES", fileName, totalRows: rows.length } });
-  const existingEmployees=await prisma.employee.findMany({select:{id:true,rsoMsisdn:true,employeeCode:true}});
-  const employeeByPhoneKey=new Map(existingEmployees.map(e=>[phoneKey(e.rsoMsisdn),e]));
-  const employeeByCode=new Map(existingEmployees.filter(e=>e.employeeCode).map(e=>[e.employeeCode!.trim().toUpperCase(),e]));
-  const seenPhone=new Set<string>(),seenCode=new Set<string>();
-  const errors:Array<{batchId:string;rowNumber:number;message:string;rawData:object}>=[],valid:Array<{rsoMsisdn:string;employeeCode:string|null;name:string;supervisorName:string}>=[];
+  const existingEmployees = await prisma.employee.findMany({
+    // supervisorId and name are selected so a supervisor change can be seen
+    // and described; without the old value there is nothing to compare.
+    select: { id: true, rsoMsisdn: true, employeeCode: true, supervisorId: true, name: true },
+  });
+  const employeeByPhoneKey = new Map(existingEmployees.map((e) => [phoneKey(e.rsoMsisdn), e]));
+  const employeeByCode = new Map(
+    existingEmployees.filter((e) => e.employeeCode).map((e) => [e.employeeCode!.trim().toUpperCase(), e]),
+  );
+  const seenPhone = new Set<string>(),
+    seenCode = new Set<string>();
+  const errors: Array<{ batchId: string; rowNumber: number; message: string; rawData: object }> = [],
+    valid: Array<{ rsoMsisdn: string; employeeCode: string | null; name: string; supervisorName: string }> = [];
 
-  for(let i=0;i<rows.length;i++){
-    const row=rows[i],rsoMsisdn=text(row["RS0 MSISDN"]),employeeCodeRaw=text(row["RSO CODE"]),employeeCode=employeeCodeRaw?employeeCodeRaw.toUpperCase():null,name=text(row["RSO NAME"]),supervisorName=text(row["SUPERVISOR"]);
-    if(!rsoMsisdn||!name){errors.push({batchId:batch.id,rowNumber:i+2,message:"RSO MSISDN and RSO Name are required",rawData:row as object});continue}
-    const pkey=phoneKey(rsoMsisdn);if(!pkey){errors.push({batchId:batch.id,rowNumber:i+2,message:"RSO MSISDN is invalid",rawData:row as object});continue}
-    if(seenPhone.has(pkey)){errors.push({batchId:batch.id,rowNumber:i+2,message:"Duplicate RSO MSISDN in upload",rawData:row as object});continue}
-    if(employeeCode&&seenCode.has(employeeCode)){errors.push({batchId:batch.id,rowNumber:i+2,message:"Duplicate RSO Code in upload",rawData:row as object});continue}
-    const byPhone=employeeByPhoneKey.get(pkey),byCode=employeeCode?employeeByCode.get(employeeCode):undefined;
-    if(byPhone&&byCode&&byPhone.id!==byCode.id){errors.push({batchId:batch.id,rowNumber:i+2,message:"RSO MSISDN and RSO Code belong to different existing employees",rawData:row as object});continue}
-    if(!byPhone&&byCode){errors.push({batchId:batch.id,rowNumber:i+2,message:"RSO Code is already assigned to another MSISDN",rawData:row as object});continue}
-    seenPhone.add(pkey);if(employeeCode)seenCode.add(employeeCode);
-    valid.push({rsoMsisdn,employeeCode,name,supervisorName});
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i],
+      rsoMsisdn = text(row["RS0 MSISDN"]),
+      employeeCodeRaw = text(row["RSO CODE"]),
+      employeeCode = employeeCodeRaw ? employeeCodeRaw.toUpperCase() : null,
+      name = text(row["RSO NAME"]),
+      supervisorName = text(row["SUPERVISOR"]);
+    if (!rsoMsisdn || !name) {
+      errors.push({
+        batchId: batch.id,
+        rowNumber: i + 2,
+        message: "RSO MSISDN and RSO Name are required",
+        rawData: row as object,
+      });
+      continue;
+    }
+    const pkey = phoneKey(rsoMsisdn);
+    if (!pkey) {
+      errors.push({ batchId: batch.id, rowNumber: i + 2, message: "RSO MSISDN is invalid", rawData: row as object });
+      continue;
+    }
+    if (seenPhone.has(pkey)) {
+      errors.push({
+        batchId: batch.id,
+        rowNumber: i + 2,
+        message: "Duplicate RSO MSISDN in upload",
+        rawData: row as object,
+      });
+      continue;
+    }
+    if (employeeCode && seenCode.has(employeeCode)) {
+      errors.push({
+        batchId: batch.id,
+        rowNumber: i + 2,
+        message: "Duplicate RSO Code in upload",
+        rawData: row as object,
+      });
+      continue;
+    }
+    const byPhone = employeeByPhoneKey.get(pkey),
+      byCode = employeeCode ? employeeByCode.get(employeeCode) : undefined;
+    if (byPhone && byCode && byPhone.id !== byCode.id) {
+      errors.push({
+        batchId: batch.id,
+        rowNumber: i + 2,
+        message: "RSO MSISDN and RSO Code belong to different existing employees",
+        rawData: row as object,
+      });
+      continue;
+    }
+    if (!byPhone && byCode) {
+      errors.push({
+        batchId: batch.id,
+        rowNumber: i + 2,
+        message: "RSO Code is already assigned to another MSISDN",
+        rawData: row as object,
+      });
+      continue;
+    }
+    seenPhone.add(pkey);
+    if (employeeCode) seenCode.add(employeeCode);
+    valid.push({ rsoMsisdn, employeeCode, name, supervisorName });
   }
 
-  if(errors.length){
-    const preview=errors.slice(0,8).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
-    await prisma.importBatch.delete({where:{id:batch.id}}).catch(()=>undefined);
-    throw new Error(`Employee data validation failed: ${errors.length} invalid row(s). ${preview}${errors.length>8?" …":""}`);
+  if (errors.length) {
+    const preview = errors
+      .slice(0, 8)
+      .map((e) => `Row ${e.rowNumber}: ${e.message}`)
+      .join("; ");
+    await prisma.importBatch.delete({ where: { id: batch.id } }).catch(() => undefined);
+    throw new Error(
+      `Employee data validation failed: ${errors.length} invalid row(s). ${preview}${errors.length > 8 ? " …" : ""}`,
+    );
   }
 
-  const supervisorNames=[...new Set(valid.map(x=>x.supervisorName).filter(Boolean))];
-  for(let i=0;i<supervisorNames.length;i+=50){
-    await prisma.$transaction(supervisorNames.slice(i,i+50).map(name=>prisma.supervisor.upsert({where:{name},update:{active:true},create:{name}})));
+  const supervisorNames = [...new Set(valid.map((x) => x.supervisorName).filter(Boolean))];
+  for (let i = 0; i < supervisorNames.length; i += 50) {
+    await prisma.$transaction(
+      supervisorNames
+        .slice(i, i + 50)
+        .map((name) => prisma.supervisor.upsert({ where: { name }, update: { active: true }, create: { name } })),
+    );
   }
-  const supervisors=await prisma.supervisor.findMany({where:{name:{in:supervisorNames}},select:{id:true,name:true}});
-  const supervisorByName=new Map(supervisors.map(x=>[x.name,x.id]));
+  const supervisors = await prisma.supervisor.findMany({
+    where: { name: { in: supervisorNames } },
+    select: { id: true, name: true },
+  });
+  const supervisorByName = new Map(supervisors.map((x) => [x.name, x.id]));
+  // The PREVIOUS supervisor may not appear in this file at all, so its name is
+  // fetched separately rather than taken from `supervisors` above.
+  const priorSupervisorIds = [...new Set(existingEmployees.map((e) => e.supervisorId).filter(Boolean))] as string[];
+  const priorSupervisors = priorSupervisorIds.length
+    ? await prisma.supervisor.findMany({ where: { id: { in: priorSupervisorIds } }, select: { id: true, name: true } })
+    : [];
+  const supervisorName = new Map([...priorSupervisors, ...supervisors].map((x) => [x.id, x.name]));
 
-  const ops=[];
-  for(const row of valid){
-    const existing=employeeByPhoneKey.get(phoneKey(row.rsoMsisdn)),supervisorId=row.supervisorName?supervisorByName.get(row.supervisorName)||null:null;
-    if(existing)ops.push(prisma.employee.update({where:{id:existing.id},data:{rsoMsisdn:row.rsoMsisdn,employeeCode:row.employeeCode,name:row.name,supervisorId,active:true}}));
-    else ops.push(prisma.employee.create({data:{rsoMsisdn:row.rsoMsisdn,employeeCode:row.employeeCode,name:row.name,supervisorId}}));
+  const ops = [];
+  const reassignments: AssignmentChange[] = [];
+  for (const row of valid) {
+    const existing = employeeByPhoneKey.get(phoneKey(row.rsoMsisdn)),
+      supervisorId = row.supervisorName ? supervisorByName.get(row.supervisorName) || null : null;
+    if (existing && existing.supervisorId !== supervisorId)
+      reassignments.push({
+        kind: "RSO_SUPERVISOR",
+        entityId: existing.id,
+        entityName: `${row.employeeCode || existing.employeeCode || existing.rsoMsisdn} — ${row.name || existing.name}`,
+        fromId: existing.supervisorId,
+        fromName: existing.supervisorId ? (supervisorName.get(existing.supervisorId) ?? null) : null,
+        toId: supervisorId,
+        toName: supervisorId ? (supervisorName.get(supervisorId) ?? null) : null,
+      });
+    if (existing)
+      ops.push(
+        prisma.employee.update({
+          where: { id: existing.id },
+          data: {
+            rsoMsisdn: row.rsoMsisdn,
+            employeeCode: row.employeeCode,
+            name: row.name,
+            supervisorId,
+            active: true,
+          },
+        }),
+      );
+    else
+      ops.push(
+        prisma.employee.create({
+          data: { rsoMsisdn: row.rsoMsisdn, employeeCode: row.employeeCode, name: row.name, supervisorId },
+        }),
+      );
   }
-  for(let i=0;i<ops.length;i+=100)await prisma.$transaction(ops.slice(i,i+100));
-  if(errors.length)await prisma.importError.createMany({data:errors});
+  for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100));
+  await recordAssignmentChanges(actor, reassignments, `employee master: ${fileName}`);
+  if (errors.length) await prisma.importError.createMany({ data: errors });
 
-  const successRows=valid.length,failedRows=errors.length;
-  await prisma.importBatch.update({where:{id:batch.id},data:{successRows,failedRows,status:failedRows?"COMPLETED_WITH_ERRORS":"COMPLETED"}});
-  return {batchId:batch.id,sheetName,totalRows:rows.length,successRows,failedRows};
+  const successRows = valid.length,
+    failedRows = errors.length;
+  await prisma.importBatch.update({
+    where: { id: batch.id },
+    data: { successRows, failedRows, status: failedRows ? "COMPLETED_WITH_ERRORS" : "COMPLETED" },
+  });
+  return { batchId: batch.id, sheetName, totalRows: rows.length, successRows, failedRows };
 }
 
-export async function importRetailers(buffer: Buffer, fileName: string) {
+export async function importRetailers(buffer: Buffer, fileName: string, actor: AuditActor | null = null) {
   const required = ["RETAILER_CODE", "RETAILER_NAME", "I_TOP_UP_SR_NUMBER"];
   const { rows, sheetName } = rowsFromWorkbook(buffer, required);
   const batch = await prisma.importBatch.create({ data: { type: "RETAILERS", fileName, totalRows: rows.length } });
 
-  const employees = await prisma.employee.findMany({ select: { id: true, rsoMsisdn: true } });
+  const employees = await prisma.employee.findMany({ select: { id: true, rsoMsisdn: true, name: true } });
   const employeeByMsisdn = new Map(employees.map((employee) => [phoneKey(employee.rsoMsisdn), employee.id]));
-  const sourceCodes = [...new Set(rows.map(row => text(row["RETAILER_CODE"]).toUpperCase()).filter(Boolean))];
+  // Names, so a history row reads "moved from Karim to Rahim" rather than
+  // from one cuid to another.
+  const employeeName = new Map(employees.map((employee) => [employee.id, employee.name]));
+  const sourceCodes = [...new Set(rows.map((row) => text(row["RETAILER_CODE"]).toUpperCase()).filter(Boolean))];
   const existingRows = await prisma.retailer.findMany({
     where: { retailerCode: { in: sourceCodes } },
-    select: {retailerCode:true,retailerName:true,simSeller:true,iTopUpSeller:true,tranMobileNo:true,iTopUpSrNumber:true,iTopUpNumber:true,category:true,rsoCode:true,route:true,employeeId:true}
+    select: {
+      retailerCode: true,
+      retailerName: true,
+      simSeller: true,
+      iTopUpSeller: true,
+      tranMobileNo: true,
+      iTopUpSrNumber: true,
+      iTopUpNumber: true,
+      category: true,
+      rsoCode: true,
+      route: true,
+      employeeId: true,
+    },
   });
-  const existingByCode = new Map(existingRows.map(row => [row.retailerCode, row]));
+  const existingByCode = new Map(existingRows.map((row) => [row.retailerCode, row]));
 
-  let mappedRows=0,unassignedRows=0,newRows=0,updatedRows=0,unchangedRows=0;
-  const errors:Array<{batchId:string;rowNumber:number;message:string;rawData:object}>=[],ops=[];
-  const seenRetailerCodes=new Set<string>();
+  let mappedRows = 0,
+    unassignedRows = 0,
+    newRows = 0,
+    updatedRows = 0,
+    unchangedRows = 0;
+  const errors: Array<{ batchId: string; rowNumber: number; message: string; rawData: object }> = [],
+    ops = [];
+  const seenRetailerCodes = new Set<string>();
+  // Every retailer whose RSO this upload moves. Without this the previous
+  // owner is overwritten and gone — see lib/assignment-history.ts.
+  const reassignments: AssignmentChange[] = [];
 
-  for(let i=0;i<rows.length;i++){
-    const row=rows[i],retailerCode=text(row["RETAILER_CODE"]).toUpperCase();
-    if(!retailerCode){errors.push({batchId:batch.id,rowNumber:i+2,message:"RETAILER_CODE is required",rawData:row as object});continue}
-    if(seenRetailerCodes.has(retailerCode)){errors.push({batchId:batch.id,rowNumber:i+2,message:"Duplicate RETAILER_CODE in upload",rawData:row as object});continue}
-    seenRetailerCodes.add(retailerCode);
-    const iTopUpSrNumber=text(row["I_TOP_UP_SR_NUMBER"]),employeeId=employeeByMsisdn.get(phoneKey(iTopUpSrNumber))??null;
-    employeeId?mappedRows++:unassignedRows++;
-    const next={retailerName:text(row["RETAILER_NAME"])||null,simSeller:text(row["SIM_SELLER"])||null,iTopUpSeller:text(row["I_TOP_UP_SELLER"])||null,tranMobileNo:text(row["TRANMOBILENO"])||null,iTopUpSrNumber:iTopUpSrNumber||null,iTopUpNumber:text(row["I_TOP_UP_NUMBER"])||null,category:text(row["CATEGORY"])||null,rsoCode:text(row["RSOCODE"])||null,route:text(row["ROUTE"])||null,employeeId,active:true};
-    const old=existingByCode.get(retailerCode);
-    if(!old)newRows++;else{
-      const changed=old.retailerName!==next.retailerName||old.simSeller!==next.simSeller||old.iTopUpSeller!==next.iTopUpSeller||old.tranMobileNo!==next.tranMobileNo||old.iTopUpSrNumber!==next.iTopUpSrNumber||old.iTopUpNumber!==next.iTopUpNumber||old.category!==next.category||old.rsoCode!==next.rsoCode||old.route!==next.route||old.employeeId!==next.employeeId;
-      changed?updatedRows++:unchangedRows++;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i],
+      retailerCode = text(row["RETAILER_CODE"]).toUpperCase();
+    if (!retailerCode) {
+      errors.push({
+        batchId: batch.id,
+        rowNumber: i + 2,
+        message: "RETAILER_CODE is required",
+        rawData: row as object,
+      });
+      continue;
     }
-    ops.push(prisma.retailer.upsert({where:{retailerCode},update:next,create:{retailerCode,...next}}));
+    if (seenRetailerCodes.has(retailerCode)) {
+      errors.push({
+        batchId: batch.id,
+        rowNumber: i + 2,
+        message: "Duplicate RETAILER_CODE in upload",
+        rawData: row as object,
+      });
+      continue;
+    }
+    seenRetailerCodes.add(retailerCode);
+    const iTopUpSrNumber = text(row["I_TOP_UP_SR_NUMBER"]),
+      employeeId = employeeByMsisdn.get(phoneKey(iTopUpSrNumber)) ?? null;
+    if (employeeId) mappedRows++;
+    else unassignedRows++;
+    const next = {
+      retailerName: text(row["RETAILER_NAME"]) || null,
+      simSeller: text(row["SIM_SELLER"]) || null,
+      iTopUpSeller: text(row["I_TOP_UP_SELLER"]) || null,
+      tranMobileNo: text(row["TRANMOBILENO"]) || null,
+      iTopUpSrNumber: iTopUpSrNumber || null,
+      iTopUpNumber: text(row["I_TOP_UP_NUMBER"]) || null,
+      category: text(row["CATEGORY"]) || null,
+      rsoCode: text(row["RSOCODE"]) || null,
+      route: text(row["ROUTE"]) || null,
+      employeeId,
+      active: true,
+    };
+    const old = existingByCode.get(retailerCode);
+    const label = `${retailerCode}${next.retailerName ? ` — ${next.retailerName}` : ""}`;
+    if (!old) {
+      newRows++;
+      // A brand-new retailer's first owner is the opening of its history, and
+      // a later backfill needs that start point as much as any move.
+      if (employeeId)
+        reassignments.push({
+          kind: "RETAILER_RSO",
+          entityId: retailerCode,
+          entityName: label,
+          fromId: null,
+          fromName: null,
+          toId: employeeId,
+          toName: employeeName.get(employeeId) ?? null,
+        });
+    } else {
+      const changed =
+        old.retailerName !== next.retailerName ||
+        old.simSeller !== next.simSeller ||
+        old.iTopUpSeller !== next.iTopUpSeller ||
+        old.tranMobileNo !== next.tranMobileNo ||
+        old.iTopUpSrNumber !== next.iTopUpSrNumber ||
+        old.iTopUpNumber !== next.iTopUpNumber ||
+        old.category !== next.category ||
+        old.rsoCode !== next.rsoCode ||
+        old.route !== next.route ||
+        old.employeeId !== next.employeeId;
+      if (changed) updatedRows++;
+      else unchangedRows++;
+      if (old.employeeId !== next.employeeId)
+        reassignments.push({
+          kind: "RETAILER_RSO",
+          entityId: retailerCode,
+          entityName: label,
+          fromId: old.employeeId,
+          fromName: old.employeeId ? (employeeName.get(old.employeeId) ?? null) : null,
+          toId: employeeId,
+          toName: employeeId ? (employeeName.get(employeeId) ?? null) : null,
+        });
+    }
+    ops.push(prisma.retailer.upsert({ where: { retailerCode }, update: next, create: { retailerCode, ...next } }));
   }
 
-  if(errors.length){
-    const preview=errors.slice(0,8).map(e=>`Row ${e.rowNumber}: ${e.message}`).join("; ");
-    await prisma.importBatch.delete({where:{id:batch.id}}).catch(()=>undefined);
-    throw new Error(`Retailer data validation failed: ${errors.length} invalid row(s). ${preview}${errors.length>8?" …":""}`);
+  if (errors.length) {
+    const preview = errors
+      .slice(0, 8)
+      .map((e) => `Row ${e.rowNumber}: ${e.message}`)
+      .join("; ");
+    await prisma.importBatch.delete({ where: { id: batch.id } }).catch(() => undefined);
+    throw new Error(
+      `Retailer data validation failed: ${errors.length} invalid row(s). ${preview}${errors.length > 8 ? " …" : ""}`,
+    );
   }
-  for(let i=0;i<ops.length;i+=100)await prisma.$transaction(ops.slice(i,i+100));
-  const successRows=ops.length,failedRows=0;
-  await prisma.importBatch.update({where:{id:batch.id},data:{successRows,failedRows,status:failedRows?"COMPLETED_WITH_ERRORS":"COMPLETED"}});
-  return {batchId:batch.id,sheetName,totalRows:rows.length,successRows,failedRows,mappedRows,unassignedRows,newRows,updatedRows,unchangedRows};
+  for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100));
+  // After the writes land, never before: history must not claim a move that
+  // the transaction then failed to make.
+  const historyRows = await recordAssignmentChanges(actor, reassignments, `retailer master: ${fileName}`);
+  const successRows = ops.length,
+    failedRows = 0;
+  await prisma.importBatch.update({
+    where: { id: batch.id },
+    data: { successRows, failedRows, status: failedRows ? "COMPLETED_WITH_ERRORS" : "COMPLETED" },
+  });
+  return {
+    reassignedRetailers: historyRows,
+    batchId: batch.id,
+    sheetName,
+    totalRows: rows.length,
+    successRows,
+    failedRows,
+    mappedRows,
+    unassignedRows,
+    newRows,
+    updatedRows,
+    unchangedRows,
+  };
 }
-
