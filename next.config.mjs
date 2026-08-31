@@ -29,7 +29,29 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      {
+        // The service worker must be revalidated on every load, or a browser
+        // holding an old copy keeps serving an old caching policy — the classic
+        // way a bad worker becomes hard to withdraw. `no-cache` means "ask
+        // first", not "do not store", so the check is a cheap 304.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, must-revalidate" },
+          // Lets the worker control the whole origin from /sw.js. It already
+          // registers with scope "/", and this is what permits that.
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        // Content-hashed by the icon build, but referenced by a stable name, so
+        // a day is the compromise: long enough that a phone is not refetching
+        // them, short enough that a new mark appears without a reinstall.
+        source: "/icons/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400" }],
+      },
+    ];
   },
 };
 

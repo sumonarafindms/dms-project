@@ -12,16 +12,16 @@
 
 import Link from "next/link";
 import { requirePagePermission } from "../../lib/auth";
-import { employeePerformance, pct } from "../../lib/performance";
+import { employeePerformance } from "../../lib/performance";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
 import { prisma } from "../../lib/prisma";
 import { latestDailySnapshot, monthPace } from "../../lib/intelligence";
 import { dhakaMonth } from "../../lib/business-time";
 import { pacing } from "../../lib/pacing";
-import { ACHIEVEMENT_ON_TRACK_PERCENT } from "../../lib/achievement";
+import { ACHIEVEMENT_ON_TRACK_PERCENT, targetPercent as pct } from "../../lib/achievement";
 import {
   Card,
-  ComparisonCard,
+  ComparisonSection,
   EmptyState,
   EntityCard,
   KpiCard,
@@ -33,7 +33,8 @@ import {
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
-import type { ComparisonKind } from "../../lib/comparison";
+import { teamTotals } from "../../lib/bp-rollup";
+import { parseComparisonKind } from "../../lib/comparison";
 
 export const dynamic = "force-dynamic";
 
@@ -57,18 +58,22 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
   ]);
 
   const sp = await searchParams;
-  const compareKind: ComparisonKind = sp.compare === "week" || sp.compare === "month" ? sp.compare : "day";
+  const compareKind = parseComparisonKind(sp.compare);
   const comparison = await performanceComparison(compareKind, ids);
 
   const attention = attentionRows.filter((x) => x.priority > 0).length;
   const retailers = rows.reduce((a, r) => a + r.retailerCount, 0);
   const expected = monthPace(month);
-  const sum = (k: keyof (typeof rows)[number]) => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
+  // teamTotals, not a plain sum of the rows: a supervisor is responsible for
+  // the whole territory, and each RSO row now excludes its BPs. Summing the
+  // rows directly would quietly drop every BP's SIMs and recharge from the
+  // team figure. See lib/bp-rollup.ts.
+  const team = teamTotals(rows);
   // One clock read for the whole page, so four cards cannot straddle a Dhaka
   // midnight and disagree about how many days are left.
   const now = new Date();
-  const paceFor = (targetKey: keyof (typeof rows)[number], achievedKey: keyof (typeof rows)[number]) =>
-    pacing(sum(targetKey), sum(achievedKey), monthKey, now);
+  const paceFor = (targetKey: keyof typeof team, achievedKey: keyof typeof team) =>
+    pacing(team[targetKey], team[achievedKey], monthKey, now);
 
   // Shared band, not a local number — see lib/achievement.ts.
   const lowPerformers = rows
@@ -105,53 +110,36 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
       <div className="kit-kpi-grid kit-mb-20">
         <KpiCard
           label="GA"
-          achieved={sum("gaAchieved")}
-          target={sum("gaTarget")}
+          achieved={team.gaAchieved}
+          target={team.gaTarget}
           pace={paceFor("gaTarget", "gaAchieved")}
         />
         <KpiCard
           label="SSO"
-          achieved={sum("ssoAchieved")}
-          target={sum("ssoTarget")}
+          achieved={team.ssoAchieved}
+          target={team.ssoTarget}
           pace={paceFor("ssoTarget", "ssoAchieved")}
         />
         <KpiCard
           label="LSO"
-          achieved={sum("lsoAchieved")}
-          target={sum("lsoTarget")}
+          achieved={team.lsoAchieved}
+          target={team.lsoTarget}
           pace={paceFor("lsoTarget", "lsoAchieved")}
         />
         <KpiCard
           label="C2C"
-          achieved={sum("c2cAchieved")}
-          target={sum("c2cTarget")}
+          achieved={team.c2cAchieved}
+          target={team.c2cTarget}
           unit="৳"
           pace={paceFor("c2cTarget", "c2cAchieved")}
         />
       </div>
 
-      <SectionHead
-        title="Compared with the previous period"
-        sub="Each figure names the two dates it was measured between, because the feeds do not always arrive together."
-        link={
-          <span className="kit-period-switch">
-            {(["day", "week", "month"] as const).map((k) => (
-              <Link
-                key={k}
-                href={`/supervisor?compare=${k}`}
-                className={`kit-btn size-sm ${k === compareKind ? "is-primary" : "is-ghost"}`}
-              >
-                {k === "day" ? "Day" : k === "week" ? "Week" : "Month"}
-              </Link>
-            ))}
-          </span>
-        }
+      <ComparisonSection
+        metrics={comparison.metrics}
+        kind={compareKind}
+        control={{ mode: "link", hrefFor: (k) => `/supervisor?compare=${k}` }}
       />
-      <div className="kit-card-grid kit-mb-20">
-        {comparison.metrics.map((m) => (
-          <ComparisonCard key={m.metric} item={m} />
-        ))}
-      </div>
 
       <SectionHead title="Needs attention" sub="Tap a count to open the work behind it." />
       <div className="kit-status-tiles kit-mb-20">

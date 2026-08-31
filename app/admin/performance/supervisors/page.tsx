@@ -1,5 +1,7 @@
 import { requireUser } from "../../../../lib/auth";
-import { employeePerformance, pct } from "../../../../lib/performance";
+import { employeePerformance } from "../../../../lib/performance";
+import { withBp } from "../../../../lib/bp-rollup";
+import { targetPercent as pct } from "../../../../lib/achievement";
 import { prisma } from "../../../../lib/prisma";
 import { normalizeMonth } from "../../../../lib/drilldown";
 import { monthBounds } from "../../../../lib/month";
@@ -66,17 +68,22 @@ export default async function Page({
     // whose supervisor is inactive or unset.
     const x = r.supervisorId ? map.get(r.supervisorId) : undefined;
     if (!x) continue;
+    // withBp: a supervisor answers for their RSOs' Business Partners too, and
+    // an RSO row no longer contains them. See lib/bp-rollup.ts.
+    const t = withBp(r);
     x.rsos++;
-    x.retailers += r.retailerCount;
-    x.target += r.totalRechargeTarget;
-    x.achieved += r.totalRechargeAchieved;
-    x.gaT += r.gaTarget;
-    x.gaA += r.gaAchieved;
+    x.retailers += t.retailerCount;
+    x.target += t.totalRechargeTarget;
+    x.achieved += t.totalRechargeAchieved;
+    x.gaT += t.gaTarget;
+    x.gaA += t.gaAchieved;
   }
   for (const b of bp) {
     if (b.employee.supervisorId && map.has(b.employee.supervisorId)) {
       const x = map.get(b.employee.supervisorId)!;
-      x.bps.add(b.retailerId); /* BP target is tracked separately from RSO GA; do not add it to employee GA target. */
+      // Only the BP COUNT is collected here. The BP's GA and target already
+      // arrived through withBp() above; adding them again would double count.
+      x.bps.add(b.retailerId);
     }
   }
   const data = [...map.values()];

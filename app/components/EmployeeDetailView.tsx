@@ -18,7 +18,7 @@ import { ListControls, useListControls } from "./ListControls";
 import { matchesTokens } from "../../lib/text-search";
 import { Icon } from "./icons";
 import { Card, EmptyState, KpiCard, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";
-import { pct } from "../../lib/performance";
+import { targetPercent as pct } from "../../lib/achievement";
 import { activeSort, applySort, byNumberAsc, byNumberDesc, byText, sortOptions, type SortSpec } from "../../lib/sort";
 import { pacingForView } from "../../lib/pacing";
 

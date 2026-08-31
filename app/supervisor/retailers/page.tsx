@@ -2,13 +2,14 @@ import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { retailerOpportunities } from "../../../lib/retailer-opportunities";
+import { retailerListPage, sortOptionsFor } from "../../../lib/retailer-list";
 import { RetailerSearchView } from "../../components/RetailerOpportunityViews";
 import { Card, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
 
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string; page?: string }>;
 }) {
   const u = await requirePagePermission(["SUPERVISOR"], "retailers"),
     s = await searchParams,
@@ -21,6 +22,12 @@ export default async function Page({
   const rows = await retailerOpportunities(month, ids, s.from, s.to),
     sim = rows.filter((x) => x.simSeller).length,
     flagged = rows.filter((x) => x.priority > 0).length;
+  const listPage = retailerListPage(rows, {
+    q: s.q,
+    sort: s.sort,
+    page: s.page,
+  });
+
   return (
     <main className="page">
       <PageHeader title="My Retailers" subtitle="Every active retailer under your RSO team." />
@@ -34,7 +41,14 @@ export default async function Page({
       />
       <SectionHead title="Search & review" sub="GA, C2S, SSO and LSO status for the selected dates." />
       <Card padded>
-        <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/supervisor/retailers" />
+        <RetailerSearchView
+          page={listPage}
+          sortOptions={sortOptionsFor(false)}
+          month={month}
+          from={s.from}
+          to={s.to}
+          base="/supervisor/retailers"
+        />
       </Card>
     </main>
   );

@@ -7,8 +7,33 @@
  *
  * Scope is deliberately absent: every caller here is an ADMIN/IT page, which
  * sees everything. If a scoped variant is ever needed, it takes a REQUIRED
- * employeeIds argument rather than an optional one — see lib/ownership.ts for
- * why optional scope is dangerous.
+ * employeeIds argument rather than an optional one — see the warning below.
+ *
+ * ## Who owns what (moved here from lib/ownership.ts in v132)
+ *
+ * The schema carries two different links from a Retailer to an Employee. They
+ * answer different questions and are NOT interchangeable:
+ *
+ *   Retailer.employeeId
+ *     Which RSO works this outlet. Set in bulk by the retailer master import,
+ *     which matches I_TOP_UP_SR_NUMBER against the employee's RSO MSISDN
+ *     (lib/master-import.ts). Every active retailer has one.
+ *
+ *   BpAssignment
+ *     Which retailers act as Business Partners, which RSO each BP reports to,
+ *     and that BP's GA target. Created one at a time by an admin from
+ *     /admin/bp-management, date-ranged so history is preserved. Only a small
+ *     subset of retailers ever has one.
+ *
+ * So BpAssignment is authoritative for BP identity and BP ownership;
+ * Retailer.employeeId is authoritative for retailer ownership. Using
+ * BpAssignment for plain retailer scoping would empty every RSO, supervisor
+ * and manager page, because most retailers are not BPs.
+ *
+ * **The dangerous part.** `lib/retailer-opportunities.ts` and
+ * `lib/performance.ts` both treat an omitted `employeeIds` as "company-wide",
+ * which is one forgotten argument away from showing another team's data. Any
+ * new scoped helper should take the argument as REQUIRED.
  */
 
 import { prisma } from "./prisma";
@@ -16,54 +41,32 @@ import { rangeBounds } from "./report-range";
 import type { ReportRange } from "./report-range";
 import { withSimSwap, withStandardGa } from "./business-rules";
 import { coversDate, overlapsRange } from "./bp-period";
-import type { ImportType } from "@prisma/client";
 import { retailerOpportunities } from "./retailer-opportunities";
 import type { RetailerOpportunity } from "./retailer-opportunities";
 
 /* ------------------------------------------------------------------ *
- * Data readiness
+ * Data readiness — MOVED
  * ------------------------------------------------------------------ *
- * "Was each feed actually imported for the selected period?"
+ * `dataReadiness()`, `FeedReadiness` and `REPORT_FEEDS` lived here until v135.
+ * They are now `lib/readiness.ts` (the rules) and `lib/readiness-data.ts` (the
+ * queries), and `/it/readiness` shows the result.
  *
- * Answered only from ImportBatch, which records a businessDate and a status
- * per import. A feed with no successful batch whose businessDate falls in the
- * range is reported "Missing" — never guessed at from whether rows happen to
- * exist, because rows can survive from an earlier import and would make a
- * missing day look present.
- */
-export type FeedReadiness = {
-  feed: ImportType;
-  ready: boolean;
-  latestBusinessDate: Date | null;
-  fileName: string | null;
-  uploadedAt: Date | null;
-};
-
-const REPORT_FEEDS = ["GA", "C2C", "C2S", "OB"] as const;
-
-export async function dataReadiness(range: ReportRange): Promise<FeedReadiness[]> {
-  const { start, endExclusive } = rangeBounds(range);
-  const batches = await Promise.all(
-    REPORT_FEEDS.map((feed) =>
-      prisma.importBatch.findFirst({
-        where: {
-          type: feed as ImportType,
-          businessDate: { gte: start, lt: endExclusive },
-          status: { in: ["COMPLETED", "COMPLETED_WITH_ERRORS"] },
-        },
-        orderBy: { businessDate: "desc" },
-        select: { businessDate: true, fileName: true, uploadedAt: true },
-      }),
-    ),
-  );
-  return REPORT_FEEDS.map((feed, i) => ({
-    feed: feed as ImportType,
-    ready: Boolean(batches[i]),
-    latestBusinessDate: batches[i]?.businessDate ?? null,
-    fileName: batches[i]?.fileName ?? null,
-    uploadedAt: batches[i]?.uploadedAt ?? null,
-  }));
-}
+ * Worth recording, because the old version looked right:
+ *
+ *   It asked whether ONE completed batch of each type had a businessDate
+ *   anywhere in the selected range. For the Reporting Center's default range —
+ *   yesterday — that is exactly correct. For a month it is close to
+ *   meaningless: a single GA import on the 3rd reported "Ready", in green,
+ *   while the totals printed underneath it were missing thirty days of
+ *   activations. Nothing failed, nothing looked wrong, and the number was
+ *   simply not the whole answer.
+ *
+ * The original note here said readiness must come from ImportBatch and never be
+ * inferred from whether rows happen to exist. That reasoning was kept: the new
+ * code reads BOTH, per day, because the disagreement is the useful part — a
+ * completed batch with no rows is a file that parsed to nothing, and the Upload
+ * Center shows it as a success.
+ * ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ *
  * Headline totals for the range
@@ -210,7 +213,8 @@ function monthStartOf(d: Date) {
  * place for the SSO and LSO thresholds to drift.
  *
  * The one thing it does not carry is the BP, because a BP is a BpAssignment
- * and not a retailer column. That is joined on here, per lib/ownership.ts.
+ * and not a retailer column. That is joined on here — see the ownership
+ * note at the top of this file.
  */
 
 export type RetailerReportRow = RetailerOpportunity & { bpName: string };

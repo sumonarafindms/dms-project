@@ -4,6 +4,10 @@ import { monthBounds } from "./month";
 import { normalizeMonth } from "./drilldown";
 import { monthStartsInRange, parseYmd } from "./date-range";
 import { withGa170, withSimSwap, withStandardGa } from "./business-rules";
+import { assignmentGaTarget, assignmentWindow } from "./bp-period";
+// Re-exported so the BP screens keep their existing import path; the rule
+// itself now lives in bp-period.ts, shared with lib/performance.ts.
+export { assignmentWindow };
 
 export type BpViewer = {
   role: string;
@@ -97,11 +101,6 @@ export async function standardGaByAssignment(
  * The part of a report range an assignment actually covers. `endDate` is the
  * last effective day, so the exclusive end is the day after it.
  */
-export function assignmentWindow(a: { startDate: Date; endDate: Date | null }, rangeStart: Date, rangeEnd: Date) {
-  const effectiveStart = a.startDate > rangeStart ? a.startDate : rangeStart;
-  const assignmentEnd = a.endDate ? new Date(a.endDate.getTime() + 86400000) : rangeEnd;
-  return { effectiveStart, effectiveEnd: assignmentEnd < rangeEnd ? assignmentEnd : rangeEnd };
-}
 
 export async function listBpAssignments(
   user: BpViewer,
@@ -153,11 +152,7 @@ export async function listBpAssignments(
   const withCounts: BpAssignmentListRow[] = assignments.map((a) => {
     const { effectiveStart, effectiveEnd } = assignmentWindow(a, rangeStart, rangeEnd);
     const monthGa = gaByAssignment.get(a.id) ?? 0;
-    const targetMap = new Map(a.monthlyTargets.map((x) => [x.month.toISOString().slice(0, 7), x.gaTarget]));
-    const gaTarget = monthStartsInRange(effectiveStart, effectiveEnd).reduce(
-      (sum, m) => sum + (targetMap.get(m.toISOString().slice(0, 7)) ?? a.gaTarget),
-      0,
-    );
+    const gaTarget = assignmentGaTarget(a, monthStartsInRange(effectiveStart, effectiveEnd));
     return {
       id: a.id,
       active: a.active,
@@ -204,13 +199,9 @@ export async function bpAssignmentDetail(
   const assignmentEnd = assignment.endDate ? new Date(assignment.endDate.getTime() + 86400000) : rangeEnd;
   // Detail view respects the selected date range and the BP assignment boundary.
   const effectiveEnd = assignmentEnd < rangeEnd ? assignmentEnd : rangeEnd;
-  const targetMap = new Map(assignment.monthlyTargets.map((x) => [x.month.toISOString().slice(0, 7), x.gaTarget]));
   const rangeTarget =
     effectiveStart < effectiveEnd
-      ? monthStartsInRange(effectiveStart, effectiveEnd).reduce(
-          (sum, m) => sum + (targetMap.get(m.toISOString().slice(0, 7)) ?? assignment.gaTarget),
-          0,
-        )
+      ? assignmentGaTarget(assignment, monthStartsInRange(effectiveStart, effectiveEnd))
       : 0;
   const assignmentView = { ...assignment, gaTarget: rangeTarget };
   // No `q` here, and that fixes two things at once.

@@ -114,6 +114,7 @@ const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/c2s": ["ADMIN", "IT"],
   "/dashboard": ["ADMIN", "IT"],
   "/ga": ["ADMIN", "IT"],
+  "/it/readiness": ["ADMIN", "IT"],
   "/it/reports": ["ADMIN", "IT"],
   "/it/reports/activation": ["ADMIN", "IT"],
   "/it/reports/c2c": ["ADMIN", "IT"],

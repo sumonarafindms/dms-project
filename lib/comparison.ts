@@ -24,18 +24,23 @@
  */
 
 /**
- * Which day a week starts on, as `Date.getUTCDay()` (0 = Sunday).
+ * Which day a week starts on, as `Date.getUTCDay()` (0 = Sunday, 6 = Saturday).
  *
- * Bangladesh's weekend is Friday and Saturday, so the working week runs
- * Sunday to Thursday. Starting the week on Sunday keeps those five days
- * together in one bucket; the ISO convention of Monday would split the working
- * week across two weeks and make every week-on-week comparison compare
- * different things.
+ * **Saturday**, confirmed by the distributor in v133. Their week runs Saturday
+ * to Friday, so Saturday is day one of every week-on-week comparison.
  *
- * This is a business convention rather than a fact — change this one number if
- * the distributor works to a different week.
+ * This is a business convention, not a fact about calendars, and it is the
+ * single number the whole week comparison turns on. Get it wrong and nothing
+ * breaks — every week window silently compares the wrong five or six days
+ * against each other, which is worse than an error, because the numbers still
+ * look plausible.
+ *
+ * v130 shipped this as `0` (Sunday) on the reasoning that Bangladesh's weekend
+ * is Friday and Saturday. That reasoning was flagged for confirmation rather
+ * than assumed, and the answer was that this distributor starts on Saturday.
+ * Confirm before changing it again.
  */
-export const WEEK_STARTS_ON = 0;
+export const WEEK_STARTS_ON = 6;
 
 const DAY = 86400000;
 const utc = (ymd: string) => new Date(`${ymd}T00:00:00.000Z`);
@@ -196,6 +201,29 @@ export function windowsFor(kind: ComparisonKind, anchor: string): ComparisonWind
   if (kind === "day") return dayWindows(anchor);
   if (kind === "week") return weekWindows(anchor);
   return monthWindows(anchor);
+}
+
+/** The three kinds, in the order the period switch shows them. */
+export const COMPARISON_KINDS: readonly ComparisonKind[] = ["day", "week", "month"];
+
+export const COMPARISON_KIND_LABEL: Record<ComparisonKind, string> = {
+  day: "Day",
+  week: "Week",
+  month: "Month",
+};
+
+/**
+ * Read a comparison kind out of untrusted input — a query string, a route
+ * parameter, a JSON body.
+ *
+ * Anything unrecognised becomes `day`, which is the safe answer: the daily
+ * comparison is the cheapest of the three and the one the pages default to.
+ * This exists so that the check lives in one place; it was written out inline
+ * on three pages before v134, and an API route repeating it by hand is exactly
+ * how a fourth spelling of the same rule appears.
+ */
+export function parseComparisonKind(value: unknown): ComparisonKind {
+  return value === "week" || value === "month" ? value : "day";
 }
 
 /** Exclusive end, for the half-open `{ gte, lt }` ranges every query here uses. */

@@ -21,17 +21,12 @@ export function FilterForm({
   to,
   showMonth = true,
   dateRange = false,
-  sort,
-  sortValue,
 }: {
   month?: string;
   from?: string;
   to?: string;
   showMonth?: boolean;
   dateRange?: boolean;
-  /** Orders this page offers. Omit on a page whose list has no meaningful order. */
-  sort?: { value: string; label: string }[];
-  sortValue?: string;
 }) {
   return (
     <LiveFilterForm className="kit-filter-bar no-print">
@@ -44,9 +39,8 @@ export function FilterForm({
           (ListControls / SimActivationList), which filter the rows already
           fetched, in the browser, with no request at all.
 
-          `placeholder` is kept only so existing callers still type-check; it
-          renders nothing. tests/search-instant.smoke.test.ts fails if a
-          search input ever reappears inside a submitting form. */}
+          tests/search-instant.smoke.test.ts fails if a search input ever
+          reappears inside a submitting form. */}
       {showMonth && !dateRange ? (
         <label className="kit-field">
           <span>Month</span>
@@ -65,18 +59,12 @@ export function FilterForm({
           </label>
         </>
       ) : null}
-      {sort && sort.length > 1 ? (
-        <label className="kit-field kit-sort">
-          <span>Sort by</span>
-          <select className="kit-select" name="sort" defaultValue={sortValue || sort[0].value}>
-            {sort.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
+      {/* The sort control that used to live here was removed in v132.
+          No caller ever passed `sort`, so it rendered nothing — but it sat
+          inside this submitting form, so the first page to use it would have
+          reloaded on every change of order, exactly the bug v131 fixed for
+          search. Sorting belongs in ListControls / EntityGrid, as client
+          state over rows already fetched. */}
       <span className="kit-filter-note">
         <Icon name="filter" /> Live filter
       </span>

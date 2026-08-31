@@ -5,30 +5,93 @@ import { Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { PermissionProvider, type ClientPermissionMap } from "./PermissionContext";
 
-type NavItem = { href: string; label: string; icon: string; module?: string };
+/**
+ * `group` places the item in the collapsible admin sidebar. It exists because
+ * the groups used to be INDEX SLICES of `adminNav` — `adminNav.slice(5, 11)`
+ * and so on — which had two consequences:
+ *
+ *   - Inserting one item anywhere shifted every group after it, silently.
+ *   - `AdminNav` closed over `adminNav`, so `itNav` was built, filtered, and
+ *     then never rendered. That is why IT could not see the Reporting Center
+ *     it defines: the entry existed the whole time and the sidebar drew a
+ *     different list.
+ *
+ * Grouping by a field on the item makes both impossible.
+ */
+type NavGroup = "Overview" | "Reports" | "Performance" | "Data Operations" | "Management";
+/**
+ * `group` is optional because the field roles (manager, supervisor, accounts,
+ * rso, bp) render a FLAT list and have no groups. It is required in practice for
+ * the admin/IT menu, and `tests/nav.smoke.test.ts` asserts that — an ungrouped
+ * item there would simply not be drawn, which is the failure this whole change
+ * is about.
+ */
+type NavItem = { href: string; label: string; icon: string; module?: string; group?: NavGroup };
 type RoleConfig = { name: string; title: string; initials: string; home: string; nav: NavItem[]; bottom: NavItem[] };
 const adminNav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: "home", module: "dashboard" },
-  { href: "/admin/performance/supervisors", label: "Supervisor Performance", icon: "users", module: "performance" },
-  { href: "/admin/performance/rsos", label: "RSO Performance", icon: "chart", module: "performance" },
-  { href: "/admin/performance/bps", label: "BP Performance", icon: "sim", module: "performance" },
-  { href: "/admin/performance/retailers", label: "Retailer Performance", icon: "shop", module: "performance" },
-  { href: "/admin/upload", label: "Upload Center", icon: "upload", module: "ga" },
-  { href: "/ga", label: "GA Upload", icon: "sim", module: "ga" },
-  { href: "/c2c", label: "C2C Upload", icon: "wallet", module: "c2c" },
-  { href: "/c2s", label: "C2S Upload", icon: "chart", module: "c2s" },
-  { href: "/ob", label: "OB Upload", icon: "balance", module: "ob" },
-  { href: "/admin/upload/retailers", label: "Retailer List", icon: "shop", module: "retailers" },
-  { href: "/admin/employees", label: "Employees", icon: "users", module: "employees" },
-  { href: "/admin/permissions", label: "Permissions", icon: "target", module: "employees" },
-  { href: "/admin/audit", label: "Activity Log", icon: "chart", module: "employees" },
-  { href: "/targets", label: "Targets", icon: "target", module: "targets" },
-  { href: "/admin/attention", label: "Attention Center", icon: "target", module: "attention" },
+  { href: "/dashboard", label: "Dashboard", icon: "home", module: "dashboard", group: "Overview" },
+  // Reports were IT-only in the demos, but the routes have always allowed
+  // ADMIN too, and an admin who cannot reach the Reporting Center from the
+  // menu has to know the URL. Both roles get the group.
+  { href: "/it/reports", label: "Reporting Center", icon: "file", module: "dashboard", group: "Reports" },
+  { href: "/it/readiness", label: "Data Readiness", icon: "alert", module: "dashboard", group: "Reports" },
+  {
+    href: "/admin/performance/supervisors",
+    label: "Supervisor Performance",
+    icon: "users",
+    module: "performance",
+    group: "Performance",
+  },
+  {
+    href: "/admin/performance/rsos",
+    label: "RSO Performance",
+    icon: "chart",
+    module: "performance",
+    group: "Performance",
+  },
+  { href: "/admin/performance/bps", label: "BP Performance", icon: "sim", module: "performance", group: "Performance" },
+  {
+    href: "/admin/performance/retailers",
+    label: "Retailer Performance",
+    icon: "shop",
+    module: "performance",
+    group: "Performance",
+  },
+  { href: "/admin/upload", label: "Upload Center", icon: "upload", module: "ga", group: "Data Operations" },
+  { href: "/ga", label: "GA Upload", icon: "sim", module: "ga", group: "Data Operations" },
+  { href: "/c2c", label: "C2C Upload", icon: "wallet", module: "c2c", group: "Data Operations" },
+  { href: "/c2s", label: "C2S Upload", icon: "chart", module: "c2s", group: "Data Operations" },
+  { href: "/ob", label: "OB Upload", icon: "balance", module: "ob", group: "Data Operations" },
+  {
+    href: "/admin/upload/retailers",
+    label: "Retailer List",
+    icon: "shop",
+    module: "retailers",
+    group: "Data Operations",
+  },
+  { href: "/admin/employees", label: "Employees", icon: "users", module: "employees", group: "Management" },
+  { href: "/admin/permissions", label: "Permissions", icon: "target", module: "employees", group: "Management" },
+  { href: "/admin/audit", label: "Activity Log", icon: "chart", module: "employees", group: "Management" },
+  { href: "/targets", label: "Targets", icon: "target", module: "targets", group: "Management" },
+  { href: "/admin/attention", label: "Attention Center", icon: "target", module: "attention", group: "Management" },
 ];
-const itNav: NavItem[] = [
-  adminNav[0],
-  { href: "/it/reports", label: "Reporting Center", icon: "file", module: "dashboard" },
-  ...adminNav.slice(1),
+/** ADMIN and IT now share one menu; the routes always allowed both. */
+const itNav: NavItem[] = adminNav;
+/**
+ * The mobile bottom bar, picked BY HREF.
+ *
+ * It used to be index positions into `adminNav` — `adminNav[11]` — so inserting
+ * one menu item quietly changed which five buttons a phone showed.
+ */
+const pick = (nav: NavItem[], hrefs: string[]) =>
+  hrefs.map((h) => nav.find((i) => i.href === h)).filter((i): i is NavItem => Boolean(i));
+const ADMIN_BOTTOM = ["/dashboard", "/it/reports", "/admin/performance/rsos", "/admin/upload", "/admin/employees"];
+const NAV_GROUPS: { label: NavGroup; icon: string }[] = [
+  { label: "Overview", icon: "home" },
+  { label: "Reports", icon: "file" },
+  { label: "Performance", icon: "chart" },
+  { label: "Data Operations", icon: "upload" },
+  { label: "Management", icon: "users" },
 ];
 const configs: Record<string, RoleConfig> = {
   admin: {
@@ -37,7 +100,7 @@ const configs: Record<string, RoleConfig> = {
     initials: "SA",
     home: "/dashboard",
     nav: adminNav,
-    bottom: [adminNav[0], adminNav[2], adminNav[4], adminNav[5], adminNav[11]],
+    bottom: pick(adminNav, ADMIN_BOTTOM),
   },
   manager: {
     name: "Manager",
@@ -120,7 +183,7 @@ const configs: Record<string, RoleConfig> = {
     initials: "IT",
     home: "/dashboard",
     nav: itNav,
-    bottom: [itNav[0], itNav[1], adminNav[2], adminNav[5], adminNav[11]],
+    bottom: pick(itNav, ADMIN_BOTTOM),
   },
 };
 for (const key of ["manager", "supervisor", "accounts", "rso", "bp"])
@@ -204,7 +267,7 @@ export default function AppShell({
           </div>
           <div className="sidebar-section">{role.title}</div>
           {isAdmin ? (
-            <AdminNav path={path} permissions={permissions} onNavigate={setNavPending} />
+            <AdminNav nav={role.nav} path={path} permissions={permissions} onNavigate={setNavPending} />
           ) : (
             visibleNav.map((i) => <NavLink key={i.href} item={i} path={path} onNavigate={setNavPending} />)
           )}
@@ -267,21 +330,26 @@ export default function AppShell({
     </PermissionProvider>
   );
 }
+/**
+ * The admin/IT sidebar: the role's OWN nav list, grouped.
+ *
+ * `nav` is a parameter rather than a closed-over constant. The previous version
+ * read `adminNav` directly, so every role that reached this component saw the
+ * admin menu whatever its config said — which is precisely how IT lost its
+ * Reporting Center entry.
+ */
 function AdminNav({
+  nav,
   path,
   permissions,
   onNavigate,
 }: {
+  nav: NavItem[];
   path: string;
   permissions: ClientPermissionMap;
   onNavigate: (href: string) => void;
 }) {
-  const groups = [
-    { label: "Overview", icon: "home", items: [adminNav[0]] },
-    { label: "Performance", icon: "chart", items: adminNav.slice(1, 5) },
-    { label: "Data Operations", icon: "upload", items: adminNav.slice(5, 11) },
-    { label: "Management", icon: "users", items: adminNav.slice(11, 16) },
-  ];
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: nav.filter((i) => i.group === g.label) }));
   return (
     <nav className="admin-sidebar-nav">
       {groups.map((g) => {

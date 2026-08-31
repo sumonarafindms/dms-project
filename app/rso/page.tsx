@@ -23,7 +23,7 @@ import { pacing } from "../../lib/pacing";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
 import {
   Card,
-  ComparisonCard,
+  ComparisonSection,
   EmptyState,
   KpiCard,
   PageHeader,
@@ -35,7 +35,7 @@ import {
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
-import type { ComparisonKind } from "../../lib/comparison";
+import { parseComparisonKind } from "../../lib/comparison";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +68,7 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
   // "day" unless asked otherwise. An unknown value falls back rather than
   // throwing, because this arrives from the URL.
   const sp = await searchParams;
-  const compareKind: ComparisonKind = sp.compare === "week" || sp.compare === "month" ? sp.compare : "day";
+  const compareKind = parseComparisonKind(sp.compare);
   const comparison = await performanceComparison(compareKind, [u.employeeId]);
 
   // The clock is read ONCE here, on the server, and the same instant is used
@@ -126,28 +126,11 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
         />
       </div>
 
-      <SectionHead
-        title="Compared with the previous period"
-        sub="Each figure names the two dates it was measured between, because the feeds do not always arrive together."
-        link={
-          <span className="kit-period-switch">
-            {(["day", "week", "month"] as const).map((k) => (
-              <Link
-                key={k}
-                href={`/rso?compare=${k}`}
-                className={`kit-btn size-sm ${k === compareKind ? "is-primary" : "is-ghost"}`}
-              >
-                {k === "day" ? "Day" : k === "week" ? "Week" : "Month"}
-              </Link>
-            ))}
-          </span>
-        }
+      <ComparisonSection
+        metrics={comparison.metrics}
+        kind={compareKind}
+        control={{ mode: "link", hrefFor: (k) => `/rso?compare=${k}` }}
       />
-      <div className="kit-card-grid kit-mb-20">
-        {comparison.metrics.map((m) => (
-          <ComparisonCard key={m.metric} item={m} />
-        ))}
-      </div>
 
       <SectionHead title="Quick status" sub="Tap a count to open the work behind it." />
       <div className="kit-status-tiles kit-mb-20">

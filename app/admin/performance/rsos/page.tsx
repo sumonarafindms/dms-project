@@ -1,5 +1,7 @@
 import { requireUser } from "../../../../lib/auth";
-import { employeePerformance, pct } from "../../../../lib/performance";
+import { employeePerformance } from "../../../../lib/performance";
+import { teamTotals } from "../../../../lib/bp-rollup";
+import { targetPercent as pct } from "../../../../lib/achievement";
 import { normalizeMonth } from "../../../../lib/drilldown";
 import { PageHeader, SummaryStrip } from "../../../components/Kit";
 import { EntityGrid } from "../../../components/EntityGrid";
@@ -23,8 +25,11 @@ export default async function Page({
   const s = await searchParams,
     month = normalizeMonth(s.from?.slice(0, 7) || s.month),
     rows = await employeePerformance(`${month}-01`, undefined, s.from, s.to);
-  const t = rows.reduce((a, x) => a + x.totalRechargeTarget, 0),
-    a = rows.reduce((n, x) => n + x.totalRechargeAchieved, 0);
+  // The strip is a COMPANY total, so Business Partners count; the grid below is
+  // per-RSO and stays as the rows come. See lib/bp-rollup.ts.
+  const company = teamTotals(rows);
+  const t = company.totalRechargeTarget,
+    a = company.totalRechargeAchieved;
   return (
     <main className="page">
       <PageHeader
@@ -34,7 +39,7 @@ export default async function Page({
       <SummaryStrip
         items={[
           { label: "RSOs", value: rows.length.toLocaleString() },
-          { label: "Retailers", value: rows.reduce((n, x) => n + x.retailerCount, 0).toLocaleString() },
+          { label: "Retailers", value: company.retailerCount.toLocaleString() },
           { label: "Achieved", value: `৳${Math.round(a).toLocaleString()}`, tone: "teal" },
           { label: "Remaining", value: `৳${Math.max(0, Math.round(t - a)).toLocaleString()}`, tone: "amber" },
         ]}

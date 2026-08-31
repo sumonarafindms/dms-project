@@ -8,13 +8,14 @@
 import { requirePagePermission } from "../../../lib/auth";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { retailerOpportunities } from "../../../lib/retailer-opportunities";
+import { retailerListPage, sortOptionsFor } from "../../../lib/retailer-list";
 import { RetailerSearchView } from "../../components/RetailerOpportunityViews";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
 
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string; page?: string }>;
 }) {
   await requirePagePermission(["ACCOUNTS"], "retailers");
   const s = await searchParams,
@@ -22,6 +23,12 @@ export default async function Page({
     rows = await retailerOpportunities(month, undefined, s.from, s.to);
   const sim = rows.filter((x) => x.simSeller).length,
     flagged = rows.filter((x) => x.reasons.length).length;
+
+  const listPage = retailerListPage(rows, {
+    q: s.q,
+    sort: s.sort,
+    page: s.page,
+  });
 
   return (
     <main className="page">
@@ -39,7 +46,14 @@ export default async function Page({
         ]}
       />
 
-      <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/accounts/retailers" />
+      <RetailerSearchView
+        page={listPage}
+        sortOptions={sortOptionsFor(false)}
+        month={month}
+        from={s.from}
+        to={s.to}
+        base="/accounts/retailers"
+      />
     </main>
   );
 }

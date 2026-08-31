@@ -45,9 +45,7 @@ export default async function Page({
             <span>To</span>
             <input className="kit-input" type="date" name="to" defaultValue={end} />
           </label>
-          <button className="kit-btn is-primary is-end">
-            Apply
-          </button>
+          <button className="kit-btn is-primary is-end">Apply</button>
         </div>
       </form>
       <SectionHead

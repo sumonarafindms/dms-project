@@ -1,20 +1,28 @@
 import { requireUser } from "../../../../lib/auth";
 import { normalizeMonth } from "../../../../lib/drilldown";
 import { retailerOpportunities } from "../../../../lib/retailer-opportunities";
+import { retailerListPage, sortOptionsFor } from "../../../../lib/retailer-list";
 import { Card, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
 import { RetailerSearchView } from "../../../components/RetailerOpportunityViews";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string; page?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const s = await searchParams,
     month = normalizeMonth(s.from?.slice(0, 7) || s.month),
-    rows = await retailerOpportunities(month, undefined, s.from, s.to),
-    // No server-side search any more: the summary strip describes the whole
-    // period, and the list below filters itself in the browser as you type.
-    filtered = rows;
+    rows = await retailerOpportunities(month, undefined, s.from, s.to);
+  // The strip describes the WHOLE period, never the search: narrowing to one
+  // retailer must not make "Retailers: 2,431" read as 1. Only the list below
+  // is filtered and paged.
+  const filtered = rows;
+  const listPage = retailerListPage(filtered, {
+    q: s.q,
+    sort: s.sort,
+    page: s.page,
+  });
+
   return (
     <main className="page">
       <PageHeader
@@ -43,7 +51,14 @@ export default async function Page({
       />
       <SectionHead title="Retailer directory" sub="Open any retailer for full sales and activity detail." />
       <Card padded>
-        <RetailerSearchView rows={filtered} month={month} from={s.from} to={s.to} base="/admin/retailers" />
+        <RetailerSearchView
+          page={listPage}
+          sortOptions={sortOptionsFor(false)}
+          month={month}
+          from={s.from}
+          to={s.to}
+          base="/admin/retailers"
+        />
       </Card>
     </main>
   );

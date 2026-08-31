@@ -133,10 +133,7 @@ export default function Page() {
             </div>
 
             {message && (
-              <div
-                className={`kit-note is-${tone} is-last`}
-                role={tone === "bad" ? "alert" : "status"}
-              >
+              <div className={`kit-note is-${tone} is-last`} role={tone === "bad" ? "alert" : "status"}>
                 <Icon name={tone === "ok" ? "check" : tone === "bad" ? "alert" : "info"} />
                 <span>{message}</span>
               </div>

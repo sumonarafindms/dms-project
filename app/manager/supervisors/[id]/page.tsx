@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requirePagePermission } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
-import { employeePerformance, pct } from "../../../../lib/performance";
+import { employeePerformance } from "../../../../lib/performance";
+import { teamTotals } from "../../../../lib/bp-rollup";
+import { targetPercent as pct } from "../../../../lib/achievement";
 import { normalizeMonth } from "../../../../lib/drilldown";
 import { notFound } from "next/navigation";
 import { managerScope } from "../../../../lib/manager-scope";
@@ -43,14 +45,16 @@ export default async function Page({
       s.to,
     ),
     rows = all;
-  const sum = (k: keyof (typeof all)[number]) => all.reduce((a, r) => a + Number(r[k] || 0), 0),
-    retailers = sum("retailerCount");
+  // teamTotals: this is a supervisor's team, so their RSOs' Business Partners
+  // count. See lib/bp-rollup.ts.
+  const team = teamTotals(all),
+    retailers = team.retailerCount;
   // pacingForView, not pacing: this page accepts from/to, so the figures may
   // describe an eight-day window. A monthly "22 days left" over that would be
   // a confidently wrong number, so it returns null and the line is hidden.
   const now = new Date();
-  const paceFor = (targetKey: keyof (typeof all)[number], achievedKey: keyof (typeof all)[number]) =>
-    pacingForView(sum(targetKey), sum(achievedKey), month, { from: s.from, to: s.to, now }) ?? undefined;
+  const paceFor = (targetKey: keyof typeof team, achievedKey: keyof typeof team) =>
+    pacingForView(team[targetKey], team[achievedKey], month, { from: s.from, to: s.to, now }) ?? undefined;
   return (
     <main className="page">
       <Link href="/manager/supervisors" className="kit-detail-back">
@@ -66,7 +70,7 @@ export default async function Page({
           { label: "Retailers", value: retailers.toLocaleString() },
           {
             label: "Recharge Progress",
-            value: `${pct(sum("totalRechargeAchieved"), sum("totalRechargeTarget"))}%`,
+            value: `${pct(team.totalRechargeAchieved, team.totalRechargeTarget)}%`,
             tone: "teal",
           },
           { label: "Showing", value: rows.length.toLocaleString() },
@@ -76,27 +80,27 @@ export default async function Page({
       <div className="kit-kpi-grid kit-mb-20">
         <KpiCard
           label="GA"
-          achieved={sum("gaAchieved")}
-          target={sum("gaTarget")}
+          achieved={team.gaAchieved}
+          target={team.gaTarget}
           pace={paceFor("gaTarget", "gaAchieved")}
         />
         <KpiCard
           label="LSO"
-          achieved={sum("lsoAchieved")}
-          target={sum("lsoTarget")}
+          achieved={team.lsoAchieved}
+          target={team.lsoTarget}
           pace={paceFor("lsoTarget", "lsoAchieved")}
         />
         <KpiCard
           label="C2C"
-          achieved={sum("c2cAchieved")}
-          target={sum("c2cTarget")}
+          achieved={team.c2cAchieved}
+          target={team.c2cTarget}
           unit="৳"
           pace={paceFor("c2cTarget", "c2cAchieved")}
         />
         <KpiCard
           label="Total Recharge"
-          achieved={sum("totalRechargeAchieved")}
-          target={sum("totalRechargeTarget")}
+          achieved={team.totalRechargeAchieved}
+          target={team.totalRechargeTarget}
           unit="৳"
           pace={paceFor("totalRechargeTarget", "totalRechargeAchieved")}
         />

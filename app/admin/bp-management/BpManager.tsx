@@ -94,7 +94,15 @@ export default function BpManager({
       return;
     }
     setOk(true);
-    setMessage(d.transferredLogin ? `BP assigned. Existing BP login moved to ${d.code}.` : `BP assigned to ${d.code}.`);
+    // No more "existing BP login moved": adding a BP no longer ends this RSO's
+    // previous one, so nothing is moved. `updated` distinguishes editing an
+    // assignment that already existed from creating a new one, which is the
+    // only thing the person needs told apart.
+    setMessage(
+      d.updated
+        ? `Assignment for ${d.code} updated.`
+        : `BP assigned to ${d.code}. This RSO's other BP assignments are unchanged.`,
+    );
     setRetailerId("");
     setQ("");
     router.refresh();

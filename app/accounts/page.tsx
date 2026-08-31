@@ -45,7 +45,7 @@ export default async function Accounts() {
     prisma.employee.count({ where: { active: true } }),
     prisma.retailer.count({ where: { active: true } }),
     // A BP is a retailer holding a live BpAssignment — that assignment, not
-    // the BP login account, is what makes a retailer a BP. See lib/ownership.ts.
+    // the BP login account, is what makes a retailer a BP. See the ownership note in lib/report-data.ts.
     prisma.bpAssignment.count({ where: { active: true } }),
     latestDailySnapshot(),
     ...(["GA", "C2C", "C2S", "OB"] as const).map((type) =>

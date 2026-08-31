@@ -9,6 +9,7 @@
 import { requirePagePermission } from "../../../lib/auth";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { retailerOpportunities } from "../../../lib/retailer-opportunities";
+import { retailerListPage, sortOptionsFor } from "../../../lib/retailer-list";
 import { AttentionSummary, RetailerSearchView } from "../../components/RetailerOpportunityViews";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
 import { Icon } from "../../components/icons";
@@ -16,17 +17,26 @@ import { Icon } from "../../components/icons";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; month?: string; from?: string; to?: string; sort?: string; page?: string }>;
 }) {
   await requirePagePermission(["ACCOUNTS"], "attention");
   const s = await searchParams,
     month = normalizeMonth(s.from?.slice(0, 7) || s.month),
-    all = await retailerOpportunities(month, undefined, s.from, s.to),
-    rows = [...all].sort((a, b) => b.priority - a.priority || a.c2s - b.c2s);
+    all = await retailerOpportunities(month, undefined, s.from, s.to);
+  // The priority ordering moved into retailerListPage's sort specs, where it
+  // is one of the choices in the dropdown rather than a fixed pre-sort the
+  // user could not change.
   // `reasons.length`, not `priority > 0` — priority is a ranking weight, and a
   // retailer can carry one without having an open reason to act on.
   const flagged = all.filter((x) => x.reasons.length).length,
     high = all.filter((x) => x.priority >= 3 && x.reasons.length).length;
+
+  const listPage = retailerListPage(all, {
+    q: s.q,
+    sort: s.sort,
+    page: s.page,
+    attentionOnly: true,
+  });
 
   return (
     <main className="page">
@@ -54,7 +64,15 @@ export default async function Page({
 
       <AttentionSummary rows={all} />
 
-      <RetailerSearchView rows={rows} month={month} from={s.from} to={s.to} base="/accounts/retailers" attentionOnly />
+      <RetailerSearchView
+        page={listPage}
+        sortOptions={sortOptionsFor(true)}
+        month={month}
+        from={s.from}
+        to={s.to}
+        base="/accounts/retailers"
+        attentionOnly
+      />
     </main>
   );
 }

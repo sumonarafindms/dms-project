@@ -13,18 +13,18 @@
 
 import Link from "next/link";
 import { requirePagePermission } from "../../lib/auth";
-import { employeePerformance, pct } from "../../lib/performance";
+import { employeePerformance } from "../../lib/performance";
 import { prisma } from "../../lib/prisma";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
 import { latestDailySnapshot, monthPace } from "../../lib/intelligence";
 import { managerScope } from "../../lib/manager-scope";
 import { dhakaMonth } from "../../lib/business-time";
 import { pacing } from "../../lib/pacing";
-import { ACHIEVEMENT_ON_TRACK_PERCENT, paceBand } from "../../lib/achievement";
+import { ACHIEVEMENT_ON_TRACK_PERCENT, paceBand, targetPercent as pct } from "../../lib/achievement";
 import {
   Badge,
   Card,
-  ComparisonCard,
+  ComparisonSection,
   EmptyState,
   EntityCard,
   KpiCard,
@@ -36,7 +36,8 @@ import {
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
-import type { ComparisonKind } from "../../lib/comparison";
+import { teamTotals, withBp } from "../../lib/bp-rollup";
+import { parseComparisonKind } from "../../lib/comparison";
 
 export const dynamic = "force-dynamic";
 
@@ -60,16 +61,18 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
   const attention = attentionRows.filter((x) => x.priority > 0).length;
   const retailers = rows.reduce((a, r) => a + r.retailerCount, 0);
   const sp = await searchParams;
-  const compareKind: ComparisonKind = sp.compare === "week" || sp.compare === "month" ? sp.compare : "day";
+  const compareKind = parseComparisonKind(sp.compare);
   const comparison = await performanceComparison(compareKind, scope.employeeIds);
 
   const expected = monthPace(month);
-  const sum = (k: keyof (typeof rows)[number]) => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
+  // teamTotals, not a plain sum: each RSO row now excludes its BPs, and a
+  // manager answers for the whole territory. See lib/bp-rollup.ts.
+  const team = teamTotals(rows);
   // One clock read for the whole page — four cards each calling new Date()
   // could straddle a Dhaka midnight and disagree about the days left.
   const now = new Date();
-  const paceFor = (targetKey: keyof (typeof rows)[number], achievedKey: keyof (typeof rows)[number]) =>
-    pacing(sum(targetKey), sum(achievedKey), monthKey, now);
+  const paceFor = (targetKey: keyof typeof team, achievedKey: keyof typeof team) =>
+    pacing(team[targetKey], team[achievedKey], monthKey, now);
 
   // Roll RSO rows up to their supervisor. Supervisors hold no targets of their
   // own, so a supervisor's target is the sum of their RSOs'.
@@ -91,12 +94,14 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
   for (const r of rows) {
     const x = supBy.get(r.supervisor);
     if (!x) continue;
+    // withBp: the supervisor's team includes their RSOs' Business Partners.
+    const t = withBp(r);
     x.rsos++;
-    x.retailers += r.retailerCount;
-    x.achieved += r.totalRechargeAchieved;
-    x.target += r.totalRechargeTarget;
-    x.ga += r.gaAchieved;
-    x.gaTarget += r.gaTarget;
+    x.retailers += t.retailerCount;
+    x.achieved += t.totalRechargeAchieved;
+    x.target += t.totalRechargeTarget;
+    x.ga += t.gaAchieved;
+    x.gaTarget += t.gaTarget;
   }
   const supRows = [...supBy.values()].sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
 
@@ -124,54 +129,37 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
       <div className="kit-kpi-grid kit-mb-20">
         <KpiCard
           label="GA"
-          achieved={sum("gaAchieved")}
-          target={sum("gaTarget")}
+          achieved={team.gaAchieved}
+          target={team.gaTarget}
           pace={paceFor("gaTarget", "gaAchieved")}
         />
         <KpiCard
           label="LSO"
-          achieved={sum("lsoAchieved")}
-          target={sum("lsoTarget")}
+          achieved={team.lsoAchieved}
+          target={team.lsoTarget}
           pace={paceFor("lsoTarget", "lsoAchieved")}
         />
         <KpiCard
           label="C2C"
-          achieved={sum("c2cAchieved")}
-          target={sum("c2cTarget")}
+          achieved={team.c2cAchieved}
+          target={team.c2cTarget}
           unit="৳"
           pace={paceFor("c2cTarget", "c2cAchieved")}
         />
         <KpiCard
           label="Total Recharge"
-          achieved={sum("totalRechargeAchieved")}
-          target={sum("totalRechargeTarget")}
+          achieved={team.totalRechargeAchieved}
+          target={team.totalRechargeTarget}
           unit="৳"
           pace={paceFor("totalRechargeTarget", "totalRechargeAchieved")}
         />
       </div>
 
-      <SectionHead
-        title="Compared with the previous period"
-        sub="Each figure names the two dates it was measured between, because the feeds do not always arrive together."
-        link={
-          <span className="kit-period-switch">
-            {(["day", "week", "month"] as const).map((k) => (
-              <Link
-                key={k}
-                href={`/manager?compare=${k}`}
-                className={`kit-btn size-sm ${k === compareKind ? "is-primary" : "is-ghost"}`}
-              >
-                {k === "day" ? "Day" : k === "week" ? "Week" : "Month"}
-              </Link>
-            ))}
-          </span>
-        }
+      <ComparisonSection
+        metrics={comparison.metrics}
+        kind={compareKind}
+        control={{ mode: "link", hrefFor: (k) => `/manager?compare=${k}` }}
       />
-      <div className="kit-card-grid kit-mb-20">
-        {comparison.metrics.map((m) => (
-          <ComparisonCard key={m.metric} item={m} />
-        ))}
-      </div>
 
       <SectionHead title="Needs attention" sub="Tap a count to open the work behind it." />
       <div className="kit-status-tiles kit-mb-20">

@@ -17,7 +17,8 @@ import Link from "next/link";
 import { TARGET_BAND_LABEL, targetBand, targetPercent } from "../../lib/achievement";
 import type { TargetBand } from "../../lib/achievement";
 import { perDayLabel, riskTone } from "../../lib/pacing";
-import { changeLabel, changeTone } from "../../lib/comparison";
+import { COMPARISON_KINDS, COMPARISON_KIND_LABEL, changeLabel, changeTone } from "../../lib/comparison";
+import type { ComparisonKind } from "../../lib/comparison";
 import type { MetricComparison } from "../../lib/comparison-data";
 import type { Pacing } from "../../lib/pacing";
 
@@ -668,6 +669,156 @@ export function ComparisonCard({ item }: { item: MetricComparison }) {
         </>
       )}
     </Card>
+  );
+}
+
+/**
+ * How the period switch changes the period.
+ *
+ * Two modes, because the pages genuinely differ and pretending otherwise would
+ * make one of them worse:
+ *
+ * - `link` — the role pages render the comparison on the server from a
+ *   `?compare=` query parameter. A real link keeps the choice in the URL, so
+ *   it is bookmarkable, survives a refresh, and works before React has
+ *   hydrated.
+ * - `select` — `/dashboard` is a client component that fetches its own data
+ *   and already holds the reporting month in state. A link there would throw
+ *   away that state and re-run the month fetch to change one word, so it calls
+ *   back instead.
+ */
+export type PeriodControl =
+  | { mode: "link"; hrefFor: (kind: ComparisonKind) => string }
+  | { mode: "select"; onSelect: (kind: ComparisonKind) => void };
+
+/** Day / Week / Month, as three buttons with the active one filled. */
+export function PeriodSwitch({ value, control }: { value: ComparisonKind; control: PeriodControl }) {
+  const className = (kind: ComparisonKind) => `kit-btn size-sm ${kind === value ? "is-primary" : "is-ghost"}`;
+  return (
+    <span className="kit-period-switch">
+      {COMPARISON_KINDS.map((kind) =>
+        control.mode === "link" ? (
+          <Link key={kind} href={control.hrefFor(kind)} className={className(kind)}>
+            {COMPARISON_KIND_LABEL[kind]}
+          </Link>
+        ) : (
+          <button
+            key={kind}
+            type="button"
+            className={className(kind)}
+            aria-pressed={kind === value}
+            onClick={() => control.onSelect(kind)}
+          >
+            {COMPARISON_KIND_LABEL[kind]}
+          </button>
+        ),
+      )}
+    </span>
+  );
+}
+
+/**
+ * The whole "compared with the previous period" section: heading, period
+ * switch and the row of cards.
+ *
+ * This is one component rather than three copies because it WAS three copies.
+ * v130 shipped the block to /rso, /supervisor and /manager as byte-identical
+ * JSX, and v134 was about to paste a fourth onto /dashboard. The heading text
+ * matters as much as the markup — it explains why two cards may name different
+ * dates, and a fourth copy is a fourth place for that explanation to drift out
+ * of step with what the data actually does.
+ */
+export function ComparisonSection({
+  metrics,
+  kind,
+  control,
+  loading,
+}: {
+  metrics: MetricComparison[];
+  kind: ComparisonKind;
+  control: PeriodControl;
+  /** Client callers only: show placeholders instead of a misleading empty row. */
+  loading?: boolean;
+}) {
+  return (
+    <>
+      <SectionHead
+        title="Compared with the previous period"
+        sub="Each figure names the two dates it was measured between, because the feeds do not always arrive together."
+        link={<PeriodSwitch value={kind} control={control} />}
+      />
+      <div className="kit-card-grid kit-mb-20">
+        {loading
+          ? [1, 2, 3].map((i) => (
+              <Card key={i} padded>
+                <Skeleton className="kit-skel-num" />
+              </Card>
+            ))
+          : metrics.map((m) => <ComparisonCard key={m.metric} item={m} />)}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Page controls for a server-paged list.
+ *
+ * Links, not buttons: the page is part of the URL, so a page can be bookmarked,
+ * shared and reopened, and the back button walks back through the pages the way
+ * a person expects. `scroll` is left on — moving to page 4 SHOULD return you to
+ * the top of the list, unlike a search, where jumping is disorienting.
+ *
+ * The label always names the true total ("61–120 of 2,431"). The list this
+ * replaced said "showing the first 300" and gave no way to reach the 301st,
+ * which is the silent-truncation pattern the v132 audit kept finding.
+ */
+export function Pager({
+  page,
+  pageCount,
+  label,
+  hrefFor,
+}: {
+  page: number;
+  pageCount: number;
+  /** e.g. "61–120 of 2,431 retailers". */
+  label: string;
+  hrefFor: (page: number) => string;
+}) {
+  // A single page still shows the count — it is the answer to "how many are
+  // there", not decoration for the controls.
+  const first = page <= 1;
+  const last = page >= pageCount;
+  return (
+    <div className="kit-pager no-print">
+      <span className="kit-pager-label" aria-live="polite">
+        {label}
+      </span>
+      {pageCount > 1 && (
+        <nav className="kit-pager-controls" aria-label="Pagination">
+          {first ? (
+            <span className="kit-btn size-sm is-ghost is-disabled" aria-disabled="true">
+              ← Previous
+            </span>
+          ) : (
+            <Link className="kit-btn size-sm is-ghost" href={hrefFor(page - 1)} rel="prev">
+              ← Previous
+            </Link>
+          )}
+          <span className="kit-pager-position">
+            Page {page.toLocaleString()} of {pageCount.toLocaleString()}
+          </span>
+          {last ? (
+            <span className="kit-btn size-sm is-ghost is-disabled" aria-disabled="true">
+              Next →
+            </span>
+          ) : (
+            <Link className="kit-btn size-sm is-ghost" href={hrefFor(page + 1)} rel="next">
+              Next →
+            </Link>
+          )}
+        </nav>
+      )}
+    </div>
   );
 }
 

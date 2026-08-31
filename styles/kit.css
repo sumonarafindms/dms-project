@@ -2991,6 +2991,12 @@
     flex-direction: column;
     gap: 0.375rem;
   }
+  /* The gap between stacked CARDS, matching .kit-card-grid's own. */
+  .kit-stack-12 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
 
   /* --- Text ---------------------------------------------------------- */
 
@@ -3149,5 +3155,168 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
+  }
+}
+
+@layer components {
+  /* --- Data readiness grid ----------------------------------------------
+     One row per feed, one cell per day. Tone arrives from dayStateTone() in
+     lib/readiness.ts as one of the badge tones the kit already owns, so this
+     block introduces no new status colour — only the shape.
+
+     ONE scroll container around the whole grid, not one per row. Four
+     independently scrolling rows would let the feeds drift out of step, and
+     the entire point of the grid is reading a column downwards: "the 17th is
+     missing for GA and C2S but fine for C2C". A fixed-width label column
+     (rather than `auto`) keeps the columns aligned whatever the feed is
+     called — "Opening Balance" is much wider than "C2C", and `auto` pushed
+     that row's days out of line with the others.
+
+     The label is sticky so it stays readable while the days scroll, and
+     <TableScrollHint> after the container tells a phone user there is more.
+     Cells are 14px: small enough that a month fits on a laptop, large enough
+     that a single missing day is still visible. */
+  .kit-readiness {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .kit-readiness-row {
+    display: grid;
+    grid-template-columns: 7.5rem max-content;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-slate-100);
+  }
+  .kit-readiness-row:last-child {
+    border-bottom: 0;
+  }
+  .kit-readiness-head {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    /* Matches .kit-card, so the days scroll cleanly underneath it. */
+    background: #fff;
+    padding-right: 0.5rem;
+    min-width: 0;
+  }
+  .kit-readiness-head > strong {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--color-slate-900);
+  }
+  .kit-readiness-head > span:not(.kit-badge) {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-slate-500);
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-readiness-days {
+    display: flex;
+    gap: 2px;
+  }
+  .kit-readiness-day {
+    flex: 0 0 auto;
+    width: 0.875rem;
+    height: 1.5rem;
+    border-radius: 3px;
+    border: 1px solid transparent;
+  }
+  /* Same four tones as .kit-badge, so a cell and a badge saying the same
+     thing look the same. */
+  .kit-readiness-day.tone-complete {
+    background: var(--color-teal-500);
+  }
+  .kit-readiness-day.tone-pending {
+    background: var(--color-amber-400);
+  }
+  .kit-readiness-day.tone-failed {
+    background: var(--color-rose-500);
+  }
+  .kit-readiness-day.tone-inactive {
+    background: var(--color-slate-100);
+    border-color: var(--color-slate-200);
+  }
+  .kit-readiness-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--color-slate-500);
+  }
+  .kit-readiness-legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .kit-readiness-key {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 2px;
+    border: 1px solid transparent;
+  }
+  .kit-readiness-key.tone-complete {
+    background: var(--color-teal-500);
+  }
+  .kit-readiness-key.tone-pending {
+    background: var(--color-amber-400);
+  }
+  .kit-readiness-key.tone-failed {
+    background: var(--color-rose-500);
+  }
+  .kit-readiness-key.tone-inactive {
+    background: var(--color-slate-100);
+    border-color: var(--color-slate-200);
+  }
+}
+
+@layer components {
+  /* --- Pager -------------------------------------------------------------
+     Count on the left, controls on the right; stacked below 480px, where a
+     five-part row would wrap into something unreadable.
+
+     `is-disabled` is a span rather than a disabled <a>: an anchor with no href
+     is not focusable, so a keyboard user tabs straight past the dead control
+     instead of landing on something that does nothing. */
+  .kit-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    margin-top: 1rem;
+  }
+  .kit-pager-label {
+    font-size: 0.8125rem;
+    color: var(--color-slate-500);
+    font-variant-numeric: tabular-nums;
+  }
+  .kit-pager-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .kit-pager-position {
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .kit-btn.is-disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+  }
+  @media (max-width: 479px) {
+    .kit-pager {
+      justify-content: center;
+    }
+    .kit-pager-controls {
+      width: 100%;
+      justify-content: space-between;
+    }
   }
 }

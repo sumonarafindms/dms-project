@@ -67,23 +67,7 @@ export function ListControls({
         </div>
       ) : null}
 
-      {showDates ? (
-        // Its own form: submitting a date must not carry the search text into
-        // the URL, and changing the search must not touch the dates.
-        <form className="kit-date-form">
-          <label className="kit-field">
-            <span>From</span>
-            <input className="kit-input" type="date" name="from" defaultValue={from || (month ? `${month}-01` : "")} />
-          </label>
-          <label className="kit-field">
-            <span>To</span>
-            <input className="kit-input" type="date" name="to" defaultValue={to || ""} />
-          </label>
-          <button className="kit-btn is-secondary size-sm" type="submit">
-            Apply dates
-          </button>
-        </form>
-      ) : null}
+      {showDates ? <DateRangeFields month={month} from={from} to={to} /> : null}
 
       {sort && sort.length > 1 && onSort ? (
         <label className="kit-field kit-sort">
@@ -104,6 +88,44 @@ export function ListControls({
           ? "Instant filter"
           : `${resultCount.toLocaleString()} ${resultCount === 1 ? resultNoun : `${resultNoun}s`}`}
       </span>
+    </div>
+  );
+}
+
+/**
+ * The date range, as its own form.
+ *
+ * A real form submission on purpose: a date change selects a DIFFERENT dataset,
+ * so it belongs in the URL where it can be bookmarked and shared. That is the
+ * one control on these bars that should navigate — mixing search into the same
+ * submit is what made typing feel like a page load (v131).
+ *
+ * Extracted in v137 so the retailer list, which no longer uses ListControls,
+ * gets the same markup rather than a second copy of it.
+ */
+export function DateRangeFields({ month, from, to }: { month?: string; from?: string; to?: string }) {
+  return (
+    <form className="kit-date-form">
+      <label className="kit-field">
+        <span>From</span>
+        <input className="kit-input" type="date" name="from" defaultValue={from || (month ? `${month}-01` : "")} />
+      </label>
+      <label className="kit-field">
+        <span>To</span>
+        <input className="kit-input" type="date" name="to" defaultValue={to || ""} />
+      </label>
+      <button className="kit-btn is-secondary size-sm" type="submit">
+        Apply dates
+      </button>
+    </form>
+  );
+}
+
+/** The same form, wrapped in a bar of its own for pages with no ListControls. */
+export function DateRangeForm(props: { month?: string; from?: string; to?: string }) {
+  return (
+    <div className="kit-filter-bar no-print">
+      <DateRangeFields {...props} />
     </div>
   );
 }

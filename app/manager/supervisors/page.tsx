@@ -1,5 +1,7 @@
 import { requirePagePermission } from "../../../lib/auth";
-import { employeePerformance, pct } from "../../../lib/performance";
+import { employeePerformance } from "../../../lib/performance";
+import { withBp } from "../../../lib/bp-rollup";
+import { targetPercent as pct } from "../../../lib/achievement";
 import { prisma } from "../../../lib/prisma";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { managerScope } from "../../../lib/manager-scope";
@@ -37,13 +39,16 @@ export default async function Page({
   const by = new Map<string, { rso: number; ret: number; a: number; t: number; ga: number; gaT: number }>();
   for (const r of rows) {
     if (!r.supervisorId) continue;
+    // withBp: an RSO row excludes its Business Partners; a supervisor's team
+    // does not. See lib/bp-rollup.ts.
+    const t = withBp(r);
     const x = by.get(r.supervisorId) || { rso: 0, ret: 0, a: 0, t: 0, ga: 0, gaT: 0 };
     x.rso++;
-    x.ret += r.retailerCount;
-    x.a += r.totalRechargeAchieved;
-    x.t += r.totalRechargeTarget;
-    x.ga += r.gaAchieved;
-    x.gaT += r.gaTarget;
+    x.ret += t.retailerCount;
+    x.a += t.totalRechargeAchieved;
+    x.t += t.totalRechargeTarget;
+    x.ga += t.gaAchieved;
+    x.gaT += t.gaTarget;
     by.set(r.supervisorId, x);
   }
   const teams = sups.map((sup) => ({

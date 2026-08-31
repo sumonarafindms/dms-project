@@ -13,120 +13,97 @@
  * server already decided the signed-in user may see, so filtering them in the
  * browser cannot widen anyone's access.
  *
- * A client component on purpose: search and sort are filtering over rows that
- * are already here, so they run locally and instantly. Only the date range
- * navigates, because only the date range changes which rows exist.
+ * ## Why the search is now a soft navigation
+ *
+ * It used to filter rows already in the browser, which is the right answer when
+ * the rows are there. They no longer are: with ~2,500 retailers, shipping every
+ * row to render at most 300 of them cost roughly half a megabyte per page load
+ * and left everything past the 300th unreachable. The server now filters,
+ * orders and pages (lib/retailer-list.ts) and sends one page.
+ *
+ * So search moves to `ServerSearchBar` — the pattern this codebase already uses
+ * wherever the server has to narrow the set. It is still instant: a debounced
+ * `router.replace` inside a transition re-renders the server tree in place, the
+ * input never unmounts, and focus and caret survive. It is NOT the form submit
+ * that caused the reload reported in v131; a test forbids that shape.
+ *
+ * The date range still navigates for its own reason: it selects a different
+ * dataset entirely.
  */
 
-import { useMemo } from "react";
 import Link from "next/link";
-import { ListControls, useListControls } from "./ListControls";
+import { DateRangeForm } from "./ListControls";
+import { ServerSearchBar, ServerSelect } from "./ServerSearchBar";
 import { Icon } from "./icons";
-import { Badge, Card, EmptyState, Row, SectionHead } from "./Kit";
+import { Badge, Card, EmptyState, Pager, Row, SectionHead } from "./Kit";
 import type { RetailerOpportunity } from "../../lib/retailer-opportunities";
-import { matchesRetailerQuery } from "../../lib/retailer-search";
-import { activeSort, applySort, byNumberAsc, byNumberDesc, byText, sortOptions, type SortSpec } from "../../lib/sort";
+import type { RetailerListPage } from "../../lib/retailer-list";
+import { pageLabel } from "../../lib/retailer-list";
 
 const fmt = (n: number) => new Intl.NumberFormat("en-BD", { maximumFractionDigits: 0 }).format(n);
 
-const name = (r: RetailerOpportunity) => r.retailerName || r.retailerCode;
-
-/**
- * Cards rendered at once. The retailer base runs to a few thousand rows, and
- * every card carries a ring, four figures and up to two reason chips — past
- * this many the browser spends longer laying the page out than the server does
- * producing it. The count above the list always reports the true total, and
- * the search narrows the set rather than paging through it.
+/*
+ * The sort orders and the 300-card cap that used to live here moved to
+ * lib/retailer-list.ts in v137. The server sorts now, and a comparator cannot
+ * cross the Server-to-Client boundary — this component receives only the
+ * `{ value, label }` options its dropdown needs.
  */
-const MAX_CARDS = 300;
-
-/**
- * Orders for a retailer list. The attention view leads with priority; the
- * plain directory leads with the highest sellers, which is what the first
- * entry of each list below encodes.
- */
-const COMMON: SortSpec<RetailerOpportunity>[] = [
-  { value: "ga-desc", label: "GA — high to low", compare: byNumberDesc((r) => r.ga, name) },
-  { value: "ga-asc", label: "GA — low to high", compare: byNumberAsc((r) => r.ga, name) },
-  { value: "c2s-desc", label: "C2S sales — high to low", compare: byNumberDesc((r) => r.c2s, name) },
-  { value: "c2s-asc", label: "C2S sales — low to high", compare: byNumberAsc((r) => r.c2s, name) },
-  { value: "trx-desc", label: "C2S transactions — most first", compare: byNumberDesc((r) => r.c2sTransactions, name) },
-  { value: "name-asc", label: "Retailer name — A to Z", compare: (a, b) => byText(name(a), name(b)) },
-  { value: "code-asc", label: "Retailer code — A to Z", compare: (a, b) => byText(a.retailerCode, b.retailerCode) },
-  {
-    value: "rso-asc",
-    label: "RSO — A to Z",
-    compare: (a, b) => byText(a.employeeName, b.employeeName) || byText(name(a), name(b)),
-  },
-  {
-    value: "route-asc",
-    label: "Route — A to Z",
-    compare: (a, b) => byText(a.route || "", b.route || "") || byText(name(a), name(b)),
-  },
-];
-
-const PRIORITY: SortSpec<RetailerOpportunity> = {
-  value: "priority-desc",
-  label: "Priority — highest first",
-  compare: byNumberDesc((r) => r.priority, name),
-};
-
-const DIRECTORY_SORTS = COMMON;
-const ATTENTION_SORTS: SortSpec<RetailerOpportunity>[] = [PRIORITY, ...COMMON];
 
 export function RetailerSearchView({
-  rows,
+  page,
+  sortOptions,
   month,
   base,
   from,
   to,
   attentionOnly = false,
 }: {
-  rows: RetailerOpportunity[];
+  /** One page of rows, already filtered, ordered and counted by the server. */
+  page: RetailerListPage;
+  sortOptions: { value: string; label: string }[];
   month: string;
   base: string;
   from?: string;
   to?: string;
   attentionOnly?: boolean;
 }) {
-  const SORTS = attentionOnly ? ATTENTION_SORTS : DIRECTORY_SORTS;
-  const { query, setQuery, deferredQuery, sort, setSort } = useListControls(SORTS[0].value);
-
-  const ordered = useMemo(() => {
-    const filtered = rows.filter((r) => {
-      if (attentionOnly && !r.reasons.length) return false;
-      return matchesRetailerQuery(r, deferredQuery);
-    });
-    return applySort(filtered, SORTS, sort);
-  }, [rows, attentionOnly, deferredQuery, sort, SORTS]);
-
-  const shown = ordered.slice(0, MAX_CARDS);
   const range = `month=${month}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`;
+  const sortLabel = sortOptions.find((o) => o.value === page.sort)?.label ?? sortOptions[0]?.label;
+
+  /**
+   * Links for the pager, preserving everything else in the URL.
+   *
+   * Built from the values the server already resolved rather than from
+   * `useSearchParams`, so page 2 of a search cannot lose the search — the two
+   * would disagree for one render after a soft navigation.
+   */
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams({ month });
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (page.q) params.set("q", page.q);
+    if (page.sort) params.set("sort", page.sort);
+    if (n > 1) params.set("page", String(n));
+    return `?${params.toString()}`;
+  };
 
   return (
     <>
-      <ListControls
-        query={query}
-        onQuery={setQuery}
+      <ServerSearchBar
         placeholder="Retailer code, name, RSO, supervisor or route"
-        sort={sortOptions(SORTS)}
-        sortValue={sort}
-        onSort={setSort}
-        month={month}
-        from={from}
-        to={to}
-        resultCount={ordered.length}
+        resultCount={page.total}
         resultNoun="retailer"
-      />
+      >
+        <ServerSelect paramName="sort" label="Sort" options={sortOptions} allLabel={null} />
+      </ServerSearchBar>
+      <DateRangeForm month={month} from={from} to={to} />
       <SectionHead
         title={attentionOnly ? "Needs attention" : "Retailers"}
-        sub={`${ordered.length} ${ordered.length === 1 ? "result" : "results"}${
-          ordered.length > shown.length ? ` · showing the first ${shown.length}` : ""
-        } · sorted by ${activeSort(SORTS, sort).label}`}
+        sub={`${pageLabel(page)}${sortLabel ? ` · sorted by ${sortLabel}` : ""}`}
       />
-      {shown.length ? (
+      {page.rows.length ? (
         <div className="kit-card-grid">
-          {shown.map((r) => (
+          {page.rows.map((r) => (
             <Link key={r.id} href={`${base}/${r.id}?${range}`} className="kit-card kit-card-p is-clickable kit-outlet">
               <div className="kit-entity-top">
                 <span className="kit-avatar" aria-hidden="true">
@@ -183,25 +160,26 @@ export function RetailerSearchView({
       ) : (
         <Card>
           <EmptyState
-            positive={attentionOnly && !deferredQuery}
+            positive={attentionOnly && !page.q}
             title={
-              attentionOnly && !deferredQuery
+              attentionOnly && !page.q
                 ? "Nothing needs attention"
-                : deferredQuery
-                  ? `No retailer matches “${query.trim()}”`
+                : page.q
+                  ? `No retailer matches “${page.q}”`
                   : "No retailers in this period"
             }
             hint={
-              deferredQuery
+              page.q
                 ? "Clear the search to see the whole list again."
                 : attentionOnly
                   ? "Every retailer in scope has completed SSO and LSO for this period."
                   : "Try another date range."
             }
-            icon={<Icon name={attentionOnly && !deferredQuery ? "check" : "search"} />}
+            icon={<Icon name={attentionOnly && !page.q ? "check" : "search"} />}
           />
         </Card>
       )}
+      <Pager page={page.page} pageCount={page.pageCount} label={pageLabel(page)} hrefFor={pageHref} />
     </>
   );
 }

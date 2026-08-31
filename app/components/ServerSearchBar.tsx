@@ -129,6 +129,8 @@ export function ServerSearchBar({
  * navigation. One interaction rather than one per keystroke, so it commits
  * immediately with no debounce.
  */
+export type SelectOption = string | { value: string; label: string };
+
 export function ServerSelect({
   paramName,
   label,
@@ -137,8 +139,14 @@ export function ServerSelect({
 }: {
   paramName: string;
   label: string;
-  options: string[];
-  allLabel?: string;
+  /** Plain strings where value and label are the same, or `{ value, label }`. */
+  options: SelectOption[];
+  /**
+   * The leading "no choice" entry. Pass `null` where every option is a real
+   * choice — a sort dropdown has no "All", and offering one would show the
+   * default order twice under two different names.
+   */
+  allLabel?: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -161,10 +169,15 @@ export function ServerSelect({
           });
         }}
       >
-        <option value="">{allLabel}</option>
-        {options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
+        {allLabel === null ? null : <option value="">{allLabel}</option>}
+        {options.map((o) => {
+          const { value, label: text } = typeof o === "string" ? { value: o, label: o } : o;
+          return (
+            <option key={value} value={value}>
+              {text}
+            </option>
+          );
+        })}
       </select>
     </label>
   );

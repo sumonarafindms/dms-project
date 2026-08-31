@@ -4,10 +4,13 @@
  * The IT demo's landing screen, wired to real data. Three things it shows are
  * only shown when they can be answered honestly:
  *
- *   Data Readiness — from ImportBatch business dates, never inferred from
- *     whether rows exist. A feed with no successful import for the selected
- *     period reads "Missing", and the page says outright that reports may be
- *     incomplete because of it.
+ *   Data Readiness — per-day coverage from lib/readiness-data.ts, with a link
+ *     to the full grid. It used to ask whether ONE completed batch existed
+ *     anywhere in the range, which is right for the default range of yesterday
+ *     and badly wrong for a month: a single GA import on the 3rd painted the
+ *     whole of August green while the totals below were missing thirty days.
+ *     Now the card reads "27 of 31 days" and only says Imported when every due
+ *     day is.
  *   Daily Performance — real aggregates over the selected range.
  *   Report Shortcuts — every card links onward carrying the current range, so
  *     the period a user picked here survives into the report they open.
@@ -19,19 +22,14 @@
 import Link from "next/link";
 import { requireUser } from "../../../lib/auth";
 import { resolveRange, rangeQuery } from "../../../lib/report-range";
-import { dataReadiness, rangeTotals } from "../../../lib/report-data";
+import { rangeTotals } from "../../../lib/report-data";
+import { readinessReport } from "../../../lib/readiness-data";
+import { DAY_STATE_LABEL, coverageLabel, dayStateTone, readinessWarning, worstState } from "../../../lib/readiness";
 import { Badge, Card, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
 import { ReportDateBar } from "../../components/ReportShell";
 import { Icon } from "../../components/icons";
 
 export const dynamic = "force-dynamic";
-
-const FEED_LABEL: Record<string, string> = {
-  GA: "GA Activation",
-  C2C: "C2C",
-  C2S: "C2S",
-  OB: "Opening Balance",
-};
 
 // All fourteen reports from the IT demo. Every entry here resolves to a real
 // page — a shortcut that opens an empty page is worse than no shortcut.
@@ -56,8 +54,8 @@ export default async function ReportsHome({ searchParams }: { searchParams: Prom
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const [feeds, totals] = await Promise.all([dataReadiness(range), rangeTotals(range)]);
-  const missing = feeds.filter((f) => !f.ready);
+  const [readiness, totals] = await Promise.all([readinessReport(range), rangeTotals(range)]);
+  const warning = readinessWarning(readiness.feeds);
   const q = rangeQuery(range);
 
   return (
@@ -68,31 +66,35 @@ export default async function ReportsHome({ searchParams }: { searchParams: Prom
       />
       <ReportDateBar range={range} />
 
-      <SectionHead title="Data readiness" sub="Whether each feed was actually imported for the selected period." />
+      <SectionHead
+        title="Data readiness"
+        sub="How many days of the selected period each feed actually landed for."
+        link={
+          <Link className="no-print" href={`/it/readiness?${q}`}>
+            Day-by-day view →
+          </Link>
+        }
+      />
       <div className="kit-summary-strip">
-        {feeds.map((f) => (
-          <Card key={f.feed} padded>
-            <div className="kit-row-between">
-              <strong className="kit-rowtitle">
-                {FEED_LABEL[f.feed] ?? f.feed}
-              </strong>
-              <Badge tone={f.ready ? "complete" : "pending"}>{f.ready ? "Ready" : "Missing"}</Badge>
-            </div>
-            <p className="kit-hint is-xs kit-mt-6">
-              {f.ready && f.uploadedAt
-                ? `Imported ${f.uploadedAt.toISOString().slice(0, 16).replace("T", " ")}`
-                : "No import covering this period"}
-            </p>
-          </Card>
-        ))}
+        {readiness.feeds.map((f) => {
+          const worst = worstState(f);
+          return (
+            <Card key={f.feed} padded>
+              <div className="kit-row-between">
+                <strong className="kit-rowtitle">{f.label}</strong>
+                <Badge tone={dayStateTone(worst)}>{DAY_STATE_LABEL[worst]}</Badge>
+              </div>
+              <p className="kit-hint is-xs kit-mt-6">{coverageLabel(f)}</p>
+            </Card>
+          );
+        })}
       </div>
 
-      {missing.length > 0 && (
+      {warning && (
         <div className="kit-note is-warn" role="status">
           <Icon name="alert" />
           <span>
-            Reports for this period may be incomplete — {missing.map((f) => FEED_LABEL[f.feed] ?? f.feed).join(", ")}{" "}
-            {missing.length === 1 ? "has" : "have"} no import covering it.
+            {warning} <Link href={`/it/readiness?${q}`}>See which days →</Link>
           </span>
         </div>
       )}

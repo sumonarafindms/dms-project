@@ -109,36 +109,42 @@ describe("day windows", () => {
 });
 
 describe("week windows", () => {
-  it("starts the week on Sunday, so the Sun–Thu working week stays together", () => {
-    expect(WEEK_STARTS_ON).toBe(0);
-    // 29 Aug 2026 is a Saturday; its week began Sunday 23 Aug.
+  it("starts the week on Saturday, as the distributor confirmed", () => {
+    // Locked deliberately. Changing WEEK_STARTS_ON silently redefines every
+    // week-on-week number on every screen, and no other check would notice,
+    // because a wrong week still produces plausible-looking figures. If this
+    // ever needs to change, it needs an owner's answer, not a code review.
+    expect(WEEK_STARTS_ON).toBe(6);
+    // 29 Aug 2026 is a Saturday, so it is its own week start.
     expect(new Date("2026-08-29T00:00:00.000Z").getUTCDay()).toBe(6);
-    expect(weekStart("2026-08-29")).toBe("2026-08-23");
-    // A Sunday is its own week start.
-    expect(weekStart("2026-08-23")).toBe("2026-08-23");
+    expect(weekStart("2026-08-29")).toBe("2026-08-29");
+    // 26 Aug 2026 is a Wednesday; its week began Saturday 22 Aug.
+    expect(weekStart("2026-08-26")).toBe("2026-08-22");
   });
 
   it("compares the same number of days on both sides", () => {
-    // Wednesday: four days into the week. The previous window must also be
-    // four days, or every early-week comparison looks like a collapse.
+    // Wednesday: five days into a Saturday-start week. The previous window
+    // must also be five days, or every early-week comparison looks like a
+    // collapse.
     const w = weekWindows("2026-08-26");
-    expect(w.current).toMatchObject({ from: "2026-08-23", to: "2026-08-26" });
-    expect(w.previous).toMatchObject({ from: "2026-08-16", to: "2026-08-19" });
+    expect(w.current).toMatchObject({ from: "2026-08-22", to: "2026-08-26" });
+    expect(w.previous).toMatchObject({ from: "2026-08-15", to: "2026-08-19" });
     const span = (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 86400000;
     expect(span(w.current.from, w.current.to)).toBe(span(w.previous.from, w.previous.to));
   });
 
   it("handles the first day of a week", () => {
-    const w = weekWindows("2026-08-23");
-    expect(w.current).toMatchObject({ from: "2026-08-23", to: "2026-08-23" });
-    expect(w.previous).toMatchObject({ from: "2026-08-16", to: "2026-08-16" });
+    // A Saturday: one day against the one day of the Saturday before.
+    const w = weekWindows("2026-08-22");
+    expect(w.current).toMatchObject({ from: "2026-08-22", to: "2026-08-22" });
+    expect(w.previous).toMatchObject({ from: "2026-08-15", to: "2026-08-15" });
   });
 
   it("labels a week that straddles two months with both", () => {
-    // 30 Jul 2026 is a Thursday; its week began Sunday 26 Jul.
-    const w = weekWindows("2026-08-01");
-    expect(w.current.label).toMatch(/Jul.*Aug/);
-    expect(w.current.from).toBe("2026-07-26");
+    // 1 Oct 2026 is a Thursday; its week began Saturday 26 Sep.
+    const w = weekWindows("2026-10-01");
+    expect(w.current.from).toBe("2026-09-26");
+    expect(w.current.label).toMatch(/Sep.*Oct/);
   });
 });
 

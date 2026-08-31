@@ -149,9 +149,7 @@ export default async function CustomReport({
     >
       <Card padded className="no-print kit-mb-12">
         <SectionHead title="Build the report" sub="Choices are stored in the link, so this view can be shared." />
-        <p className="kit-label kit-mb-6">
-          Level
-        </p>
+        <p className="kit-label kit-mb-6">Level</p>
         <div className="kit-report-presets kit-mb-12">
           {LEVELS.map((l) => (
             <Link key={l.key} href={linkFor(l.key, [])} className={`kit-preset${level === l.key ? " is-active" : ""}`}>
@@ -159,9 +157,7 @@ export default async function CustomReport({
             </Link>
           ))}
         </div>
-        <p className="kit-label kit-mb-6">
-          Columns
-        </p>
+        <p className="kit-label kit-mb-6">Columns</p>
         <div className="kit-report-presets">
           {availableFields.map((f) => {
             const on = active.includes(f.key);

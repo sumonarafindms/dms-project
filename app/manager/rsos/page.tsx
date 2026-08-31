@@ -1,10 +1,10 @@
 import { requirePagePermission } from "../../../lib/auth";
-import { employeePerformance, pct } from "../../../lib/performance";
+import { employeePerformance } from "../../../lib/performance";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { managerScope } from "../../../lib/manager-scope";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
 import { EntityGrid } from "../../components/EntityGrid";
-import { ACHIEVEMENT_ON_TRACK_PERCENT } from "../../../lib/achievement";
+import { ACHIEVEMENT_ON_TRACK_PERCENT, targetPercent as pct } from "../../../lib/achievement";
 
 // A plain description, not comparators: functions cannot cross the
 // Server-to-Client boundary.

@@ -1,12 +1,20 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { monthBounds } from "./month";
-import type { EmployeePerformance } from "./performance";
+/*
+ * `paceStatus`, `rankRows` and the `PaceStatus` type were removed in v132:
+ * nothing imported them. `rankRows` was the only caller of `paceStatus`, and
+ * nothing called `rankRows` — so the whole chain was dead.
+ *
+ * Worth recording, because it is the sort of thing that wastes a later hour:
+ * v128 "removed a duplicate" inside `paceStatus` (it inlined the 8 / -5
+ * margins that lib/achievement.ts already owned as PACE_AHEAD_MARGIN and
+ * PACE_BEHIND_MARGIN). The observation was right and the fix was correct, but
+ * it was applied to code no screen ever ran. Deleting it is the real fix.
+ */
 import { dhakaTodayYmd } from "./business-time";
 import { withStandardGa } from "./business-rules";
-import { paceBand } from "./achievement";
 
-export type PaceStatus = "Ahead" | "On track" | "Behind" | "No target";
 export function monthPace(month: string, now = new Date()) {
   const { start, end } = monthBounds(month);
   const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000);
@@ -15,38 +23,6 @@ export function monthPace(month: string, now = new Date()) {
   if (todayUtc >= end) return 100;
   const elapsed = Math.max(1, Math.min(totalDays, Math.floor((todayUtc.getTime() - start.getTime()) / 86400000) + 1));
   return Math.round((elapsed / totalDays) * 100);
-}
-export function paceStatus(achieved: number, target: number, expected: number) {
-  if (!target) return { status: "No target" as PaceStatus, progress: 0, gap: 0 };
-  const progress = Math.round((achieved / target) * 100);
-  const gap = progress - expected;
-  // This used to inline `gap >= 8 ? "Ahead" : gap >= -5 ? "On track" : "Behind"`
-  // — the same two numbers PACE_AHEAD_MARGIN and PACE_BEHIND_MARGIN already
-  // owned in lib/achievement.ts. Two copies of one rule is how the manager and
-  // supervisor pages ended up disagreeing about the same RSO before v100, so
-  // the band is asked for rather than repeated.
-  return { status: paceBand(progress, expected) as PaceStatus, progress, gap };
-}
-export function rankRows(rows: EmployeePerformance[], expected: number) {
-  return rows
-    .map((r) => {
-      const recharge = paceStatus(r.totalRechargeAchieved, r.totalRechargeTarget, expected);
-      const ga = paceStatus(r.gaAchieved, r.gaTarget, expected);
-      const executionTargets = (r.ssoTarget ? 1 : 0) + (r.lsoTarget ? 1 : 0);
-      const ssoProgress = r.ssoTarget ? Math.min(100, (r.ssoAchieved / r.ssoTarget) * 100) : 0;
-      const lsoProgress = r.lsoTarget ? Math.min(100, (r.lsoAchieved / r.lsoTarget) * 100) : 0;
-      const executionProgress = executionTargets ? Math.round((ssoProgress + lsoProgress) / executionTargets) : 0;
-      const score = Math.round((recharge.progress + ga.progress + executionProgress) / 3);
-      return {
-        ...r,
-        pace: recharge.status,
-        score,
-        rechargeProgress: recharge.progress,
-        gaProgress: ga.progress,
-        executionProgress,
-      };
-    })
-    .sort((a, b) => b.score - a.score);
 }
 export async function latestDailySnapshot(employeeIds?: string[]) {
   const gaFilter: Prisma.GaActivationWhereInput = withStandardGa(

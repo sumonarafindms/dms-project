@@ -1,10 +1,13 @@
 import { requireUser } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
-import { employeePerformance, pct } from "../../../../../lib/performance";
+import { employeePerformance } from "../../../../../lib/performance";
+import { targetPercent as pct } from "../../../../../lib/achievement";
 import { normalizeMonth } from "../../../../../lib/drilldown";
 import { monthBounds } from "../../../../../lib/month";
 import { parseYmd, monthStartsInRange } from "../../../../../lib/date-range";
-import { assignmentWindow, standardGaByAssignment } from "../../../../../lib/bp-activations";
+import { standardGaByAssignment } from "../../../../../lib/bp-activations";
+import { teamTotals } from "../../../../../lib/bp-rollup";
+import { assignmentGaTarget, assignmentWindow } from "../../../../../lib/bp-period";
 import { notFound } from "next/navigation";
 import { EntityGrid } from "../../../../components/EntityGrid";
 import Link from "next/link";
@@ -56,16 +59,16 @@ export default async function Page({
   const gaByAssignment = await standardGaByAssignment(bps, rs, re);
   const bpStats = bps.map((b) => {
     const { effectiveStart: es, effectiveEnd: ee } = assignmentWindow(b, rs, re);
-    const targetMap = new Map(b.monthlyTargets.map((x) => [x.month.toISOString().slice(0, 7), x.gaTarget]));
-    const target =
-      es < ee
-        ? monthStartsInRange(es, ee).reduce((n, m) => n + (targetMap.get(m.toISOString().slice(0, 7)) ?? b.gaTarget), 0)
-        : 0;
+    const target = es < ee ? assignmentGaTarget(b, monthStartsInRange(es, ee)) : 0;
     return { ...b, target, achieved: gaByAssignment.get(b.id) ?? 0 };
   });
   const range = `month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`;
-  const rechargeTarget = rows.reduce((a, x) => a + x.totalRechargeTarget, 0),
-    rechargeAchieved = rows.reduce((a, x) => a + x.totalRechargeAchieved, 0),
+  // Recharge is the TEAM's, so it includes the BPs' C2C. GA is shown split, so
+  // the RSO figures below stay exactly as the rows come and the BP figures get
+  // their own card.
+  const team = teamTotals(rows);
+  const rechargeTarget = team.totalRechargeTarget,
+    rechargeAchieved = team.totalRechargeAchieved,
     rsoGaT = rows.reduce((a, x) => a + x.gaTarget, 0),
     rsoGaA = rows.reduce((a, x) => a + x.gaAchieved, 0),
     bpGaT = bpStats.reduce((a, x) => a + x.target, 0),
@@ -87,6 +90,8 @@ export default async function Page({
           { label: "Recharge", value: `${pct(rechargeAchieved, rechargeTarget)}%`, tone: "teal" },
           { label: "RSO GA", value: `${rsoGaA} / ${rsoGaT}` },
           // BP GA is a separate target from RSO GA and is never added to it.
+          // Before v136 this was only half true: `rows` still had the BP SIMs
+          // inside "RSO GA", so a BP was counted here twice. It is not now.
           { label: "BP GA", value: `${bpGaA} / ${bpGaT}` },
           { label: "BPs", value: bpStats.length.toLocaleString() },
         ]}

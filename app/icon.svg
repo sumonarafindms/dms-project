@@ -1,14 +1,61 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DMS">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DMS">
   <!--
-    Placeholder mark, not a brand design.
+    The DMS mark.
 
-    Before this existed the app shipped no icon of any kind, so every page load
-    logged a 404 for /favicon.ico and the browser tab and any home-screen
-    shortcut were blank. The shape is deliberately plain — a monogram in the
-    kit's own teal (--color-teal-600, #0d9488) — so replacing it with the real
-    mark is a one-file change and nothing else refers to it.
+    A distribution network read as three tiers, which is literally what the
+    product models: one distributor at the top, supervisors branching from it,
+    retailers at the base. The rising bar behind them is the performance the
+    whole app exists to measure.
+
+    Drawn at 512 and scaled down rather than the reverse: the strokes are heavy
+    enough (28-32 units, ~5% of the canvas) that the shape still reads at 32px
+    in a browser tab, which is where most icons of this kind fall apart.
+
+    Colours are the kit's own tokens, not new ones:
+      #0d9488  color-teal-600  (ground)
+      #5eead4  color-teal-300  (nodes)
+      #2dd4bf  color-teal-400  (bars)
+
+    (Token names written without their leading dashes: a double hyphen is
+    illegal inside an XML comment and makes the file unparseable.)
+    Change these here and app/icon.svg is the only file that needs it; the PNG
+    sizes under public/icons are generated from this by scripts/build-icons.mjs.
   -->
-  <rect width="64" height="64" rx="14" fill="#0d9488"/>
-  <path d="M16 20h11c8.2 0 13.5 4.6 13.5 12S35.2 44 27 44H16V20zm7.6 6.2v11.6h3c4 0 6.3-2.2 6.3-5.8s-2.3-5.8-6.3-5.8h-3z" fill="#fff"/>
-  <circle cx="46.5" cy="41.5" r="4.5" fill="#5eead4"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14b8a6" />
+      <stop offset="1" stop-color="#0d9488" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#g)" />
+
+  <!-- Performance bars, behind the network and deliberately quiet. -->
+  <g fill="#ffffff" opacity="0.16">
+    <rect x="126" y="300" width="46" height="86" rx="12" />
+    <rect x="196" y="262" width="46" height="124" rx="12" />
+    <rect x="266" y="216" width="46" height="170" rx="12" />
+    <rect x="336" y="162" width="46" height="224" rx="12" />
+  </g>
+
+  <!-- The distribution tree: one root, two branches, three outlets. -->
+  <g
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.95"
+  >
+    <path d="M256 150 V196" />
+    <path d="M170 244 H342" />
+    <path d="M170 244 V286" />
+    <path d="M342 244 V286" />
+    <path d="M256 196 V286" />
+  </g>
+
+  <circle cx="256" cy="140" r="34" fill="#ffffff" />
+  <circle cx="170" cy="318" r="30" fill="#5eead4" />
+  <circle cx="256" cy="318" r="30" fill="#5eead4" />
+  <circle cx="342" cy="318" r="30" fill="#5eead4" />
 </svg>

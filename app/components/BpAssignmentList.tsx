@@ -36,7 +36,13 @@ export type BpListRow = {
 const label = (b: BpListRow) => b.retailerName || b.retailerCode;
 const pctOf = (b: BpListRow) => (b.gaTarget > 0 ? Math.round((b.monthGa / b.gaTarget) * 100) : 0);
 
-/** Mirrors lib/bp-sort.ts, over the serialised row this list receives. */
+/**
+ * The sort orders for this list, over the serialised row it receives.
+ *
+ * These used to be duplicated in `lib/bp-sort.ts`, which nothing called after
+ * this component took over the screen; that file was deleted in v132. This is
+ * now the only definition — keep it that way.
+ */
 const SORTS: SortSpec<BpListRow>[] = [
   {
     value: "active-first",

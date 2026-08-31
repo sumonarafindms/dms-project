@@ -18,8 +18,13 @@ import { Icon } from "../components/icons";
 import { dhakaMonth } from "../../lib/business-time";
 import { ACHIEVEMENT_ON_TRACK_PERCENT, ACHIEVEMENT_WATCH_PERCENT } from "../../lib/achievement";
 import { pacing } from "../../lib/pacing";
+import type { ComparisonKind } from "../../lib/comparison";
+import type { MetricComparison } from "../../lib/comparison-data";
+import { teamTotals, withBp } from "../../lib/bp-rollup";
+import type { BpPortion } from "../../lib/bp-rollup";
 import {
   Card,
+  ComparisonSection,
   EmptyState,
   KpiCard,
   MetricBar,
@@ -51,6 +56,8 @@ type ApiRow = {
   totalRechargeAchieved: number;
   lsoTarget: number;
   lsoAchieved: number;
+  /** The BP share, already excluded from every field above. */
+  bp: BpPortion;
 };
 
 const fmt = (n: number) => new Intl.NumberFormat("en-BD", { maximumFractionDigits: 0 }).format(n);
@@ -65,6 +72,13 @@ export default function Dashboard() {
   const [rows, setRows] = useState<ApiRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // The period comparison is its own concern: it is company-wide and anchored
+  // on the latest day each feed actually has, so it does NOT depend on the
+  // reporting month above and must not be refetched when the month changes.
+  const [compareKind, setCompareKind] = useState<ComparisonKind>("day");
+  const [comparison, setComparison] = useState<MetricComparison[]>([]);
+  const [comparisonLoading, setComparisonLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -93,26 +107,43 @@ export default function Dashboard() {
     };
   }, [month]);
 
-  const totals = useMemo(
-    () =>
-      rows.reduce(
-        (a, r) => ({
-          gaT: a.gaT + r.gaTarget,
-          gaA: a.gaA + r.gaAchieved,
-          c2cT: a.c2cT + r.c2cTarget,
-          c2cA: a.c2cA + r.c2cAchieved,
-          trT: a.trT + r.totalRechargeTarget,
-          trA: a.trA + r.totalRechargeAchieved,
-          ssoT: a.ssoT + r.ssoTarget,
-          ssoA: a.ssoA + r.ssoAchieved,
-          lsoT: a.lsoT + r.lsoTarget,
-          lsoA: a.lsoA + r.lsoAchieved,
-          ret: a.ret + r.retailerCount,
-        }),
-        { gaT: 0, gaA: 0, c2cT: 0, c2cA: 0, trT: 0, trA: 0, ssoT: 0, ssoA: 0, lsoT: 0, lsoA: 0, ret: 0 },
-      ),
-    [rows],
-  );
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    (async () => {
+      setComparisonLoading(true);
+      try {
+        const res = await fetch(`/api/dashboard/comparison?kind=${compareKind}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not load the comparison");
+        if (active) setComparison(data.metrics || []);
+      } catch (e) {
+        // Deliberately not routed into the page-level `error` banner. A failed
+        // comparison must not make the KPI row above it look broken, and an
+        // empty metric list already renders as "no data uploaded yet".
+        if (active && !(e instanceof DOMException && e.name === "AbortError")) setComparison([]);
+      } finally {
+        if (active) setComparisonLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [compareKind]);
+
+  /*
+   * COMPANY totals, so Business Partners count.
+   *
+   * `teamTotals` rather than a reduce over the rows: each row now carries only
+   * what its RSO did, with the BP share held aside in `row.bp`. Summing the
+   * rows here would silently drop every BP's SIMs and recharge from the
+   * company figure — see lib/bp-rollup.ts.
+   */
+  const totals = useMemo(() => teamTotals(rows), [rows]);
 
   // Composite score: recharge, GA and the SSO/LSO execution pair, weighted
   // equally. One number for "is this RSO keeping up overall".
@@ -144,12 +175,14 @@ export default function Dashboard() {
         ga: 0,
         gaTarget: 0,
       };
+      // withBp: a supervisor's team includes their RSOs' Business Partners.
+      const t = withBp(r);
       x.rsos++;
-      x.retailers += r.retailerCount;
-      x.achieved += r.totalRechargeAchieved;
-      x.target += r.totalRechargeTarget;
-      x.ga += r.gaAchieved;
-      x.gaTarget += r.gaTarget;
+      x.retailers += t.retailerCount;
+      x.achieved += t.totalRechargeAchieved;
+      x.target += t.totalRechargeTarget;
+      x.ga += t.gaAchieved;
+      x.gaTarget += t.gaTarget;
       map.set(r.supervisor, x);
     }
     return [...map.values()].sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
@@ -208,7 +241,7 @@ export default function Dashboard() {
         <SummaryStrip
           items={[
             { label: "Field Force", value: fmt(rows.length) },
-            { label: "Retailers", value: fmt(totals.ret) },
+            { label: "Retailers", value: fmt(totals.retailerCount) },
             { label: "On Track", value: fmt(onTrack), tone: "teal" },
             { label: "Target Coverage", value: `${targetCoverage}%` },
           ]}
@@ -217,17 +250,39 @@ export default function Dashboard() {
 
       <SectionHead title="Monthly targets" sub="Company-wide completion for the selected month." />
       <div className="kit-kpi-grid kit-mb-20">
-        <KpiCard label="GA" achieved={totals.gaA} target={totals.gaT} pace={paceFor(totals.gaT, totals.gaA)} />
-        <KpiCard label="SSO" achieved={totals.ssoA} target={totals.ssoT} pace={paceFor(totals.ssoT, totals.ssoA)} />
-        <KpiCard label="LSO" achieved={totals.lsoA} target={totals.lsoT} pace={paceFor(totals.lsoT, totals.lsoA)} />
+        <KpiCard
+          label="GA"
+          achieved={totals.gaAchieved}
+          target={totals.gaTarget}
+          pace={paceFor(totals.gaTarget, totals.gaAchieved)}
+        />
+        <KpiCard
+          label="SSO"
+          achieved={totals.ssoAchieved}
+          target={totals.ssoTarget}
+          pace={paceFor(totals.ssoTarget, totals.ssoAchieved)}
+        />
+        <KpiCard
+          label="LSO"
+          achieved={totals.lsoAchieved}
+          target={totals.lsoTarget}
+          pace={paceFor(totals.lsoTarget, totals.lsoAchieved)}
+        />
         <KpiCard
           label="Total Recharge"
-          achieved={totals.trA}
-          target={totals.trT}
+          achieved={totals.totalRechargeAchieved}
+          target={totals.totalRechargeTarget}
           unit="৳"
-          pace={paceFor(totals.trT, totals.trA)}
+          pace={paceFor(totals.totalRechargeTarget, totals.totalRechargeAchieved)}
         />
       </div>
+
+      <ComparisonSection
+        metrics={comparison}
+        kind={compareKind}
+        control={{ mode: "select", onSelect: setCompareKind }}
+        loading={comparisonLoading}
+      />
 
       <SectionHead title="Needs attention" sub="Tap a count to open the work behind it." />
       <div className="kit-status-tiles kit-mb-20">
@@ -310,7 +365,7 @@ export default function Dashboard() {
         <div className="kit-pill-grid">
           <StatPill value={fmt(rows.length)} label="Active RSO" />
           <StatPill value={fmt(supervisors.length)} label="Supervisors" />
-          <StatPill value={fmt(totals.ret)} label="Retailers" />
+          <StatPill value={fmt(totals.retailerCount)} label="Retailers" />
           <StatPill value={`${targetCoverage}%`} label="Target Coverage" />
         </div>
       </Card>
