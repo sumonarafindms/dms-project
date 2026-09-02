@@ -13,7 +13,7 @@ import { rollUpToSupervisor, rsoSummary } from "../../../../lib/report-data";
 import type { RsoSummaryRow } from "../../../../lib/report-data";
 import { targetPercent } from "../../../../lib/achievement";
 import { GroupSwitch, GroupedReportView, money } from "../GroupedReportView";
-import type { Column } from "../../../components/ReportShell";
+import type { Column } from "../../../components/ReportTable";
 
 export const dynamic = "force-dynamic";
 

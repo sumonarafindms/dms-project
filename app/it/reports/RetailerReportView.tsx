@@ -14,8 +14,10 @@ import { rangeLabel, rangeQuery } from "../../../lib/report-range";
 import type { ReportRange } from "../../../lib/report-range";
 import type { RetailerReportRow } from "../../../lib/report-data";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
-import { ReportActionBar, ReportDateBar, ReportTable } from "../../components/ReportShell";
-import type { Column, ExportRow } from "../../components/ReportShell";
+import { ReportActionBar, ReportDateBar } from "../../components/ReportShell";
+import { ReportTable } from "../../components/ReportTable";
+import type { ExportRow } from "../../components/ReportShell";
+import type { Column } from "../../components/ReportTable";
 import { Icon } from "../../components/icons";
 
 export const money = (n: number) => `৳${Math.round(n).toLocaleString()}`;

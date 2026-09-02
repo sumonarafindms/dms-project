@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { expectNoHorizontalOverflow, expectUsableTapTargets, login } from "./helpers";
+import { expectContentFillsViewport, expectNoHorizontalOverflow, expectUsableTapTargets, login } from "./helpers";
 
 /**
  * Every role's own pages, at every width.
@@ -85,6 +85,7 @@ for (const role of ROLES) {
         if (ended !== path) throw new Error(`${where}: redirected to ${ended} — role cannot reach its own route`);
         if ((res?.status() ?? 0) >= 400) throw new Error(`${where}: HTTP ${res?.status()}`);
 
+        await expectContentFillsViewport(page, where);
         await expectNoHorizontalOverflow(page, where);
         await expectUsableTapTargets(page, where);
 

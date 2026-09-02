@@ -13,8 +13,10 @@ import { rangeLabel, resolveRange, rangeQuery, monthToDate, isMonthToDate } from
 import { supervisorSummary, rangeTotals } from "../../../../lib/report-data";
 import { targetPercent } from "../../../../lib/achievement";
 import { PageHeader, SummaryStrip } from "../../../components/Kit";
-import { ReportActionBar, ReportDateBar, ReportTable } from "../../../components/ReportShell";
-import type { Column, ExportRow } from "../../../components/ReportShell";
+import { ReportActionBar, ReportDateBar } from "../../../components/ReportShell";
+import { ReportTable } from "../../../components/ReportTable";
+import type { ExportRow } from "../../../components/ReportShell";
+import type { Column } from "../../../components/ReportTable";
 import { Icon } from "../../../components/icons";
 
 export const dynamic = "force-dynamic";

@@ -53,14 +53,13 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
 
   const monthKey = dhakaMonth();
   const month = `${monthKey}-01`;
-  const [perf, daily, retailers, bp] = await Promise.all([
+  const [perf, daily, retailers, bpCount] = await Promise.all([
     employeePerformance(month, [u.employeeId]),
     latestDailySnapshot([u.employeeId]),
     retailerOpportunities(monthKey, [u.employeeId]),
-    prisma.bpAssignment.findFirst({
-      where: { employeeId: u.employeeId, active: true },
-      select: { id: true, retailer: { select: { retailerCode: true, retailerName: true } } },
-    }),
+    // count, not findFirst: an RSO may hold several BPs, and the tile below
+    // reports how many. `findFirst` made three of them read as one.
+    prisma.bpAssignment.count({ where: { employeeId: u.employeeId, active: true } }),
   ]);
   const r = perf[0];
   if (!r) return null;
@@ -136,7 +135,12 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
       <div className="kit-status-tiles kit-mb-20">
         <StatusTile href={`/rso/sso?month=${monthKey}&status=pending`} count={ssoPending} label="SSO Pending" />
         <StatusTile href={`/rso/lso?month=${monthKey}&status=pending`} count={lsoPending} label="LSO Pending" />
-        <StatusTile href="/rso/bp" count={bp ? 1 : 0} label="My BP" tone={bp ? "teal" : "rose"} />
+        <StatusTile
+          href="/rso/bp"
+          count={bpCount}
+          label={bpCount === 1 ? "My BP" : "My BPs"}
+          tone={bpCount ? "teal" : "rose"}
+        />
       </div>
 
       <SectionHead title="Team snapshot" />

@@ -15,12 +15,15 @@
  * 2. `xlsx` is imported dynamically, inside the click handler. It is ~400 KB;
  *    static-importing it would put that in the first load of every report page
  *    for a button most viewings never press.
+ *
+ * The report TABLE is deliberately not here — see ./ReportTable. It has no
+ * hooks and no browser API, and living in this file made it a Client Component
+ * purely by association, which broke every report page.
  */
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { ReactNode } from "react";
-import { Btn, Card, EmptyState } from "./Kit";
+import { Btn } from "./Kit";
 import { Icon } from "./icons";
 import { rangeDayCount, rangeLabel, rangePresets } from "../../lib/report-range";
 import type { ReportRange } from "../../lib/report-range";
@@ -154,81 +157,6 @@ export function ReportActionBar({
           </div>
         </div>
       )}
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Report table — desktop table, mobile cards, same data
- * ------------------------------------------------------------------ */
-export type Column<T> = {
-  key: string;
-  label: string;
-  align?: "right";
-  render?: (row: T) => ReactNode;
-};
-
-export function ReportTable<T extends { id?: string }>({
-  columns,
-  rows,
-  emptyTitle = "No data for this period",
-  emptyHint,
-}: {
-  columns: Column<T>[];
-  rows: T[];
-  emptyTitle?: string;
-  emptyHint?: string;
-}) {
-  if (!rows.length) {
-    return (
-      <Card>
-        <EmptyState title={emptyTitle} hint={emptyHint} icon={<Icon name="search" />} />
-      </Card>
-    );
-  }
-  const cell = (c: Column<T>, row: T) =>
-    c.render ? c.render(row) : ((row as Record<string, ReactNode>)[c.key] ?? "—");
-
-  return (
-    <>
-      <Card className="kit-report-table">
-        <div className="kit-report-scroll">
-          <table>
-            <thead>
-              <tr>
-                {columns.map((c) => (
-                  <th key={c.key} className={c.align === "right" ? "is-right" : undefined}>
-                    {c.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={row.id ?? i}>
-                  {columns.map((c) => (
-                    <td key={c.key} className={c.align === "right" ? "is-right" : undefined}>
-                      {cell(c, row)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      <div className="kit-report-cards">
-        {rows.map((row, i) => (
-          <Card key={row.id ?? i} padded>
-            {columns.map((c) => (
-              <div className="kit-report-cardrow" key={c.key}>
-                <span>{c.label}</span>
-                <b>{cell(c, row)}</b>
-              </div>
-            ))}
-          </Card>
-        ))}
-      </div>
     </>
   );
 }

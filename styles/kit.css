@@ -2973,11 +2973,35 @@
   .kit-min0 {
     min-width: 0;
   }
+  /* A link whose whole content is a control: the anchor must be the same box
+     as the thing it wraps, or its hit area is a text line inside it. */
+  .kit-block-link {
+    display: block;
+  }
   .kit-row-between {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    /*
+     * A flex item defaults to `min-width: auto`, so it refuses to shrink below
+     * its own min-content width. On a 320px screen the Reporting Center's feed
+     * label held its full width and pushed the "Missing" badge 26px past the
+     * right edge, scrolling the whole page sideways.
+     *
+     * The badge is the item that must NOT shrink — it is short, and a truncated
+     * status word is worse than none. So the text side yields: it wraps, and
+     * the badge keeps its size. Same mistake as the bottom nav's `1fr` tracks,
+     * one level down.
+     */
+    min-width: 0;
+  }
+  .kit-row-between > :first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .kit-row-between > .kit-badge {
+    flex-shrink: 0;
   }
   .kit-row-between.is-top {
     align-items: flex-start;
@@ -3034,20 +3058,30 @@
   }
   /* The mobile bottom nav tiles its items evenly; the count is whatever the
      signed-in role can see. */
+  /*
+   * minmax(0, 1fr), never a bare 1fr.
+   *
+   * `1fr` means `minmax(auto, 1fr)`, and that `auto` floor is the item's
+   * min-content width — the longest unbreakable word inside it. So the column
+   * holding "RSO Performance" grew to fit "Performance" while the other four
+   * shrank, the tracks stopped being equal, and the labels overlapped their
+   * neighbours. minmax(0, ...) removes the floor and the five columns are
+   * genuinely the same width; `.bottom-link` sets `min-width: 0` to match.
+   */
   .bottom-nav.is-cols-2 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .bottom-nav.is-cols-3 {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .bottom-nav.is-cols-4 {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .bottom-nav.is-cols-5 {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .bottom-nav.is-cols-6 {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 

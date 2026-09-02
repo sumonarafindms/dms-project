@@ -305,27 +305,50 @@ export default function AppShell({
             </Link>
           </header>
           {children}
+          {visibleBottom.length > 0 && (
+            /*
+             * INSIDE `.app-main`, and that placement is load-bearing.
+             *
+             * It used to be a sibling of `.app-main`, directly under
+             * `.app-root` — which is `display: flex` in the ROW direction. So
+             * the nav was a second flex item on that row: it claimed the full
+             * 390px, and `.app-main` (flex: 1, min-width: 0) was squeezed to
+             * ZERO width. Every page rendered as a blank white column with the
+             * nav's icons stranded at the top and the active item's highlight
+             * stretched down the whole document, because a row flex item
+             * stretches to the line's height.
+             *
+             * Desktop never showed it: at >=900px the nav is `display: none`,
+             * so it stops being a flex item and `.app-main` gets the row back.
+             * The app was unusable on a phone and perfect on the machine it
+             * was being checked on.
+             *
+             * Here it is the last child of the column that holds the page, so
+             * `position: sticky; bottom: 0` pins it to the bottom of the
+             * viewport the way it was always meant to.
+             *
+             * The count is whatever the signed-in role can see; the classes for
+             * 2..6 are in kit.css, and anything outside that keeps the
+             * stylesheet's own default rather than falling back to an inline
+             * style.
+             */
+            <nav className={`bottom-nav is-cols-${Math.min(6, Math.max(2, visibleBottom.length))}`}>
+              {visibleBottom.map((i) => (
+                <Link
+                  key={i.href}
+                  href={i.href}
+                  prefetch={true}
+                  onPointerEnter={() => router.prefetch(i.href)}
+                  onClick={() => setNavPending(i.href)}
+                  className={`bottom-link ${active(path, i.href) ? "active" : ""}`}
+                >
+                  <Icon name={i.icon} />
+                  <span>{i.label}</span>
+                </Link>
+              ))}
+            </nav>
+          )}
         </div>
-        {visibleBottom.length > 0 && (
-          // The count is whatever the signed-in role can see; the classes for
-          // 2..6 are in kit.css, and anything outside that keeps the stylesheet's
-          // own default rather than falling back to an inline style.
-          <nav className={`bottom-nav is-cols-${Math.min(6, Math.max(2, visibleBottom.length))}`}>
-            {visibleBottom.map((i) => (
-              <Link
-                key={i.href}
-                href={i.href}
-                prefetch={true}
-                onPointerEnter={() => router.prefetch(i.href)}
-                onClick={() => setNavPending(i.href)}
-                className={`bottom-link ${active(path, i.href) ? "active" : ""}`}
-              >
-                <Icon name={i.icon} />
-                <span>{i.label}</span>
-              </Link>
-            ))}
-          </nav>
-        )}
       </div>
     </PermissionProvider>
   );

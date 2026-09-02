@@ -70,6 +70,11 @@ export function ServerSearchBar({
     const search = new URLSearchParams(params.toString());
     if (next.trim()) search.set(paramName, next.trim());
     else search.delete(paramName);
+    // Narrowing the list invalidates the page number. Without this, searching
+    // from page 12 asks for page 12 of a result that may have three pages, and
+    // the server clamps you to the last one — so a search that DID work looks
+    // like it found the wrong thing.
+    search.delete("page");
     lastCommitted.current = next.trim();
     startTransition(() => {
       router.replace(`${pathname}${search.toString() ? `?${search}` : ""}`, { scroll: false });
@@ -164,6 +169,20 @@ export function ServerSelect({
           const search = new URLSearchParams(params.toString());
           if (e.target.value) search.set(paramName, e.target.value);
           else search.delete(paramName);
+          /*
+           * Reordering sends you back to page 1, and this is the fix for the
+           * reported "the sort does nothing".
+           *
+           * It always did something. With 2,500 retailers the list is 42 pages,
+           * and picking "GA — high to low" from page 20 kept `page=20` — so the
+           * screen filled with rows 1141-1200 of the new order, which are the
+           * middling ones. The heading said "sorted by GA — high to low" above
+           * a page of unremarkable numbers, and there is no way to tell that
+           * apart from a dead dropdown.
+           *
+           * The top of an ordering is the reason anyone chooses it.
+           */
+          search.delete("page");
           startTransition(() => {
             router.replace(`${pathname}${search.toString() ? `?${search}` : ""}`, { scroll: false });
           });

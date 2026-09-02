@@ -62,8 +62,25 @@ export function contentSecurityPolicy(nonce: string, isProduction: boolean) {
     `frame-ancestors ${SELF}`,
     `frame-src 'none'`,
   ];
-  // Only meaningful over HTTPS, and locally it would break plain-http dev.
-  if (isProduction) directives.push("upgrade-insecure-requests");
+  /*
+   * `upgrade-insecure-requests` only when the policy is ENFORCED.
+   *
+   * The directive is ignored in a report-only policy — that is in the spec, not
+   * a browser quirk — and Chrome says so out loud on every page load:
+   *
+   *     The Content Security Policy directive 'upgrade-insecure-requests' is
+   *     ignored when delivered in a report-only policy.
+   *
+   * So while `cspHeaderName()` returns Report-Only, this line bought nothing
+   * and cost a console error in front of every user, on every screen, forever.
+   * It also drowned the E2E console-error check, which exists to catch real
+   * failures and was failing on this instead.
+   *
+   * Gated on the header rather than on `isProduction` so the two cannot drift:
+   * flip `cspHeaderName()` to enforcement and the directive comes back by
+   * itself, which is exactly when it starts working.
+   */
+  if (isProduction && cspHeaderName() === "Content-Security-Policy") directives.push("upgrade-insecure-requests");
   return directives.join("; ");
 }
 

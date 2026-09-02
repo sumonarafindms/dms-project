@@ -10,7 +10,7 @@ import { resolveRange } from "../../../../lib/report-range";
 import { retailerReport } from "../../../../lib/report-data";
 import { LSO_MIN_MONTHLY_AMOUNT, LSO_MIN_MONTHLY_TRANSACTIONS } from "../../../../lib/business-rules";
 import { RetailerReportView, identityColumns, identityExport, money } from "../RetailerReportView";
-import type { Column } from "../../../components/ReportShell";
+import type { Column } from "../../../components/ReportTable";
 import type { RetailerReportRow } from "../../../../lib/report-data";
 
 export const dynamic = "force-dynamic";

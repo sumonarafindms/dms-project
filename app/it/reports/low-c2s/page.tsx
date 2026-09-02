@@ -10,7 +10,7 @@ import { requireUser } from "../../../../lib/auth";
 import { resolveRange, rangeQuery } from "../../../../lib/report-range";
 import { retailerReport } from "../../../../lib/report-data";
 import { RetailerReportView, identityColumns, identityExport, money } from "../RetailerReportView";
-import type { Column } from "../../../components/ReportShell";
+import type { Column } from "../../../components/ReportTable";
 import type { RetailerReportRow } from "../../../../lib/report-data";
 import Link from "next/link";
 

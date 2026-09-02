@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Icon } from "./icons";
 
 /**
@@ -104,8 +105,24 @@ export function ListControls({
  * gets the same markup rather than a second copy of it.
  */
 export function DateRangeFields({ month, from, to }: { month?: string; from?: string; to?: string }) {
+  const params = useSearchParams();
+  /*
+   * A native GET submit REPLACES the whole query string with this form's own
+   * fields. So applying a date range used to throw away the sort the user had
+   * chosen and the search they had typed — the list came back reordered and
+   * unfiltered, and the obvious reading is that the controls are broken.
+   *
+   * Everything else in the URL is re-emitted as a hidden field. `page` is the
+   * deliberate exception: a new period is a new list, and page 12 of it is not
+   * where anyone wants to land.
+   */
+  const carried = Array.from(params.entries()).filter(([k]) => k !== "from" && k !== "to" && k !== "page");
+
   return (
     <form className="kit-date-form">
+      {carried.map(([k, v]) => (
+        <input key={k} type="hidden" name={k} value={v} />
+      ))}
       <label className="kit-field">
         <span>From</span>
         <input className="kit-input" type="date" name="from" defaultValue={from || (month ? `${month}-01` : "")} />

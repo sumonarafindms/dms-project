@@ -13,7 +13,7 @@ import { resolveRange } from "../../../../lib/report-range";
 import { retailerReport } from "../../../../lib/report-data";
 import { SSO_MIN_MONTHLY_STANDARD_GA } from "../../../../lib/business-rules";
 import { RetailerReportView, identityColumns, identityExport } from "../RetailerReportView";
-import type { Column } from "../../../components/ReportShell";
+import type { Column } from "../../../components/ReportTable";
 import type { RetailerReportRow } from "../../../../lib/report-data";
 
 export const dynamic = "force-dynamic";

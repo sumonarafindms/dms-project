@@ -16,7 +16,8 @@ import { retailerReport, rollUpToSupervisor, rsoSummary } from "../../../../lib/
 import { targetPercent } from "../../../../lib/achievement";
 import { GroupedReportView, money } from "../GroupedReportView";
 import { Card, SectionHead } from "../../../components/Kit";
-import type { Column, ExportRow } from "../../../components/ReportShell";
+import type { ExportRow } from "../../../components/ReportShell";
+import type { Column } from "../../../components/ReportTable";
 
 export const dynamic = "force-dynamic";
 

@@ -81,3 +81,60 @@ export async function login(page: Page, identifier: string, credential: string, 
   await page.waitForURL((u) => !/\/(login|sacool)$/.test(u.pathname), { timeout: 15_000 });
   return new URL(page.url()).pathname;
 }
+
+/**
+ * The page must actually occupy the screen.
+ *
+ * This is the check that was missing when the bottom nav shipped as a sibling
+ * of `.app-main` instead of a child of it. `.app-root` is a row flex container,
+ * so on a phone the nav became a second item on that row, took the full 390px,
+ * and squeezed `.app-main` to ZERO width — every page a blank white column with
+ * the nav's icons stranded at the top.
+ *
+ * Neither existing assertion could see it. Nothing overflowed horizontally: a
+ * zero-width column overflows nothing. Every tap target was comfortably large:
+ * the only things left on screen were the nav links, and they were fine. The
+ * app was unusable and the suite was green at all seven widths.
+ *
+ * So: the main column must fill the viewport, and the bottom nav must be a bar
+ * rather than a full-height panel. Both are consequences of the nav sitting on
+ * the correct side of the layout, and either one alone would have caught it.
+ */
+export async function expectContentFillsViewport(page: Page, where: string) {
+  const m = await page.evaluate(() => {
+    const box = (sel: string) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height) };
+    };
+    return {
+      viewport: window.innerWidth,
+      viewportH: window.innerHeight,
+      main: box(".app-main"),
+      page: box("main.page"),
+      nav: box(".bottom-nav"),
+    };
+  });
+
+  expect(m.main, `${where}: no .app-main — the shell did not render`).not.toBeNull();
+  expect(
+    m.main!.w,
+    `${where}: .app-main is ${m.main!.w}px inside a ${m.viewport}px viewport. Something beside it on the ` +
+      `.app-root row is taking the width — check that .bottom-nav is INSIDE .app-main.`,
+  ).toBeGreaterThan(m.viewport * 0.6);
+
+  if (m.page)
+    expect(m.page.w, `${where}: main.page is only ${m.page.w}px of ${m.viewport}px`).toBeGreaterThan(
+      m.viewport * 0.6,
+    );
+
+  // A sticky bar, not a column. Stretched to the document height is the exact
+  // symptom of the nav being a row flex item.
+  if (m.nav)
+    expect(
+      m.nav.h,
+      `${where}: .bottom-nav is ${m.nav.h}px tall in a ${m.viewportH}px viewport — it is being stretched, ` +
+        `which means it is a flex item of .app-root rather than a child of .app-main.`,
+    ).toBeLessThan(m.viewportH * 0.5);
+}

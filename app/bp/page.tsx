@@ -185,7 +185,12 @@ export default async function BP() {
       </Card>
 
       <div className="kit-mt-20">
-        <Link href="/bp/sales">
+        {/* `kit-block-link`, because the anchor is what a browser and a screen
+            reader measure and hit-test, not the button drawn inside it. An
+            inline <a> around a full-width button reported a 19px-tall target
+            while looking like a 48px one — under the 24px WCAG 2.5.8 floor, on
+            the role that works entirely from a phone. */}
+        <Link href="/bp/sales" className="kit-block-link">
           <Btn size="lg" block>
             View Activation History <Icon name="arrow" />
           </Btn>

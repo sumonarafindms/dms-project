@@ -103,9 +103,22 @@ describe("content security policy", () => {
     expect(directive("style-src-attr")).toContain("'unsafe-inline'");
   });
 
-  it("only upgrades to https in production", () => {
-    // On a plain-http dev server this directive breaks every asset request.
-    expect(policy).toContain("upgrade-insecure-requests");
+  it("does not upgrade to https while the policy is only reporting", () => {
+    /*
+     * This asserted the opposite, and the opposite was wrong.
+     *
+     * `upgrade-insecure-requests` is IGNORED in a report-only policy — spec
+     * behaviour, not a browser quirk — and Chrome logs an error saying so on
+     * every page load. Since cspHeaderName() returns Report-Only, the directive
+     * did nothing except put a permanent console error in front of every user
+     * and drown the E2E console-error check.
+     *
+     * It is gated on the header now, so when enforcement is switched on it
+     * returns by itself. The `dev` case never wanted it either: on a plain-http
+     * dev server it breaks every asset request.
+     */
+    expect(cspHeaderName()).toBe("Content-Security-Policy-Report-Only");
+    expect(policy).not.toContain("upgrade-insecure-requests");
     expect(dev).not.toContain("upgrade-insecure-requests");
   });
 

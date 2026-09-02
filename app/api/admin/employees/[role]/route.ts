@@ -138,23 +138,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
           { error: "Selected retailer must be active and belong to the selected RSO." },
           { status: 400 },
         );
+      /*
+       * The SECOND door onto BP creation, and it had the same bug.
+       *
+       * v139 stopped /api/admin/bp-assignments ending an RSO's existing BP as
+       * a side effect of adding another. This path — creating a BP from the
+       * employee form — still did exactly that: it found the RSO's current
+       * assignment, ended it with `endDate = startDate - 1`, and moved its
+       * login. So the fix held at one entrance and not the other, which is
+       * worse than not fixing it, because the behaviour now depends on which
+       * screen you used.
+       *
+       * An RSO may hold several BPs. The only constraint is the retailer's:
+       * one outlet cannot be an active BP twice.
+       */
       const result = await prisma.$transaction(async (tx) => {
         const other = await tx.bpAssignment.findFirst({ where: { retailerId, active: true } });
         if (other) throw new Error("This retailer is already an active BP.");
-        const current = await tx.bpAssignment.findFirst({ where: { employeeId, active: true } });
-        let transferableUser: null | { id: string } = null;
-        if (current) {
-          if (startDate <= current.startDate)
-            throw new Error("New BP effective date must be after the current BP assignment start date.");
-          transferableUser = await tx.user.findFirst({
-            where: { role: "BP", bpRetailerId: current.retailerId, active: true },
-            select: { id: true },
-          });
-          await tx.bpAssignment.update({
-            where: { id: current.id },
-            data: { active: false, endDate: new Date(startDate.getTime() - 86400000) },
-          });
-        }
         const assignment = await tx.bpAssignment.create({
           data: { employeeId, retailerId, startDate, gaTarget, active: true },
         });
@@ -169,11 +169,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
               active: b.active !== false,
             },
           });
-        else if (transferableUser)
-          await tx.user.update({
-            where: { id: transferableUser.id },
-            data: { bpRetailerId: retailerId, displayName: name || retailer.retailerName || retailer.retailerCode },
-          });
+        // No login transfer: nothing was ended, so there is no login to move.
         return assignment;
       });
       return NextResponse.json({ ok: true, id: result.id });

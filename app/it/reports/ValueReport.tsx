@@ -12,7 +12,7 @@ import { retailerReport, rollUpToSupervisor, rsoSummary } from "../../../lib/rep
 import type { ReportRange } from "../../../lib/report-range";
 import { targetPercent } from "../../../lib/achievement";
 import { GroupSwitch, GroupedReportView, money } from "./GroupedReportView";
-import type { Column } from "../../components/ReportShell";
+import type { Column } from "../../components/ReportTable";
 
 export const VALUE_GROUPS = [
   { key: "supervisor", label: "By Supervisor" },

@@ -293,6 +293,25 @@
   .bottom-link .nav-icon {
     width: 1.2rem;
     height: 1.2rem;
+    flex-shrink: 0;
+  }
+  /* A grid item's default `min-width: auto` lets its longest word push the
+     track wider than its share. Without this the label spilled sideways over
+     the next item instead of wrapping inside its own column. */
+  .bottom-link {
+    min-width: 0;
+  }
+  .bottom-link span {
+    width: 100%;
+    text-align: center;
+    line-height: 1.15;
+    /* Two lines is the most a 74px column can carry legibly; a third would
+       push the bar over the content it is meant to sit beside. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
   }
   .bottom-link.active {
     color: var(--color-accent-600);

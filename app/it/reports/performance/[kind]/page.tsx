@@ -17,7 +17,7 @@ import { bpActivation, retailerReport, rollUpToSupervisor, rsoSummary } from "..
 import { targetPercent } from "../../../../../lib/achievement";
 import { Badge } from "../../../../components/Kit";
 import { GroupedReportView, money } from "../../GroupedReportView";
-import type { Column } from "../../../../components/ReportShell";
+import type { Column } from "../../../../components/ReportTable";
 
 export const dynamic = "force-dynamic";
 
