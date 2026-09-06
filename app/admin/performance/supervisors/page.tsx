@@ -1,6 +1,6 @@
 import { requireUser } from "../../../../lib/auth";
 import { employeePerformance } from "../../../../lib/performance";
-import { withBp } from "../../../../lib/bp-rollup";
+import { groupSizes, groupTotals } from "../../../../lib/bp-rollup";
 import { targetPercent as pct } from "../../../../lib/achievement";
 import { prisma } from "../../../../lib/prisma";
 import { normalizeMonth } from "../../../../lib/drilldown";
@@ -62,21 +62,31 @@ export default async function Page({
       gaA: 0,
       retailers: 0,
     });
-  for (const r of rows) {
-    // Group on the supervisor's id. Matching on the name merged two
-    // supervisors who happen to share one, and silently dropped every RSO
-    // whose supervisor is inactive or unset.
-    const x = r.supervisorId ? map.get(r.supervisorId) : undefined;
+  /*
+   * groupTotals, not a reduce over withBp().
+   *
+   * Group on the supervisor's id. Matching on the name merged two supervisors
+   * who happen to share one, and silently dropped every RSO whose supervisor
+   * is inactive or unset.
+   *
+   * The arithmetic then belongs to lib/bp-rollup.ts. This loop used to add
+   * `withBp(r)` into the bucket one metric at a time, which was right until a
+   * Business Partner could be held by two RSOs — `withBp()` gives each holder
+   * the whole outlet on purpose, so a bucket containing both added its GA and
+   * its target twice. On real data one shared outlet turned 3,744 GA against a
+   * 415 target into 3,765 against 440, on the screen whose job is that number.
+   */
+  const totals = groupTotals(rows, (r) => r.supervisorId);
+  const sizes = groupSizes(rows, (r) => r.supervisorId);
+  for (const [supervisorId, t] of totals) {
+    const x = map.get(supervisorId);
     if (!x) continue;
-    // withBp: a supervisor answers for their RSOs' Business Partners too, and
-    // an RSO row no longer contains them. See lib/bp-rollup.ts.
-    const t = withBp(r);
-    x.rsos++;
-    x.retailers += t.retailerCount;
-    x.target += t.totalRechargeTarget;
-    x.achieved += t.totalRechargeAchieved;
-    x.gaT += t.gaTarget;
-    x.gaA += t.gaAchieved;
+    x.rsos = sizes.get(supervisorId) ?? 0;
+    x.retailers = t.retailerCount;
+    x.target = t.totalRechargeTarget;
+    x.achieved = t.totalRechargeAchieved;
+    x.gaT = t.gaTarget;
+    x.gaA = t.gaAchieved;
   }
   for (const b of bp) {
     if (b.employee.supervisorId && map.has(b.employee.supervisorId)) {

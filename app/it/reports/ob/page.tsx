@@ -9,8 +9,9 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange } from "../../../../lib/report-range";
-import { retailerReport } from "../../../../lib/report-data";
-import { RetailerReportView, identityColumns, identityExport, money } from "../RetailerReportView";
+import { buildOpeningBalance, reportExportHref } from "../../../../lib/report-builders";
+import { reportPageHref } from "../../../../lib/report-paging";
+import { RetailerReportView, identityColumns, money } from "../RetailerReportView";
 import type { Column } from "../../../components/ReportTable";
 import type { RetailerReportRow } from "../../../../lib/report-data";
 
@@ -19,14 +20,12 @@ export const dynamic = "force-dynamic";
 export default async function OpeningBalance({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; page?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
-  const range = resolveRange(...(await searchParams.then((s) => [s.from, s.to] as const)));
-  const all = await retailerReport(range);
-
-  const withBalance = all.filter((r) => r.openingBalance !== null);
-  const rows = [...all].sort((a, b) => (b.openingBalance ?? -1) - (a.openingBalance ?? -1));
+  const sp = await searchParams;
+  const range = resolveRange(sp.from, sp.to);
+  const { rows, total, withBalance, totalBalance } = await buildOpeningBalance(range);
 
   const columns: Column<RetailerReportRow>[] = [
     ...identityColumns,
@@ -38,7 +37,6 @@ export default async function OpeningBalance({
     },
   ];
 
-  const total = withBalance.reduce((a, r) => a + (r.openingBalance ?? 0), 0);
   return (
     <RetailerReportView
       title="Opening Balance Report"
@@ -46,18 +44,18 @@ export default async function OpeningBalance({
       range={range}
       rows={rows}
       columns={columns}
-      exportRows={rows.map((r) => ({
-        ...identityExport(r),
-        // Blank, not 0 — the sheet must not assert a balance that was never imported.
-        "Opening Balance": r.openingBalance === null ? "" : Math.round(r.openingBalance),
-      }))}
+      exportHref={reportExportHref("ob", range)}
+      paging={{
+        page: sp.page,
+        noun: "retailer",
+        hrefFor: (p) => reportPageHref("/it/reports/ob", { from: range.from, to: range.to }, p),
+      }}
       summaryItems={[
-        { label: "Retailers", value: all.length.toLocaleString() },
-        { label: "With Balance", value: withBalance.length.toLocaleString(), tone: "teal" },
-        { label: "Not In Snapshot", value: (all.length - withBalance.length).toLocaleString(), tone: "amber" },
-        { label: "Total Balance", value: money(total) },
+        { label: "Retailers", value: total.toLocaleString() },
+        { label: "With Balance", value: withBalance.toLocaleString(), tone: "teal" },
+        { label: "Not In Snapshot", value: (total - withBalance).toLocaleString(), tone: "amber" },
+        { label: "Total Balance", value: money(totalBalance) },
       ]}
-      filename="opening-balance"
       emptyTitle="No retailers found"
       emptyHint="Check Data Readiness — the Opening Balance feed may not be imported."
     />

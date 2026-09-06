@@ -38,8 +38,9 @@
  */
 
 import type { ReactNode } from "react";
-import { Card, EmptyState } from "./Kit";
+import { Card, EmptyState, Pager } from "./Kit";
 import { Icon } from "./icons";
+import { REPORT_PAGE_SIZE, pageOf, reportPageLabel } from "../../lib/report-paging";
 
 export type Column<T> = {
   key: string;
@@ -48,16 +49,37 @@ export type Column<T> = {
   render?: (row: T) => ReactNode;
 };
 
+/**
+ * Paging, when the caller supplies it.
+ *
+ * `rows` is always the WHOLE report — the slice happens here, so no page can
+ * accidentally render one page and count another. Omit `paging` and the table
+ * renders every row it was given, which is right for the handful of rows a
+ * supervisor-level report produces.
+ */
+export type ReportPaging = {
+  /** 1-based, straight off ?page=. Out-of-range values are clamped. */
+  page: unknown;
+  /** Builds the href for a page number; the page number lives in the URL. */
+  hrefFor: (page: number) => string;
+  /** "retailer" → "1–60 of 2,431 retailers". */
+  noun?: string;
+  pageSize?: number;
+};
+
 export function ReportTable<T extends { id?: string }>({
   columns,
   rows,
   emptyTitle = "No data for this period",
   emptyHint,
+  paging,
 }: {
   columns: Column<T>[];
+  /** Every row in the report, not a page of them. */
   rows: T[];
   emptyTitle?: string;
   emptyHint?: string;
+  paging?: ReportPaging;
 }) {
   if (!rows.length) {
     return (
@@ -66,6 +88,9 @@ export function ReportTable<T extends { id?: string }>({
       </Card>
     );
   }
+  const slice = paging
+    ? pageOf(rows, paging.page, paging.pageSize ?? REPORT_PAGE_SIZE)
+    : { rows, page: 1, pageCount: 1, total: rows.length, pageSize: rows.length };
   const cell = (c: Column<T>, row: T) =>
     c.render ? c.render(row) : ((row as Record<string, ReactNode>)[c.key] ?? "—");
 
@@ -84,7 +109,7 @@ export function ReportTable<T extends { id?: string }>({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {slice.rows.map((row, i) => (
                 <tr key={row.id ?? i}>
                   {columns.map((c) => (
                     <td key={c.key} className={c.align === "right" ? "is-right" : undefined}>
@@ -98,7 +123,7 @@ export function ReportTable<T extends { id?: string }>({
         </div>
       </Card>
       <div className="kit-report-cards">
-        {rows.map((row, i) => (
+        {slice.rows.map((row, i) => (
           <Card key={row.id ?? i} padded>
             {columns.map((c) => (
               <div className="kit-report-cardrow" key={c.key}>
@@ -109,6 +134,14 @@ export function ReportTable<T extends { id?: string }>({
           </Card>
         ))}
       </div>
+      {paging && (
+        <Pager
+          page={slice.page}
+          pageCount={slice.pageCount}
+          label={reportPageLabel(slice, paging.noun ?? "row")}
+          hrefFor={paging.hrefFor}
+        />
+      )}
     </>
   );
 }

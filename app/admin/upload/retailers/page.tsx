@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useCan } from "../../../components/PermissionContext";
 import { Icon } from "../../../components/icons";
-import { Card, DropZone, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
+import { Btn, Card, DropZone, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
 
 type Summary = { retailers: number; mappedRetailers: number; unassignedRetailers: number };
 type ImportResult = {
@@ -105,12 +105,11 @@ export default function Page() {
             title="Upload retailer list"
             sub=".xlsx, .xls or .xlsm"
             link={
-              // A real <a>: this is a file download from an API route, and
-              // <Link> would client-side navigate to it instead.
-              // eslint-disable-next-line @next/next/no-html-link-for-pages
-              <a href="/api/samples/retailers" className="kit-btn is-secondary size-sm">
+              // `external`: a real <a>, because this is a file download from
+              // an API route and <Link> would client-side navigate to it.
+              <LinkBtn href="/api/samples/retailers" external variant="secondary" size="sm">
                 Download Sample
-              </a>
+              </LinkBtn>
             }
           />
           <Card className="kit-mb-20" padded="lg">
@@ -122,13 +121,13 @@ export default function Page() {
               disabled={busy}
             />
             <div className="kit-form-actions">
-              <button onClick={upload} disabled={!file || busy} className="kit-btn is-primary size-md">
+              <Btn variant="primary" onClick={upload} disabled={!file || busy}>
                 {busy ? "Processing…" : "Validate & Import"}
-              </button>
+              </Btn>
               {file && !busy && (
-                <button type="button" onClick={() => setFile(null)} className="kit-btn is-ghost size-md">
+                <Btn variant="ghost" type="button" onClick={() => setFile(null)}>
                   Cancel
-                </button>
+                </Btn>
               )}
             </div>
 

@@ -20,7 +20,7 @@ import { ACHIEVEMENT_ON_TRACK_PERCENT, ACHIEVEMENT_WATCH_PERCENT } from "../../l
 import { pacing } from "../../lib/pacing";
 import type { ComparisonKind } from "../../lib/comparison";
 import type { MetricComparison } from "../../lib/comparison-data";
-import { teamTotals, withBp } from "../../lib/bp-rollup";
+import { groupSizes, groupTotals, teamTotals } from "../../lib/bp-rollup";
 import type { BpPortion } from "../../lib/bp-rollup";
 import {
   Card,
@@ -165,26 +165,24 @@ export default function Dashboard() {
       string,
       { name: string; rsos: number; retailers: number; achieved: number; target: number; ga: number; gaTarget: number }
     >();
-    for (const r of rows) {
-      const x = map.get(r.supervisor) || {
-        name: r.supervisor,
-        rsos: 0,
-        retailers: 0,
-        achieved: 0,
-        target: 0,
-        ga: 0,
-        gaTarget: 0,
-      };
-      // withBp: a supervisor's team includes their RSOs' Business Partners.
-      const t = withBp(r);
-      x.rsos++;
-      x.retailers += t.retailerCount;
-      x.achieved += t.totalRechargeAchieved;
-      x.target += t.totalRechargeTarget;
-      x.ga += t.gaAchieved;
-      x.gaTarget += t.gaTarget;
-      map.set(r.supervisor, x);
-    }
+    /*
+     * groupTotals, not a reduce over withBp(). One Business Partner can be
+     * held by two RSOs on the same team, and `withBp()` gives each of them the
+     * whole outlet by design — so summing them into a bucket counted its GA
+     * and its target twice, on the company's own dashboard.
+     */
+    const totals = groupTotals(rows, (r) => r.supervisor);
+    const sizes = groupSizes(rows, (r) => r.supervisor);
+    for (const [name, t] of totals)
+      map.set(name, {
+        name,
+        rsos: sizes.get(name) ?? 0,
+        retailers: t.retailerCount,
+        achieved: t.totalRechargeAchieved,
+        target: t.totalRechargeTarget,
+        ga: t.gaAchieved,
+        gaTarget: t.gaTarget,
+      });
     return [...map.values()].sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
   }, [rows]);
 

@@ -31,6 +31,13 @@ const ROOT = path.join(__dirname, "..");
 const read = (...p: string[]) => fs.readFileSync(path.join(ROOT, ...p), "utf8");
 
 const SHELL = read("app", "components", "AppShell.tsx");
+/*
+ * Code only. Several assertions below quote the old, wrong code in a comment to
+ * explain what they are guarding against — matching against the raw file makes
+ * the explanation trip the guard it explains.
+ */
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+const SHELL_CODE = stripComments(SHELL);
 const SHELL_CSS = read("styles", "shell.css");
 const KIT_CSS = read("styles", "kit.css");
 
@@ -96,10 +103,41 @@ describe("the nav's own columns are equal", () => {
      * shrank, and the labels overlapped their neighbours.
      */
     const cols = KIT_CSS.match(/\.bottom-nav\.is-cols-\d\s*\{[^}]*\}/g) ?? [];
-    expect(cols.length, "the bottom-nav column rules were not found").toBeGreaterThanOrEqual(5);
+    expect(cols.length, "the bottom-nav column rules were not found").toBeGreaterThanOrEqual(7);
     for (const rule of cols) {
       expect(rule, `bare 1fr lets one label widen its track: ${rule}`).toMatch(/repeat\(\d, minmax\(0, 1fr\)\)/);
     }
+  });
+
+  it("has a column rule for every count the roles actually use", () => {
+    /*
+     * On a phone the bottom bar IS the navigation — the sidebar is hidden below
+     * 900px — so a role's entries all have to fit in one row. The RSO has seven
+     * and the grid only defined up to six, so the seventh wrapped onto a second
+     * row and took a chunk out of a 390px screen.
+     *
+     * Read from AppShell rather than hard-coded: add an eighth destination to a
+     * role and this fails instead of quietly wrapping again.
+     */
+    const capped = SHELL.match(/is-cols-\$\{Math\.min\((\d+),/);
+    expect(capped, "the bottom-nav column cap was not found in AppShell").toBeTruthy();
+    const cap = Number(capped![1]);
+    const longest = Math.max(
+      ...[...SHELL.matchAll(/nav:\s*\[([\s\S]*?)\n\s*\],/g)].map((m) => [...m[1].matchAll(/\bhref:/g)].length),
+    );
+    expect(cap, `a role has ${longest} nav entries but the grid caps at ${cap}`).toBeGreaterThanOrEqual(longest);
+    for (let n = 2; n <= cap; n++)
+      expect(KIT_CSS, `.bottom-nav.is-cols-${n} has no rule`).toMatch(
+        new RegExp(`\\.bottom-nav\\.is-cols-${n}\\s*\\{`),
+      );
+  });
+
+  it("does not cap the bar below what a role needs", () => {
+    // A cap here silently removes destinations on mobile, where there is no
+    // other menu. The block that claimed to cap at four never did — the lines
+    // after it assigned the whole nav — which is worse than either choice made
+    // on purpose.
+    expect(SHELL_CODE).not.toMatch(/bottom = configs\[key\]\.nav\.slice\(/);
   });
 
   it("lets a nav item shrink below its label", () => {

@@ -15,8 +15,17 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { Card, DropZone, EmptyState, PageHeader, SectionHead, SummaryStrip, Table } from "../components/Kit";
+import {
+  Btn,
+  Card,
+  DropZone,
+  EmptyState,
+  LinkBtn,
+  PageHeader,
+  SectionHead,
+  SummaryStrip,
+  Table,
+} from "../components/Kit";
 import { Icon } from "../components/icons";
 
 type EmployeeRow = {
@@ -101,13 +110,13 @@ function UploadBox({
         disabled={busy}
       />
       <div className="kit-form-actions">
-        <button onClick={upload} disabled={!file || busy} className="kit-btn is-primary size-md">
+        <Btn variant="primary" onClick={upload} disabled={!file || busy}>
           {busy ? "Importing…" : `Import ${title}`}
-        </button>
+        </Btn>
         {file && !busy && (
-          <button type="button" onClick={() => setFile(null)} className="kit-btn is-ghost size-md">
+          <Btn variant="ghost" type="button" onClick={() => setFile(null)}>
             Cancel
-          </button>
+          </Btn>
         )}
       </div>
       {message && (
@@ -145,9 +154,9 @@ export default function MasterDataPage() {
         title="Master Data"
         subtitle="Supervisor → Employee → Retailer mapping"
         action={
-          <Link href="/dashboard" className="kit-btn is-secondary size-sm">
+          <LinkBtn href="/dashboard" variant="secondary" size="sm">
             Dashboard
-          </Link>
+          </LinkBtn>
         }
       />
 

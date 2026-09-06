@@ -64,27 +64,71 @@ export async function POST(req: Request) {
     const headers = (matrix[0] || []).map(head),
       rows = matrix.slice(1).filter((r) => r.some((v: any) => text(v))),
       idx = (name: string) => headers.indexOf(name);
-    const iRso = idx("RSO_NUMBER"),
-      iBp = idx("BP_CODE"),
+    /*
+     * Two sheet shapes, told apart by their headings.
+     *
+     * WIDE (what /api/samples/targets now hands out): one row per person.
+     *
+     *     CODE | GA | C2C | SC | SSO | LSO
+     *
+     * CODE is an RSO's mobile number, or a retailer code for a Business
+     * Partner. One column rather than two, because a row is one or the other;
+     * the importer tells them apart by looking the value up and reports which
+     * it matched. This is the shape a spreadsheet is already in when someone
+     * copies a block of numbers out of one, which is the whole point.
+     *
+     * LONG (the previous sheet): one row per target.
+     *
+     *     RSO_NUMBER | BP_CODE | TARGET_TYPE | TARGET
+     *
+     * Still accepted, because a file that used to import must not start
+     * failing. Six numbers for one RSO took six rows here, and forty RSOs took
+     * two hundred and forty.
+     */
+    const iCode = idx("CODE"),
       iType = idx("TARGET_TYPE"),
+      iRso = idx("RSO_NUMBER"),
+      iBp = idx("BP_CODE"),
       iTarget = idx("TARGET");
-    const missing: string[] = [];
-    if (iRso < 0 && iBp < 0) missing.push("RSO_NUMBER or BP_CODE");
-    if (iType < 0) missing.push("TARGET_TYPE");
-    if (iTarget < 0) missing.push("TARGET");
-    if (missing.length)
-      return NextResponse.json(
-        {
-          error: `Required heading${missing.length > 1 ? "s" : ""} missing: ${missing.join(", ")}. Found headings: ${headers.filter(Boolean).join(", ") || "none"}.`,
-        },
-        { status: 400 },
-      );
+    const wide = iType < 0;
+    const WIDE_METRICS = [
+      { head: "GA", key: "gaTarget" as const, integer: true },
+      { head: "C2C", key: "c2cTarget" as const, integer: false },
+      { head: "SC", key: "scTarget" as const, integer: false },
+      { head: "SSO", key: "ssoTarget" as const, integer: true },
+      { head: "LSO", key: "lsoTarget" as const, integer: true },
+    ];
+    const wideCols = WIDE_METRICS.map((m) => ({ ...m, at: idx(m.head) }));
+
+    if (wide) {
+      const missing: string[] = [];
+      if (iCode < 0) missing.push("CODE");
+      if (!wideCols.some((c) => c.at >= 0)) missing.push("at least one of GA, C2C, SC, SSO, LSO");
+      if (missing.length)
+        return NextResponse.json(
+          {
+            error: `Required heading${missing.length > 1 ? "s" : ""} missing: ${missing.join(", ")}. Found headings: ${headers.filter(Boolean).join(", ") || "none"}. Download the sample for the expected layout.`,
+          },
+          { status: 400 },
+        );
+    } else {
+      const missing: string[] = [];
+      if (iRso < 0 && iBp < 0) missing.push("RSO_NUMBER or BP_CODE");
+      if (iTarget < 0) missing.push("TARGET");
+      if (missing.length)
+        return NextResponse.json(
+          {
+            error: `Required heading${missing.length > 1 ? "s" : ""} missing: ${missing.join(", ")}. Found headings: ${headers.filter(Boolean).join(", ") || "none"}.`,
+          },
+          { status: 400 },
+        );
+    }
 
     const [employees, existingTargets, bpAssignments] = await Promise.all([
       prisma.employee.findMany({ where: { active: true }, select: { id: true, rsoMsisdn: true, employeeCode: true } }),
       prisma.monthlyTarget.findMany({ where: { month } }),
       prisma.bpAssignment.findMany({
-        where: { startDate: { lt: monthEnd }, OR: [{ endDate: null }, { endDate: { gte: month } }] },
+        where: { active: true, startDate: { lt: monthEnd }, OR: [{ endDate: null }, { endDate: { gte: month } }] },
         include: { retailer: { select: { retailerCode: true } } },
         orderBy: { startDate: "desc" },
       }),
@@ -108,45 +152,108 @@ export async function POST(req: Request) {
         },
       ]),
     );
+    /*
+     * EVERY active assignment of a code, not the first one.
+     *
+     * A retailer can be a Business Partner under several RSOs at once, and a
+     * target file names the outlet, not the assignment — so one row sets the
+     * same GA target for each RSO holding it, which is what the owner asked
+     * for. Keeping only the first match would have set one and silently left
+     * the others at whatever they were.
+     */
     type BpAssignmentRow = (typeof bpAssignments)[number];
-    const bpByCode = new Map<string, BpAssignmentRow>();
+    const bpByCode = new Map<string, BpAssignmentRow[]>();
     for (const a of bpAssignments) {
       const code = a.retailer.retailerCode.trim().toUpperCase();
-      if (!bpByCode.has(code)) bpByCode.set(code, a);
+      bpByCode.set(code, [...(bpByCode.get(code) ?? []), a]);
     }
+
+    const blankState = (): TargetState => ({
+      gaTarget: 0,
+      c2cTarget: 0,
+      scTarget: 0,
+      totalRechargeTarget: 0,
+      ssoTarget: 0,
+      lsoTarget: 0,
+      explicitRecharge: false,
+    });
 
     const touched = new Set<string>(),
       bpTargets = new Map<string, number>(),
-      errors: string[] = [];
-    let validRows = 0;
+      errors: string[] = [],
+      /** Values a BP row carried that this system has nowhere to put. */
+      ignored: string[] = [];
+    let validRows = 0,
+      rsoRows = 0,
+      bpRows = 0;
+
     for (let n = 0; n < rows.length; n++) {
-      const row = rows[n],
-        rso = iRso >= 0 ? text(row[iRso]) : "",
-        bp = iBp >= 0 ? text(row[iBp]).toUpperCase() : "",
-        type = text(row[iType]).toUpperCase(),
-        value = strictNum(row[iTarget]);
+      const row = rows[n];
       try {
+        if (wide) {
+          const code = text(row[iCode]);
+          if (!code) throw new Error("CODE is required.");
+          const employeeId = employeeByKey.get(phoneKey(code)) || employeeByKey.get(code.trim().toUpperCase());
+          const assignments = bpByCode.get(code.trim().toUpperCase());
+          if (employeeId && assignments?.length)
+            throw new Error(`${code} matches both an RSO and a BP retailer code. Rename one of them.`);
+          if (!employeeId && !assignments?.length)
+            throw new Error(`${code} is not an RSO mobile number or a BP retailer code active in ${monthText}.`);
+
+          const value = (at: number) => (at < 0 ? null : strictNum(row[at]));
+
+          if (assignments?.length) {
+            // A BP has a GA target and nothing else in this schema.
+            const ga = value(wideCols[0].at);
+            if (ga === null) throw new Error("GA must be a valid non-negative number.");
+            for (const a of assignments) bpTargets.set(a.id, int(ga));
+            const spare = wideCols
+              .slice(1)
+              .filter((c) => (value(c.at) ?? 0) > 0)
+              .map((c) => c.head);
+            if (spare.length && ignored.length < 30)
+              ignored.push(`Row ${n + 2}: ${code} is a BP — ${spare.join(", ")} ignored (BPs carry a GA target only).`);
+            bpRows++;
+            validRows++;
+            continue;
+          }
+
+          const state = targetByEmployee.get(employeeId!) || blankState();
+          for (const c of wideCols) {
+            if (c.at < 0) continue;
+            const v = value(c.at);
+            if (v === null) {
+              // A blank cell leaves the stored target alone; a bad one is an
+              // error, because "0" and "abc" must not mean the same thing.
+              if (text(row[c.at])) throw new Error(`${c.head} must be a valid non-negative number.`);
+              continue;
+            }
+            state[c.key] = c.integer ? int(v) : v;
+          }
+          targetByEmployee.set(employeeId!, state);
+          touched.add(employeeId!);
+          rsoRows++;
+          validRows++;
+          continue;
+        }
+
+        const rso = iRso >= 0 ? text(row[iRso]) : "",
+          bp = iBp >= 0 ? text(row[iBp]).toUpperCase() : "",
+          type = text(row[iType]).toUpperCase(),
+          value = strictNum(row[iTarget]);
         if (value === null) throw new Error("TARGET must be a valid non-negative number.");
         if (bp) {
           if (!["BP_GA", "GA"].includes(type)) throw new Error("BP_CODE supports TARGET_TYPE BP_GA or GA.");
-          const assignment = bpByCode.get(bp);
-          if (!assignment) throw new Error(`No BP assignment found for ${bp} in ${monthText}.`);
-          bpTargets.set(assignment.id, int(value));
+          const assignments = bpByCode.get(bp);
+          if (!assignments?.length) throw new Error(`No BP assignment found for ${bp} in ${monthText}.`);
+          for (const a of assignments) bpTargets.set(a.id, int(value));
           validRows++;
           continue;
         }
         if (!rso) throw new Error("RSO_NUMBER or BP_CODE is required.");
         const employeeId = employeeByKey.get(phoneKey(rso)) || employeeByKey.get(rso.trim().toUpperCase());
         if (!employeeId) throw new Error(`RSO ${rso} not found.`);
-        const state = targetByEmployee.get(employeeId) || {
-          gaTarget: 0,
-          c2cTarget: 0,
-          scTarget: 0,
-          totalRechargeTarget: 0,
-          ssoTarget: 0,
-          lsoTarget: 0,
-          explicitRecharge: false,
-        };
+        const state = targetByEmployee.get(employeeId) || blankState();
         if (type === "GA") state.gaTarget = int(value);
         else if (type === "C2C") state.c2cTarget = value;
         else if (type === "SC") state.scTarget = value;
@@ -212,16 +319,26 @@ export async function POST(req: Request) {
       targetType: "File",
       targetName: file.name,
       detail: `Imported ${updated} target record(s) for ${monthText}`,
-      metadata: { month: monthText, updated, failed, validRows },
+      metadata: { month: monthText, updated, failed, validRows, layout: wide ? "wide" : "long", rsoRows, bpRows },
     });
     return NextResponse.json({
       ok: true,
       month: monthText,
+      layout: wide ? "wide" : "long",
       totalRows: rows.length,
       validRows,
+      rsoRows,
+      // Assignments written, which is more than the number of BP rows when a
+      // code is held by several RSOs — the caller should see both.
+      bpRows,
+      bpAssignmentsUpdated: bpTargets.size,
       updated,
       failed,
       errors,
+      // Values the sheet carried that this system cannot store. Reported
+      // rather than dropped: a number typed into a cell and silently discarded
+      // is the failure mode this project keeps auditing for.
+      ignored,
     });
   } catch (e) {
     console.error(e);

@@ -158,8 +158,19 @@ const configs: Record<string, RoleConfig> = {
       { href: "/rso/lso", label: "LSO", icon: "chart", module: "attention" },
       { href: "/rso/attention", label: "Attention", icon: "target", module: "attention" },
       { href: "/rso/retailers", label: "Retailers", icon: "shop", module: "retailers" },
+      /*
+       * ONE BP entry, not two.
+       *
+       * The RSO had "My BP" and "BP Activations" side by side, and both opened
+       * a list of the same Business Partners — one with each BP's monthly GA,
+       * the other with each BP's assignment row. Two menu items for one
+       * question ("how are my BPs doing?") is a choice the reader should not
+       * have to make, and on a phone it cost a whole nav column.
+       *
+       * My BP is the list; tapping a BP opens that BP's own record, which is
+       * where the day-by-day activations live. /rso/bp/activations is gone.
+       */
       { href: "/rso/bp", label: "My BP", icon: "users", module: "bp" },
-      { href: "/rso/bp/activations", label: "BP Activations", icon: "sim", module: "bp" },
     ],
     bottom: [],
   },
@@ -186,12 +197,26 @@ const configs: Record<string, RoleConfig> = {
     bottom: pick(itNav, ADMIN_BOTTOM),
   },
 };
-for (const key of ["manager", "supervisor", "accounts", "rso", "bp"])
-  configs[key].bottom = configs[key].nav.slice(0, 4);
-configs.manager.bottom = configs.manager.nav;
-configs.supervisor.bottom = configs.supervisor.nav;
-configs.rso.bottom = configs.rso.nav;
-configs.accounts.bottom = configs.accounts.nav;
+/*
+ * The field roles put their WHOLE nav in the bottom bar, and they have to.
+ *
+ * Below 900px the sidebar is `display: none`, so the bottom bar is the only
+ * navigation that exists on a phone. Anything left out of it is unreachable
+ * unless you know the URL — which is why capping the bar is not the tidy fix it
+ * looks like. The RSO's seven entries are seven real destinations.
+ *
+ * This block used to say both things at once:
+ *
+ *     for (const key of [...]) configs[key].bottom = configs[key].nav.slice(0, 4);
+ *     configs.rso.bottom = configs.rso.nav;   // ...and three more like it
+ *
+ * The loop capped at four and the next four lines threw that away, so the cap
+ * applied to nobody: `bp` was the only role left holding it and it has two
+ * entries. Code that states a rule it does not apply is worse than no rule —
+ * the grid was still sized for at most six columns, so the RSO's seventh item
+ * wrapped onto a second row and ate the bottom of a 390px screen.
+ */
+for (const key of ["manager", "supervisor", "accounts", "rso", "bp"]) configs[key].bottom = configs[key].nav;
 function roleFor(path: string) {
   const first = path.split("/").filter(Boolean)[0] || "";
   return configs[first] || configs.admin;
@@ -332,7 +357,7 @@ export default function AppShell({
              * stylesheet's own default rather than falling back to an inline
              * style.
              */
-            <nav className={`bottom-nav is-cols-${Math.min(6, Math.max(2, visibleBottom.length))}`}>
+            <nav className={`bottom-nav is-cols-${Math.min(8, Math.max(2, visibleBottom.length))}`}>
               {visibleBottom.map((i) => (
                 <Link
                   key={i.href}

@@ -10,7 +10,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Check, Field, SectionHead } from "./Kit";
+import { Btn, Card, Check, Field, SectionHead } from "./Kit";
 import { Icon } from "./icons";
 
 type U = { id: string; name: string; role: string; mobile: string; custom: number };
@@ -120,9 +120,9 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
               </select>
             </Field>
             <div className="kit-form-actions">
-              <button type="button" className="kit-btn is-primary size-sm" disabled={busy} onClick={applyPreset}>
+              <Btn size="sm" type="button" disabled={busy} onClick={applyPreset}>
                 Apply to selected
-              </button>
+              </Btn>
             </div>
           </div>
           <div>
@@ -137,9 +137,9 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
               </select>
             </Field>
             <div className="kit-form-actions">
-              <button type="button" className="kit-btn is-secondary size-sm" disabled={busy} onClick={copy}>
+              <Btn variant="secondary" size="sm" type="button" disabled={busy} onClick={copy}>
                 Copy to selected
-              </button>
+              </Btn>
             </div>
           </div>
         </div>

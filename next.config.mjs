@@ -28,6 +28,27 @@ if (isProduction)
 const nextConfig = {
   poweredByHeader: false,
   compress: true,
+  /*
+   * Routes that moved, kept working.
+   *
+   * v145 folded the RSO's two BP menus into one: `/rso/bp` lists the partners
+   * and `/rso/bp/[id]` is one partner's day-by-day record. The old
+   * `/rso/bp/activations` pages are gone.
+   *
+   * Without these, an RSO's bookmark to `/rso/bp/activations/<id>` would land
+   * on `/rso/bp/[id]` with the literal id "activations" — no such assignment,
+   * so the page renders "BP activation unavailable". Technically graceful, and
+   * completely baffling to the person whose link used to work.
+   *
+   * The `/:id` case maps onto the SAME assignment id the new route takes, so a
+   * deep link survives the move rather than merely failing politely.
+   */
+  async redirects() {
+    return [
+      { source: "/rso/bp/activations", destination: "/rso/bp", permanent: true },
+      { source: "/rso/bp/activations/:id", destination: "/rso/bp/:id", permanent: true },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

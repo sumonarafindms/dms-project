@@ -12,7 +12,7 @@ import { Icon } from "../../components/icons";
 import { requireUser } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { ASSIGNMENT_MODULE } from "../../../lib/assignment-history";
-import { Card, EmptyState, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
+import { Card, EmptyState, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
 import type { Prisma } from "@prisma/client";
 
 const fmt = (d: Date) =>
@@ -119,9 +119,9 @@ export default async function Page({
         <ServerSelect paramName="module" label="Module" allLabel="All modules" options={modules.map((x) => x.module)} />
         <ServerSelect paramName="action" label="Action" allLabel="All actions" options={actions.map((x) => x.action)} />
         {filtered && (
-          <Link className="kit-btn is-ghost size-sm" href="/admin/audit">
+          <LinkBtn variant="ghost" size="sm" href="/admin/audit">
             Clear
-          </Link>
+          </LinkBtn>
         )}
       </ServerSearchBar>
 

@@ -48,12 +48,12 @@
   }
   input::placeholder,
   textarea::placeholder {
-    color: var(--color-slate-400);
+    color: var(--text-muted);
   }
   input:disabled,
   select:disabled {
     background: var(--color-slate-50);
-    color: var(--color-slate-400);
+    color: var(--text-muted);
     cursor: not-allowed;
   }
   label {
@@ -129,7 +129,7 @@
   .auth-v54-brand-top span {
     display: block;
     font-size: 0.72rem;
-    color: var(--color-slate-400);
+    color: var(--text-muted);
   }
   .auth-v54-kicker {
     display: inline-block;
@@ -172,13 +172,13 @@
     color: white;
   }
   .auth-v54-role-grid small {
-    color: var(--color-slate-400);
+    color: var(--text-muted);
     font-size: 0.68rem;
   }
   .auth-v54-foot {
     display: flex;
     gap: 1.5rem;
-    color: var(--color-slate-400);
+    color: var(--text-muted);
     font-size: 0.75rem;
   }
 
@@ -390,7 +390,7 @@
   }
   .auth-admin-points small {
     font-size: 0.68rem;
-    color: var(--color-slate-400);
+    color: var(--text-muted);
   }
 
   /* Amber, not teal: this badge is a caution, not a brand mark. */

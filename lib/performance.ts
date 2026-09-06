@@ -2,11 +2,11 @@ import { prisma } from "./prisma";
 import { monthBounds } from "./month";
 import { parseYmd, monthStartUtc, monthStartsInRange, fullyCoveredMonths } from "./date-range";
 import { classifyGaActivation, isLsoComplete, isSsoComplete } from "./business-rules";
-import { assignmentGaTarget, assignmentWindow } from "./bp-period";
+import { bpLedger } from "./bp-ledger";
 // BpPortion lives in the Prisma-free rollup module so client components can
 // name it without dragging this file (and Prisma) into the browser bundle.
-import type { BpPortion } from "./bp-rollup";
-export type { BpPortion };
+import type { BpPortion, BpRetailerFigures } from "./bp-rollup";
+export type { BpPortion, BpRetailerFigures };
 
 /**
  * One RSO's own performance. **Every figure here excludes their BPs.**
@@ -66,6 +66,17 @@ const NO_BP: BpPortion = {
   lsoAchieved: 0,
   c2sAmount: 0,
   c2sTransactions: 0,
+  byRetailer: {},
+};
+
+const NO_BP_RETAILER: BpRetailerFigures = {
+  gaTarget: 0,
+  gaAchieved: 0,
+  ssoAchieved: 0,
+  c2cAchieved: 0,
+  lsoAchieved: 0,
+  c2sAmount: 0,
+  c2sTransactions: 0,
 };
 
 export async function employeePerformance(month: string, employeeIds?: string[], fromInput?: string, toInput?: string) {
@@ -94,13 +105,34 @@ export async function employeePerformance(month: string, employeeIds?: string[],
   if (!employees.length) return [];
 
   const eids = employees.map((e) => e.id);
+  const employeeIdSet = new Set(eids);
   // Every assigned retailer, active or not: a retailer deactivated mid-period
   // still made the sales it made, so its activity belongs in the period's
   // totals. The COUNT above is active-only because that is what the screens
   // mean by "Retailers"; the drill-down list shows the inactive ones that had
   // activity so the totals stay explainable.
+  /*
+   * A BP need not be one of this RSO's own retailers.
+   *
+   * Scope used to be "retailers whose employeeId is one of these", which is
+   * the RSO's own base. Now that one outlet can be a Business Partner under
+   * several RSOs, at most one of them owns it in the master list — so scoping
+   * by ownership alone left every other holder looking at a BP with no
+   * figures: the assignment showed, the count showed, and the GA was zero.
+   */
+  const scopeAssignments = await prisma.bpAssignment.findMany({
+    where: {
+      employeeId: { in: eids },
+      startDate: { lt: rangeEnd },
+      OR: [{ endDate: null }, { endDate: { gte: rangeStart } }],
+    },
+    select: { retailerId: true },
+  });
+  const bpScopeIds = [...new Set(scopeAssignments.map((a) => a.retailerId))];
   const retailerRefs = await prisma.retailer.findMany({
-    where: { employeeId: { in: eids } },
+    where: bpScopeIds.length
+      ? { OR: [{ employeeId: { in: eids } }, { id: { in: bpScopeIds } }] }
+      : { employeeId: { in: eids } },
     select: { id: true, employeeId: true, simSeller: true },
   });
   const totalByEmployee = new Map<string, number>();
@@ -138,45 +170,17 @@ export async function employeePerformance(month: string, employeeIds?: string[],
       })
     : [];
 
-  /** Half-open BP windows per retailer, in epoch ms, for a cheap day test. */
-  const bpWindows = new Map<string, { from: number; to: number }[]>();
-  const bpTargetByEmployee = new Map<string, number>();
-  const bpCountByEmployee = new Map<string, number>();
-  for (const a of bpAssignments) {
-    const { effectiveStart, effectiveEnd } = assignmentWindow(a, rangeStart, rangeEnd);
-    if (effectiveStart >= effectiveEnd) continue;
-    const list = bpWindows.get(a.retailerId) ?? [];
-    list.push({ from: effectiveStart.getTime(), to: effectiveEnd.getTime() });
-    bpWindows.set(a.retailerId, list);
-    // The BP's own target, by the same rule the BP screens use. The RSO's GA
-    // target is reduced by exactly this, so the same SIM is never targeted
-    // twice.
-    bpTargetByEmployee.set(
-      a.employeeId,
-      (bpTargetByEmployee.get(a.employeeId) ?? 0) +
-        assignmentGaTarget(a, monthStartsInRange(effectiveStart, effectiveEnd)),
-    );
-    bpCountByEmployee.set(a.employeeId, (bpCountByEmployee.get(a.employeeId) ?? 0) + 1);
-  }
-  const bpOwnsDay = (retailerId: string, dayMs: number) =>
-    (bpWindows.get(retailerId) ?? []).some((w) => dayMs >= w.from && dayMs < w.to);
-  /**
-   * For the monthly figures (LSO, C2S transactions) there is no day to test —
-   * `C2sMonthlySummary` is one row per retailer-month. A retailer that was a BP
-   * for any part of the reported window is treated as a BP for its monthly
-   * summary. That is the only choice available without splitting the summary,
-   * and it errs toward the BP, which is the side the RSO is not measured on.
+  /*
+   * One ledger answers both BP questions for this window: which days belong to
+   * a BP at all, and which RSOs to credit for them. The rule lives in
+   * lib/bp-ledger.ts because /api/dashboard/summary needs exactly the same
+   * answers — two copies is how the dashboard and the RSO page start
+   * disagreeing about one RSO.
    */
-  const bpOwnsRetailerAtAll = (retailerId: string) => bpWindows.has(retailerId);
-  const bpPortions = new Map<string, BpPortion>();
-  const portion = (eid: string) => {
-    let x = bpPortions.get(eid);
-    if (!x) {
-      x = { ...NO_BP };
-      bpPortions.set(eid, x);
-    }
-    return x;
-  };
+  const inScope = (id: string) => employeeIdSet.has(id);
+  const ledger = bpLedger(bpAssignments, rangeStart, rangeEnd, inScope);
+  const ownerOf = (retailerId: string) => retailerMap.get(retailerId)?.employeeId ?? null;
+
   if (!retailerIds.length) {
     return employees.map((e) => {
       const targets = e.targets.reduce(
@@ -253,7 +257,13 @@ export async function employeePerformance(month: string, employeeIds?: string[],
 
   const gaBy = new Map<string, { t: number; a150: number; a300: number }>(),
     retailerGaMonth = new Map<string, { eid: string; count: number; simSeller: string | null }>(),
-    bpGaMonth = new Map<string, { eid: string; count: number; simSeller: string | null }>();
+    // Keyed by retailer-month, and it carries the retailer and a day inside
+    // that month: SSO is credited to whoever HELD the BP, which is no longer
+    // knowable from an employee id alone.
+    bpGaMonth = new Map<
+      string,
+      { retailerId: string; ownerId: string; month: Date; count: number; simSeller: string | null }
+    >();
   for (const x of gaGroups) {
     const rr = retailerMap.get(x.retailerId),
       eid = rr?.employeeId;
@@ -262,12 +272,21 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     // Standard GA only. SIMWAP / EV-SWAP and unknown product codes never count.
     const category = classifyGaActivation(x);
     if (category !== "GA_170" && category !== "GA_300") continue;
-    if (bpOwnsDay(x.retailerId, x.activationDate.getTime())) {
+    if (ledger.ownsDay(x.retailerId, x.activationDate.getTime())) {
       // The BP sold this, not the RSO. It still belongs to the territory, so
-      // it is kept here rather than dropped — teamTotals() adds it back.
-      portion(eid).gaAchieved += count;
+      // it is kept here rather than dropped — teamTotals() adds it back, once
+      // per outlet however many RSOs hold it.
+      ledger.credit(x.retailerId, x.activationDate.getTime(), eid, (f) => {
+        f.gaAchieved += count;
+      });
       const bpKey = `${x.retailerId}|${x.activationDate.toISOString().slice(0, 7)}`,
-        br = bpGaMonth.get(bpKey) || { eid, count: 0, simSeller: rr?.simSeller ?? null };
+        br = bpGaMonth.get(bpKey) || {
+          retailerId: x.retailerId,
+          ownerId: eid,
+          month: x.activationDate,
+          count: 0,
+          simSeller: rr?.simSeller ?? null,
+        };
       br.count += count;
       bpGaMonth.set(bpKey, br);
       continue;
@@ -287,33 +306,44 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     if (isSsoComplete(r.simSeller, r.count)) sso.set(r.eid, (sso.get(r.eid) || 0) + 1);
   // SSO counts RETAILER-MONTHS, so a BP's months are tallied on the same rule
   // against the BP side rather than being lost.
-  for (const r of bpGaMonth.values()) if (isSsoComplete(r.simSeller, r.count)) portion(r.eid).ssoAchieved += 1;
+  for (const r of bpGaMonth.values())
+    if (isSsoComplete(r.simSeller, r.count))
+      ledger.credit(r.retailerId, r.month.getTime(), r.ownerId, (f) => {
+        f.ssoAchieved += 1;
+      });
 
   const c2cBy = new Map<string, number>();
   for (const x of c2cGroups) {
     const eid = retailerMap.get(x.retailerId)?.employeeId;
     if (!eid) continue;
     const amount = Number(x._sum.amount || 0);
-    if (bpOwnsDay(x.retailerId, x.date.getTime())) portion(eid).c2cAchieved += amount;
+    if (ledger.ownsDay(x.retailerId, x.date.getTime()))
+      ledger.credit(x.retailerId, x.date.getTime(), eid, (f) => {
+        f.c2cAchieved += amount;
+      });
     else c2cBy.set(eid, (c2cBy.get(eid) || 0) + amount);
   }
   const c2sAmountBy = new Map<string, number>();
-  const bpC2sAmountBy = new Map<string, number>();
   for (const x of c2sGroups) {
     const eid = retailerMap.get(x.retailerId)?.employeeId;
     if (!eid) continue;
     const amount = Number(x._sum.amount || 0);
-    if (bpOwnsDay(x.retailerId, x.date.getTime())) bpC2sAmountBy.set(eid, (bpC2sAmountBy.get(eid) || 0) + amount);
+    if (ledger.ownsDay(x.retailerId, x.date.getTime()))
+      ledger.credit(x.retailerId, x.date.getTime(), eid, (f) => {
+        f.c2sAmount += amount;
+      });
     else c2sAmountBy.set(eid, (c2sAmountBy.get(eid) || 0) + amount);
   }
   const c2sBy = new Map<string, { amount: number; trx: number; lso: number }>();
   for (const r of c2sMonthly) {
     const eid = retailerMap.get(r.retailerId)?.employeeId;
     if (!eid) continue;
-    if (bpOwnsRetailerAtAll(r.retailerId)) {
-      const bp = portion(eid);
-      bp.c2sTransactions += r.transactionCount;
-      if (isLsoComplete(r.totalAmount, r.transactionCount)) bp.lsoAchieved += 1;
+    if (ledger.ownsRetailer(r.retailerId)) {
+      const lso = isLsoComplete(r.totalAmount, r.transactionCount);
+      ledger.credit(r.retailerId, null, eid, (f) => {
+        f.c2sTransactions += r.transactionCount;
+        if (lso) f.lsoAchieved += 1;
+      });
       continue;
     }
     const e = c2sBy.get(eid) || { amount: c2sAmountBy.get(eid) || 0, trx: 0, lso: 0 };
@@ -322,7 +352,6 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     c2sBy.set(eid, e);
   }
   for (const [eid, amount] of c2sAmountBy) if (!c2sBy.has(eid)) c2sBy.set(eid, { amount, trx: 0, lso: 0 });
-  for (const [eid, amount] of bpC2sAmountBy) portion(eid).c2sAmount += amount;
 
   return employees.map((e) => {
     const targets = e.targets.reduce(
@@ -343,11 +372,7 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     const g = gaBy.get(e.id) || { t: 0, a150: 0, a300: 0 },
       c = c2cBy.get(e.id) || 0,
       cs = c2sBy.get(e.id) || { amount: 0, trx: 0, lso: 0 };
-    const bp: BpPortion = {
-      ...(bpPortions.get(e.id) ?? NO_BP),
-      gaTarget: bpTargetByEmployee.get(e.id) ?? 0,
-      count: bpCountByEmployee.get(e.id) ?? 0,
-    };
+    const bp: BpPortion = ledger.portionFor(e.id);
     /*
      * The RSO's GA target is used EXACTLY as entered.
      *

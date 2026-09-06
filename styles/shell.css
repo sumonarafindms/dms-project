@@ -70,7 +70,7 @@
     letter-spacing: 0.01em;
   }
   .brand-sub {
-    color: var(--color-slate-400);
+    color: var(--text-muted);
     font-size: 0.7rem;
     margin-top: 0.05rem;
   }
@@ -165,7 +165,7 @@
     line-height: 1.2;
   }
   .profile-role {
-    color: var(--color-slate-400);
+    color: var(--text-muted);
     font-size: 0.72rem;
   }
 
@@ -185,7 +185,7 @@
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--color-slate-400);
+    color: var(--text-muted);
     cursor: pointer;
     list-style: none;
   }
@@ -311,7 +311,9 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    overflow-wrap: anywhere;
+    /* break-word, not anywhere: a word is split only when it genuinely
+       cannot fit, so "Attention" stays whole instead of reading "Attentio n". */
+    overflow-wrap: break-word;
   }
   .bottom-link.active {
     color: var(--color-accent-600);

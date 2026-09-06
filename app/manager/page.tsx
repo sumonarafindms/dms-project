@@ -36,7 +36,7 @@ import {
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
-import { teamTotals, withBp } from "../../lib/bp-rollup";
+import { groupSizes, groupTotals, teamTotals } from "../../lib/bp-rollup";
 import { parseComparisonKind } from "../../lib/comparison";
 
 export const dynamic = "force-dynamic";
@@ -91,17 +91,23 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
   >();
   for (const s of supervisors)
     supBy.set(s.name, { id: s.id, name: s.name, rsos: 0, retailers: 0, achieved: 0, target: 0, ga: 0, gaTarget: 0 });
-  for (const r of rows) {
-    const x = supBy.get(r.supervisor);
+  /*
+   * groupTotals, not a reduce over withBp(). A supervisor's team may hold one
+   * Business Partner through two of its RSOs, and `withBp()` deliberately
+   * gives each holder the whole outlet — so adding those together counted it
+   * twice. The dedup lives in lib/bp-rollup.ts.
+   */
+  const supTotals = groupTotals(rows, (r) => r.supervisor);
+  const supSizes = groupSizes(rows, (r) => r.supervisor);
+  for (const [name, t] of supTotals) {
+    const x = supBy.get(name);
     if (!x) continue;
-    // withBp: the supervisor's team includes their RSOs' Business Partners.
-    const t = withBp(r);
-    x.rsos++;
-    x.retailers += t.retailerCount;
-    x.achieved += t.totalRechargeAchieved;
-    x.target += t.totalRechargeTarget;
-    x.ga += t.gaAchieved;
-    x.gaTarget += t.gaTarget;
+    x.rsos = supSizes.get(name) ?? 0;
+    x.retailers = t.retailerCount;
+    x.achieved = t.totalRechargeAchieved;
+    x.target = t.totalRechargeTarget;
+    x.ga = t.gaAchieved;
+    x.gaTarget = t.gaTarget;
   }
   const supRows = [...supBy.values()].sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
 

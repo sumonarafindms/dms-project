@@ -16,7 +16,6 @@
  * Center and need completely different fixes.
  */
 
-import Link from "next/link";
 import { requireUser } from "../../../lib/auth";
 import { resolveRange, rangeQuery, rangeLabel } from "../../../lib/report-range";
 import { readinessReport } from "../../../lib/readiness-data";
@@ -28,7 +27,7 @@ import {
   worstState,
   type DayState,
 } from "../../../lib/readiness";
-import { Badge, Card, EmptyState, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
+import { Badge, Card, EmptyState, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
 import { ReportDateBar } from "../../components/ReportShell";
 import { TableScrollHint } from "../../components/TableScrollHint";
 import { Icon } from "../../components/icons";
@@ -60,9 +59,9 @@ export default async function ReadinessPage({
         title="Data Readiness"
         subtitle={`Which feeds actually landed, day by day, for ${rangeLabel(range)}`}
         action={
-          <Link className="kit-btn size-sm is-ghost no-print" href={`/it/reports?${q}`}>
+          <LinkBtn variant="ghost" size="sm" className="no-print" href={`/it/reports?${q}`}>
             ← Reporting Center
-          </Link>
+          </LinkBtn>
         }
       />
       <ReportDateBar range={range} />

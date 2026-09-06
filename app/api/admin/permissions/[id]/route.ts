@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { getCurrentUser } from "../../../../../lib/auth";
+import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../../lib/rate-limit";
 import { permissionModules, roleDefaults } from "../../../../../lib/permissions";
 import { audit } from "../../../../../lib/audit";
 
@@ -29,6 +30,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await getCurrentUser();
   if (!me || !["ADMIN", "IT"].includes(me.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const { id } = await params,
     user = await prisma.user.findUnique({ where: { id } });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -67,6 +73,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await getCurrentUser();
   if (!me || !["ADMIN", "IT"].includes(me.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const { id } = await params;
   const target = await prisma.user.findUnique({ where: { id }, select: { displayName: true } });
   await prisma.userPermission.deleteMany({ where: { userId: id } });

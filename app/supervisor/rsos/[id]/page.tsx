@@ -8,7 +8,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ month?: string; q?: string; from?: string; to?: string; sort?: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string }>;
 }) {
   const u = await requirePagePermission(["SUPERVISOR"], "employees"),
     { id } = await params,
@@ -21,10 +21,8 @@ export default async function Page({
       d={d}
       month={month}
       nowIso={new Date().toISOString()}
-      q={s.q || ""}
       from={s.from}
       to={s.to}
-      sort={s.sort}
       basePath="/supervisor"
       backHref={`/supervisor/rsos${s.from ? `?from=${s.from}${s.to ? `&to=${s.to}` : ""}` : ""}`}
     />

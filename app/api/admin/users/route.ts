@@ -2,19 +2,29 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser, hashCredential } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
+import { validatePin } from "../../../../lib/credential-policy";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 const roles = ["IT", "MANAGER", "SUPERVISOR", "ACCOUNTS", "RSO", "BP"] as const;
 export async function POST(req: Request) {
   const me = await getCurrentUser();
   if (!me || !["ADMIN", "IT"].includes(me.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Creating a login sets a PIN, so it shares the credential budget with the
+  // PATCH below — which had one while this did not.
+  const rl = await consumeRateLimit(RATE_LIMITS.credential, me.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const b = await req.json();
   const role = String(b.role || "") as (typeof roles)[number];
   if (!roles.includes(role)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   const displayName = String(b.displayName || "").trim(),
     mobileNumber = String(b.mobileNumber || "").trim(),
     pin = String(b.pin || "").trim();
-  if (!displayName || !mobileNumber || pin.length < 4)
-    return NextResponse.json({ error: "Name, mobile number and at least 4-digit PIN are required." }, { status: 400 });
+  if (!displayName || !mobileNumber)
+    return NextResponse.json({ error: "Name and mobile number are required." }, { status: 400 });
+  const pinError = validatePin(pin);
+  if (pinError) return NextResponse.json({ error: pinError }, { status: 400 });
   const employeeId = b.employeeId ? String(b.employeeId) : null,
     supervisorId = b.supervisorId ? String(b.supervisorId) : null,
     bpRetailerId = b.bpRetailerId ? String(b.bpRetailerId) : null;
@@ -115,28 +125,58 @@ export async function PATCH(req: Request) {
   }
 
   const pin = typeof b.pin === "string" ? b.pin.trim() : "";
-  if (pin && pin.length < 4)
-    return NextResponse.json({ error: "PIN must contain at least 4 characters." }, { status: 400 });
+  // `allowEmpty`: on an edit form, a blank PIN field means "leave it alone".
+  const pinError = validatePin(pin, { allowEmpty: true });
+  if (pinError) return NextResponse.json({ error: pinError }, { status: 400 });
   if (pin) data.credentialHash = await hashCredential(pin);
+
+  /*
+   * Unlocking.
+   *
+   * The counter is cleared alongside `lockedAt`, or the account would lock
+   * again on the very next failure — an "unlock" that lasts one attempt is
+   * worse than none, because the admin believes they fixed it.
+   *
+   * Setting a new PIN also unlocks: an admin resetting the PIN of someone who
+   * is locked out has plainly decided this person should be able to sign in,
+   * and making them press a second button would only teach them to press both
+   * every time.
+   */
+  if (b.unlock === true || pin) {
+    // Both, always, in one place. An earlier version cleared the flag in one
+    // branch and the counter in another, which meant a guard could be satisfied
+    // by the wrong line — and a mutation that dropped the counter from the
+    // unlock path went undetected. Clearing a null flag costs nothing.
+    data.lockedAt = null;
+    data.failedLoginCount = 0;
+  }
 
   try {
     const target = await prisma.user.update({ where: { id }, data });
     const securityChanged = Boolean(pin) || editingDetails || b.active === false;
     if (securityChanged) await prisma.session.deleteMany({ where: { userId: id } });
-    const action = pin
-      ? "RESET_PIN"
-      : editingDetails
-        ? "UPDATE_USER"
-        : typeof b.active === "boolean"
-          ? b.active
-            ? "ACTIVATE_USER"
-            : "DEACTIVATE_USER"
-          : "UPDATE_USER";
+    const action =
+      b.unlock === true && !pin
+        ? "UNLOCK_USER"
+        : pin
+          ? "RESET_PIN"
+          : editingDetails
+            ? "UPDATE_USER"
+            : typeof b.active === "boolean"
+              ? b.active
+                ? "ACTIVATE_USER"
+                : "DEACTIVATE_USER"
+              : "UPDATE_USER";
     await audit(me, action, "accounts", {
       targetType: "User",
       targetId: target.id,
       targetName: target.displayName,
-      detail: editingDetails ? `Updated ${target.role} login details` : undefined,
+      detail:
+        b.unlock === true && existing.lockedAt
+          ? `Unlocked after ${existing.failedLoginCount} failed sign-ins`
+          : editingDetails
+            ? `Updated ${target.role} login details`
+            : undefined,
     });
     return NextResponse.json({ ok: true });
   } catch (e: any) {

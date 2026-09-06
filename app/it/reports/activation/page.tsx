@@ -10,8 +10,15 @@
 import Link from "next/link";
 import { requireUser } from "../../../../lib/auth";
 import { rangeLabel, resolveRange, rangeQuery } from "../../../../lib/report-range";
-import { bpActivation, rsoActivation, supervisorSummary } from "../../../../lib/report-data";
 import type { ActivationRow } from "../../../../lib/report-data";
+import {
+  ACTIVATION_GROUPS,
+  ACTIVATION_SUB_LABEL,
+  activationGroup,
+  buildActivation,
+  reportExportHref,
+} from "../../../../lib/report-builders";
+import { reportPageHref } from "../../../../lib/report-paging";
 import { targetPercent } from "../../../../lib/achievement";
 import { PageHeader, SummaryStrip } from "../../../components/Kit";
 import { ReportActionBar, ReportDateBar } from "../../../components/ReportShell";
@@ -21,52 +28,25 @@ import { Icon } from "../../../components/icons";
 
 export const dynamic = "force-dynamic";
 
-const GROUPS = [
-  { key: "supervisor", label: "By Supervisor" },
-  { key: "rso", label: "By RSO" },
-  { key: "bp", label: "By BP" },
-] as const;
-type GroupKey = (typeof GROUPS)[number]["key"];
-
-const SUB_LABEL: Record<GroupKey, string> = {
-  supervisor: "RSOs",
-  rso: "Supervisor",
-  bp: "RSO",
-};
-
 export default async function ActivationReport({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; group?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const group: GroupKey = (GROUPS.find((g) => g.key === sp.group)?.key ?? "supervisor") as GroupKey;
+  const group = activationGroup(sp.group);
+  const { rows: ordered } = await buildActivation(range, group);
+  const groupParam = group === "supervisor" ? undefined : group;
 
-  // Only the grouping actually being shown is queried.
-  const rows: ActivationRow[] =
-    group === "supervisor"
-      ? (await supervisorSummary(range)).map((s) => ({
-          id: s.id,
-          name: s.name,
-          code: "—",
-          sub: `${s.rsoCount}`,
-          activation: s.standardGa,
-          target: s.gaTarget,
-        }))
-      : group === "rso"
-        ? await rsoActivation(range)
-        : await bpActivation(range);
-
-  const ordered = [...rows].sort((a, b) => b.activation - a.activation || a.name.localeCompare(b.name));
   const totalActivation = ordered.reduce((a, r) => a + r.activation, 0);
   const totalTarget = ordered.reduce((a, r) => a + r.target, 0);
 
   const columns: Column<ActivationRow>[] = [
-    { key: "name", label: GROUPS.find((g) => g.key === group)!.label.replace("By ", "") },
+    { key: "name", label: ACTIVATION_GROUPS.find((g) => g.key === group)!.label.replace("By ", "") },
     { key: "code", label: "Code" },
-    { key: "sub", label: SUB_LABEL[group] },
+    { key: "sub", label: ACTIVATION_SUB_LABEL[group] },
     { key: "activation", label: "Activation", align: "right", render: (r) => r.activation.toLocaleString() },
     { key: "target", label: "Target", align: "right", render: (r) => r.target.toLocaleString() },
     {
@@ -87,21 +67,14 @@ export default async function ActivationReport({
         subtitle={`Report Period: ${rangeLabel(range)} • Standard GA only, SIM swap excluded`}
         action={
           <ReportActionBar
-            filename={`activation-${group}-${range.from}_to_${range.to}`}
-            rows={ordered.map((r) => ({
-              Name: r.name,
-              Code: r.code,
-              [SUB_LABEL[group]]: r.sub,
-              Activation: r.activation,
-              Target: r.target,
-              "Achievement %": r.target ? targetPercent(r.activation, r.target) : "",
-            }))}
+            exportHref={reportExportHref("activation", range, groupParam ? { group: groupParam } : {})}
+            rowCount={ordered.length}
           />
         }
       />
       <ReportDateBar range={range} />
       <div className="kit-report-presets no-print kit-mb-12">
-        {GROUPS.map((g) => (
+        {ACTIVATION_GROUPS.map((g) => (
           <Link
             key={g.key}
             href={`/it/reports/activation?${rangeQuery(range, g.key === "supervisor" ? {} : { group: g.key })}`}
@@ -125,6 +98,12 @@ export default async function ActivationReport({
       <ReportTable
         columns={columns}
         rows={ordered}
+        paging={{
+          page: sp.page,
+          noun: group === "bp" ? "BP" : group,
+          hrefFor: (p) =>
+            reportPageHref("/it/reports/activation", { from: range.from, to: range.to, group: groupParam }, p),
+        }}
         emptyTitle="No activation for this period"
         emptyHint="Check Data Readiness on the Reporting Center — the GA feed may not be imported for these dates."
       />

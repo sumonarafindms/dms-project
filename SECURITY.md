@@ -98,17 +98,89 @@ until the new database and deployment account are created.
 - Credential comparison via `timingSafeEqual`.
 - Session tokens random, stored server-side as a hash, HttpOnly + SameSite=Lax
   - Secure in production, with enforced expiry and login throttling.
+- `getCurrentUser` **omits `credentialHash`**. That object is passed into
+  layouts, pages and permission checks; a password hash riding along is one
+  careless serialisation away from being served. Login reads the user row
+  itself, so nothing outside `lib/auth` needs it.
 - `/setup` transactionally refuses to create a second first-admin.
-- Every non-public API route checks role and, for mutations, module permission.
+- Every non-public API route checks role and, for mutations, module permission —
+  and `tests/api-authorization.smoke.test.ts` now **enumerates every handler**
+  and fails if one has no gate. Being public requires adding the route to an
+  explicit list with a written reason.
 - Upload size capped at 20 MB.
 - No `eval`, `new Function`, `dangerouslySetInnerHTML`, raw SQL helpers or
   child-process execution in application source.
 
+### Credentials: six-digit PINs, five strikes, admin unlock
+
+- **Six digits, digits only** (`lib/credential-policy.ts`). Four digits is ten
+  thousand possibilities; six is a million. Numeric because these are typed
+  one-handed in the field — a six-digit PIN behind a five-attempt lock beats a
+  "complex" password written inside a SIM folder.
+- Obvious PINs are refused: `111111`, `123456`, `654321` and the rest. A lock
+  stops brute force; it does nothing about someone trying the same guess on
+  every account they can name.
+- **Enforced when a credential is SET, never when it is used.** Existing
+  four-digit PINs keep working until an admin resets them. The alternative locks
+  out the whole distribution team on the morning of the deploy — the owner's
+  call, recorded so nobody "fixes" it later by accident.
+- **Five consecutive failures lock the login, with no timer.** `User.lockedAt`
+  is a timestamp of the event, not a deadline. Only an administrator clears it,
+  from Authorized Users → Unlock. A timed lock lets an attacker keep guessing
+  forever at a slower rate; this one ends the attempt and puts a person in the
+  loop who can ask why that account was being guessed at.
+- Unlocking clears the counter as well as the flag. Clearing only the flag would
+  re-lock on the next failure — an unlock that lasts one attempt, which is worse
+  than none because the admin believes they fixed it.
+- Both the lock (`ACCOUNT_LOCKED`) and the unlock (`UNLOCK_USER`) are audited.
+
+**The trade-off, stated plainly:** anyone who knows a mobile number can lock
+that user out with five wrong guesses. That is inherent to admin-unlock lockout,
+and the mitigation is the source throttle below — an attacker is blocked after
+five attempts _of their own_ before they can walk down a list doing it to
+everyone. If nuisance lockouts become a real problem, the next lever is a short
+self-service delay on the first offence rather than weakening the lock.
+
+### Login throttling: the source bucket
+
+The throttle was keyed on `identifier + client IP`, and the client IP came from
+`X-Forwarded-For` — a header the caller sends. Measured against the running app:
+
+    same address, 8 wrong PINs      401 401 401 401 429 429 429 429
+    rotating address, 8 wrong PINs  401 401 401 401 401 401 401 401
+
+The second line was the bug: **unlimited guesses**. Field logins are four-digit
+PINs, so any RSO or BP account was at most ten thousand requests from being
+opened. Rotating real addresses through proxies reaches the same place without
+touching a header, so this was never only a spoofing problem.
+
+v149 answered this with a second throttle bucket keyed on the identifier alone.
+v150 replaced that bucket with the account lockout above, which is stricter: a
+throttle only ever slowed an attacker down, the lock stops them.
+
+What remains (`lib/login-policy.ts`) is the **source** bucket — identifier +
+client hint, five failures, a flat fifteen minutes — and it still matters for a
+specific reason: it is what stops one attacker from walking down a list of
+mobile numbers locking every account in turn. They are blocked after five
+attempts of their own, before they reach the sixth person. It is checked
+_before_ the account is even looked up, so a blocked caller cannot keep adding
+failures to other people's accounts.
+
+The lock is deliberately flat, not escalating: locking one address for a day is
+cheap for an attacker to route around and expensive for an office behind one
+NAT.
+
 ### Rate limiting
 
-Beyond the existing login throttle, three buckets are counted per authenticated
-user (`lib/rate-limit.ts`): **upload** (30 / 10 min), **credential** changes
-(20 / 10 min) and generated **downloads** (60 / 5 min). Limits are set well
+Beyond the login throttle, four buckets are counted per authenticated user
+(`lib/rate-limit.ts`): **upload** (30 / 10 min), **credential** changes
+(20 / 10 min), generated **downloads** (60 / 5 min) and administrative
+**mutation**s (120 / 10 min).
+
+Every write handler must consume one, enforced by
+`tests/api-authorization.smoke.test.ts`. That guard immediately found two gaps:
+`POST /api/admin/users` and `POST /api/admin/employees/[role]` — both of which
+**mint credentials** — had no limit, while their PATCH counterparts did. Limits are set well
 above real use — one an operator can hit during normal work is a bug report,
 not security.
 
@@ -139,7 +211,7 @@ path and capping them would break paging and refresh for real users.
    list.
 2. **Content signature** — the file's actual first bytes must match the
    container the name claims: `PK\x03\x04` for xlsx/xlsm, the OLE2 magic for
-   xls. `file.type` is *not* trusted: it is absent on many platforms, wrong on
+   xls. `file.type` is _not_ trusted: it is absent on many platforms, wrong on
    others and trivially forged. This is what stops a renamed binary or an HTML
    page reaching the spreadsheet parser at all.
 3. **Row limit** — 250,000 rows per sheet, enforced at all six `sheet_to_json`
@@ -179,16 +251,18 @@ text export. It now tests for known binary containers instead, and
   deliberately omitted: submission to the preload list is effectively
   irreversible and should wait until the production domain and its subdomains
   are settled.
-- **Content-Security-Policy, currently `Report-Only`** — see below.
+- **Content-Security-Policy, enforcing** — see below.
 
-## Content-Security-Policy: shipped as Report-Only, and how to enforce it
+## Content-Security-Policy: enforcing, and how that was established
 
 The policy is built in `lib/csp.ts` and attached per-request by `middleware.ts`.
+`cspHeaderName()` is the only switch, and it now returns
+`"Content-Security-Policy"`. Nothing else changed to enforce it.
 
 **How the nonce works.** Next.js emits inline bootstrap scripts carrying the
 RSC stream. Allowing those with `'unsafe-inline'` would allow every injected
 script too, which is most of what a CSP is for. So middleware mints a fresh
-128-bit nonce per request, sets it on the *request* headers, and Next.js reads
+128-bit nonce per request, sets it on the _request_ headers, and Next.js reads
 it back out and stamps it onto its own script tags. `'strict-dynamic'` then
 lets those trusted scripts load their chunks without the policy enumerating
 them. All 70 routes in this app are dynamically rendered, so no cached HTML can
@@ -200,7 +274,10 @@ inline style, and nonces do not apply to attributes at all. v124 converted 123
 such props to classes; **two remain**, both the width of a progress bar
 (`Bar` in `app/components/Kit.tsx`, and the equivalent in
 `app/components/OperationsPremiumUI.tsx`). Those are a continuous 0–100%, so
-the only way to express them as classes is 101 quantised rules.
+the only way to express them as classes is 101 quantised rules. Two props, not
+two attributes: `/rso` renders eleven style attributes because it renders
+eleven bars, so a violation count from a browser is not a count of source
+sites.
 
 That has deliberately not been done, and the reasoning is worth recording
 rather than rediscovering. Dropping `'unsafe-inline'` here would stop an
@@ -211,53 +288,48 @@ data — background images, fonts, `@import` — are all closed by `img-src`,
 `font-src` and `connect-src` being `'self'`. So the residual is UI redressing
 within the page, weighed against ~300 lines of generated CSS. If that trade
 ever stops looking right, the change is: quantise the two widths to whole
-percent, generate `.kit-bar-0` … `.kit-bar-100`, and delete
-`style-src-attr` from `lib/csp.ts`.
+percent, generate `.kit-bar-0` … `.kit-bar-100`, and delete **both**
+`style-src-attr` and the `'unsafe-inline'` in `style-src` from `lib/csp.ts`.
+Removing only `style-src-attr` changes nothing: browsers fall back to
+`style-src` for attributes, so the allowance survives. That is not a guess —
+it was measured while mutation-testing this policy.
 
 The third page-level exception is `app/global-error.tsx`, which renders its
 own `<html>` when the root layout has failed and therefore cannot assume any
 stylesheet loaded. Its inline styles are correct and are commented as such.
 
-**What has been verified here.** Against a production build served by
-`next start`, loaded in headless Chromium: the header is present, all 17 script
-tags carry the nonce, the nonce matches the header and differs per request, the
-page hydrates (typing into a React-controlled input returns its value), and
-**zero `securitypolicyviolation` events fire**.
+### The checklist is now executed, not described
 
-The policy was then re-run **as enforcing**, by rewriting the header name in
-front of the browser so the same policy and the same nonce arrived under
-`Content-Security-Policy`. Still zero violations, and still hydrated. So on the
-one page reachable here the enforcing policy is not a guess — it has been run.
+This section previously carried a five-step manual checklist that had never
+been run, because the build sandbox had no database and only `/login` was
+reachable. One page is not the app. That checklist is now code, and it runs on
+every suite run rather than once:
 
-**What has not.** Only `/login` could be exercised, because this build sandbox
-has no database and every other page's layout calls `getCurrentUser()`. One
-page is not the app: the reporting centre's exports, the upload centre's file
-handling and the chart components are exactly the places a policy is most
-likely to catch on something, and none of them were reached. That is why the
-policy still ships under `Content-Security-Policy-Report-Only`: a CSP that
-blocks something the app needs fails in the browser, where no server-side test
-would catch it.
+| Checklist step                                                     | Where it runs now                                                                                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1–2. Sign in as each role and walk every area                      | `e2e/coverage.spec.ts` — seven roles, ninety-six routes, against a seeded database                                                               |
+| 3. Perform a spreadsheet export and a download (the `blob:` paths) | `e2e/csp-downloads.spec.ts`                                                                                                                      |
+| 4. Confirm no CSP report fires on any of it                        | both specs collect `securitypolicyviolation` events per route and fail on any                                                                    |
+| 5. Repeat once enforcing                                           | `tests/security-headers.smoke.test.ts` asserts the policy ships enforcing, and `csp-downloads.spec.ts` re-asserts it from a live response header |
 
-### Checklist before flipping to enforcement
+**The collector has been proven to fire.** A listener that is installed and
+never read back reports zero violations forever, which is silence dressed up as
+evidence — the first version of this collector did exactly that and had to be
+fixed. The wired version was then mutation-tested: with **both** style
+allowances removed from `lib/csp.ts` and the app rebuilt, the RSO sweep failed
+with four `style-src-attr blocked inline` violations on `/rso`, `/rso/bp`,
+`/rso/lso` and `/rso/sso`, reported separately from the console-error check so
+the two cannot be confused for each other. Restoring the allowances returned
+the suite to green. Each spec also asserts that `window.__csp` exists before
+reading it, so a page where the init script failed to install fails loudly
+instead of reporting nothing.
 
-`cspHeaderName()` in `lib/csp.ts` is the only switch. Before changing it:
-
-1. Deploy with Report-Only against a real database.
-2. Sign in as each role and walk every area — dashboards, drill-downs, the
-   import/upload centre, the reporting centre, targets, admin people/access.
-3. Perform a spreadsheet export and a file upload (the `blob:` paths).
-4. With DevTools open, confirm the console logs no CSP report on any of it.
-5. Then flip `cspHeaderName()` to `"Content-Security-Policy"` and repeat step 2
-   once.
-
-`tests/security-headers.smoke.test.ts` asserts the header is still Report-Only,
-so the flip is a deliberate act that updates a test, not something a refactor
-can do by accident.
-
-One console message is expected and harmless under Report-Only:
-`'upgrade-insecure-requests' is ignored when delivered in a report-only
-policy`. The directive is kept because it takes effect on enforcement — do not
-"fix" the warning by deleting it.
+`upgrade-insecure-requests` is back. It is ignored in a report-only policy —
+that is the spec, not a browser quirk — and Chrome logged a console error about
+it on every page load for every user while the policy was Report-Only. It is
+gated on `cspHeaderName()` rather than on `isProduction`, so it returned by
+itself the moment enforcement was switched on, which is exactly when it starts
+doing anything.
 
 ## `/api/health`
 
@@ -273,11 +345,24 @@ monitors read 500 as "the app is broken" rather than "its database is".
 
 ## Still open
 
-- **Enforce the CSP** once the checklist above passes on a real deployment.
-- **Remove `'unsafe-inline'` from `style-src-attr`** — now blocked only by the
-  two progress-bar widths; see the reasoning above before spending the 101
+- **Watch the first enforcing deployment.** The checklist now runs in CI against
+  a seeded local database, which is the app but not production data. A route
+  whose content differs there — an unusual retailer name, a chart with no rows —
+  could still trip something. The first deploy after this flip is worth a walk
+  with DevTools open.
+- **Remove the style `'unsafe-inline'`** — blocked only by the two progress-bar
+  widths; see the reasoning above, including that `style-src-attr` and the
+  `'unsafe-inline'` in `style-src` must go together, before spending the 101
   rules it costs.
-- **Upgrade `xlsx`** — blocked by this sandbox's egress; command above.
+- **Upgrade `xlsx`** — blocked by this sandbox's egress; command above. The
+  prototype-pollution path is already neutralised by `normalizeHeader` (and
+  tested), and the ReDoS path is bounded by the size and row caps, but the
+  upgrade is still the real fix.
+- **`postcss` and `deepmerge-ts`** report high-severity advisories that npm can
+  only resolve with `npm audit fix --force`, which changes major versions.
+  Not run: forcing a breaking upgrade of the CSS pipeline unattended is a worse
+  risk than the advisory. Owner's call, on a machine where the result can be
+  seen.
 - **Rotate credentials** before going live, per the Secrets section.
 
 ## Blocked in the build sandbox — needs one command on a real machine

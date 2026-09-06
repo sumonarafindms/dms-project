@@ -144,14 +144,37 @@ const definitions: Record<string, { name: string; sheet: string; rows: Record<st
       },
     ],
   },
+  /*
+   * One row per person, six columns, in the order the owner asked for.
+   *
+   * The previous sheet was one row per TARGET: four columns
+   * (RSO_NUMBER, BP_CODE, TARGET_TYPE, TARGET) and six rows to give one RSO
+   * six numbers. Setting targets for forty RSOs meant two hundred and forty
+   * rows, none of which could be pasted from anything — every value needed its
+   * own label typed beside it.
+   *
+   * Now each row is a person and each column a metric, which is the shape a
+   * spreadsheet is already in when you copy a block of numbers out of one.
+   *
+   * CODE carries whichever identifier that row is: an RSO's mobile number, or
+   * a retailer code for a Business Partner. One column rather than two,
+   * because a row is one or the other and a blank column beside every value is
+   * a column people mis-fill. The importer tells them apart by looking the
+   * value up, and says which it matched.
+   *
+   * A BP's row uses GA only — a Business Partner has no C2C, SC, SSO or LSO
+   * target in this system. The columns stay in the sheet so one file shape
+   * covers both, and the importer reports any non-zero value it could not
+   * store rather than dropping it quietly.
+   */
   targets: {
     name: "Target_Upload_Sample.xlsx",
     sheet: "Targets",
     rows: [
-      { RSO_NUMBER: "01900000001", BP_CODE: "", TARGET_TYPE: "GA", TARGET: 100 },
-      { RSO_NUMBER: "01900000001", BP_CODE: "", TARGET_TYPE: "C2C", TARGET: 50000 },
-      { RSO_NUMBER: "01900000001", BP_CODE: "", TARGET_TYPE: "SSO", TARGET: 25 },
-      { RSO_NUMBER: "", BP_CODE: "R000001", TARGET_TYPE: "BP_GA", TARGET: 80 },
+      { CODE: "01900000001", GA: 100, C2C: 50000, SC: 20000, SSO: 25, LSO: 40 },
+      { CODE: "01900000002", GA: 120, C2C: 60000, SC: 25000, SSO: 30, LSO: 45 },
+      { CODE: "R000001", GA: 80, C2C: 0, SC: 0, SSO: 0, LSO: 0 },
+      { CODE: "R000002", GA: 60, C2C: 0, SC: 0, SSO: 0, LSO: 0 },
     ],
   },
 };

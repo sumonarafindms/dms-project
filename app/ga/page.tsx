@@ -16,6 +16,7 @@ import {
   StatusPill,
   OpsFreshness,
 } from "../components/OperationsPremiumUI";
+import { Btn } from "../components/Kit";
 
 type EmployeeRow = {
   employeeId: string;
@@ -223,9 +224,7 @@ export default function GaPage() {
           <small>Excel · max 20 MB</small>
           <input name="file" type="file" accept=".xlsx,.xlsm,.xls" required />
         </label>
-        <button disabled={loading} className="kit-btn is-primary size-md">
-          {loading ? "Processing…" : "Upload GA"}
-        </button>
+        <Btn disabled={loading}>{loading ? "Processing…" : "Upload GA"}</Btn>
       </form>
     </OpsUpload>
   ) : null;

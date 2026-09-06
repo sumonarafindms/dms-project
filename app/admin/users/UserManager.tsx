@@ -14,8 +14,10 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmActionButton from "../../components/ConfirmActionButton";
 import { Icon } from "../../components/icons";
+import { PIN_LENGTH } from "../../../lib/credential-policy";
 import {
   Badge,
+  Btn,
   Card,
   EmptyState,
   Field,
@@ -33,6 +35,9 @@ type U = {
   mobileNumber: string | null;
   role: string;
   active: boolean;
+  /** ISO string when the login locked itself out, or null. */
+  lockedAt: string | null;
+  failedLoginCount: number;
   employeeId?: string | null;
   supervisorId?: string | null;
   bpRetailerId?: string | null;
@@ -80,6 +85,31 @@ export default function UserManager({
     setMsgTone("ok");
     setMsg("User created successfully.");
     form.reset();
+    router.refresh();
+  }
+
+  /**
+   * Clear a lockout.
+   *
+   * Sends `unlock: true` rather than reusing the PIN field, because unlocking
+   * and resetting a PIN are different decisions: most lockouts are the real
+   * person mistyping, and making the admin invent a new PIN to let them back in
+   * would mean a phone call to read it out every time.
+   */
+  async function unlock(u: U) {
+    const r = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: u.id, unlock: true }),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      setMsgTone("bad");
+      setMsg(d.error || "Could not unlock account");
+      return;
+    }
+    setMsgTone("ok");
+    setMsg(`${u.displayName} can sign in again.`);
     router.refresh();
   }
 
@@ -133,6 +163,7 @@ export default function UserManager({
   );
   const editRole = editing?.role || "";
   const activeCount = users.filter((u) => u.active).length;
+  const lockedCount = users.filter((u) => u.lockedAt).length;
 
   /** The link selector shown for a role, or null when that role links to nothing. */
   const linkField = (r: string, current?: string | null) => {
@@ -177,7 +208,7 @@ export default function UserManager({
           { label: "Total Accounts", value: users.length.toLocaleString() },
           { label: "Active", value: activeCount.toLocaleString(), tone: "teal" },
           { label: "Disabled", value: (users.length - activeCount).toLocaleString(), tone: "amber" },
-          { label: "Roles", value: new Set(users.map((u) => u.role)).size.toLocaleString() },
+          { label: "Locked out", value: lockedCount.toLocaleString(), tone: lockedCount ? "amber" : undefined },
         ]}
       />
 
@@ -206,12 +237,23 @@ export default function UserManager({
               <input className="kit-input" name="mobileNumber" required inputMode="tel" />
             </Field>
             <Field label="PIN">
-              <input className="kit-input" name="pin" required minLength={4} inputMode="numeric" type="password" />
+              <input
+                className="kit-input"
+                name="pin"
+                required
+                minLength={PIN_LENGTH}
+                maxLength={PIN_LENGTH}
+                pattern={`\\d{${PIN_LENGTH}}`}
+                inputMode="numeric"
+                autoComplete="off"
+                type="password"
+                placeholder={`${PIN_LENGTH} digits`}
+              />
             </Field>
             {linkField(role)}
           </div>
           <div className="kit-form-actions">
-            <button className="kit-btn is-primary size-md">Create Login</button>
+            <Btn>Create Login</Btn>
             <span className="kit-filter-note">PIN resets and deactivation revoke active sessions automatically.</span>
           </div>
         </form>
@@ -245,18 +287,33 @@ export default function UserManager({
                 avatar={u.displayName}
                 title={u.displayName}
                 sub={`${u.role} · ${u.mobileNumber || "Admin login"}`}
-                detail={u.link || "System account"}
+                detail={
+                  u.lockedAt
+                    ? `Locked after ${u.failedLoginCount} failed sign-ins · ${new Date(u.lockedAt).toLocaleString()}`
+                    : u.link || "System account"
+                }
                 after={
                   <div className="kit-row-actions">
                     {/* Status is shown, not clicked. The old row made the status
                         pill itself the toggle, so the label named the current
                         state while the click did the opposite. */}
+                    {u.lockedAt ? <Badge tone="failed">Locked</Badge> : null}
                     <Badge tone={u.active ? "active" : "inactive"}>{u.active ? "Active" : "Disabled"}</Badge>
-                    <button type="button" className="kit-btn is-secondary size-sm" onClick={() => setEditing(u)}>
+                    {u.lockedAt ? (
+                      <ConfirmActionButton
+                        size="sm"
+                        message={`Unlock ${u.displayName}? They will be able to sign in with their existing PIN.`}
+                        onConfirm={() => unlock(u)}
+                      >
+                        <Icon name="check" /> Unlock
+                      </ConfirmActionButton>
+                    ) : null}
+                    <Btn variant="secondary" size="sm" type="button" onClick={() => setEditing(u)}>
                       <Icon name="edit" /> Edit / PIN
-                    </button>
+                    </Btn>
                     <ConfirmActionButton
-                      className={`kit-btn size-sm ${u.active ? "is-danger" : "is-secondary"}`}
+                      size="sm"
+                      variant={u.active ? "danger" : "secondary"}
                       message={
                         u.active
                           ? `Disable login for ${u.displayName}? Active sessions will be revoked.`
@@ -284,12 +341,12 @@ export default function UserManager({
           labelledBy="edit-login-title"
           footer={
             <>
-              <button type="button" className="kit-btn is-ghost size-md" onClick={() => setEditing(null)}>
+              <Btn variant="ghost" type="button" onClick={() => setEditing(null)}>
                 Cancel
-              </button>
-              <button form="edit-login-form" disabled={saving} className="kit-btn is-primary size-md">
+              </Btn>
+              <Btn form="edit-login-form" disabled={saving}>
                 {saving ? "Saving…" : "Save changes"}
-              </button>
+              </Btn>
             </>
           }
         >
@@ -323,10 +380,13 @@ export default function UserManager({
                 <input
                   className="kit-input"
                   name="pin"
-                  minLength={4}
+                  minLength={PIN_LENGTH}
+                  maxLength={PIN_LENGTH}
+                  pattern={`\\d{${PIN_LENGTH}}`}
                   inputMode="numeric"
+                  autoComplete="off"
                   type="password"
-                  placeholder="Leave blank to keep current PIN"
+                  placeholder={`Leave blank to keep, or ${PIN_LENGTH} digits`}
                 />
               </Field>
               {linkField(

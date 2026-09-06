@@ -14,6 +14,7 @@ import {
   StatusPill,
   OpsFreshness,
 } from "../components/OperationsPremiumUI";
+import { Btn } from "../components/Kit";
 import { dhakaTodayYmd } from "../../lib/business-time";
 
 type Row = {
@@ -178,9 +179,7 @@ export default function C2sPage() {
               <small>Excel / TXT · max 20 MB</small>
               <input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required />
             </label>
-            <button disabled={loading} className="kit-btn is-primary size-md">
-              {loading ? "Processing..." : "⇧  Upload C2S"}
-            </button>
+            <Btn disabled={loading}>{loading ? "Processing..." : "⇧  Upload C2S"}</Btn>
           </form>
         </OpsUpload>
       )}
@@ -189,20 +188,17 @@ export default function C2sPage() {
         <OpsSectionTitle
           title="Employee LSO Performance"
           subtitle="Retail sales and LSO execution across the selected range."
-          icon="↗"
         />
         <div className="kit-metrics-grid">
-          <OpsMetric tone="blue" label="C2S Sales" value={money(totals.amount)} note="Retail sales amount" />
+          <OpsMetric label="C2S Sales" value={money(totals.amount)} note="Retail sales amount" />
           <OpsMetric
-            tone="cyan"
             label="Monthly Transactions"
             value={totals.trx.toLocaleString()}
             note="Exact TRANSACTION_COUNT from source"
           />
-          <OpsMetric tone="orange" label="LSO Target" value={totals.lsoT.toLocaleString()} note="Monthly target" />
-          <OpsMetric tone="green" label="LSO Achieved" value={totals.lsoA.toLocaleString()} note="Completed outlets" />
+          <OpsMetric label="LSO Target" value={totals.lsoT.toLocaleString()} note="Monthly target" />
+          <OpsMetric label="LSO Achieved" value={totals.lsoA.toLocaleString()} note="Completed outlets" />
           <OpsMetric
-            tone="purple"
             label="LSO %"
             value={totals.lsoT ? `${((totals.lsoA / totals.lsoT) * 100).toFixed(1)}%` : "0%"}
             note="Achievement rate"
@@ -265,7 +261,6 @@ export default function C2sPage() {
         <OpsSectionTitle
           title={`Date-wise C2S · ${new Date(date + "T00:00:00").toLocaleDateString()}`}
           subtitle="Retailers with customer sales on the selected day."
-          icon="▣"
           right={
             <label className="kit-field kit-inline-date">
               <span>VIEW DATE</span>
@@ -281,9 +276,8 @@ export default function C2sPage() {
           }
         />
         <div className="kit-metrics-grid">
-          <OpsMetric tone="green" label="Selected Day Sales" value={money(dayTotal)} note="Customer sales amount" />
+          <OpsMetric label="Selected Day Sales" value={money(dayTotal)} note="Customer sales amount" />
           <OpsMetric
-            tone="purple"
             label="Retailers Selling"
             value={dailyRows.length.toLocaleString()}
             note="Active selling outlets"

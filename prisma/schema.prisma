@@ -333,7 +333,15 @@ model User {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  /// Consecutive failed sign-ins. Cleared on a successful sign-in.
+  failedLoginCount Int        @default(0)
+  /// Set when failedLoginCount reaches the limit. Only an admin clears it —
+  /// there is deliberately no timer, so a locked account stays locked until a
+  /// person looks at it.
+  lockedAt         DateTime?
+
   @@index([role])
+  @@index([lockedAt])
 }
 
 model UserPermission {

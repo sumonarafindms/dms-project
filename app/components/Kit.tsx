@@ -175,18 +175,82 @@ export function StatusBadge({ percent }: { percent: number }) {
 /* ------------------------------------------------------------------ *
  * Buttons, inputs
  * ------------------------------------------------------------------ */
+type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
+type BtnSize = "sm" | "md" | "lg";
+
+/**
+ * The button class string, in one place.
+ *
+ * Two elements wear this look — `<button>` for actions and `<a>`/`<Link>` for
+ * navigation — and until v148 only the first had a component. Fifteen links
+ * spelled `kit-btn is-primary size-md` out by hand, which is the same drift
+ * `Btn` was created to end, just on the other element. They share the formula
+ * now; what they must not share is the tag, because a link that is really a
+ * button loses middle-click, open-in-new-tab and its meaning to a screen
+ * reader.
+ */
+function btnClass(variant: BtnVariant, size: BtnSize, block?: boolean, extra = "") {
+  return `kit-btn is-${variant} size-${size}${block ? " is-block" : ""} ${extra}`.trim();
+}
+
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-  size?: "sm" | "md" | "lg";
+  variant?: BtnVariant;
+  size?: BtnSize;
   block?: boolean;
 };
 
 export function Btn({ variant = "primary", size = "md", block, className = "", ...props }: BtnProps) {
+  return <button {...props} className={btnClass(variant, size, block, className)} />;
+}
+
+type LinkBtnProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
+  href: string;
+  variant?: BtnVariant;
+  size?: BtnSize;
+  block?: boolean;
+  /**
+   * A dead end that still holds its place — the pager's "Previous" on page 1.
+   * Rendered as a `<span>`, because a link that goes nowhere should not be
+   * offered to the keyboard or announced as a link.
+   */
+  disabled?: boolean;
+  /**
+   * A plain `<a>` instead of `next/link`: file downloads (`/api/samples/…`),
+   * and the deliberate full reload out of an error boundary, where routing
+   * client-side would keep the broken tree alive.
+   */
+  external?: boolean;
+};
+
+/** A link that looks like a button. Same class formula as `Btn`, different tag. */
+export function LinkBtn({
+  href,
+  variant = "primary",
+  size = "md",
+  block,
+  disabled,
+  external,
+  className = "",
+  children,
+  ...rest
+}: LinkBtnProps) {
+  const cls = btnClass(variant, size, block, `${disabled ? "is-disabled " : ""}${className}`.trim());
+  if (disabled)
+    return (
+      <span className={cls} aria-disabled="true">
+        {children}
+      </span>
+    );
+  if (external)
+    return (
+      <a {...rest} href={href} className={cls}>
+        {children}
+      </a>
+    );
   return (
-    <button
-      {...props}
-      className={`kit-btn is-${variant} size-${size}${block ? " is-block" : ""} ${className}`.trim()}
-    />
+    <Link {...rest} href={href} className={cls}>
+      {children}
+    </Link>
   );
 }
 
@@ -539,7 +603,17 @@ export function Table<T extends { id?: string }>({
   const cell = (c: Column<T>, r: T) => (c.render ? c.render(r) : ((r as Record<string, ReactNode>)[c.key] ?? null));
   return (
     <>
-      <div className="kit-table-wrap">
+      {/*
+        tabIndex + a name, because this scrolls sideways.
+
+        An `overflow-x: auto` box is reachable with a mouse or a thumb and with
+        nothing else: a keyboard user cannot scroll it, so the columns past the
+        fold are simply unavailable to them (axe: scrollable-region-focusable).
+        Making it focusable gives the arrow keys somewhere to land, and the
+        label says what they have landed on instead of announcing an anonymous
+        group.
+      */}
+      <div className="kit-table-wrap" tabIndex={0} role="group" aria-label="Table, scrolls sideways">
         <table className="kit-table">
           <thead>
             <tr>
@@ -693,24 +767,25 @@ export type PeriodControl =
 
 /** Day / Week / Month, as three buttons with the active one filled. */
 export function PeriodSwitch({ value, control }: { value: ComparisonKind; control: PeriodControl }) {
-  const className = (kind: ComparisonKind) => `kit-btn size-sm ${kind === value ? "is-primary" : "is-ghost"}`;
+  const variant = (kind: ComparisonKind) => (kind === value ? "primary" : "ghost");
   return (
     <span className="kit-period-switch">
       {COMPARISON_KINDS.map((kind) =>
         control.mode === "link" ? (
-          <Link key={kind} href={control.hrefFor(kind)} className={className(kind)}>
+          <LinkBtn key={kind} href={control.hrefFor(kind)} variant={variant(kind)} size="sm">
             {COMPARISON_KIND_LABEL[kind]}
-          </Link>
+          </LinkBtn>
         ) : (
-          <button
+          <Btn
             key={kind}
             type="button"
-            className={className(kind)}
+            variant={variant(kind)}
+            size="sm"
             aria-pressed={kind === value}
             onClick={() => control.onSelect(kind)}
           >
             {COMPARISON_KIND_LABEL[kind]}
-          </button>
+          </Btn>
         ),
       )}
     </span>
@@ -795,27 +870,15 @@ export function Pager({
       </span>
       {pageCount > 1 && (
         <nav className="kit-pager-controls" aria-label="Pagination">
-          {first ? (
-            <span className="kit-btn size-sm is-ghost is-disabled" aria-disabled="true">
-              ← Previous
-            </span>
-          ) : (
-            <Link className="kit-btn size-sm is-ghost" href={hrefFor(page - 1)} rel="prev">
-              ← Previous
-            </Link>
-          )}
+          <LinkBtn variant="ghost" size="sm" disabled={first} href={first ? "#" : hrefFor(page - 1)} rel="prev">
+            ← Previous
+          </LinkBtn>
           <span className="kit-pager-position">
             Page {page.toLocaleString()} of {pageCount.toLocaleString()}
           </span>
-          {last ? (
-            <span className="kit-btn size-sm is-ghost is-disabled" aria-disabled="true">
-              Next →
-            </span>
-          ) : (
-            <Link className="kit-btn size-sm is-ghost" href={hrefFor(page + 1)} rel="next">
-              Next →
-            </Link>
-          )}
+          <LinkBtn variant="ghost" size="sm" disabled={last} href={last ? "#" : hrefFor(page + 1)} rel="next">
+            Next →
+          </LinkBtn>
         </nav>
       )}
     </div>
@@ -1013,12 +1076,12 @@ export function ModuleCard({
       </div>
       <p className="kit-module-note">{note}</p>
       <div className="kit-form-actions">
-        <Link className="kit-btn is-primary size-sm" href={href}>
+        <LinkBtn size="sm" href={href}>
           Open Workspace
-        </Link>
-        <a className="kit-btn is-secondary size-sm" href={sample}>
+        </LinkBtn>
+        <LinkBtn variant="secondary" size="sm" external href={sample}>
           Sample
-        </a>
+        </LinkBtn>
       </div>
     </Card>
   );

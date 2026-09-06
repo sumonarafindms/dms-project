@@ -59,9 +59,7 @@ function WorklistCard({
     >
       <div className="kit-row-between is-top">
         <div className="kit-min0">
-          <strong className="kit-rowtitle is-block">
-            {row.name}
-          </strong>
+          <strong className="kit-rowtitle is-block">{row.name}</strong>
           <span className="kit-hint">
             {row.code} · BP: {row.bpName}
           </span>

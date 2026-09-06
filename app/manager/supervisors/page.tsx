@@ -1,6 +1,6 @@
 import { requirePagePermission } from "../../../lib/auth";
 import { employeePerformance } from "../../../lib/performance";
-import { withBp } from "../../../lib/bp-rollup";
+import { groupSizes, groupTotals } from "../../../lib/bp-rollup";
 import { targetPercent as pct } from "../../../lib/achievement";
 import { prisma } from "../../../lib/prisma";
 import { normalizeMonth } from "../../../lib/drilldown";
@@ -37,20 +37,23 @@ export default async function Page({
   // Keyed by supervisor id, not name: two supervisors sharing a name used to
   // share one row's totals here.
   const by = new Map<string, { rso: number; ret: number; a: number; t: number; ga: number; gaT: number }>();
-  for (const r of rows) {
-    if (!r.supervisorId) continue;
-    // withBp: an RSO row excludes its Business Partners; a supervisor's team
-    // does not. See lib/bp-rollup.ts.
-    const t = withBp(r);
-    const x = by.get(r.supervisorId) || { rso: 0, ret: 0, a: 0, t: 0, ga: 0, gaT: 0 };
-    x.rso++;
-    x.ret += t.retailerCount;
-    x.a += t.totalRechargeAchieved;
-    x.t += t.totalRechargeTarget;
-    x.ga += t.gaAchieved;
-    x.gaT += t.gaTarget;
-    by.set(r.supervisorId, x);
-  }
+  /*
+   * groupTotals, not a reduce over withBp(): a supervisor's team can hold one
+   * Business Partner through two RSOs, and `withBp()` gives each of them the
+   * whole outlet on purpose. Adding those into a bucket counted it twice.
+   * lib/bp-rollup.ts is the one place allowed to do this arithmetic.
+   */
+  const totals = groupTotals(rows, (r) => r.supervisorId);
+  const sizes = groupSizes(rows, (r) => r.supervisorId);
+  for (const [supervisorId, t] of totals)
+    by.set(supervisorId, {
+      rso: sizes.get(supervisorId) ?? 0,
+      ret: t.retailerCount,
+      a: t.totalRechargeAchieved,
+      t: t.totalRechargeTarget,
+      ga: t.gaAchieved,
+      gaT: t.gaTarget,
+    });
   const teams = sups.map((sup) => ({
     id: sup.id,
     name: sup.name,

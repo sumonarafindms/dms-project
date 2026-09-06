@@ -5,12 +5,11 @@
  * the reporting chain, and the two access-management entry points.
  */
 
-import Link from "next/link";
 import { requireUser } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { Icon } from "../../components/icons";
 import { withDatabaseRetry } from "../../../lib/db-retry";
-import { Card, PageHeader, Row, SectionHead, SummaryStrip } from "../../components/Kit";
+import { Card, LinkBtn, PageHeader, Row, SectionHead, SummaryStrip } from "../../components/Kit";
 
 export default async function Page() {
   await requireUser(["ADMIN", "IT"]);
@@ -47,12 +46,10 @@ export default async function Page() {
         />
         <Card padded>
           <div className="kit-form-actions is-flush">
-            <Link className="kit-btn is-primary size-md" href="/admin/employees">
-              Try again
-            </Link>
-            <Link className="kit-btn is-ghost size-md" href="/dashboard">
+            <LinkBtn href="/admin/employees">Try again</LinkBtn>
+            <LinkBtn variant="ghost" href="/dashboard">
               Back to dashboard
-            </Link>
+            </LinkBtn>
           </div>
         </Card>
       </main>
@@ -130,12 +127,12 @@ export default async function Page() {
       <SectionHead title="Access management" sub="Authorized accounts and module-level permissions." />
       <Card padded>
         <div className="kit-form-actions is-flush">
-          <Link className="kit-btn is-primary size-md" href="/admin/permissions">
+          <LinkBtn href="/admin/permissions">
             <Icon name="shield" /> Manage Permissions
-          </Link>
-          <Link className="kit-btn is-secondary size-md" href="/admin/users">
+          </LinkBtn>
+          <LinkBtn variant="secondary" href="/admin/users">
             Login Accounts
-          </Link>
+          </LinkBtn>
         </div>
       </Card>
     </main>

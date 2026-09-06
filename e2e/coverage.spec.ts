@@ -1,0 +1,256 @@
+import { test } from "@playwright/test";
+import { expectContentFillsViewport, expectNoHorizontalOverflow, login } from "./helpers";
+import { EXPECTED } from "../tests/route-map";
+
+/**
+ * Every route, for every role that may reach it.
+ *
+ * ## Why this exists next to roles.spec.ts
+ *
+ * `roles.spec.ts` walks about five hand-listed routes per role at seven widths.
+ * That is the right shape for a layout suite — the same page at 320px and
+ * 1440px is two different tests — but it means roughly thirty route-visits out
+ * of the ninety-six routes this app has. Two thirds of the app had never been
+ * loaded in a browser with data in it.
+ *
+ * That gap is not hypothetical. Every bug in v141 lived in it: the Reporting
+ * Center's fifteen report routes all answered 500, and nothing failed, because
+ * nothing opened them.
+ *
+ * So this spec trades widths for breadth. One width — 390px, the phone most of
+ * this app's users hold — and every route in the canonical map, driven from the
+ * same list `tests/route-guards.smoke.test.ts` asserts against the source. One
+ * list, so a new page joins both at once.
+ *
+ * ## What it checks
+ *
+ * Loading, not layout: an HTTP status, no redirect away from a route the role is
+ * supposed to reach, no console errors, and content that actually fills the
+ * screen. Layout at seven widths stays roles.spec's job.
+ *
+ * `[id]` routes are resolved by following a real link out of their parent list,
+ * which is how a person reaches them — a fabricated id would test the
+ * not-found path instead of the page.
+ */
+
+/** The parent list whose first matching link reaches each dynamic route. */
+const DYNAMIC_PARENT: Record<string, { from: string; match: RegExp }> = {
+  "/accounts/retailers/[id]": { from: "/accounts/retailers", match: /^\/accounts\/retailers\/[a-z0-9]{20,}/ },
+  "/admin/employees/bps/[id]": { from: "/admin/employees/bps", match: /^\/admin\/employees\/bps\/[a-z0-9]{20,}/ },
+  "/admin/employees/managers/[id]": {
+    from: "/admin/employees/managers",
+    match: /^\/admin\/employees\/managers\/[a-z0-9]{20,}/,
+  },
+  "/admin/employees/rsos/[id]": { from: "/admin/employees/rsos", match: /^\/admin\/employees\/rsos\/[a-z0-9]{20,}/ },
+  "/admin/employees/supervisors/[id]": {
+    from: "/admin/employees/supervisors",
+    match: /^\/admin\/employees\/supervisors\/[a-z0-9]{20,}/,
+  },
+  "/admin/performance/bps/[id]": { from: "/admin/performance/bps", match: /^\/admin\/performance\/bps\/[a-z0-9]{20,}/ },
+  "/admin/performance/supervisors/[id]": {
+    from: "/admin/performance/supervisors",
+    match: /^\/admin\/performance\/supervisors\/[a-z0-9]{20,}/,
+  },
+  "/admin/permissions/[id]": { from: "/admin/permissions", match: /^\/admin\/permissions\/[a-z0-9]{20,}/ },
+  "/admin/retailers/[id]": { from: "/admin/retailers", match: /^\/admin\/retailers\/[a-z0-9]{20,}/ },
+  "/admin/rsos/[id]": { from: "/admin/performance/rsos", match: /^\/admin\/rsos\/[a-z0-9]{20,}/ },
+  "/it/reports/performance/[kind]": { from: "/it/reports", match: /^\/it\/reports\/performance\/[a-z]+/ },
+  "/manager/bp-activations/[id]": {
+    from: "/manager/bp-activations",
+    match: /^\/manager\/bp-activations\/[a-z0-9]{20,}/,
+  },
+  "/manager/retailers/[id]": { from: "/manager/attention", match: /^\/manager\/retailers\/[a-z0-9]{20,}/ },
+  "/manager/rsos/[id]": { from: "/manager/rsos", match: /^\/manager\/rsos\/[a-z0-9]{20,}/ },
+  "/manager/supervisors/[id]": { from: "/manager/supervisors", match: /^\/manager\/supervisors\/[a-z0-9]{20,}/ },
+  "/rso/bp/[id]": { from: "/rso/bp", match: /^\/rso\/bp\/[a-z0-9]{20,}/ },
+  "/rso/retailers/[id]": { from: "/rso/retailers", match: /^\/rso\/retailers\/[a-z0-9]{20,}/ },
+  "/supervisor/bp-activations/[id]": {
+    from: "/supervisor/bp-activations",
+    match: /^\/supervisor\/bp-activations\/[a-z0-9]{20,}/,
+  },
+  "/supervisor/retailers/[id]": { from: "/supervisor/retailers", match: /^\/supervisor\/retailers\/[a-z0-9]{20,}/ },
+  "/supervisor/rsos/[id]": { from: "/supervisor/rsos", match: /^\/supervisor\/rsos\/[a-z0-9]{20,}/ },
+};
+
+/*
+ * Routes that forward on purpose, and where to.
+ *
+ * `/admin/performance` is an entry point: it calls `redirect()` to the RSO view
+ * and carries the query with it (v143). Landing somewhere else is correct there,
+ * so the sweep has to be told — otherwise the one honest redirect in the app
+ * reads as four roles failing to reach a page they can reach.
+ */
+const FORWARDS: Record<string, string> = { "/admin/performance": "/admin/performance/rsos" };
+
+const ROLES = [
+  { key: "RSO", admin: false },
+  { key: "SUPERVISOR", admin: false },
+  { key: "BP", admin: false },
+  { key: "MANAGER", admin: false },
+  { key: "ACCOUNTS", admin: false },
+  { key: "ADMIN", admin: true },
+  { key: "IT", admin: false },
+];
+
+/** Routes this role may load, from the one canonical map. */
+function routesFor(role: string) {
+  return Object.entries(EXPECTED)
+    .filter(([, roles]) => roles !== "PUBLIC" && (roles as string[]).includes(role))
+    .map(([route]) => route)
+    .sort();
+}
+
+/*
+ * One width. `roles.spec.ts` owns the seven-width layout sweep; repeating
+ * ninety-six routes across seven projects would be seven hundred page loads to
+ * learn what one tells us.
+ */
+const WIDTH_PROJECT = "w390";
+
+for (const role of ROLES) {
+  const user = process.env[`E2E_${role.key}_USER`];
+  const pass = process.env[`E2E_${role.key}_PASS`];
+  const routes = routesFor(role.key);
+
+  test.describe(`${role.key} route coverage`, () => {
+    test.skip(!user || !pass, `set E2E_${role.key}_USER and E2E_${role.key}_PASS to run`);
+
+    test(`${role.key} can load all ${routes.length} of its routes`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== WIDTH_PROJECT, `breadth sweep runs at ${WIDTH_PROJECT} only`);
+      test.setTimeout(180_000);
+
+      /*
+       * Collect Content-Security-Policy violations from every page this sweep
+       * touches.
+       *
+       * SECURITY.md carried a five-step checklist for turning the policy from
+       * Report-Only into enforcement: sign in as each role, walk every area,
+       * and confirm the console logs no CSP report. That checklist could not be
+       * run when it was written — the build sandbox had no database, so only
+       * `/login` was reachable, and the note says so plainly.
+       *
+       * It is runnable now. This sweep already loads all ninety-six routes as
+       * all seven roles against real data, which is exactly steps 1-4. So the
+       * page reports its own violations and the run either produces the
+       * evidence to enforce, or the list of what to fix first.
+       */
+      await page.addInitScript(() => {
+        (window as unknown as { __csp: string[] }).__csp = [];
+        document.addEventListener("securitypolicyviolation", (e) => {
+          const v = e as SecurityPolicyViolationEvent;
+          (window as unknown as { __csp: string[] }).__csp.push(
+            `${v.violatedDirective} blocked ${v.blockedURI || "inline"}${v.sourceFile ? ` @ ${v.sourceFile.split("/").pop()}` : ""}`,
+          );
+        });
+      });
+
+      await login(page, user!, pass!, role.admin);
+
+      /** Resolved `[id]` route -> a real URL, discovered once per parent list. */
+      const resolved = new Map<string, string | null>();
+      const failures: string[] = [];
+      const cspViolations = new Set<string>();
+
+      for (const route of routes) {
+        let url = route;
+
+        if (route.includes("[")) {
+          const parent = DYNAMIC_PARENT[route];
+          if (!parent) {
+            failures.push(`${route}: no parent list configured — add it to DYNAMIC_PARENT`);
+            continue;
+          }
+          if (!resolved.has(route)) {
+            await page.goto(parent.from).catch(() => null);
+            await page.waitForTimeout(400);
+            const href = await page.evaluate((pattern: string) => {
+              const re = new RegExp(pattern);
+              for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))) {
+                const h = a.getAttribute("href") || "";
+                if (re.test(h)) return h;
+              }
+              return null;
+            }, parent.match.source);
+            resolved.set(route, href);
+          }
+          const found = resolved.get(route);
+          if (!found) {
+            // No row to click through to. Reported, not silently passed: an
+            // empty parent means this detail page went unchecked.
+            failures.push(`${route}: no link found on ${parent.from} — page NOT covered (empty list?)`);
+            continue;
+          }
+          url = found;
+        }
+
+        const errors: string[] = [];
+        const onError = (m: { type(): string; text(): string }) => m.type() === "error" && errors.push(m.text());
+        page.on("console", onError);
+        page.on("pageerror", (e) => errors.push(`pageerror: ${String(e)}`));
+
+        const res = await page.goto(url, { waitUntil: FORWARDS[url] ? "networkidle" : "load" }).catch((e) => {
+          failures.push(`${url}: navigation threw — ${String(e).slice(0, 120)}`);
+          return null;
+        });
+
+        if (res) {
+          const status = res.status();
+          if (status >= 400) failures.push(`${url}: HTTP ${status}`);
+
+          const ended = new URL(page.url()).pathname;
+          const expectedPath = url.split("?")[0];
+          const allowed = FORWARDS[expectedPath];
+          // A redirect away means the role could not reach a route the map says
+          // it may — unless the route forwards by design. Trailing-slash and
+          // query differences are not redirects.
+          if (ended !== expectedPath && ended !== allowed && !expectedPath.startsWith(ended))
+            failures.push(`${url}: redirected to ${ended}`);
+
+          const body = await page.textContent("body").catch(() => "");
+          if (body?.includes("We couldn't load this page")) failures.push(`${url}: rendered the error boundary`);
+
+          try {
+            await expectContentFillsViewport(page, url);
+            await expectNoHorizontalOverflow(page, url);
+          } catch (e) {
+            failures.push(`${url}: ${String(e).split("\n")[0].slice(0, 160)}`);
+          }
+        }
+
+        page.off("console", onError);
+        if (errors.length) failures.push(`${url}: console — ${errors.join(" | ").slice(0, 200)}`);
+
+        /*
+         * Read this page's Content-Security-Policy violations.
+         *
+         * `armed` is not decoration. The first version of this collector
+         * installed the listener and never read it back, so `cspViolations` was
+         * always empty and the sweep reported "no violations" for a policy it
+         * had not actually observed. It looked like evidence and was silence.
+         * A missing `__csp` now means the init script did not run, which fails
+         * the role rather than passing it quietly.
+         */
+        const armed = await page
+          .evaluate(() => Array.isArray((window as unknown as { __csp?: string[] }).__csp))
+          .catch(() => false);
+        if (!armed) failures.push(`${url}: the CSP collector is not armed — window.__csp is missing`);
+        else {
+          const violations = await page
+            .evaluate(() => (window as unknown as { __csp: string[] }).__csp)
+            .catch(() => [] as string[]);
+          for (const v of new Set(violations)) cspViolations.add(`${url}: ${v}`);
+        }
+      }
+
+      testInfo.annotations.push({ type: "routes", description: `${routes.length} checked` });
+      if (cspViolations.size)
+        failures.push(
+          `Content-Security-Policy violations (${cspViolations.size}):\n    ${[...cspViolations].slice(0, 12).join("\n    ")}`,
+        );
+      if (failures.length)
+        throw new Error(
+          `${role.key}: ${failures.length} of ${routes.length} routes failed\n  ${failures.join("\n  ")}`,
+        );
+    });
+  });
+}

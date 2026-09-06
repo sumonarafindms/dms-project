@@ -102,15 +102,21 @@ export async function standardGaByAssignment(
  * last effective day, so the exclusive end is the day after it.
  */
 
+/**
+ * Every BP assignment in the viewer's scope for a period.
+ *
+ * Like `bpAssignmentDetail` below, this no longer takes a search string. The
+ * list is narrowed in the browser (BpAssignmentList) so typing costs no
+ * request, every caller passed `undefined`, and the server-side `contains`
+ * clause it fed was unreachable code sitting in the hot query.
+ */
 export async function listBpAssignments(
   user: BpViewer,
   monthInput?: string,
-  qInput?: string,
   fromInput?: string,
   toInput?: string,
 ): Promise<{ month: string; assignments: BpAssignmentListRow[] }> {
   const month = normalizeMonth(monthInput),
-    q = (qInput || "").trim(),
     { start, end } = monthBounds(`${month}-01`);
   // The shared strict parser: a local copy accepted 2026-02-31 and rolled it
   // forward to 3 March.
@@ -122,22 +128,7 @@ export async function listBpAssignments(
   const assignments = await prisma.bpAssignment.findMany({
     where: {
       ...access,
-      AND: [
-        { startDate: { lt: rangeEnd } },
-        { OR: [{ endDate: null }, { endDate: { gte: rangeStart } }] },
-        ...(q
-          ? [
-              {
-                OR: [
-                  { retailer: { retailerCode: { contains: q, mode: "insensitive" as const } } },
-                  { retailer: { retailerName: { contains: q, mode: "insensitive" as const } } },
-                  { employee: { name: { contains: q, mode: "insensitive" as const } } },
-                  { employee: { employeeCode: { contains: q, mode: "insensitive" as const } } },
-                ],
-              },
-            ]
-          : []),
-      ],
+      AND: [{ startDate: { lt: rangeEnd } }, { OR: [{ endDate: null }, { endDate: { gte: rangeStart } }] }],
     },
     include: {
       retailer: { select: { retailerCode: true, retailerName: true } },
@@ -169,16 +160,23 @@ export async function listBpAssignments(
   return { month, assignments: withCounts };
 }
 
+/**
+ * One BP assignment's activations.
+ *
+ * `qInput` used to be the fifth parameter and it did nothing: the SIM-serial
+ * search moved into the browser (SimActivationList) in v131, every caller since
+ * has passed `undefined`, and the `q` this returned was never read. A parameter
+ * nobody can use is a parameter that misleads the next person to read the
+ * signature, so it is gone.
+ */
 export async function bpAssignmentDetail(
   user: BpViewer,
   id: string,
   monthInput?: string,
-  qInput?: string,
   fromInput?: string,
   toInput?: string,
 ) {
   const month = normalizeMonth(fromInput?.slice(0, 7) || monthInput),
-    q = (qInput || "").trim(),
     { start, end } = monthBounds(`${month}-01`);
   // The shared strict parser: a local copy accepted 2026-02-31 and rolled it
   // forward to 3 March.
@@ -239,7 +237,6 @@ export async function bpAssignmentDetail(
   });
   return {
     month,
-    q,
     /** True when the 500-row cap was hit, so browser search covers a window. */
     capped: rows.length >= 500,
     assignment: assignmentView,

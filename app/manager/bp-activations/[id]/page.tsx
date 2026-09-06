@@ -6,7 +6,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ month?: string; q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string }>;
 }) {
   const u = await requirePagePermission(["MANAGER"], "bp"),
     scope = await managerScope(u.id),
@@ -18,10 +18,8 @@ export default async function Page({
       id={p.id}
       backHref="/manager/bp-activations"
       month={s.month}
-      q={s.q}
       from={s.from}
       to={s.to}
-      eyebrow="Manager · BP"
     />
   );
 }

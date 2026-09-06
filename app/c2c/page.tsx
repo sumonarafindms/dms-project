@@ -15,6 +15,7 @@ import {
   StatusPill,
   OpsFreshness,
 } from "../components/OperationsPremiumUI";
+import { Btn } from "../components/Kit";
 import { dhakaTodayYmd } from "../../lib/business-time";
 
 type Row = {
@@ -189,9 +190,7 @@ export default function C2cPage() {
               <small>Excel / TXT · max 20 MB</small>
               <input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required />
             </label>
-            <button disabled={loading} className="kit-btn is-primary size-md">
-              {loading ? "Processing..." : "⇧  Upload C2C"}
-            </button>
+            <Btn disabled={loading}>{loading ? "Processing..." : "⇧  Upload C2C"}</Btn>
           </form>
         </OpsUpload>
       )}
@@ -200,26 +199,18 @@ export default function C2cPage() {
         <OpsSectionTitle
           title="Employee Recharge Performance"
           subtitle="C2C, SC and total recharge progress across the selected date range."
-          icon="↗"
         />
         <div className="kit-metrics-grid">
-          <OpsMetric tone="blue" label="C2C Target" value={money(totals.c2cT)} note="Selected range target" />
-          <OpsMetric tone="green" label="C2C Achieved" value={money(totals.c2cA)} note="Stock lifting" />
+          <OpsMetric label="C2C Target" value={money(totals.c2cT)} note="Selected range target" />
+          <OpsMetric label="C2C Achieved" value={money(totals.c2cA)} note="Stock lifting" />
           <OpsMetric
-            tone="purple"
             label="C2C %"
             value={totals.c2cT ? `${((totals.c2cA / totals.c2cT) * 100).toFixed(1)}%` : "0%"}
             note="Achievement rate"
           />
+          <OpsMetric label="SC Achieved" value={money(totals.sc)} note="Included for fully covered months" />
+          <OpsMetric label="Total Recharge" value={money(totals.trA)} note="C2C + SC" />
           <OpsMetric
-            tone="cyan"
-            label="SC Achieved"
-            value={money(totals.sc)}
-            note="Included for fully covered months"
-          />
-          <OpsMetric tone="orange" label="Total Recharge" value={money(totals.trA)} note="C2C + SC" />
-          <OpsMetric
-            tone="rose"
             label="Monthly Transactions"
             value={totals.trx.toLocaleString()}
             note="Exact TRANSACTION_COUNT from source"
@@ -292,7 +283,6 @@ export default function C2cPage() {
         <OpsSectionTitle
           title={`Date-wise C2C · ${new Date(date + "T00:00:00").toLocaleDateString()}`}
           subtitle="Retailers that received balance on the selected day."
-          icon="▣"
           right={
             <label className="kit-field kit-inline-date">
               <span>VIEW DATE</span>
@@ -308,9 +298,8 @@ export default function C2cPage() {
           }
         />
         <div className="kit-metrics-grid">
-          <OpsMetric tone="blue" label="Selected Day Amount" value={money(dayTotal)} note="Total C2C distributed" />
+          <OpsMetric label="Selected Day Amount" value={money(dayTotal)} note="Total C2C distributed" />
           <OpsMetric
-            tone="purple"
             label="Retailers Receiving Balance"
             value={dailyRows.length.toLocaleString()}
             note="Active recipients"

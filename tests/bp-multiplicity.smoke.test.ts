@@ -154,11 +154,45 @@ describe("neither creation path ends another assignment", () => {
     }
   });
 
-  it("still refuses an outlet that is already an active BP", () => {
+  it("refuses only the same outlet under the same RSO", () => {
+    /*
+     * This used to assert `{ retailerId, active: true }` — "is this outlet a BP
+     * anywhere" — which was right while a BP belonged to one RSO and became
+     * the next unstated rule when that changed (v142).
+     *
+     * The pair is what is genuinely duplicated: two live assignments for one
+     * retailer under one RSO would target and count that outlet twice for one
+     * person. A second RSO is not a duplicate, it is a colleague.
+     */
     for (const p of paths) {
       const src = stripComments(fs.readFileSync(path.join(ROOT, p), "utf8"));
-      expect(src, p).toMatch(/findFirst\(\{\s*where:\s*\{\s*retailerId,\s*active:\s*true\s*\}\s*\}\)/);
-      expect(src, p).toMatch(/already an active BP/);
+      expect(src, p).toMatch(/findFirst\(\{\s*where:\s*\{\s*retailerId,\s*employeeId,\s*active:\s*true\s*\}\s*\}\)/);
+      expect(src, p).not.toMatch(/where:\s*\{\s*retailerId,\s*active:\s*true\s*\}/);
+    }
+    /*
+     * What the two doors DO about that pair differs, on purpose.
+     *
+     * The BP manager is an editing screen: re-assigning the same outlet to the
+     * same RSO is how you correct its start date or target, so it updates in
+     * place. The employee form only creates, so the same pair there is a
+     * mistake and is refused.
+     *
+     * Asserted separately rather than papered over — the important thing is
+     * that neither creates a duplicate, not that they word it the same way.
+     */
+    const manager = stripComments(fs.readFileSync(path.join(ROOT, paths[0]), "utf8"));
+    expect(manager).toMatch(/bpAssignment\.update/);
+    const employeeForm = stripComments(fs.readFileSync(path.join(ROOT, paths[1]), "utf8"));
+    expect(employeeForm).toMatch(/already an active BP under this RSO/);
+  });
+
+  it("lets a retailer owned by one RSO be a BP under another", () => {
+    // Only one RSO owns a retailer in the master list, so an ownership check on
+    // either creation path makes a second holder impossible whatever else the
+    // route does.
+    for (const p of paths) {
+      const src = stripComments(fs.readFileSync(path.join(ROOT, p), "utf8"));
+      expect(src, p).not.toMatch(/retailer\.employeeId !== employeeId/);
     }
   });
 });

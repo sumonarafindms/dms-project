@@ -31,14 +31,9 @@ export async function BpActivationListView({
   month?: string;
   from?: string;
   to?: string;
-  /** Ignored — search and sort are local to the list now. */
-  q?: string;
-  sort?: string;
-  /** Ignored — the kit page header has no eyebrow. Kept so callers compile. */
-  eyebrow?: string;
 }) {
   // No `q`: the server no longer narrows the list, the browser does.
-  const data = await listBpAssignments(user, month, undefined, from, to);
+  const data = await listBpAssignments(user, month, from, to);
   const range = `month=${data.month}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`;
 
   return (
@@ -77,7 +72,6 @@ export async function BpActivationDetailView({
   id,
   backHref,
   month,
-  q,
   from,
   to,
 }: {
@@ -88,10 +82,8 @@ export async function BpActivationDetailView({
   q?: string;
   from?: string;
   to?: string;
-  /** Ignored — see BpActivationListView. */
-  eyebrow?: string;
 }) {
-  const d = await bpAssignmentDetail(user, id, month, q, from, to);
+  const d = await bpAssignmentDetail(user, id, month, from, to);
 
   if (!d)
     return (

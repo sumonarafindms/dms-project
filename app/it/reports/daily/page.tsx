@@ -9,65 +9,30 @@
 
 import Link from "next/link";
 import { requireUser } from "../../../../lib/auth";
-import { rangeLabel, resolveRange, rangeQuery, monthToDate, isMonthToDate } from "../../../../lib/report-range";
-import { supervisorSummary, rangeTotals } from "../../../../lib/report-data";
-import { targetPercent } from "../../../../lib/achievement";
+import { rangeLabel, resolveRange, rangeQuery, isMonthToDate } from "../../../../lib/report-range";
+import { rangeTotals } from "../../../../lib/report-data";
+import { buildDaily, reportExportHref } from "../../../../lib/report-builders";
+import type { DailyRow as Row } from "../../../../lib/report-builders";
+import { reportPageHref } from "../../../../lib/report-paging";
 import { PageHeader, SummaryStrip } from "../../../components/Kit";
 import { ReportActionBar, ReportDateBar } from "../../../components/ReportShell";
 import { ReportTable } from "../../../components/ReportTable";
-import type { ExportRow } from "../../../components/ReportShell";
 import type { Column } from "../../../components/ReportTable";
 import { Icon } from "../../../components/icons";
 
 export const dynamic = "force-dynamic";
-
-type Row = {
-  id: string;
-  name: string;
-  rsoCount: number;
-  retailerCount: number;
-  standardGa: number;
-  mtdGa: number;
-  gaTarget: number;
-  achievement: number;
-  c2cAmount: number;
-  c2sAmount: number;
-};
 
 const money = (n: number) => `৳${Math.round(n).toLocaleString()}`;
 
 export default async function DailySummary({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; page?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const mtd = monthToDate(range);
-  const [supervisors, totals, mtdRows] = await Promise.all([
-    supervisorSummary(range),
-    rangeTotals(range),
-    // The GA target is a MONTHLY figure. Comparing one day's activations
-    // against it produced an "Achievement %" that read as catastrophic
-    // under-performance every morning; month-to-date is the comparison that
-    // matches the denominator. Skipped when the range already is the month.
-    isMonthToDate(range) ? Promise.resolve(null) : supervisorSummary(mtd),
-  ]);
-  const mtdGaById = new Map((mtdRows ?? supervisors).map((r) => [r.id, r.standardGa]));
-
-  const rows: Row[] = supervisors.map((s) => ({
-    id: s.id,
-    name: s.name,
-    rsoCount: s.rsoCount,
-    retailerCount: s.retailerCount,
-    standardGa: s.standardGa,
-    mtdGa: mtdGaById.get(s.id) ?? s.standardGa,
-    gaTarget: s.gaTarget,
-    achievement: targetPercent(mtdGaById.get(s.id) ?? s.standardGa, s.gaTarget),
-    c2cAmount: s.c2cAmount,
-    c2sAmount: s.c2sAmount,
-  }));
+  const [{ rows }, totals] = await Promise.all([buildDaily(range), rangeTotals(range)]);
 
   const columns: Column<Row>[] = [
     { key: "name", label: "Supervisor" },
@@ -88,20 +53,6 @@ export default async function DailySummary({
     { key: "c2cAmount", label: "C2C", align: "right", render: (r) => money(r.c2cAmount) },
     { key: "c2sAmount", label: "C2S", align: "right", render: (r) => money(r.c2sAmount) },
   ];
-
-  // Keys are the human-readable headings, so the sheet needs no separate
-  // header row and the columns match the screen exactly.
-  const exportRows: ExportRow[] = rows.map((r) => ({
-    Supervisor: r.name,
-    RSO: r.rsoCount,
-    Retailer: r.retailerCount,
-    "GA (period)": r.standardGa,
-    "GA (MTD)": r.mtdGa,
-    "Monthly GA Target": r.gaTarget,
-    "MTD Achievement %": r.gaTarget ? r.achievement : "",
-    C2C: Math.round(r.c2cAmount),
-    C2S: Math.round(r.c2sAmount),
-  }));
 
   const summary = [
     `DMS Daily Summary`,
@@ -127,11 +78,7 @@ export default async function DailySummary({
         title="Daily Summary"
         subtitle={`Report Period: ${rangeLabel(range)}`}
         action={
-          <ReportActionBar
-            filename={`daily-summary-${range.from}_to_${range.to}`}
-            rows={exportRows}
-            summary={summary}
-          />
+          <ReportActionBar exportHref={reportExportHref("daily", range)} rowCount={rows.length} summary={summary} />
         }
       />
       <ReportDateBar range={range} />
@@ -146,6 +93,11 @@ export default async function DailySummary({
       <ReportTable
         columns={columns}
         rows={rows}
+        paging={{
+          page: sp.page,
+          noun: "supervisor",
+          hrefFor: (p) => reportPageHref("/it/reports/daily", { from: range.from, to: range.to }, p),
+        }}
         emptyTitle="No supervisor activity for this period"
         emptyHint="Check Data Readiness on the Reporting Center — a feed may not be imported for these dates."
       />

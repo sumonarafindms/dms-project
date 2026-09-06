@@ -73,7 +73,10 @@ export default async function Page() {
 
   const historySection = (
     <div className="kit-mt-20">
-      <SectionHead title="Previous BP codes" sub={`${history.length} ended assignment${history.length === 1 ? "" : "s"}`} />
+      <SectionHead
+        title="Previous BP codes"
+        sub={`${history.length} ended assignment${history.length === 1 ? "" : "s"}`}
+      />
       <Card padded>
         {history.length ? (
           <div className="kit-rows">
@@ -123,7 +126,23 @@ export default async function Page() {
           const ga = gaByAssignment.get(a.id) ?? 0;
           const login = a.retailer.bpUser?.active && a.retailer.bpUser.role === "BP" ? a.retailer.bpUser : null;
           return (
-            <Card key={a.id} padded>
+            /*
+             * The card IS the link, because "how many did this BP do, and
+             * when?" is one question with two halves. The monthly figure lives
+             * here; the day-by-day record lives one tap away at /rso/bp/[id].
+             *
+             * It used to be neither: the cards were inert and the dates sat
+             * behind a second menu entry that re-listed the same partners.
+             *
+             * `month` is carried so the detail opens on the period the reader
+             * was already looking at rather than resetting to today's.
+             */
+            <Link
+              key={a.id}
+              href={`/rso/bp/${a.id}?month=${dhakaMonth()}`}
+              className="kit-card kit-card-p is-clickable"
+              aria-label={`${a.retailer.retailerName || a.retailer.retailerCode} — daily activation record`}
+            >
               <div className="kit-row-between">
                 {/* kit-entity-main, not kit-readiness-head: the latter belongs
                     to the Data Readiness grid, and borrowing a class named for
@@ -146,22 +165,15 @@ export default async function Page() {
               <p className="kit-hint is-xs kit-mt-6">
                 {/* The login matters to an RSO: without one the BP cannot see
                     their own screen, and the RSO is the person who notices. */}
-                {login ? `Login: ${login.displayName}${login.mobileNumber ? ` · ${login.mobileNumber}` : ""}` : "No login created yet"}
+                {login
+                  ? `Login: ${login.displayName}${login.mobileNumber ? ` · ${login.mobileNumber}` : ""}`
+                  : "No login created yet"}
               </p>
-            </Card>
+              <p className="kit-hint is-xs kit-mt-6">Tap for this BP&rsquo;s day-by-day record →</p>
+            </Link>
           );
         })}
       </div>
-
-      <Link href="/rso/bp/activations" className="kit-card is-clickable kit-tile kit-mt-20">
-        <span className="kit-tile-icon" aria-hidden="true">
-          <Icon name="sim" />
-        </span>
-        <div>
-          <strong>View BP Activation Details</strong>
-          <span>SIM sales, dates and activation records for every BP</span>
-        </div>
-      </Link>
 
       {historySection}
     </main>

@@ -22,9 +22,19 @@ import path from "node:path";
  *
  * ## The rule now
  *
- * The constraint belongs to the RETAILER, not the RSO: one outlet cannot be an
- * active BP twice. Ending an assignment is its own deliberate action, because a
- * side-effect of adding is not a decision anyone made.
+ * BP and RSO are MANY-TO-MANY. Several BPs under one RSO (the fix above), and
+ * several RSOs over one BP (v142) — a retailer can be worked by more than one
+ * person, and the owner asked for both directions.
+ *
+ * Two constraints were dropped to allow the second: that the retailer belong
+ * to the selected RSO, and that no other RSO already hold it. The first made a
+ * second RSO impossible by construction, since only one RSO owns a retailer in
+ * the master list.
+ *
+ * What survives is the same retailer under the SAME RSO, which would target
+ * and count one outlet twice for one person. Ending an assignment stays its own
+ * deliberate action, because a side-effect of adding is not a decision anyone
+ * made.
  */
 
 const ROOT = path.join(__dirname, "..");
@@ -43,15 +53,34 @@ describe("assigning a BP", () => {
     expect(POST).not.toMatch(/endDate/);
   });
 
-  it("does not look for the RSO's existing BP at all", () => {
-    // It used to find `{ employeeId, active: true }` — an RSO-shaped question,
-    // which is what made one-BP-per-RSO an unstated rule.
-    expect(POST).not.toMatch(/employeeId,\s*active:\s*true/);
+  it("does not ask whether ANY RSO already holds the outlet", () => {
+    /*
+     * Two questions have been wrong here in turn, and both read as reasonable.
+     *
+     * `{ employeeId, active: true }` — "does this RSO already have a BP" —
+     * made one-BP-per-RSO an unstated rule, and adding a second silently ended
+     * the first.
+     *
+     * `{ retailerId, active: true }` — "is this outlet already a BP" — was the
+     * fix for that, and made one-RSO-per-BP an unstated rule in the same shape.
+     * It is what this asserts is gone.
+     */
+    expect(POST).not.toMatch(/where:\s*\{\s*employeeId,\s*active:\s*true\s*\}/);
+    expect(POST).not.toMatch(/where:\s*\{\s*retailerId,\s*active:\s*true\s*\}/);
+    expect(POST).not.toMatch(/already an active BP under another RSO/);
   });
 
-  it("checks the retailer instead, which is the real constraint", () => {
-    expect(POST).toMatch(/findFirst\(\{\s*where:\s*\{\s*retailerId,\s*active:\s*true\s*\}\s*\}\)/);
-    expect(POST).toMatch(/already an active BP under another RSO/);
+  it("no longer requires the retailer to belong to the selected RSO", () => {
+    // Only one RSO owns a retailer in the master list, so this check alone made
+    // a second holder impossible however the rest of the route behaved.
+    expect(POST).not.toMatch(/retailer\.employeeId !== employeeId/);
+    expect(POST).not.toMatch(/not assigned under the selected RSO/);
+  });
+
+  it("checks the one pair that is still a duplicate", () => {
+    // Same outlet, same RSO. Two live assignments there would target and count
+    // one retailer twice for one person.
+    expect(POST).toMatch(/findFirst\(\{\s*where:\s*\{\s*retailerId,\s*employeeId,\s*active:\s*true\s*\}\s*\}\)/);
   });
 
   it("no longer moves a BP login between retailers", () => {
@@ -64,13 +93,16 @@ describe("assigning a BP", () => {
 
   it("edits in place when the same retailer is reassigned to the same RSO", () => {
     // Otherwise a correction to the start date or target would create a second
-    // active assignment for one outlet.
-    expect(POST).toMatch(/existing\.employeeId !== employeeId/);
+    // active assignment for one outlet under one RSO.
+    expect(POST).toMatch(/if \(existing\) \{/);
     expect(POST).toMatch(/bpAssignment\.update/);
   });
 
-  it("still refuses an outlet already assigned under a different RSO", () => {
-    expect(POST).toMatch(/throw new Error\("This retailer is already an active BP under another RSO\."\)/);
+  it("accepts the same outlet under a different RSO", () => {
+    // The lookup is keyed by the PAIR, so a second RSO finds nothing and the
+    // create below runs. This is the whole of the v142 change at this route.
+    expect(POST).toMatch(/retailerId,\s*employeeId,\s*active:\s*true/);
+    expect(POST).toMatch(/bpAssignment\.create/);
   });
 });
 
@@ -80,6 +112,17 @@ describe("ending a BP assignment stays deliberate", () => {
   it("is what PATCH is for, and it still clears the login", () => {
     expect(PATCH).toMatch(/active:\s*false/);
     expect(PATCH).toMatch(/bpRetailerId:\s*null/);
+  });
+
+  it("keeps the BP's login while another RSO still holds the outlet", () => {
+    /*
+     * The login belongs to the retailer, not to one assignment. Clearing it
+     * whenever any assignment ended would lock a working BP out of their own
+     * screen because an unrelated RSO stopped working with them — and they
+     * would have no idea why.
+     */
+    expect(PATCH).toMatch(/bpAssignment\.count\(\{\s*where:\s*\{\s*retailerId:[^}]*active:\s*true\s*\}\s*\}\)/);
+    expect(PATCH).toMatch(/if \(stillActive === 0\)/);
   });
 });
 

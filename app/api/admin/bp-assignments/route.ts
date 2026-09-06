@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
+import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { dhakaTodayYmd } from "../../../../lib/business-time";
 function parseDay(value: unknown) {
   const s = String(value || "");
@@ -11,6 +12,11 @@ function parseDay(value: unknown) {
 export async function POST(req: Request) {
   const me = await getCurrentUser();
   if (!me || !["ADMIN", "IT"].includes(me.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const b = await req.json();
   const employeeId = String(b.employeeId || ""),
     retailerId = String(b.retailerId || ""),
@@ -23,29 +29,33 @@ export async function POST(req: Request) {
     select: { id: true, retailerCode: true, employeeId: true, active: true },
   });
   if (!retailer?.active) return NextResponse.json({ error: "Retailer was not found or is inactive." }, { status: 400 });
-  if (retailer.employeeId !== employeeId)
-    return NextResponse.json({ error: "This retailer is not assigned under the selected RSO." }, { status: 400 });
   /*
-   * An RSO may hold SEVERAL Business Partners at once.
+   * BP and RSO are MANY-TO-MANY. Both directions, and neither is a mistake.
    *
-   * This route used to enforce one. Adding a BP found that RSO's existing
-   * active assignment, ended it with `endDate = startDate - 1`, and moved its
-   * BP login to the new retailer — all silently, reported as a successful
-   * "assign". So an owner who added a second BP got a second BP and lost the
-   * first, and the target list showed one name where they expected two. That
-   * is what "the new BP's name does not appear" actually was: it did appear,
-   * and the other one had gone.
+   * One RSO may hold several Business Partners — that was v139, after adding a
+   * second BP was found to be silently ending the first.
    *
-   * The only real constraint is on the RETAILER: one outlet cannot be an
-   * active BP twice, under this RSO or another. Ending an assignment is its
-   * own deliberate action (PATCH below), which is where it belongs — a
+   * One BP may now be held by several RSOs, which is this version. Two
+   * constraints used to stand in the way and both are gone:
+   *
+   *   - The retailer had to be owned by the selected RSO
+   *     (`retailer.employeeId !== employeeId`). At most one RSO owns a
+   *     retailer in the master list, so this made a second RSO impossible by
+   *     construction.
+   *   - An outlet could be an active BP only once
+   *     ("already an active BP under another RSO").
+   *
+   * What remains is the one rule that is still true: the SAME retailer under
+   * the SAME RSO cannot exist twice. That is not a business rule so much as
+   * arithmetic — two identical live assignments would target and count the
+   * same outlet twice for one person.
+   *
+   * Ending an assignment stays its own deliberate action (PATCH below). A
    * side-effect of adding is not a decision anyone made.
    */
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const existing = await tx.bpAssignment.findFirst({ where: { retailerId, active: true } });
-      if (existing && existing.employeeId !== employeeId)
-        throw new Error("This retailer is already an active BP under another RSO.");
+      const existing = await tx.bpAssignment.findFirst({ where: { retailerId, employeeId, active: true } });
       // Re-assigning the same retailer to the same RSO edits the assignment in
       // place rather than creating a duplicate.
       if (existing) {
@@ -70,6 +80,11 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   const me = await getCurrentUser();
   if (!me || !["ADMIN", "IT"].includes(me.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const b = await req.json();
   const id = String(b.id || "");
   if (!id) return NextResponse.json({ error: "Assignment is required" }, { status: 400 });
@@ -78,7 +93,19 @@ export async function PATCH(req: Request) {
   const endDate = parseDay(b.endDate) || new Date(`${dhakaTodayYmd()}T00:00:00.000Z`);
   await prisma.$transaction(async (tx) => {
     await tx.bpAssignment.update({ where: { id }, data: { active: false, endDate } });
-    await tx.user.updateMany({ where: { role: "BP", bpRetailerId: a.retailerId }, data: { bpRetailerId: null } });
+    /*
+     * The login belongs to the RETAILER, not to this assignment.
+     *
+     * A retailer can now be a BP under several RSOs at once, so ending one of
+     * those assignments must not take the BP's login away while the others are
+     * still live — that would lock a working BP out of their own screen
+     * because an unrelated RSO stopped working with them.
+     *
+     * Cleared only when this was the last one standing.
+     */
+    const stillActive = await tx.bpAssignment.count({ where: { retailerId: a.retailerId, active: true } });
+    if (stillActive === 0)
+      await tx.user.updateMany({ where: { role: "BP", bpRetailerId: a.retailerId }, data: { bpRetailerId: null } });
   });
   return NextResponse.json({ ok: true });
 }

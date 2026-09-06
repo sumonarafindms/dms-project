@@ -87,12 +87,21 @@ export function contentSecurityPolicy(nonce: string, isProduction: boolean) {
 /**
  * Which header the policy is sent under.
  *
- * Report-Only until the checklist in SECURITY.md has been run against a real
- * deployment. Next.js honours the nonce under either name, so switching to
- * enforcement changes nothing else.
+ * **Enforcing.** It shipped Report-Only because the checklist in SECURITY.md
+ * could not be run: the build sandbox had no database, so only `/login` was
+ * reachable, and one page is not the app.
+ *
+ * The checklist is now run by `e2e/coverage.spec.ts`, which signs in as all
+ * seven roles, loads all ninety-six routes against real data, and collects
+ * `securitypolicyviolation` events from every one of them. That is steps 1-4
+ * of the checklist, executed rather than described, and it runs again on every
+ * suite run rather than once.
+ *
+ * Next.js honours the nonce under either header name, so this switch is the
+ * whole change.
  */
 export function cspHeaderName(): "Content-Security-Policy" | "Content-Security-Policy-Report-Only" {
-  return "Content-Security-Policy-Report-Only";
+  return "Content-Security-Policy";
 }
 
 /** 128 bits, base64. Edge runtime has WebCrypto and `btoa`. */

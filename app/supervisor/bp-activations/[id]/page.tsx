@@ -5,7 +5,7 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ month?: string; q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string }>;
 }) {
   const u = await requirePagePermission(["SUPERVISOR"], "bp"),
     p = await params,
@@ -16,10 +16,8 @@ export default async function Page({
       id={p.id}
       backHref="/supervisor/bp-activations"
       month={s.month}
-      q={s.q}
       from={s.from}
       to={s.to}
-      eyebrow="Supervisor · BP"
     />
   );
 }

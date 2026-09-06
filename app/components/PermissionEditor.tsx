@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, Check, EmptyState, PageHeader, Skeleton } from "./Kit";
+import { Btn, Card, Check, EmptyState, PageHeader, Skeleton } from "./Kit";
 import { Icon } from "./icons";
 
 type Perm = "view" | "add" | "edit" | "update";
@@ -96,15 +96,15 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
           <Icon name="shield" /> View controls visibility. Add, Edit and Update only take effect when View is on.
         </p>
         <div className="kit-form-actions is-flush">
-          <button type="button" className="kit-btn is-secondary size-sm" onClick={() => localPreset("VIEW_ONLY")}>
+          <Btn variant="secondary" size="sm" type="button" onClick={() => localPreset("VIEW_ONLY")}>
             View Only
-          </button>
-          <button type="button" className="kit-btn is-secondary size-sm" onClick={() => localPreset("DATA_OPERATOR")}>
+          </Btn>
+          <Btn variant="secondary" size="sm" type="button" onClick={() => localPreset("DATA_OPERATOR")}>
             Data Operator
-          </button>
-          <button type="button" className="kit-btn is-secondary size-sm" onClick={() => localPreset("FULL")}>
+          </Btn>
+          <Btn variant="secondary" size="sm" type="button" onClick={() => localPreset("FULL")}>
             Full Access
-          </button>
+          </Btn>
         </div>
       </Card>
 
@@ -165,12 +165,12 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
       )}
 
       <div className="kit-form-actions is-flush">
-        <button className="kit-btn is-primary size-md" disabled={busy} onClick={save}>
+        <Btn disabled={busy} onClick={save}>
           {busy ? "Working…" : "Save Permissions"}
-        </button>
-        <button className="kit-btn is-ghost size-md" disabled={busy} onClick={reset}>
+        </Btn>
+        <Btn variant="ghost" disabled={busy} onClick={reset}>
           Reset to Role Default
-        </button>
+        </Btn>
       </div>
     </main>
   );

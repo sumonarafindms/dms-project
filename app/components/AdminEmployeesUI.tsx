@@ -9,9 +9,8 @@
  */
 
 import { useState } from "react";
-import Link from "next/link";
 import { Icon } from "./icons";
-import { Badge, Card, EmptyState, Row, SectionHead } from "./Kit";
+import { Badge, Card, EmptyState, LinkBtn, Row, SectionHead } from "./Kit";
 
 export type AdminEmployeeRow = {
   id: string;
@@ -38,9 +37,9 @@ export function EmployeeList({ title, rows, addHref }: { title: string; rows: Ad
         title={`${rows.length} ${title}`}
         sub={`${active} active · ${rows.length - active} inactive`}
         link={
-          <Link href={addHref} className="kit-btn is-primary size-sm">
+          <LinkBtn href={addHref} size="sm">
             <Icon name="users" /> Add New
-          </Link>
+          </LinkBtn>
         }
       />
 

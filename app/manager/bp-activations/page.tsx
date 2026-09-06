@@ -14,11 +14,8 @@ export default async function Page({
       user={{ ...u, managerSupervisorIds: scope.supervisorIds }}
       basePath="/manager/bp-activations"
       month={s.month}
-      q={s.q}
       from={s.from}
       to={s.to}
-      sort={s.sort}
-      eyebrow="Manager"
     />
   );
 }

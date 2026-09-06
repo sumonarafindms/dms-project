@@ -5,6 +5,7 @@ import { recordAssignmentChanges } from "../../../../../lib/assignment-history";
 import { phoneKey } from "../../../../../lib/phone";
 import { dhakaTodayYmd } from "../../../../../lib/business-time";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { PIN_REQUIREMENT, validatePin } from "@/lib/credential-policy";
 
 const clean = (v: unknown) => String(v ?? "").trim();
 const nullable = (v: unknown) => {
@@ -23,7 +24,16 @@ async function admin() {
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ role: string }> }) {
-  if (!(await admin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const actor = await admin();
+  if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Creating an employee creates a login with a PIN, so it shares the
+  // credential budget with PATCH. PATCH had this and POST did not — the
+  // half of the pair that mints new credentials was the unlimited one.
+  const rl = await consumeRateLimit(RATE_LIMITS.credential, actor.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const { role } = await params,
     b = await req.json(),
     r = role.toLowerCase();
@@ -32,8 +42,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
       const name = clean(b.name),
         mobile = clean(b.mobile),
         pin = clean(b.pin);
-      if (!name || !mobile || pin.length < 4)
-        return NextResponse.json({ error: "Name, mobile and at least 4-digit PIN are required." }, { status: 400 });
+      if (!name || !mobile) return NextResponse.json({ error: "Name and mobile are required." }, { status: 400 });
+      const pinError = validatePin(pin);
+      if (pinError) return NextResponse.json({ error: pinError }, { status: 400 });
       const user = await prisma.user.create({
         data: {
           displayName: name,
@@ -50,9 +61,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
         mobile = clean(b.mobile),
         pin = clean(b.pin);
       if (!name) return NextResponse.json({ error: "Supervisor name is required." }, { status: 400 });
-      if ((mobile && !pin) || (pin && pin.length < 4))
+      if ((mobile && !pin) || validatePin(pin, { allowEmpty: true }))
         return NextResponse.json(
-          { error: "Provide a mobile number and at least 4-digit PIN together." },
+          { error: `Provide a mobile number and a PIN together. ${PIN_REQUIREMENT}` },
           { status: 400 },
         );
       const result = await prisma.$transaction(async (tx) => {
@@ -84,9 +95,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
       const existingPhones = await prisma.employee.findMany({ select: { id: true, rsoMsisdn: true } });
       if (existingPhones.some((x) => phoneKey(x.rsoMsisdn) === phoneKey(rsoMsisdn)))
         return NextResponse.json({ error: "This RSO MSISDN is already assigned." }, { status: 400 });
-      if ((mobile && !pin) || (pin && pin.length < 4))
+      if ((mobile && !pin) || validatePin(pin, { allowEmpty: true }))
         return NextResponse.json(
-          { error: "Provide a mobile number and at least 4-digit PIN together." },
+          { error: `Provide a mobile number and a PIN together. ${PIN_REQUIREMENT}` },
           { status: 400 },
         );
       const result = await prisma.$transaction(async (tx) => {
@@ -124,37 +135,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
           { error: "Future BP assignment dates are not supported yet. Use today or an earlier valid date." },
           { status: 400 },
         );
-      if ((mobile && !pin) || (pin && pin.length < 4))
+      if ((mobile && !pin) || validatePin(pin, { allowEmpty: true }))
         return NextResponse.json(
-          { error: "Provide a mobile number and at least 4-digit PIN together." },
+          { error: `Provide a mobile number and a PIN together. ${PIN_REQUIREMENT}` },
           { status: 400 },
         );
       const retailer = await prisma.retailer.findUnique({
         where: { id: retailerId },
         select: { id: true, retailerCode: true, retailerName: true, employeeId: true, active: true },
       });
-      if (!retailer?.active || retailer.employeeId !== employeeId)
-        return NextResponse.json(
-          { error: "Selected retailer must be active and belong to the selected RSO." },
-          { status: 400 },
-        );
+      if (!retailer?.active) return NextResponse.json({ error: "Selected retailer must be active." }, { status: 400 });
       /*
-       * The SECOND door onto BP creation, and it had the same bug.
+       * The SECOND door onto BP creation, and it must stay level with the
+       * first (/api/admin/bp-assignments). Every time these two have differed,
+       * the app's behaviour has depended on which screen you happened to use,
+       * which is worse than a rule nobody implemented.
        *
-       * v139 stopped /api/admin/bp-assignments ending an RSO's existing BP as
-       * a side effect of adding another. This path — creating a BP from the
-       * employee form — still did exactly that: it found the RSO's current
-       * assignment, ended it with `endDate = startDate - 1`, and moved its
-       * login. So the fix held at one entrance and not the other, which is
-       * worse than not fixing it, because the behaviour now depends on which
-       * screen you used.
+       * BP and RSO are many-to-many: several BPs under one RSO (v139), and now
+       * several RSOs over one BP. Two checks were dropped to allow the second
+       * direction — that the retailer belongs to the selected RSO, and that no
+       * other RSO already holds it. The first made a second RSO impossible by
+       * construction, since only one RSO owns a retailer in the master list.
        *
-       * An RSO may hold several BPs. The only constraint is the retailer's:
-       * one outlet cannot be an active BP twice.
+       * The surviving rule is the same retailer under the same RSO, which
+       * would target and count one outlet twice for one person.
        */
       const result = await prisma.$transaction(async (tx) => {
-        const other = await tx.bpAssignment.findFirst({ where: { retailerId, active: true } });
-        if (other) throw new Error("This retailer is already an active BP.");
+        const other = await tx.bpAssignment.findFirst({ where: { retailerId, employeeId, active: true } });
+        if (other) throw new Error("This retailer is already an active BP under this RSO.");
         const assignment = await tx.bpAssignment.create({
           data: { employeeId, retailerId, startDate, gaTarget, active: true },
         });
@@ -209,8 +217,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
       const data: any = { displayName: clean(b.name) || user.displayName, active: b.active !== false };
       if (clean(b.mobile)) data.mobileNumber = clean(b.mobile);
       if (clean(b.pin)) {
-        if (clean(b.pin).length < 4)
-          return NextResponse.json({ error: "PIN must contain at least 4 characters." }, { status: 400 });
+        if (validatePin(clean(b.pin))) return NextResponse.json({ error: PIN_REQUIREMENT }, { status: 400 });
         data.credentialHash = await hashCredential(clean(b.pin));
       }
       await prisma.user.update({ where: { id }, data });
@@ -238,13 +245,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
           const udata: any = { displayName: name, active };
           if (mobile) udata.mobileNumber = mobile;
           if (pin) {
-            if (pin.length < 4) throw new Error("PIN must contain at least 4 characters.");
+            if (validatePin(pin)) throw new Error(validatePin(pin)!);
             udata.credentialHash = await hashCredential(pin);
           }
           await tx.user.update({ where: { id: supervisor.user.id }, data: udata });
           if (pin || !active) await tx.session.deleteMany({ where: { userId: supervisor.user.id } });
         } else if (mobile) {
-          if (pin.length < 4) throw new Error("A PIN of at least 4 characters is required to create the login.");
+          if (validatePin(pin)) throw new Error(validatePin(pin)!);
           await tx.user.create({
             data: {
               displayName: name,
@@ -300,13 +307,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
           const udata: any = { displayName: name, active };
           if (mobile) udata.mobileNumber = mobile;
           if (pin) {
-            if (pin.length < 4) throw new Error("PIN must contain at least 4 characters.");
+            if (validatePin(pin)) throw new Error(validatePin(pin)!);
             udata.credentialHash = await hashCredential(pin);
           }
           await tx.user.update({ where: { id: employee.user.id }, data: udata });
           if (pin || !active) await tx.session.deleteMany({ where: { userId: employee.user.id } });
         } else if (mobile) {
-          if (pin.length < 4) throw new Error("A PIN of at least 4 characters is required to create the login.");
+          if (validatePin(pin)) throw new Error(validatePin(pin)!);
           await tx.user.create({
             data: {
               displayName: name,
@@ -364,13 +371,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
           const udata: any = { displayName: name, active };
           if (mobile) udata.mobileNumber = mobile;
           if (pin) {
-            if (pin.length < 4) throw new Error("PIN must contain at least 4 characters.");
+            if (validatePin(pin)) throw new Error(validatePin(pin)!);
             udata.credentialHash = await hashCredential(pin);
           }
           await tx.user.update({ where: { id: a.retailer.bpUser.id }, data: udata });
           if (pin || !active) await tx.session.deleteMany({ where: { userId: a.retailer.bpUser.id } });
         } else if (mobile && active) {
-          if (pin.length < 4) throw new Error("A PIN of at least 4 characters is required to create the login.");
+          if (validatePin(pin)) throw new Error(validatePin(pin)!);
           await tx.user.create({
             data: {
               displayName: name,

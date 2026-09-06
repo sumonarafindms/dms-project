@@ -13,8 +13,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SaveNotice } from "./AdminEmployeesUI";
 import { dhakaTodayYmd } from "../../lib/business-time";
-import { Card, Check, Field, PageHeader } from "./Kit";
+import { Btn, Card, Check, Field, LinkBtn, PageHeader } from "./Kit";
 import { Icon } from "./icons";
+import { PIN_LENGTH } from "../../lib/credential-policy";
 
 type Option = { id: string; name: string; meta?: string; employeeId?: string };
 type Initial = {
@@ -203,9 +204,7 @@ export default function AdminEmployeeForm({
         </Card>
 
         <Card padded="lg">
-          <h2 className="kit-label kit-mb-12">
-            Login &amp; Access
-          </h2>
+          <h2 className="kit-label kit-mb-12">Login &amp; Access</h2>
           <div className="kit-form-grid">
             <Field label="Mobile Number">
               <input
@@ -222,8 +221,11 @@ export default function AdminEmployeeForm({
                 name="pin"
                 type="password"
                 inputMode="numeric"
-                minLength={4}
-                placeholder={edit ? "Leave blank to keep current PIN" : "Minimum 4 characters"}
+                autoComplete="off"
+                minLength={PIN_LENGTH}
+                maxLength={PIN_LENGTH}
+                pattern={`\\d{${PIN_LENGTH}}`}
+                placeholder={edit ? `Leave blank to keep, or ${PIN_LENGTH} digits` : `${PIN_LENGTH} digits`}
                 required={role === "managers" && !edit}
               />
             </Field>
@@ -252,12 +254,10 @@ export default function AdminEmployeeForm({
           </div>
           <SaveNotice message={message} ok={ok} />
           <div className="kit-form-actions">
-            <button className="kit-btn is-primary size-md" disabled={busy}>
-              {busy ? "Saving…" : edit ? "Save Changes" : `Create ${title}`}
-            </button>
-            <Link className="kit-btn is-ghost size-md" href={`/admin/employees/${role}`}>
+            <Btn disabled={busy}>{busy ? "Saving…" : edit ? "Save Changes" : `Create ${title}`}</Btn>
+            <LinkBtn variant="ghost" href={`/admin/employees/${role}`}>
               Cancel
-            </Link>
+            </LinkBtn>
           </div>
         </Card>
       </form>

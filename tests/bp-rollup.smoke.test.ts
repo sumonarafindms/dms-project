@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { hasBp, teamTotals, withBp, type BpPortion, type RollupRow } from "../lib/bp-rollup";
+import { groupSizes, groupTotals, hasBp, teamTotals, withBp, type BpPortion, type RollupRow } from "../lib/bp-rollup";
 import { assignmentGaTarget, assignmentWindow } from "../lib/bp-period";
 
 /**
@@ -40,17 +40,35 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-const bp = (over: Partial<BpPortion> = {}): BpPortion => ({
-  count: 0,
-  gaTarget: 0,
-  gaAchieved: 0,
-  ssoAchieved: 0,
-  c2cAchieved: 0,
-  lsoAchieved: 0,
-  c2sAmount: 0,
-  c2sTransactions: 0,
-  ...over,
-});
+/*
+ * A BP portion, with its per-retailer breakdown filled in to match.
+ *
+ * `byRetailer` is not decoration: since a BP may be held by several RSOs at
+ * once, it is what lets a team total count one outlet once. So the helper
+ * builds the breakdown from the same numbers rather than leaving it empty,
+ * which would make every rollup test quietly assert zero BP contribution.
+ *
+ * Pass an explicit `retailerId` to model the case that matters — the SAME
+ * outlet appearing under two RSOs.
+ */
+let bpSeq = 0;
+const bp = (over: Partial<BpPortion> = {}, retailerId = `bp-retailer-${++bpSeq}`): BpPortion => {
+  const figures = {
+    gaTarget: over.gaTarget ?? 0,
+    gaAchieved: over.gaAchieved ?? 0,
+    ssoAchieved: over.ssoAchieved ?? 0,
+    c2cAchieved: over.c2cAchieved ?? 0,
+    lsoAchieved: over.lsoAchieved ?? 0,
+    c2sAmount: over.c2sAmount ?? 0,
+    c2sTransactions: over.c2sTransactions ?? 0,
+  };
+  return {
+    count: 0,
+    ...figures,
+    ...over,
+    byRetailer: over.byRetailer ?? { [retailerId]: figures },
+  };
+};
 
 const row = (over: Partial<RollupRow> = {}): RollupRow => ({
   gaTarget: 0,
@@ -129,7 +147,47 @@ describe("team totals", () => {
     expect(total.gaAchieved).toBe(30);
     expect(total.gaTarget).toBe(53);
     expect(total.retailerCount).toBe(8);
-    expect(total.bpCount).toBe(3);
+    /*
+     * DISTINCT BP retailers, not assignments — and this assertion used to say
+     * 3, summing the rows' `count` fields.
+     *
+     * Both meanings are defensible on one RSO's row, where they are the same
+     * number. In a TEAM total they are not: one outlet held by three RSOs is
+     * one Business Partner and three assignments, and "3 BPs" on a company
+     * dashboard would be three outlets that do not exist. The helper gives
+     * each bp() its own retailer, so two rows here are two outlets.
+     */
+    expect(total.bpCount).toBe(2);
+  });
+
+  it("counts an outlet held by two RSOs once, and its GA once", () => {
+    /*
+     * The whole reason `byRetailer` exists.
+     *
+     * "Each RSO sees the whole thing; the company counts it once" — so both
+     * rows below carry the same BP's full 12 GA against a target of 20, and
+     * the team total carries them exactly once. Summing the aggregates would
+     * report 24 against 40: a doubling that no screen would flag, on the
+     * number the dashboard exists to show.
+     */
+    const shared = { gaAchieved: 12, gaTarget: 20, ssoAchieved: 1, c2cAchieved: 5_000 };
+    const total = teamTotals([
+      row({ gaAchieved: 10, gaTarget: 30, bp: bp({ count: 1, ...shared }, "shared-outlet") }),
+      row({ gaAchieved: 8, gaTarget: 25, bp: bp({ count: 1, ...shared }, "shared-outlet") }),
+    ]);
+    expect(total.gaAchieved).toBe(10 + 8 + 12);
+    expect(total.gaTarget).toBe(30 + 25 + 20);
+    expect(total.ssoAchieved).toBe(1);
+    expect(total.c2cAchieved).toBe(5_000);
+    expect(total.bpCount).toBe(1);
+  });
+
+  it("still gives each holder the whole BP on its own row", () => {
+    // The other half of the rule: dedup belongs to the team total, never to
+    // the individual row. An RSO working a shared outlet is working all of it.
+    const shared = bp({ count: 1, gaAchieved: 12, gaTarget: 20 }, "shared-outlet");
+    expect(withBp(row({ gaAchieved: 10, gaTarget: 30, bp: shared })).gaAchieved).toBe(22);
+    expect(withBp(row({ gaAchieved: 8, gaTarget: 25, bp: shared })).gaAchieved).toBe(20);
   });
 
   it("is a no-op when there are no BPs at all", () => {
@@ -248,12 +306,79 @@ describe("a BP that changed hands mid-period", () => {
       // the grouping keys — not the exact key list.
       expect(src, file).toMatch(/by:\s*\[[^\]]*"activationDate"[^\]]*\]/);
       expect(src, file).toMatch(/by:\s*\["retailerId",\s*"date"\]/);
-      expect(src, file).toMatch(/bpOwnsDay\(/);
+      /*
+       * Both paths go through the SHARED ledger, which is stronger than the
+       * old check that each defined its own `bpOwnsDay`.
+       *
+       * They each used to hold a copy of the rule, and the comments in both
+       * said they must agree. Now that a BP can be held by several RSOs — each
+       * seeing the whole thing, the company counting it once — the rule is
+       * harder, and a second copy would be a second chance to get it wrong.
+       */
+      expect(src, file).toMatch(/bpLedger\(/);
+      expect(src, file).toMatch(/ledger\.ownsDay\(/);
     }
   });
 });
 
+describe("grouping into teams", () => {
+  it("dedupes a shared BP inside each group", () => {
+    /*
+     * The bug groupTotals() exists to make unrepeatable. Two RSOs on one team
+     * hold the same outlet, so both rows carry its whole 12 GA against a 20
+     * target — and the team is one outlet, not two.
+     */
+    const shared = { gaAchieved: 12, gaTarget: 20 };
+    const rows = [
+      { ...row({ gaAchieved: 10, gaTarget: 30, bp: bp({ count: 1, ...shared }, "shared") }), team: "north" },
+      { ...row({ gaAchieved: 8, gaTarget: 25, bp: bp({ count: 1, ...shared }, "shared") }), team: "north" },
+    ];
+    const totals = groupTotals(rows, (r) => r.team);
+    expect(totals.get("north")!.gaAchieved).toBe(10 + 8 + 12);
+    expect(totals.get("north")!.gaTarget).toBe(30 + 25 + 20);
+    expect(totals.get("north")!.bpCount).toBe(1);
+  });
+
+  it("keeps groups apart, and lets two teams each count a shared outlet once", () => {
+    // A supervisor answers for their own territory; the outlet really is worked
+    // in both. Only a total ACROSS groups needs teamTotals over the rows.
+    const shared = { gaAchieved: 12, gaTarget: 20 };
+    const rows = [
+      { ...row({ gaAchieved: 10, bp: bp({ count: 1, ...shared }, "shared") }), team: "north" },
+      { ...row({ gaAchieved: 8, bp: bp({ count: 1, ...shared }, "shared") }), team: "south" },
+    ];
+    const totals = groupTotals(rows, (r) => r.team);
+    expect(totals.get("north")!.gaAchieved).toBe(22);
+    expect(totals.get("south")!.gaAchieved).toBe(20);
+    // And the company, over the same rows, still counts the outlet once.
+    expect(teamTotals(rows).gaAchieved).toBe(10 + 8 + 12);
+  });
+
+  it("skips rows with no group and counts the rest", () => {
+    const rows = [
+      { ...row({ gaAchieved: 5 }), team: "north" },
+      { ...row({ gaAchieved: 7 }), team: null },
+    ];
+    const totals = groupTotals(rows, (r) => r.team);
+    expect([...totals.keys()]).toEqual(["north"]);
+    expect(groupSizes(rows, (r) => r.team).get("north")).toBe(1);
+  });
+
+  it("counts people separately from outlets", () => {
+    // `retailerCount` is outlets; how many RSOs are in the bucket is its own
+    // question, which the totals deliberately do not answer.
+    const rows = [
+      { ...row({ retailerCount: 40 }), team: "north" },
+      { ...row({ retailerCount: 35 }), team: "north" },
+    ];
+    expect(groupTotals(rows, (r) => r.team).get("north")!.retailerCount).toBe(75);
+    expect(groupSizes(rows, (r) => r.team).get("north")).toBe(2);
+  });
+});
+
 describe("no page adds the BP share by hand", () => {
+  /** The legitimate ways to combine BP figures — all of them in bp-rollup.ts. */
+  const HELPER = /\b(withBp|teamTotals|groupTotals)\(/;
   const pages = sourceFiles(path.join(ROOT, "app")).filter((f) => !f.includes(`${path.sep}api${path.sep}`));
 
   it("has no page reading row.bp directly", () => {
@@ -278,13 +403,59 @@ describe("no page adds the BP share by hand", () => {
       /(reduce|\+=)[\s\S]{0,120}\b(gaAchieved|gaTarget|totalRechargeAchieved|totalRechargeTarget|c2cAchieved|ssoAchieved|lsoAchieved|retailerCount)\b/;
     const rollups = pages.filter((f) => {
       const src = stripComments(fs.readFileSync(f, "utf8"));
-      return /employeePerformance\(|ApiRow\[\]/.test(src) && SUMS_A_METRIC.test(src);
+      return /employeePerformance\(|ApiRow\[\]/.test(src) && (SUMS_A_METRIC.test(src) || HELPER.test(src));
     });
     expect(rollups.length, "no rollup pages found — the pattern stopped matching").toBeGreaterThanOrEqual(6);
-    const offenders = rollups
-      .filter((f) => !/\b(withBp|teamTotals)\(/.test(stripComments(fs.readFileSync(f, "utf8"))))
-      .map(rel);
+    const offenders = rollups.filter((f) => !HELPER.test(stripComments(fs.readFileSync(f, "utf8")))).map(rel);
     expect(offenders).toEqual([]);
+  });
+
+  it("never accumulates a withBp() result across rows", () => {
+    /*
+     * The hole this suite had, and the bug it let through.
+     *
+     * `withBp()` is for ONE row: it gives an RSO their own figures plus their
+     * Business Partners', which is exactly right on a screen about that RSO.
+     * Four pages then summed those results into supervisor buckets by hand:
+     *
+     *     const t = withBp(r);
+     *     bucket.gaAchieved += t.gaAchieved;
+     *
+     * The old guard above accepted that, because the page did call a helper.
+     * It was correct for as long as a BP had one holder — and the moment one
+     * outlet could sit under two RSOs on the same team, that bucket added its
+     * GA and its target once per holder. Measured: 3,765 GA against a 440
+     * target where the truth was 3,744 against 415.
+     *
+     * Adding up rows is what `teamTotals()` and `groupTotals()` are for, and
+     * the dedup lives inside them. So: bind `withBp()` to a variable and that
+     * variable must not be accumulated.
+     */
+    const offenders: string[] = [];
+    for (const f of pages) {
+      const src = stripComments(fs.readFileSync(f, "utf8"));
+      for (const m of src.matchAll(/(?:const|let)\s+(\w+)\s*=\s*withBp\(/g)) {
+        const v = m[1];
+        // `x += t.gaAchieved`, or a reduce that folds `t.` into an accumulator.
+        if (new RegExp(`\\+=\\s*${v}\\.|\\+\\s*${v}\\.\\w`).test(src)) offenders.push(rel(f));
+      }
+    }
+    expect(
+      [...new Set(offenders)],
+      "use groupTotals() to bucket rows — withBp() gives each holder the whole BP, so summing double counts a shared one",
+    ).toEqual([]);
+  });
+
+  it("groups with the helper rather than by hand", () => {
+    // The four pages that used to bucket by supervisor. Named, so that
+    // reverting one is a failure rather than a silent regression.
+    for (const f of [
+      "app/admin/performance/supervisors/page.tsx",
+      "app/manager/supervisors/page.tsx",
+      "app/manager/page.tsx",
+      "app/dashboard/page.tsx",
+    ])
+      expect(stripComments(read(f)), f).toMatch(/groupTotals\(/);
   });
 
   it("accumulates from the helper's result, not from the row itself", () => {

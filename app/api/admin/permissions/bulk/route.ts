@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { getCurrentUser } from "../../../../../lib/auth";
+import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../../lib/rate-limit";
 import { permissionModules, presetPermissions } from "../../../../../lib/permissions";
 import { audit } from "../../../../../lib/audit";
 
@@ -35,6 +36,11 @@ async function saveRows(userId: string, rows: any[]) {
 export async function POST(req: Request) {
   const me = await admin();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const b = await req.json(),
     mode = String(b.mode || "");
   if (mode === "preset") {

@@ -6,7 +6,9 @@ export default async function Users() {
   await requireUser(["ADMIN", "IT"]);
   const [users, employees, supervisors, bps] = await Promise.all([
     prisma.user.findMany({
-      orderBy: { createdAt: "asc" },
+      // Locked accounts first: this page exists to unlock them, and someone
+      // waiting in the field should not be on page two of a scroll.
+      orderBy: [{ lockedAt: { sort: "desc", nulls: "last" } }, { createdAt: "asc" }],
       include: { employee: true, supervisor: true, bpRetailer: true },
     }),
     prisma.employee.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -25,6 +27,8 @@ export default async function Users() {
         mobileNumber: u.mobileNumber,
         role: u.role,
         active: u.active,
+        lockedAt: u.lockedAt ? u.lockedAt.toISOString() : null,
+        failedLoginCount: u.failedLoginCount,
         employeeId: u.employeeId,
         supervisorId: u.supervisorId,
         bpRetailerId: u.bpRetailerId,

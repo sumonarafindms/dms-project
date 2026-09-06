@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Check, SectionHead } from "./Kit";
+import { Btn, Card, Check, SectionHead } from "./Kit";
 import { Icon } from "./icons";
 
 export default function SupervisorTeamEditor({
@@ -79,9 +79,9 @@ export default function SupervisorTeamEditor({
           </div>
         )}
         <div className="kit-form-actions">
-          <button className="kit-btn is-primary size-md" type="button" disabled={busy} onClick={save}>
+          <Btn type="button" disabled={busy} onClick={save}>
             {busy ? "Saving…" : "Save RSO Assignment"}
-          </button>
+          </Btn>
         </div>
       </Card>
     </>

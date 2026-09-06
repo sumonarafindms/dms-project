@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
 import { audit } from "@/lib/audit";
+import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 function monthFromParam(value: string | null) {
   const fallback = new Date();
@@ -79,6 +80,11 @@ export async function POST(request: NextRequest) {
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await apiPermission("targets", "update")))
     return NextResponse.json({ error: "You do not have permission to update targets." }, { status: 403 });
+  const rl = await consumeRateLimit(RATE_LIMITS.mutation, actor.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const body = await request.json();
   if (!body?.month || !/^\d{4}-\d{2}$/.test(body.month) || !Array.isArray(body.rows)) {
     return NextResponse.json({ error: "Invalid month or rows" }, { status: 400 });

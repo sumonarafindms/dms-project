@@ -18,7 +18,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCan } from "../components/PermissionContext";
 import { dhakaMonth } from "../../lib/business-time";
-import { Card, DropZone, EmptyState, Field, PageHeader, SectionHead, SummaryStrip } from "../components/Kit";
+import {
+  Btn,
+  Card,
+  DropZone,
+  EmptyState,
+  Field,
+  LinkBtn,
+  PageHeader,
+  SectionHead,
+  SummaryStrip,
+} from "../components/Kit";
 import { Icon } from "../components/icons";
 
 type TargetRow = {
@@ -163,6 +173,22 @@ export default function TargetsPage() {
     );
   }, [rows, search]);
 
+  /*
+   * Row index by employee, built once per change to `rows`.
+   *
+   * `cell()` edits `rows[i]`, so each rendered row needs its index in the FULL
+   * array, not its position in the filtered list. Both render passes — the
+   * table and the mobile cards — used to find it with `rows.findIndex(...)`,
+   * which is a linear scan per row per pass: with a search that matches
+   * everything, 2n² comparisons on every keystroke in every target cell. A map
+   * answers the same question once.
+   */
+  const indexByEmployee = useMemo(() => {
+    const m = new Map<string, number>();
+    rows.forEach((r, i) => m.set(r.employeeId, i));
+    return m;
+  }, [rows]);
+
   const totals = useMemo(
     () =>
       rows.reduce(
@@ -259,12 +285,11 @@ export default function TargetsPage() {
             title="Bulk import"
             sub={`RSO number or BP code + target type + target value, applied to ${month}.`}
             link={
-              // A real <a>: a file download from an API route, which <Link>
-              // would client-side navigate to instead.
-              // eslint-disable-next-line @next/next/no-html-link-for-pages
-              <a href="/api/samples/targets" className="kit-btn is-secondary size-sm">
+              // `external`: a real <a>, because a file download from an API
+              // route is not something <Link> should client-side navigate to.
+              <LinkBtn href="/api/samples/targets" external variant="secondary" size="sm">
                 Download Sample
-              </a>
+              </LinkBtn>
             }
           />
           <Card className="kit-mb-20" padded="lg">
@@ -276,13 +301,13 @@ export default function TargetsPage() {
               disabled={uploading}
             />
             <div className="kit-form-actions">
-              <button className="kit-btn is-primary size-md" disabled={!file || uploading} onClick={upload}>
+              <Btn disabled={!file || uploading} onClick={upload}>
                 {uploading ? "Validating & importing…" : `Import targets for ${month}`}
-              </button>
+              </Btn>
               {file && !uploading && (
-                <button type="button" className="kit-btn is-ghost size-md" onClick={() => setFile(null)}>
+                <Btn variant="ghost" type="button" onClick={() => setFile(null)}>
                   Cancel
-                </button>
+                </Btn>
               )}
             </div>
             {uploadResult && (
@@ -334,7 +359,7 @@ export default function TargetsPage() {
           <p className="kit-filter-note">Loading targets…</p>
         ) : visible.length ? (
           <>
-            <div className="kit-table-wrap">
+            <div className="kit-table-wrap" tabIndex={0} role="group" aria-label="Table, scrolls sideways">
               <table className="kit-table">
                 <thead>
                   <tr>
@@ -349,7 +374,7 @@ export default function TargetsPage() {
                 </thead>
                 <tbody>
                   {visible.map((r) => {
-                    const i = rows.findIndex((x) => x.employeeId === r.employeeId);
+                    const i = indexByEmployee.get(r.employeeId) ?? -1;
                     return (
                       <tr key={r.employeeId}>
                         <td>
@@ -372,7 +397,7 @@ export default function TargetsPage() {
             </div>
             <div className="kit-table-cards">
               {visible.map((r) => {
-                const i = rows.findIndex((x) => x.employeeId === r.employeeId);
+                const i = indexByEmployee.get(r.employeeId) ?? -1;
                 return (
                   <div className="kit-card kit-card-p" key={r.employeeId}>
                     <strong>{r.name}</strong>
@@ -406,7 +431,7 @@ export default function TargetsPage() {
       <Card className="kit-mb-20" padded>
         {bpRows.length ? (
           <>
-            <div className="kit-table-wrap">
+            <div className="kit-table-wrap" tabIndex={0} role="group" aria-label="Table, scrolls sideways">
               <table className="kit-table">
                 <thead>
                   <tr>
@@ -461,9 +486,9 @@ export default function TargetsPage() {
           <span>
             {rows.length} RSO · {bpRows.length} BP records
           </span>
-          <button className="kit-btn is-primary size-md" disabled={saving || loading} onClick={save}>
+          <Btn disabled={saving || loading} onClick={save}>
             {saving ? "Saving…" : "Save all changes"}
-          </button>
+          </Btn>
         </div>
       )}
     </main>

@@ -103,29 +103,46 @@ describe("content security policy", () => {
     expect(directive("style-src-attr")).toContain("'unsafe-inline'");
   });
 
-  it("does not upgrade to https while the policy is only reporting", () => {
+  it("upgrades insecure requests now that the policy is enforced", () => {
     /*
-     * This asserted the opposite, and the opposite was wrong.
+     * This assertion has been inverted twice, and both flips were the point.
      *
      * `upgrade-insecure-requests` is IGNORED in a report-only policy — spec
      * behaviour, not a browser quirk — and Chrome logs an error saying so on
-     * every page load. Since cspHeaderName() returns Report-Only, the directive
-     * did nothing except put a permanent console error in front of every user
-     * and drown the E2E console-error check.
+     * every page load. While the policy was Report-Only the directive bought
+     * nothing and cost a permanent console error in front of every user, so it
+     * was removed and this test asserted its absence.
      *
-     * It is gated on the header now, so when enforcement is switched on it
-     * returns by itself. The `dev` case never wanted it either: on a plain-http
-     * dev server it breaks every asset request.
+     * It was gated on the header rather than on NODE_ENV precisely so that
+     * switching to enforcement would bring it back by itself, which is exactly
+     * when it starts working. That switch has now happened.
+     *
+     * The `dev` case still does not want it: on a plain-http dev server it
+     * breaks every asset request.
      */
-    expect(cspHeaderName()).toBe("Content-Security-Policy-Report-Only");
-    expect(policy).not.toContain("upgrade-insecure-requests");
+    expect(cspHeaderName()).toBe("Content-Security-Policy");
+    expect(policy).toContain("upgrade-insecure-requests");
     expect(dev).not.toContain("upgrade-insecure-requests");
   });
 
-  it("is still Report-Only", () => {
-    // A deliberate tripwire. Flipping this to enforcement is a real decision
-    // that needs the checklist in SECURITY.md run against a live deployment
-    // first, so it should not happen by accident in a refactor.
-    expect(cspHeaderName()).toBe("Content-Security-Policy-Report-Only");
+  it("is enforced, not merely reported", () => {
+    /*
+     * The tripwire, pointing the other way now.
+     *
+     * It shipped Report-Only because the checklist in SECURITY.md could not be
+     * run: the build sandbox had no database, so only `/login` was reachable,
+     * and one page is not the app. Two things changed that.
+     *
+     *   e2e/coverage.spec.ts     all 96 routes, all 7 roles, collecting
+     *                            securitypolicyviolation events — steps 1, 2, 4
+     *   e2e/csp-downloads.spec.ts  the export and the sample download — step 3,
+     *                            the blob: and dynamic-import paths a page load
+     *                            never reaches
+     *
+     * Both run against real data on every suite run, so the evidence is not a
+     * one-off any more. Going BACK to Report-Only would now be the change that
+     * needs justifying, which is why this assertion exists in this direction.
+     */
+    expect(cspHeaderName()).toBe("Content-Security-Policy");
   });
 });

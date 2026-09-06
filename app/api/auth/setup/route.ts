@@ -2,17 +2,16 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../../lib/prisma";
 import { createSession, hashCredential } from "../../../../lib/auth";
+import { validatePassword } from "../../../../lib/credential-policy";
 export async function POST(req: Request) {
   try {
     const b = await req.json(),
       displayName = String(b.displayName || "").trim(),
       username = String(b.username || "").trim(),
       password = String(b.password || "");
-    if (!displayName || !username || password.length < 6)
-      return NextResponse.json(
-        { error: "Name, username and a password of at least 6 characters are required." },
-        { status: 400 },
-      );
+    const passwordError = validatePassword(password);
+    if (!displayName || !username || passwordError)
+      return NextResponse.json({ error: passwordError || "Name and username are required." }, { status: 400 });
     const hash = await hashCredential(password);
     const user = await prisma.$transaction(
       async (tx) => {

@@ -16,8 +16,7 @@ import type { RetailerReportRow } from "../../../lib/report-data";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
 import { ReportActionBar, ReportDateBar } from "../../components/ReportShell";
 import { ReportTable } from "../../components/ReportTable";
-import type { ExportRow } from "../../components/ReportShell";
-import type { Column } from "../../components/ReportTable";
+import type { Column, ReportPaging } from "../../components/ReportTable";
 import { Icon } from "../../components/icons";
 
 export const money = (n: number) => `৳${Math.round(n).toLocaleString()}`;
@@ -28,22 +27,27 @@ export function RetailerReportView({
   range,
   rows,
   columns,
-  exportRows,
+  exportHref,
   summaryItems,
-  filename,
+  paging,
   emptyTitle,
   emptyHint,
+  children,
 }: {
   title: string;
   subtitle: string;
   range: ReportRange;
+  /** Every row in the report. `paging` decides how many are rendered. */
   rows: RetailerReportRow[];
   columns: Column<RetailerReportRow>[];
-  exportRows: ExportRow[];
+  /** `/api/reports/export?report=…`, carrying every parameter except `page`. */
+  exportHref: string;
   summaryItems: { label: string; value: string; tone?: "teal" | "amber" }[];
-  filename: string;
+  paging?: ReportPaging;
   emptyTitle: string;
   emptyHint?: string;
+  /** View switch, rendered between the date bar and the summary. */
+  children?: React.ReactNode;
 }) {
   return (
     <main className="page">
@@ -53,11 +57,12 @@ export function RetailerReportView({
       <PageHeader
         title={title}
         subtitle={`Report Period: ${rangeLabel(range)} • ${subtitle}`}
-        action={<ReportActionBar filename={`${filename}-${range.from}_to_${range.to}`} rows={exportRows} />}
+        action={<ReportActionBar exportHref={exportHref} rowCount={rows.length} />}
       />
       <ReportDateBar range={range} />
+      {children}
       <SummaryStrip items={summaryItems} />
-      <ReportTable columns={columns} rows={rows} emptyTitle={emptyTitle} emptyHint={emptyHint} />
+      <ReportTable columns={columns} rows={rows} emptyTitle={emptyTitle} emptyHint={emptyHint} paging={paging} />
     </main>
   );
 }
@@ -70,11 +75,3 @@ export const identityColumns: Column<RetailerReportRow>[] = [
   { key: "employeeName", label: "RSO" },
   { key: "bpName", label: "BP" },
 ];
-
-export const identityExport = (r: RetailerReportRow) => ({
-  Retailer: r.retailerName,
-  Code: r.retailerCode,
-  Supervisor: r.supervisor,
-  RSO: r.employeeName,
-  BP: r.bpName,
-});

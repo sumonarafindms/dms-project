@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "./icons";
+import { Btn } from "./Kit";
 
 /**
  * The filter bar, split by what each control actually does.
@@ -131,9 +132,9 @@ export function DateRangeFields({ month, from, to }: { month?: string; from?: st
         <span>To</span>
         <input className="kit-input" type="date" name="to" defaultValue={to || ""} />
       </label>
-      <button className="kit-btn is-secondary size-sm" type="submit">
+      <Btn variant="secondary" size="sm" type="submit">
         Apply dates
-      </button>
+      </Btn>
     </form>
   );
 }

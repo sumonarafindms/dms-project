@@ -9,7 +9,8 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange } from "../../../../lib/report-range";
-import { rollUpToSupervisor, rsoSummary } from "../../../../lib/report-data";
+import { TARGET_GROUPS, buildTarget, reportExportHref, targetGroup } from "../../../../lib/report-builders";
+import { reportPageHref } from "../../../../lib/report-paging";
 import type { RsoSummaryRow } from "../../../../lib/report-data";
 import { targetPercent } from "../../../../lib/achievement";
 import { GroupSwitch, GroupedReportView, money } from "../GroupedReportView";
@@ -17,28 +18,18 @@ import type { Column } from "../../../components/ReportTable";
 
 export const dynamic = "force-dynamic";
 
-const GROUPS = [
-  { key: "supervisor", label: "By Supervisor" },
-  { key: "rso", label: "By RSO" },
-] as const;
-
 const pctCell = (a: number, t: number) => (t ? `${targetPercent(a, t)}%` : "—");
 
 export default async function TargetReport({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; group?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const group = GROUPS.find((g) => g.key === sp.group)?.key ?? "supervisor";
-
-  const summary = await rsoSummary(range);
-  const rows = group === "supervisor" ? rollUpToSupervisor(summary) : summary;
-  const ordered = [...rows].sort(
-    (a, b) => targetPercent(b.ga, b.gaTarget) - targetPercent(a.ga, a.gaTarget) || a.name.localeCompare(b.name),
-  );
+  const group = targetGroup(sp.group);
+  const { rows } = await buildTarget(range, group);
 
   const columns: Column<RsoSummaryRow>[] = [
     { key: "name", label: group === "supervisor" ? "Supervisor" : "RSO" },
@@ -52,7 +43,7 @@ export default async function TargetReport({
     { key: "c2cPct", label: "C2C %", align: "right", render: (r) => pctCell(r.c2c, r.c2cTarget) },
   ];
 
-  const t = ordered.reduce(
+  const t = rows.reduce(
     (a, r) => ({
       ga: a.ga + r.ga,
       gaTarget: a.gaTarget + r.gaTarget,
@@ -64,39 +55,34 @@ export default async function TargetReport({
     { ga: 0, gaTarget: 0, sso: 0, ssoTarget: 0, lso: 0, lsoTarget: 0 },
   );
 
+  const groupParam = group === "supervisor" ? undefined : group;
+
   return (
     <GroupedReportView
       title="Target vs Achievement"
       subtitle="GA, SSO, LSO and C2C against monthly targets"
       range={range}
-      rows={ordered}
+      rows={rows}
       columns={columns}
-      exportRows={ordered.map((r) => ({
-        Name: r.name,
-        GA: r.ga,
-        "GA Target": r.gaTarget,
-        "GA %": r.gaTarget ? targetPercent(r.ga, r.gaTarget) : "",
-        SSO: r.sso,
-        "SSO Target": r.ssoTarget,
-        LSO: r.lso,
-        "LSO Target": r.lsoTarget,
-        C2C: Math.round(r.c2c),
-        "C2C Target": Math.round(r.c2cTarget),
-      }))}
+      exportHref={reportExportHref("target", range, groupParam ? { group: groupParam } : {})}
+      paging={{
+        page: sp.page,
+        noun: group === "supervisor" ? "supervisor" : "RSO",
+        hrefFor: (p) => reportPageHref("/it/reports/target", { from: range.from, to: range.to, group: groupParam }, p),
+      }}
       summaryItems={[
         { label: "GA", value: `${t.ga} / ${t.gaTarget}`, tone: "teal" },
         { label: "GA Achievement", value: pctCell(t.ga, t.gaTarget) },
         { label: "SSO", value: `${t.sso} / ${t.ssoTarget}` },
         { label: "LSO", value: `${t.lso} / ${t.lsoTarget}` },
       ]}
-      filename={`target-vs-achievement-${group}`}
       emptyTitle="No targets or achievement for this period"
       emptyHint="Targets are set per RSO per month on the Targets page."
     >
       <GroupSwitch
         basePath="/it/reports/target"
         range={range}
-        options={GROUPS}
+        options={TARGET_GROUPS}
         active={group}
         defaultKey="supervisor"
       />

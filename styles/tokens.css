@@ -123,6 +123,54 @@
   --color-gold-500: #eab308;
   --color-gold-600: #ca8a04;
 
+  /*
+   * Text colours, by the job they do rather than by their place on a scale.
+   *
+   * `--color-slate-400` was the muted-text colour in fifty-eight rules, and it
+   * fails WCAG AA everywhere it appears: #94a3b8 on white is 2.56:1 against a
+   * 4.5:1 requirement, and inside a `.kit-card.is-done` it fell to 1.88:1. That
+   * is not a theoretical score. Roughly nine in ten of this app's users read it
+   * on a phone, outdoors, in Dhaka daylight.
+   *
+   * So muted text has its own name and its own rule: whatever it points at MUST
+   * clear 4.5:1 on both the card white and the page slate-50. Slate-400 keeps
+   * its place in the scale for borders, dividers and icon fills, where no
+   * contrast minimum applies.
+   *
+   * Guarded by tests/contrast.smoke.test.ts, which computes the ratios rather
+   * than trusting this comment.
+   */
+  --text-muted: var(--color-slate-500);
+  --text-body: var(--color-slate-700);
+
+  /*
+   * Status colours WHEN THEY ARE TEXT.
+   *
+   * The -600 step is the fill: rings, bars, dots, active states, where no
+   * contrast minimum applies because nothing is being read off it. As text at
+   * body size the same step fails — teal-600 is 3.74:1 on white and amber-600
+   * is 3.19:1, both under AA's 4.5:1. The -700 step is the same hue one stop
+   * darker and clears it (5.48:1 and 5.02:1).
+   *
+   * Keeping the two apart by name is the point: a ring and a number can mean
+   * the same thing and still need different colours, and nobody should have to
+   * remember which is which.
+   */
+  --text-success: var(--color-teal-700);
+  --text-warning: var(--color-amber-700);
+  --text-danger: var(--color-rose-700);
+
+  /*
+   * The primary action colour, as a BACKGROUND for white text.
+   *
+   * Teal-600 is the brand fill and stays the brand fill everywhere contrast
+   * does not apply — rings, bars, dots, active states. But white on teal-600 is
+   * 3.74:1, which is below AA for the button label sizes this app uses, so a
+   * solid button that carries white text uses teal-700 (5.48:1). One step on
+   * the same scale, same hue, legible.
+   */
+  --surface-primary: var(--color-teal-700);
+
   /* Elevation */
   --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
   --shadow-panel: 0 4px 6px -2px rgb(15 23 42 / 0.05), 0 10px 20px -4px rgb(15 23 42 / 0.08);

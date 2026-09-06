@@ -8,76 +8,48 @@
  * to fill the space.
  */
 
-import { retailerReport, rollUpToSupervisor, rsoSummary } from "../../../lib/report-data";
+import { VALUE_GROUPS, buildValue, reportExportHref } from "../../../lib/report-builders";
+import type { ValueGroup, ValueRow } from "../../../lib/report-builders";
+import { reportPageHref } from "../../../lib/report-paging";
 import type { ReportRange } from "../../../lib/report-range";
 import { targetPercent } from "../../../lib/achievement";
 import { GroupSwitch, GroupedReportView, money } from "./GroupedReportView";
 import type { Column } from "../../components/ReportTable";
 
-export const VALUE_GROUPS = [
-  { key: "supervisor", label: "By Supervisor" },
-  { key: "rso", label: "By RSO" },
-  { key: "retailer", label: "By Retailer" },
-] as const;
-export type ValueGroup = (typeof VALUE_GROUPS)[number]["key"];
-
-type Row = { id: string; name: string; code: string; sub: string; value: number; target: number };
+export { VALUE_GROUPS };
+export type { ValueGroup };
 
 export async function ValueReport({
   metric,
   range,
   group,
+  page,
 }: {
   metric: "c2c" | "c2s";
   range: ReportRange;
   group: ValueGroup;
+  page?: string;
 }) {
   const label = metric.toUpperCase();
   const hasTarget = metric === "c2c";
+  const showTarget = hasTarget && group !== "retailer";
+  const { rows, total, totalTarget } = await buildValue(range, metric, group);
 
-  let rows: Row[];
-  if (group === "retailer") {
-    const retailers = await retailerReport(range);
-    rows = retailers.map((r) => ({
-      id: r.id,
-      name: r.retailerName,
-      code: r.retailerCode,
-      sub: `${r.supervisor} / ${r.employeeName}`,
-      value: metric === "c2c" ? r.c2c : r.c2s,
-      target: 0, // no per-retailer targets exist in this schema
-    }));
-  } else {
-    const summary = await rsoSummary(range);
-    const source = group === "supervisor" ? rollUpToSupervisor(summary) : summary;
-    rows = source.map((r) => ({
-      id: r.id,
-      name: r.name,
-      code: r.code,
-      sub: group === "supervisor" ? `${r.retailerCount.toLocaleString()} retailers` : r.supervisor,
-      value: metric === "c2c" ? r.c2c : r.c2s,
-      target: metric === "c2c" ? r.c2cTarget : 0,
-    }));
-  }
-
-  const ordered = [...rows].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
-  const total = ordered.reduce((a, r) => a + r.value, 0);
-  const totalTarget = ordered.reduce((a, r) => a + r.target, 0);
-
-  const columns: Column<Row>[] = [
+  const columns: Column<ValueRow>[] = [
     { key: "name", label: group === "retailer" ? "Retailer" : group === "rso" ? "RSO" : "Supervisor" },
     { key: "code", label: "Code" },
     { key: "sub", label: group === "supervisor" ? "Coverage" : group === "rso" ? "Supervisor" : "Supervisor / RSO" },
     { key: "value", label: `${label} Value`, align: "right", render: (r) => money(r.value) },
-    ...(hasTarget && group !== "retailer"
+    ...(showTarget
       ? ([
-          { key: "target", label: "Target", align: "right", render: (r: Row) => money(r.target) },
+          { key: "target", label: "Target", align: "right", render: (r: ValueRow) => money(r.target) },
           {
             key: "pct",
             label: "Achievement %",
             align: "right",
-            render: (r: Row) => (r.target ? `${targetPercent(r.value, r.target)}%` : "—"),
+            render: (r: ValueRow) => (r.target ? `${targetPercent(r.value, r.target)}%` : "—"),
           },
-        ] as Column<Row>[])
+        ] as Column<ValueRow>[])
       : []),
     {
       key: "share",
@@ -87,36 +59,32 @@ export async function ValueReport({
     },
   ];
 
+  const groupParam = group === "supervisor" ? undefined : group;
+
   return (
     <GroupedReportView
       title={`${label} Report`}
       subtitle={hasTarget ? "Value against target" : "Retail sales value"}
       range={range}
-      rows={ordered}
+      rows={rows}
       columns={columns}
-      exportRows={ordered.map((r) => ({
-        Name: r.name,
-        Code: r.code,
-        Context: r.sub,
-        [`${label} Value`]: Math.round(r.value),
-        ...(hasTarget && group !== "retailer"
-          ? { Target: Math.round(r.target), "Achievement %": r.target ? targetPercent(r.value, r.target) : "" }
-          : {}),
-      }))}
+      exportHref={reportExportHref(metric, range, groupParam ? { group: groupParam } : {})}
+      paging={{
+        page,
+        noun: group === "retailer" ? "retailer" : "row",
+        hrefFor: (p) =>
+          reportPageHref(`/it/reports/${metric}`, { from: range.from, to: range.to, group: groupParam }, p),
+      }}
       summaryItems={[
         { label: `Total ${label}`, value: money(total), tone: "teal" },
-        ...(hasTarget && group !== "retailer"
+        ...(showTarget
           ? [
               { label: "Total Target", value: money(totalTarget) },
-              {
-                label: "Achievement",
-                value: totalTarget ? `${targetPercent(total, totalTarget)}%` : "—",
-              },
+              { label: "Achievement", value: totalTarget ? `${targetPercent(total, totalTarget)}%` : "—" },
             ]
-          : [{ label: "Rows With Value", value: ordered.filter((r) => r.value > 0).length.toLocaleString() }]),
-        { label: "Rows", value: ordered.length.toLocaleString() },
+          : [{ label: "Rows With Value", value: rows.filter((r) => r.value > 0).length.toLocaleString() }]),
+        { label: "Rows", value: rows.length.toLocaleString() },
       ]}
-      filename={`${metric}-${group}`}
       emptyTitle={`No ${label} for this period`}
       emptyHint={`Check Data Readiness — the ${label} feed may not be imported for these dates.`}
     >

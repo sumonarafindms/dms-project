@@ -8,15 +8,6 @@ export default async function Page({
   const u = await requirePagePermission(["SUPERVISOR"], "bp"),
     s = await searchParams;
   return (
-    <BpActivationListView
-      user={u}
-      basePath="/supervisor/bp-activations"
-      month={s.month}
-      q={s.q}
-      from={s.from}
-      to={s.to}
-      sort={s.sort}
-      eyebrow="Supervisor"
-    />
+    <BpActivationListView user={u} basePath="/supervisor/bp-activations" month={s.month} from={s.from} to={s.to} />
   );
 }

@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Card, EmptyState } from "./components/Kit";
+import { Card, EmptyState, LinkBtn } from "./components/Kit";
 import { Icon } from "./components/icons";
 
 /** 404 — same kit empty state as the error boundary. */
@@ -13,12 +12,10 @@ export default function NotFound() {
           icon={<Icon name="search" />}
         />
         <div className="kit-form-actions is-center">
-          <Link className="kit-btn is-primary size-md" href="/">
-            Go to home
-          </Link>
-          <Link className="kit-btn is-ghost size-md" href="/login">
+          <LinkBtn href="/">Go to home</LinkBtn>
+          <LinkBtn variant="ghost" href="/login">
             Sign in
-          </Link>
+          </LinkBtn>
         </div>
       </Card>
     </main>

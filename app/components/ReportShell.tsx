@@ -12,9 +12,11 @@
  *    at. It also means the server component can do the aggregation, so a long
  *    range does not ship every row to the browser to be summed.
  *
- * 2. `xlsx` is imported dynamically, inside the click handler. It is ~400 KB;
- *    static-importing it would put that in the first load of every report page
- *    for a button most viewings never press.
+ * 2. Export Excel is a link to `/api/reports/export`, not a click handler. The
+ *    workbook is built on the server from `lib/report-builders.ts`, so `xlsx`
+ *    is not in the browser bundle at all and the page does not have to carry
+ *    every row of the report for a button most viewings never press. See
+ *    ReportActionBar below.
  *
  * The report TABLE is deliberately not here — see ./ReportTable. It has no
  * hooks and no browser API, and living in this file made it a Client Component
@@ -23,7 +25,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Btn } from "./Kit";
+import { Btn, LinkBtn } from "./Kit";
 import { Icon } from "./icons";
 import { rangeDayCount, rangeLabel, rangePresets } from "../../lib/report-range";
 import type { ReportRange } from "../../lib/report-range";
@@ -87,36 +89,44 @@ export function ReportDateBar({ range }: { range: ReportRange }) {
 /* ------------------------------------------------------------------ *
  * Action bar
  * ------------------------------------------------------------------ */
-export type ExportRow = Record<string, string | number>;
+export type { ExportRow } from "../../lib/report-builders";
 
+/**
+ * Export, Print and Copy Summary.
+ *
+ * ## Export is a link now, not a click handler
+ *
+ * It used to receive every row of the report as a prop and build the workbook
+ * with a dynamically imported `xlsx`. That put the entire report in the page's
+ * RSC payload on every load — measured at 1,018,255 bytes for the retailer
+ * performance report — for a button most viewings never press, and it put
+ * ~400 KB of spreadsheet library in the browser to format numbers the server
+ * already had.
+ *
+ * Now the server builds it at `/api/reports/export` and this is an anchor to
+ * that URL. Three consequences worth knowing:
+ *
+ * - **The download is the whole report, not the page being viewed.** The href
+ *   deliberately carries no `page` parameter. Sixty rows on screen, every row
+ *   in the file.
+ * - There is no `busy` state to show, because the browser owns the download.
+ * - It is a plain navigation rather than a `blob:` URL, which is one fewer
+ *   thing the Content-Security-Policy has to allow.
+ */
 export function ReportActionBar({
-  filename,
-  rows,
+  exportHref,
+  rowCount,
   summary,
 }: {
-  filename: string;
-  /** Exactly the rows on screen, keyed by their column headings. */
-  rows: ExportRow[];
+  /** `/api/reports/export?report=…` — every parameter except `page`. */
+  exportHref: string;
+  /** Rows in the whole report. Zero disables the button. */
+  rowCount: number;
   /** Plain-text block for Copy Summary. Omit to hide the button. */
   summary?: string;
 }) {
   const [copyOpen, setCopyOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  async function exportExcel() {
-    if (!rows.length) return;
-    setBusy(true);
-    try {
-      const XLSX = await import("xlsx");
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Report");
-      XLSX.writeFile(wb, `${filename}.xlsx`);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   // Clipboard permission varies by browser and context, so the textarea
   // fallback is not optional — it is the path that always works.
@@ -134,9 +144,11 @@ export function ReportActionBar({
   return (
     <>
       <div className="kit-report-actions no-print">
-        <Btn variant="secondary" size="sm" onClick={exportExcel} disabled={busy || !rows.length}>
-          <Icon name="download" /> {busy ? "Preparing…" : "Export Excel"}
-        </Btn>
+        {/* `external`: a plain <a>, so the browser follows the attachment response
+            instead of next/link trying to client-route to an API route. */}
+        <LinkBtn variant="secondary" size="sm" href={rowCount ? exportHref : "#"} disabled={!rowCount} external>
+          <Icon name="download" /> Export Excel
+        </LinkBtn>
         <Btn variant="secondary" size="sm" onClick={() => window.print()}>
           <Icon name="file" /> Print
         </Btn>

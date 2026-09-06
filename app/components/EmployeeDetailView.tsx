@@ -95,11 +95,19 @@ export function EmployeeDetailView({
   month: string;
   basePath: string;
   backHref: string;
-  /** Ignored — search and sort are local state now. Kept so callers compile. */
-  q?: string;
+  /*
+   * No `q` or `sort` here on purpose.
+   *
+   * Both were props once, both were documented "Ignored — kept so callers
+   * compile", and three pages went on passing them. The list narrows and
+   * reorders in the browser (`useListControls` below), so a caller supplying
+   * either was writing a value into a prop that never reached anything.
+   *
+   * "Kept so callers compile" is how a signature starts lying: the type says
+   * the option exists, the doc says it does not work, and nobody reads the doc.
+   */
   from?: string;
   to?: string;
-  sort?: string;
   /**
    * The server's clock, as an ISO string.
    *

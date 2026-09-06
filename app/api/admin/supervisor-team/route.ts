@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
+import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { recordAssignmentChanges, type AssignmentChange } from "../../../../lib/assignment-history";
 
 export async function PATCH(req: Request) {
   const me = await getCurrentUser();
   if (!me || !["ADMIN", "IT"].includes(me.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
+  if (!rl.allowed) {
+    const r = rateLimitResponse(rl.retryAfterSeconds);
+    return NextResponse.json(r.body, r.init);
+  }
   const b = await req.json(),
     supervisorId = String(b.supervisorId || ""),
     rsoIds = Array.isArray(b.rsoIds) ? b.rsoIds.map(String) : [];

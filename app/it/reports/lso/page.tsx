@@ -1,30 +1,35 @@
 /**
  * LSO Pending — retailers that have not met the monthly C2S amount AND
- * transaction requirements. Most incomplete first.
+ * transaction requirements, closest to converting first.
  *
  * Unlike SSO, LSO applies to every retailer, not only SIM sellers.
+ *
+ * (The old header here said "Most incomplete first", which is the opposite of
+ * what the code below it has always done and of the reason written beside the
+ * sort. SSO Pending was the one actually ordered that way; v152 made both
+ * reports order by how close an outlet is to converting.)
  */
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange } from "../../../../lib/report-range";
-import { retailerReport } from "../../../../lib/report-data";
+import { buildLso, reportExportHref } from "../../../../lib/report-builders";
+import { reportPageHref } from "../../../../lib/report-paging";
 import { LSO_MIN_MONTHLY_AMOUNT, LSO_MIN_MONTHLY_TRANSACTIONS } from "../../../../lib/business-rules";
-import { RetailerReportView, identityColumns, identityExport, money } from "../RetailerReportView";
+import { RetailerReportView, identityColumns, money } from "../RetailerReportView";
 import type { Column } from "../../../components/ReportTable";
 import type { RetailerReportRow } from "../../../../lib/report-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function LsoPending({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+export default async function LsoPending({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string; page?: string }>;
+}) {
   await requireUser(["ADMIN", "IT"]);
-  const range = resolveRange(...(await searchParams.then((s) => [s.from, s.to] as const)));
-  const all = await retailerReport(range);
-
-  // Ordered by how far from the amount requirement the outlet is, so the ones
-  // closest to converting are not buried under hopeless ones.
-  const rows = all
-    .filter((r) => !r.lsoComplete)
-    .sort((a, b) => b.c2s - a.c2s || a.retailerCode.localeCompare(b.retailerCode));
+  const sp = await searchParams;
+  const range = resolveRange(sp.from, sp.to);
+  const { rows, total, complete } = await buildLso(range);
 
   const columns: Column<RetailerReportRow>[] = [
     ...identityColumns,
@@ -44,28 +49,25 @@ export default async function LsoPending({ searchParams }: { searchParams: Promi
     },
   ];
 
-  const complete = all.length - rows.length;
   return (
     <RetailerReportView
       title="LSO Pending"
-      subtitle={`Complete at ৳${LSO_MIN_MONTHLY_AMOUNT} and ${LSO_MIN_MONTHLY_TRANSACTIONS} transactions in one month`}
+      subtitle={`Complete at ৳${LSO_MIN_MONTHLY_AMOUNT} and ${LSO_MIN_MONTHLY_TRANSACTIONS} transactions in one month • Closest to complete first`}
       range={range}
       rows={rows}
       columns={columns}
-      exportRows={rows.map((r) => ({
-        ...identityExport(r),
-        "C2S Value": Math.round(r.c2s),
-        Trx: r.c2sTransactions,
-        "Needs Amount": Math.max(LSO_MIN_MONTHLY_AMOUNT - r.c2s, 0),
-        "Needs Trx": Math.max(LSO_MIN_MONTHLY_TRANSACTIONS - r.c2sTransactions, 0),
-      }))}
+      exportHref={reportExportHref("lso", range)}
+      paging={{
+        page: sp.page,
+        noun: "retailer",
+        hrefFor: (p) => reportPageHref("/it/reports/lso", { from: range.from, to: range.to }, p),
+      }}
       summaryItems={[
-        { label: "Total Retailers", value: all.length.toLocaleString() },
+        { label: "Total Retailers", value: total.toLocaleString() },
         { label: "LSO Complete", value: complete.toLocaleString(), tone: "teal" },
         { label: "LSO Pending", value: rows.length.toLocaleString(), tone: "amber" },
-        { label: "Completion", value: all.length ? `${Math.round((complete / all.length) * 100)}%` : "—" },
+        { label: "Completion", value: total ? `${Math.round((complete / total) * 100)}%` : "—" },
       ]}
-      filename="lso-pending"
       emptyTitle="All LSO complete"
       emptyHint="Every retailer met the monthly C2S amount and transaction requirement for this period."
     />

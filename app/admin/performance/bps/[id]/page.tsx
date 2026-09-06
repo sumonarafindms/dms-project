@@ -17,7 +17,7 @@ export default async function Page({
     { id } = await params,
     s = await searchParams,
     month = normalizeMonth(s.from?.slice(0, 7) || s.month),
-    d = await bpAssignmentDetail(u, id, month, undefined, s.from, s.to);
+    d = await bpAssignmentDetail(u, id, month, s.from, s.to);
   if (!d) notFound();
   const a = d.assignment;
   return (

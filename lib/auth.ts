@@ -51,7 +51,27 @@ export async function getCurrentUser() {
   if (!token) return null;
   const session = await prisma.session.findUnique({
     where: { token: sessionKey(token) },
-    include: { user: { include: { employee: true, supervisor: true } } },
+    include: {
+      user: {
+        /*
+         * The password hash never leaves this module.
+         *
+         * `getCurrentUser` is the object the whole application holds — it is
+         * passed into layouts, page components and permission checks, and from
+         * there it is one careless `JSON.stringify` or one prop crossing to a
+         * client component away from being served to a browser. Nothing outside
+         * `verifyCredential` has any use for the hash, and login reads the user
+         * row itself, so the safe thing is for this query to not carry it at
+         * all.
+         *
+         * `omit` rather than an explicit `select`: a select would have to list
+         * every column, and the day someone adds one to the schema it would go
+         * missing here instead of the hash going missing there.
+         */
+        omit: { credentialHash: true },
+        include: { employee: true, supervisor: true },
+      },
+    },
   });
   if (!session || session.expiresAt <= new Date() || !session.user.active) {
     if (session) await prisma.session.deleteMany({ where: { id: session.id } }).catch(() => {});

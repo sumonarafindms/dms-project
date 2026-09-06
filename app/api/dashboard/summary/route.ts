@@ -5,8 +5,7 @@ import { monthBounds } from "@/lib/month";
 import { isSsoComplete, lsoCompleteMonthlySummaryWhere, withStandardGa } from "@/lib/business-rules";
 import { apiError } from "@/lib/http-errors";
 import { dhakaMonth } from "@/lib/business-time";
-import { assignmentGaTarget, assignmentWindow } from "@/lib/bp-period";
-import { monthStartsInRange } from "@/lib/date-range";
+import { bpLedger } from "@/lib/bp-ledger";
 import type { BpPortion } from "@/lib/bp-rollup";
 
 export const dynamic = "force-dynamic";
@@ -101,41 +100,19 @@ export async function GET(req: NextRequest) {
         monthlyTargets: { select: { month: true, gaTarget: true } },
       },
     });
-    const bpWindows = new Map<string, { from: number; to: number }[]>();
-    const bpByEmployee = new Map<string, BpPortion>();
-    const portion = (id: string) => {
-      let x = bpByEmployee.get(id);
-      if (!x) {
-        x = {
-          count: 0,
-          gaTarget: 0,
-          gaAchieved: 0,
-          ssoAchieved: 0,
-          c2cAchieved: 0,
-          lsoAchieved: 0,
-          c2sAmount: 0,
-          c2sTransactions: 0,
-        };
-        bpByEmployee.set(id, x);
-      }
-      return x;
-    };
-    for (const a of bpAssignments) {
-      const { effectiveStart, effectiveEnd } = assignmentWindow(a, start, end);
-      if (effectiveStart >= effectiveEnd) continue;
-      const list = bpWindows.get(a.retailerId) ?? [];
-      list.push({ from: effectiveStart.getTime(), to: effectiveEnd.getTime() });
-      bpWindows.set(a.retailerId, list);
-      const x = portion(a.employeeId);
-      x.count += 1;
-      x.gaTarget += assignmentGaTarget(a, monthStartsInRange(effectiveStart, effectiveEnd));
-    }
-    const bpOwnsDay = (retailerId: string, dayMs: number) =>
-      (bpWindows.get(retailerId) ?? []).some((w) => dayMs >= w.from && dayMs < w.to);
-    // The LSO source is a monthly summary with no day to test, so a retailer
-    // that was a BP for any part of the month counts as one — the same choice
-    // lib/performance.ts documents.
-    const bpOwnsRetailer = (retailerId: string) => bpWindows.has(retailerId);
+    /*
+     * The same ledger lib/performance.ts uses, and that is the point.
+     *
+     * This route and employeePerformance() both split BP figures out of the
+     * RSO's own, and the comment above has always said they must agree. They
+     * used to agree by having two copies of the rule side by side. Since a BP
+     * may now be held by several RSOs at once — each seeing the whole thing,
+     * the company counting it once — the rule got harder, and a second copy
+     * would have been a second chance to get it wrong.
+     *
+     * This is the company dashboard, so every employee is in scope.
+     */
+    const ledger = bpLedger(bpAssignments, start, end, () => true);
 
     const gaByEmployee = new Map<string, number>();
     const ssoByEmployee = new Map<string, number>();
@@ -145,7 +122,7 @@ export async function GET(req: NextRequest) {
     const perRetailer = new Map<string, { rso: number; bp: number }>();
     for (const group of gaGroups) {
       const bucket = perRetailer.get(group.retailerId) ?? { rso: 0, bp: 0 };
-      if (bpOwnsDay(group.retailerId, group.activationDate.getTime())) bucket.bp += group._count._all;
+      if (ledger.ownsDay(group.retailerId, group.activationDate.getTime())) bucket.bp += group._count._all;
       else bucket.rso += group._count._all;
       perRetailer.set(group.retailerId, bucket);
     }
@@ -159,9 +136,13 @@ export async function GET(req: NextRequest) {
           ssoByEmployee.set(employeeId, (ssoByEmployee.get(employeeId) || 0) + 1);
       }
       if (counts.bp > 0) {
-        const x = portion(employeeId);
-        x.gaAchieved += counts.bp;
-        if (isSsoComplete(retailer.simSeller, counts.bp)) x.ssoAchieved += 1;
+        // The window here is exactly one month, so any day inside it picks the
+        // same holders; `start` is the cheapest one to hand.
+        const sso = isSsoComplete(retailer.simSeller, counts.bp);
+        ledger.credit(retailerId, start.getTime(), employeeId, (f) => {
+          f.gaAchieved += counts.bp;
+          if (sso) f.ssoAchieved += 1;
+        });
       }
     }
 
@@ -170,7 +151,10 @@ export async function GET(req: NextRequest) {
       const employeeId = retailerMap.get(group.retailerId)?.employeeId;
       if (!employeeId) continue;
       const amount = Number(group._sum.amount || 0);
-      if (bpOwnsDay(group.retailerId, group.date.getTime())) portion(employeeId).c2cAchieved += amount;
+      if (ledger.ownsDay(group.retailerId, group.date.getTime()))
+        ledger.credit(group.retailerId, group.date.getTime(), employeeId, (f) => {
+          f.c2cAchieved += amount;
+        });
       else c2cByEmployee.set(employeeId, (c2cByEmployee.get(employeeId) || 0) + amount);
     }
 
@@ -178,7 +162,10 @@ export async function GET(req: NextRequest) {
     for (const row of lsoRetailers) {
       const employeeId = retailerMap.get(row.retailerId)?.employeeId;
       if (!employeeId) continue;
-      if (bpOwnsRetailer(row.retailerId)) portion(employeeId).lsoAchieved += 1;
+      if (ledger.ownsRetailer(row.retailerId))
+        ledger.credit(row.retailerId, null, employeeId, (f) => {
+          f.lsoAchieved += 1;
+        });
       else lsoByEmployee.set(employeeId, (lsoByEmployee.get(employeeId) || 0) + 1);
     }
 
@@ -187,16 +174,7 @@ export async function GET(req: NextRequest) {
         manual = employee.manualMetrics[0];
       const scAchieved = Number(manual?.scAchieved || 0);
       const c2cAchieved = c2cByEmployee.get(employee.id) || 0;
-      const bp: BpPortion = bpByEmployee.get(employee.id) ?? {
-        count: 0,
-        gaTarget: 0,
-        gaAchieved: 0,
-        ssoAchieved: 0,
-        c2cAchieved: 0,
-        lsoAchieved: 0,
-        c2sAmount: 0,
-        c2sTransactions: 0,
-      };
+      const bp: BpPortion = ledger.portionFor(employee.id);
       return {
         employeeId: employee.id,
         employeeCode: employee.employeeCode,

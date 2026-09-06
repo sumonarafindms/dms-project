@@ -46,6 +46,18 @@ export const RATE_LIMITS = {
   credential: { limit: 20, windowMs: 10 * 60 * 1000, name: "credential" },
   /** Server-generated downloads (sample workbooks, exports). */
   download: { limit: 60, windowMs: 5 * 60 * 1000, name: "download" },
+  /**
+   * Administrative writes: permissions, team assignments, targets.
+   *
+   * These are already behind an ADMIN/IT session, so this is not what keeps a
+   * stranger out — it is what bounds the damage when a session is the thing
+   * that has been stolen, and what stops a stuck retry loop from rewriting the
+   * permission table a thousand times before anyone notices.
+   *
+   * 120 in ten minutes is far above a person clicking Save; it is far below
+   * anything a script can use.
+   */
+  mutation: { limit: 120, windowMs: 10 * 60 * 1000, name: "mutation" },
 } satisfies Record<string, RateLimitRule>;
 
 export type RateLimitResult = { allowed: true; remaining: number } | { allowed: false; retryAfterSeconds: number };

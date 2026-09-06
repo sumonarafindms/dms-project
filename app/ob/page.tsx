@@ -11,6 +11,7 @@ import {
   PersonCell,
   EmptyState,
 } from "../components/OperationsPremiumUI";
+import { Btn } from "../components/Kit";
 
 type Row = {
   retailerCode: string;
@@ -119,9 +120,9 @@ export default function ObPage() {
               <small>Excel / TXT · max 20 MB</small>
               <input name="file" type="file" accept=".xls,.xlsx,.xlsm,.txt" required />
             </label>
-            <button disabled={loading} className="kit-btn is-primary size-md">
+            <Btn variant="primary" disabled={loading}>
               {loading ? "Replacing..." : "⇧  Upload & Replace OB"}
-            </button>
+            </Btn>
           </form>
         </OpsUpload>
       )}
@@ -130,14 +131,12 @@ export default function ObPage() {
         <OpsSectionTitle
           title="Current Balance Snapshot"
           subtitle="Latest stored opening balance across your retailer base."
-          icon="◫"
         />
         <div className="kit-metrics-grid">
-          <OpsMetric tone="blue" label="Snapshot Date" value={snapshotDate || "No data"} note="Latest report date" />
-          <OpsMetric tone="purple" label="Retailers" value={pageMeta.total.toLocaleString()} note="Mapped outlets" />
-          <OpsMetric tone="green" label="Total Opening Balance" value={money(total)} note="Current total balance" />
+          <OpsMetric label="Snapshot Date" value={snapshotDate || "No data"} note="Latest report date" />
+          <OpsMetric label="Retailers" value={pageMeta.total.toLocaleString()} note="Mapped outlets" />
+          <OpsMetric label="Total Opening Balance" value={money(total)} note="Current total balance" />
           <OpsMetric
-            tone="orange"
             label="Last Import"
             value={batch ? new Date(batch.uploadedAt).toLocaleDateString() : "-"}
             note={batch ? new Date(batch.uploadedAt).toLocaleTimeString() : "No import yet"}

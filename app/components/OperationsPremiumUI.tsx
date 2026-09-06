@@ -14,7 +14,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { TableScrollHint } from "./TableScrollHint";
 import { Icon } from "./icons";
-import { Badge, Card, EmptyState as KitEmptyState, PageHeader, SectionHead } from "./Kit";
+import { Badge, Card, EmptyState as KitEmptyState, LinkBtn, PageHeader, SectionHead } from "./Kit";
 import type { BadgeTone } from "./Kit";
 
 export function OpsHeader({
@@ -111,9 +111,9 @@ export function OpsUpload({
         link={
           // A real <a>: this is a file download from an API route, and <Link>
           // would client-side navigate to it instead.
-          <a href={sample} className="kit-btn is-secondary size-sm">
+          <LinkBtn href={sample} external variant="secondary" size="sm">
             Sample File
-          </a>
+          </LinkBtn>
         }
       />
       <Card className="kit-mb-20" padded="lg">
@@ -129,10 +129,7 @@ export function OpsUpload({
           <p>{rule}</p>
         </div>
         {message && tone && (
-          <div
-            className={`kit-note is-${tone} is-last`}
-            role={tone === "bad" ? "alert" : "status"}
-          >
+          <div className={`kit-note is-${tone} is-last`} role={tone === "bad" ? "alert" : "status"}>
             <Icon name={tone === "ok" ? "check" : tone === "bad" ? "alert" : "info"} />
             <span>{message}</span>
           </div>
@@ -142,32 +139,20 @@ export function OpsUpload({
   );
 }
 
-export function OpsSectionTitle({
-  title,
-  subtitle,
-  right,
-}: {
-  title: string;
-  subtitle?: string;
-  /** Ignored — the kit heading has no decorative glyph. Kept so callers compile. */
-  icon?: string;
-  right?: ReactNode;
-}) {
+export function OpsSectionTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
   return <SectionHead title={title} sub={subtitle} link={right} />;
 }
 
-/** One figure with a label and a note. `tone` is decorative and no longer used. */
-export function OpsMetric({
-  label,
-  value,
-  note,
-}: {
-  tone?: string;
-  label: string;
-  value: string;
-  note?: string;
-  icon?: string;
-}) {
+/**
+ * One figure with a label and a note.
+ *
+ * `tone` and `icon` were props here, both dead — the kit renders one figure
+ * style and the glyphs went with the premium layer. Thirty arguments across the
+ * four operations pages were still being written into them. A prop the type
+ * accepts and the body ignores is worse than no prop: the caller believes they
+ * set something.
+ */
+export function OpsMetric({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <Card padded>
       <span className="kit-label">{label}</span>
@@ -217,10 +202,9 @@ export function OpsDataCard({
 export function OpsTable({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
     <>
-      <div className="kit-table-wrap is-always">
-        <table className={`kit-table ${wide ? "is-w1120" : "is-w900"}`}>
-          {children}
-        </table>
+      {/* Focusable and named — see the note in Kit.tsx's Table. */}
+      <div className="kit-table-wrap is-always" tabIndex={0} role="group" aria-label="Table, scrolls sideways">
+        <table className={`kit-table ${wide ? "is-w1120" : "is-w900"}`}>{children}</table>
       </div>
       <TableScrollHint />
     </>
