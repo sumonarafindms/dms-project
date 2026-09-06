@@ -19,8 +19,12 @@ export type RetailerOpportunity = {
   simSeller: boolean;
   category: string;
   route: string;
+  /** The outlet's own iTop-Up number. Blank when master data never carried one. */
+  retailerWallet: string;
   employeeId: string | null;
   employeeName: string;
+  /** The RSO's wallet number — the field people actually dial. */
+  employeeMsisdn: string;
   supervisor: string;
   ga: number;
   c2c: number;
@@ -62,8 +66,9 @@ export async function retailerOpportunities(
         simSeller: true,
         category: true,
         route: true,
+        iTopUpNumber: true,
         employeeId: true,
-        employee: { select: { name: true, supervisor: { select: { name: true } } } },
+        employee: { select: { name: true, rsoMsisdn: true, supervisor: { select: { name: true } } } },
       },
     }),
     prisma.gaActivation.groupBy({
@@ -164,8 +169,13 @@ export async function retailerOpportunities(
       simSeller,
       category: r.category || "—",
       route: r.route || "—",
+      // Em dash on screen, but the spreadsheet writes "" for a missing value —
+      // see blankIfDash in lib/report-builders.ts. A dash in a sheet column
+      // people filter on is a value; an empty cell is the absence of one.
+      retailerWallet: r.iTopUpNumber || "—",
       employeeId: r.employeeId,
       employeeName: r.employee?.name || "Unassigned",
+      employeeMsisdn: r.employee?.rsoMsisdn || "—",
       supervisor: r.employee?.supervisor?.name || "Unassigned",
       ga: gaCount,
       c2c: c2cAmount,

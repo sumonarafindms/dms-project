@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 
 /**
  * Every search box must answer while the user types.
@@ -40,7 +41,7 @@ function tsxFiles(dir = APP, acc: string[] = []): string[] {
 }
 
 const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
-const rel = (f: string) => path.relative(path.join(__dirname, ".."), f);
+const rel = relativeTo(path.join(__dirname, ".."));
 
 /** An input that a person types a query into. */
 const SEARCH_INPUT = /<input[^>]*(name="q"|type="search"|placeholder=\{?["`]?Search|aria-label=\{?["`]?Search)/i;

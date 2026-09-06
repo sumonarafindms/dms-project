@@ -6,7 +6,7 @@ import { audit } from "../../../../lib/audit";
 import { phoneKey } from "../../../../lib/phone";
 import { apiError } from "../../../../lib/http-errors";
 import { activeLock, nextLoginFailure } from "../../../../lib/login-policy";
-import { MAX_FAILURES_BEFORE_LOCK, nextAccountState } from "../../../../lib/credential-policy";
+import { nextAccountState } from "../../../../lib/credential-policy";
 
 function mobileVariants(identifier: string) {
   const raw = identifier.trim(),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 
 /**
  * A source-level rule, asserted rather than remembered.
@@ -29,7 +30,7 @@ function tsxFiles(dir = APP, acc: string[] = []): string[] {
 /** A file is range-aware if it can receive a narrowed date range. */
 const isRangeAware = (src: string) => /\bfrom\?: string\b/.test(src) || /\bfrom\?:\s*string\s*\|/.test(src);
 
-const rel = (f: string) => path.relative(path.join(__dirname, ".."), f);
+const rel = relativeTo(path.join(__dirname, ".."));
 
 /** Block and line comments removed, so prose cannot satisfy or fail a rule. */
 const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");

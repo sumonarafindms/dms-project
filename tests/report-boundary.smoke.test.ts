@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 
 /**
  * Report columns carry functions, so the table that receives them must be a
@@ -44,7 +45,7 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 const APP = sourceFiles(path.join(ROOT, "app")).map((file) => ({
-  file: path.relative(ROOT, file),
+  file: relativeTo(ROOT)(file),
   src: fs.readFileSync(file, "utf8"),
 }));
 

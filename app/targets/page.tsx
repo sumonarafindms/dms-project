@@ -1,18 +1,35 @@
 "use client";
 
 /**
- * Monthly target control — migrated to the role-UI kit.
+ * Monthly target control.
  *
- * Two editable grids (RSO targets, BP GA targets) plus a bulk importer, all
- * for one month. Nothing is written until "Save all changes": the inputs edit
- * local state so an operator can work down a column without a request per
- * keystroke, which is also why the save bar reports how many records are in
- * play.
+ * Two tables (RSO targets, BP GA targets) plus a bulk importer, all for one
+ * month. Nothing is written until "Save all changes".
  *
- * Each grid is rendered twice — a table from 640px, one card per record below
- * it. The editable cells make a horizontally scrolling table unusable on a
- * phone, so this is the one place in the app where the card fallback is worth
- * its duplication.
+ * ## Why the tables are read-only and editing happens in a dialog
+ *
+ * Every figure used to be a live `<input type="number">`, seven per RSO across
+ * twenty rows. That is a real hazard, not an aesthetic one: **a number input
+ * with focus changes its value when the mouse wheel moves over it.** Scrolling
+ * down a page of targets was enough to silently rewrite one, and because the
+ * page saves the whole grid at once, the wrong number went to the database with
+ * everything else. Nothing in the UI would have said so.
+ *
+ * So the tables now show values, and each row carries an Edit button that opens
+ * that person's targets in a dialog. Three things follow from that:
+ *
+ * - Scrolling cannot change anything, because there is nothing focusable to
+ *   scroll over.
+ * - The dialog has room for full-width fields and their labels, which the
+ *   seven-column grid never did — on a phone those cells were unusable.
+ * - What is being edited is unambiguous: the person's name and supervisor are
+ *   in the dialog header, rather than inferred from which row the cursor is on.
+ *
+ * `onWheel` is still blocked on the dialog's inputs. The dialog is short, but
+ * "short enough not to scroll" is not a guarantee, and the failure is silent.
+ *
+ * Each table is rendered twice — a table from 640px, one card per record below
+ * it — because the identity columns do not fit a phone.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -25,6 +42,7 @@ import {
   EmptyState,
   Field,
   LinkBtn,
+  Modal,
   PageHeader,
   SectionHead,
   SummaryStrip,
@@ -94,6 +112,15 @@ export default function TargetsPage() {
     [file, setFile] = useState<File | null>(null),
     [uploading, setUploading] = useState(false),
     [uploadResult, setUploadResult] = useState<ImportResult | null>(null);
+  /*
+   * Which record the dialog is editing, and a working copy of it.
+   *
+   * The draft is separate from `rows` so Cancel really cancels: editing the row
+   * in place and "undoing" by reloading would throw away every other unsaved
+   * change on the page.
+   */
+  const [editing, setEditing] = useState<{ kind: "rso"; id: string } | { kind: "bp"; id: string } | null>(null);
+  const [draft, setDraft] = useState<Record<string, number>>({});
 
   async function load() {
     setLoading(true);
@@ -113,22 +140,47 @@ export default function TargetsPage() {
   /**
    * Total recharge follows C2C + SC, but only while the operator has not typed
    * their own total: once it differs from the sum it is theirs and is left
-   * alone. Unchanged from the pre-migration behaviour.
+   * alone. Unchanged from the pre-dialog behaviour, applied to the draft.
    */
-  function update(i: number, k: NumericField, v: string) {
+  function setDraftField(k: NumericField, v: string) {
     const n = Math.max(0, Number(v) || 0);
-    setRows((old) =>
-      old.map((r, x) => {
-        if (x !== i) return r;
-        const next = { ...r, [k]: n };
-        if (
-          (k === "c2cTarget" || k === "scTarget") &&
-          (!r.totalRechargeTarget || r.totalRechargeTarget === r.c2cTarget + r.scTarget)
-        )
-          next.totalRechargeTarget = (k === "c2cTarget" ? n : r.c2cTarget) + (k === "scTarget" ? n : r.scTarget);
-        return next;
-      }),
-    );
+    setDraft((d) => {
+      const next = { ...d, [k]: n };
+      if (
+        (k === "c2cTarget" || k === "scTarget") &&
+        (!d.totalRechargeTarget || d.totalRechargeTarget === (d.c2cTarget ?? 0) + (d.scTarget ?? 0))
+      )
+        next.totalRechargeTarget =
+          (k === "c2cTarget" ? n : (d.c2cTarget ?? 0)) + (k === "scTarget" ? n : (d.scTarget ?? 0));
+      return next;
+    });
+  }
+
+  function openRso(r: TargetRow) {
+    setDraft(Object.fromEntries(numericFields.map((k) => [k, r[k]])));
+    setEditing({ kind: "rso", id: r.employeeId });
+  }
+  function openBp(r: BpRow) {
+    setDraft({ gaTarget: r.gaTarget });
+    setEditing({ kind: "bp", id: r.assignmentId });
+  }
+
+  /**
+   * Apply the draft to the page's state and close.
+   *
+   * Still nothing goes to the server here — "Save all changes" at the bottom is
+   * the one write, exactly as before. This dialog changes where a number is
+   * typed, not when it is persisted.
+   */
+  function applyDraft() {
+    if (!editing) return;
+    if (editing.kind === "rso")
+      setRows((old) => old.map((r) => (r.employeeId === editing.id ? { ...r, ...draft } : r)));
+    else
+      setBpRows((old) =>
+        old.map((r) => (r.assignmentId === editing.id ? { ...r, gaTarget: draft.gaTarget ?? r.gaTarget } : r)),
+      );
+    setEditing(null);
   }
 
   async function save() {
@@ -174,20 +226,12 @@ export default function TargetsPage() {
   }, [rows, search]);
 
   /*
-   * Row index by employee, built once per change to `rows`.
-   *
-   * `cell()` edits `rows[i]`, so each rendered row needs its index in the FULL
-   * array, not its position in the filtered list. Both render passes — the
-   * table and the mobile cards — used to find it with `rows.findIndex(...)`,
-   * which is a linear scan per row per pass: with a search that matches
-   * everything, 2n² comparisons on every keystroke in every target cell. A map
-   * answers the same question once.
+   * v152 added an index map here to kill a quadratic `rows.findIndex(...)` that
+   * ran once per rendered row, twice over, on every keystroke. v153 removed the
+   * need for it entirely: the table renders values rather than inputs, and the
+   * dialog looks its record up by id. The fastest version of a lookup is the
+   * one no longer performed.
    */
-  const indexByEmployee = useMemo(() => {
-    const m = new Map<string, number>();
-    rows.forEach((r, i) => m.set(r.employeeId, i));
-    return m;
-  }, [rows]);
 
   const totals = useMemo(
     () =>
@@ -216,37 +260,32 @@ export default function TargetsPage() {
         : "warn"
     : null;
 
-  const cell = (r: TargetRow, i: number, k: NumericField) =>
-    canUpdate ? (
-      <input
-        className="kit-input kit-num-input"
-        type="number"
-        min="0"
-        value={r[k]}
-        aria-label={`${FIELD_LABEL[k]} for ${r.name}`}
-        onChange={(e) => update(i, k, e.target.value)}
-      />
-    ) : (
-      <strong>{Number(r[k]).toLocaleString()}</strong>
-    );
+  const figure = (n: number) => <strong>{Number(n).toLocaleString()}</strong>;
 
-  const bpCell = (r: BpRow, i: number) =>
-    canUpdate ? (
+  /**
+   * A number field inside the dialog.
+   *
+   * `onWheel` blurs the input rather than preventing the event: preventing it
+   * would stop the page scrolling while the pointer happens to be over a field,
+   * which feels broken. Blurring lets the scroll through and takes the value
+   * out of harm's way, because an unfocused number input ignores the wheel.
+   */
+  const draftField = (k: NumericField, label: string) => (
+    <Field key={k} label={label}>
       <input
-        className="kit-input kit-num-input"
+        className="kit-input"
         type="number"
         min="0"
-        value={r.gaTarget}
-        aria-label={`GA target for ${r.bpName || r.bpCode}`}
-        onChange={(e) =>
-          setBpRows((v) =>
-            v.map((x, n) => (n === i ? { ...x, gaTarget: Math.max(0, Number(e.target.value) || 0) } : x)),
-          )
-        }
+        inputMode="numeric"
+        value={draft[k] ?? 0}
+        onWheel={(e) => e.currentTarget.blur()}
+        onChange={(e) => setDraftField(k, e.target.value)}
       />
-    ) : (
-      <strong>{r.gaTarget}</strong>
-    );
+    </Field>
+  );
+
+  const editingRso = editing?.kind === "rso" ? rows.find((r) => r.employeeId === editing.id) : undefined;
+  const editingBp = editing?.kind === "bp" ? bpRows.find((r) => r.assignmentId === editing.id) : undefined;
 
   return (
     <main className="page">
@@ -370,50 +409,57 @@ export default function TargetsPage() {
                         {FIELD_LABEL[k]}
                       </th>
                     ))}
+                    {canUpdate && <th className="is-right">Edit</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((r) => {
-                    const i = indexByEmployee.get(r.employeeId) ?? -1;
-                    return (
-                      <tr key={r.employeeId}>
-                        <td>
-                          <strong>{r.name}</strong>
-                          <small>
-                            {r.rsoMsisdn} · {r.employeeCode || "no code"}
-                          </small>
+                  {visible.map((r) => (
+                    <tr key={r.employeeId}>
+                      <td>
+                        <strong>{r.name}</strong>
+                        <small>
+                          {r.rsoMsisdn} · {r.employeeCode || "no code"}
+                        </small>
+                      </td>
+                      <td>{r.supervisor}</td>
+                      {numericFields.map((k) => (
+                        <td key={k} className="is-right">
+                          {figure(r[k])}
                         </td>
-                        <td>{r.supervisor}</td>
-                        {numericFields.map((k) => (
-                          <td key={k} className="is-right">
-                            {cell(r, i, k)}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
+                      ))}
+                      {canUpdate && (
+                        <td className="is-right">
+                          <Btn variant="secondary" size="sm" onClick={() => openRso(r)}>
+                            <Icon name="settings" /> Edit
+                          </Btn>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
             <div className="kit-table-cards">
-              {visible.map((r) => {
-                const i = indexByEmployee.get(r.employeeId) ?? -1;
-                return (
-                  <div className="kit-card kit-card-p" key={r.employeeId}>
-                    <strong>{r.name}</strong>
-                    <p className="kit-figure-sub">
-                      {r.employeeCode || r.rsoMsisdn} · {r.supervisor} · {r.retailerCount} retailers
-                    </p>
-                    <div className="kit-form-grid kit-mt-10">
-                      {numericFields.map((k) => (
-                        <Field key={k} label={FIELD_LABEL[k]}>
-                          {cell(r, i, k)}
-                        </Field>
-                      ))}
-                    </div>
+              {visible.map((r) => (
+                <div className="kit-card kit-card-p" key={r.employeeId}>
+                  <strong>{r.name}</strong>
+                  <p className="kit-figure-sub">
+                    {r.employeeCode || r.rsoMsisdn} · {r.supervisor} · {r.retailerCount} retailers
+                  </p>
+                  <div className="kit-form-grid kit-mt-10">
+                    {numericFields.map((k) => (
+                      <Field key={k} label={FIELD_LABEL[k]}>
+                        {figure(r[k])}
+                      </Field>
+                    ))}
                   </div>
-                );
-              })}
+                  {canUpdate && (
+                    <Btn variant="secondary" size="sm" block className="kit-mt-10" onClick={() => openRso(r)}>
+                      <Icon name="settings" /> Edit targets
+                    </Btn>
+                  )}
+                </div>
+              ))}
             </div>
           </>
         ) : (
@@ -439,10 +485,11 @@ export default function TargetsPage() {
                     <th>BP Name</th>
                     <th>RSO</th>
                     <th className="is-right">GA Target</th>
+                    {canUpdate && <th className="is-right">Edit</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {bpRows.map((r, i) => (
+                  {bpRows.map((r) => (
                     <tr key={r.assignmentId}>
                       <td>
                         <strong>{r.bpCode}</strong>
@@ -452,22 +499,34 @@ export default function TargetsPage() {
                         {r.rsoName}
                         <small>{r.rsoMsisdn}</small>
                       </td>
-                      <td className="is-right">{bpCell(r, i)}</td>
+                      <td className="is-right">{figure(r.gaTarget)}</td>
+                      {canUpdate && (
+                        <td className="is-right">
+                          <Btn variant="secondary" size="sm" onClick={() => openBp(r)}>
+                            <Icon name="settings" /> Edit
+                          </Btn>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="kit-table-cards">
-              {bpRows.map((r, i) => (
+              {bpRows.map((r) => (
                 <div className="kit-card kit-card-p" key={r.assignmentId}>
                   <strong>{r.bpName || r.bpCode}</strong>
                   <p className="kit-figure-sub">
                     {r.bpCode} · RSO {r.rsoName}
                   </p>
                   <div className="kit-mt-10">
-                    <Field label="GA target">{bpCell(r, i)}</Field>
+                    <Field label="GA target">{figure(r.gaTarget)}</Field>
                   </div>
+                  {canUpdate && (
+                    <Btn variant="secondary" size="sm" block className="kit-mt-10" onClick={() => openBp(r)}>
+                      <Icon name="settings" /> Edit target
+                    </Btn>
+                  )}
                 </div>
               ))}
             </div>
@@ -480,6 +539,51 @@ export default function TargetsPage() {
           />
         )}
       </Card>
+
+      {editingRso && (
+        <Modal
+          title={editingRso.name}
+          sub={`${editingRso.supervisor} · ${editingRso.rsoMsisdn} · ${editingRso.retailerCount} retailers · ${month}`}
+          onClose={() => setEditing(null)}
+          footer={
+            <>
+              <Btn variant="ghost" onClick={() => setEditing(null)}>
+                Cancel
+              </Btn>
+              <Btn onClick={applyDraft}>Update targets</Btn>
+            </>
+          }
+        >
+          <div className="kit-form-grid">{numericFields.map((k) => draftField(k, FIELD_LABEL[k]))}</div>
+          {/* The dialog only edits this page's copy. Saying so here stops
+              someone closing the browser after "Update" and expecting it to
+              have been written. */}
+          <p className="kit-hint is-xs kit-mt-10">
+            Changes apply when you press <b>Save all changes</b> at the bottom of the page.
+          </p>
+        </Modal>
+      )}
+
+      {editingBp && (
+        <Modal
+          title={editingBp.bpName || editingBp.bpCode}
+          sub={`${editingBp.bpCode} · RSO ${editingBp.rsoName} · ${month}`}
+          onClose={() => setEditing(null)}
+          footer={
+            <>
+              <Btn variant="ghost" onClick={() => setEditing(null)}>
+                Cancel
+              </Btn>
+              <Btn onClick={applyDraft}>Update target</Btn>
+            </>
+          }
+        >
+          <div className="kit-form-grid">{draftField("gaTarget", "GA target")}</div>
+          <p className="kit-hint is-xs kit-mt-10">
+            Changes apply when you press <b>Save all changes</b> at the bottom of the page.
+          </p>
+        </Modal>
+      )}
 
       {canUpdate && (
         <div className="kit-save-bar no-print">

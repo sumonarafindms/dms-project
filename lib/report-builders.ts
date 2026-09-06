@@ -73,6 +73,62 @@ export type Built<T> = {
 
 const round = (n: number) => Math.round(n);
 
+/*
+ * ------------------------------------------------------------------ *
+ * Spreadsheet identity blocks
+ * ------------------------------------------------------------------ *
+ *
+ * One fact per column, always.
+ *
+ * The exports used to pack two facts into one cell to save width on screen:
+ * `Context` held "Shaheen / Dipu" — a supervisor and an RSO — and `Execution`
+ * held "SSO pending, LSO pending". Both read fine in a table and are useless in
+ * a spreadsheet, which is a tool for sorting and filtering columns. Nobody can
+ * filter "all of Shaheen's outlets" out of a column that also contains the RSO
+ * name, and the RSO's wallet number — the thing you dial to chase an outlet —
+ * was not in the file at all.
+ *
+ * These helpers are the single definition of who a row belongs to, so the
+ * twelve reports cannot drift into twelve different column orders.
+ */
+
+/**
+ * `"—"` on screen, empty in a sheet.
+ *
+ * A dash is how the UI says "no value", and it is right there. In a spreadsheet
+ * it is a *value*: it sorts, it survives a filter, and `COUNTA` counts it. An
+ * empty cell is the only honest way to write "we do not have this".
+ */
+const blankIfDash = (v: string | null | undefined) => (!v || v === "—" ? "" : v);
+
+/** A yes/no fact as a word, never a badge and never a blank. */
+const doneOrPending = (ok: boolean) => (ok ? "Complete" : "Pending");
+
+/** Everything identifying one outlet, each in its own column. */
+export const retailerIdentity = (r: RetailerReportRow): ExportRow => ({
+  Retailer: r.retailerName,
+  "Retailer Code": r.retailerCode,
+  "Retailer Wallet": blankIfDash(r.retailerWallet),
+  Category: blankIfDash(r.category),
+  Route: blankIfDash(r.route),
+  Supervisor: r.supervisor,
+  RSO: r.employeeName,
+  "RSO Wallet": blankIfDash(r.employeeMsisdn),
+  BP: blankIfDash(r.bpName),
+});
+
+/** Everything identifying one RSO or one supervisor rollup. */
+export const personIdentity = (r: RsoSummaryRow, level: "supervisor" | "rso"): ExportRow =>
+  level === "supervisor"
+    ? { Supervisor: r.name, Retailers: r.retailerCount }
+    : {
+        RSO: r.name,
+        "RSO Code": blankIfDash(r.code),
+        "RSO Wallet": blankIfDash(r.msisdn),
+        Supervisor: r.supervisor,
+        Retailers: r.retailerCount,
+      };
+
 /* ------------------------------------------------------------------ *
  * Daily Summary
  * ------------------------------------------------------------------ */
@@ -121,8 +177,10 @@ export async function buildDaily(range: ReportRange): Promise<Built<DailyRow>> {
     rows,
     exportRows: rows.map((r) => ({
       Supervisor: r.name,
-      RSO: r.rsoCount,
-      Retailer: r.retailerCount,
+      // "RSOs"/"Retailers", not "RSO"/"Retailer": these are counts, and the
+      // singular headings read as though the cell held a name.
+      RSOs: r.rsoCount,
+      Retailers: r.retailerCount,
       "GA (period)": r.standardGa,
       "GA (MTD)": r.mtdGa,
       "Monthly GA Target": r.gaTarget,
@@ -171,14 +229,25 @@ export async function buildActivation(range: ReportRange, group: ActivationGroup
   const rows = [...source].sort((a, b) => b.activation - a.activation || a.name.localeCompare(b.name));
   return {
     rows,
-    exportRows: rows.map((r) => ({
-      Name: r.name,
-      Code: r.code,
-      [ACTIVATION_SUB_LABEL[group]]: r.sub,
-      Activation: r.activation,
-      Target: r.target,
-      "Achievement %": r.target ? targetPercent(r.activation, r.target) : "",
-    })),
+    /*
+     * The heading names what the row IS, rather than a generic "Name".
+     * `sub` carries a different fact per grouping — a count of RSOs under a
+     * supervisor, a supervisor's name under an RSO, an RSO's name under a BP —
+     * so it gets a heading that says which, instead of one column meaning
+     * three things depending on a URL parameter the file does not carry.
+     */
+    exportRows: rows.map((r) => {
+      const who = group === "supervisor" ? "Supervisor" : group === "rso" ? "RSO" : "BP";
+      return {
+        [who]: r.name,
+        [`${who} Code`]: blankIfDash(r.code),
+        [group === "supervisor" ? "RSOs" : ACTIVATION_SUB_LABEL[group]]:
+          group === "supervisor" ? Number(r.sub) || 0 : blankIfDash(r.sub),
+        Activation: r.activation,
+        Target: r.target,
+        "Achievement %": r.target ? targetPercent(r.activation, r.target) : "",
+      };
+    }),
   };
 }
 
@@ -216,6 +285,15 @@ export type PerformanceRow = {
   lsoComplete?: boolean;
   c2c?: number;
   c2s?: number;
+  /**
+   * The row's identity as spreadsheet columns, one fact each.
+   *
+   * Built where the source record is still in hand. `sub` above is the screen's
+   * compact form ("Shaheen / Dipu") and stays that way — a table column is
+   * narrow and a reader takes it in at a glance. A sheet is filtered and
+   * sorted, so it gets the pieces separately.
+   */
+  identity: ExportRow;
 };
 
 export async function buildPerformance(range: ReportRange, kind: PerformanceKind): Promise<Built<PerformanceRow>> {
@@ -229,6 +307,7 @@ export async function buildPerformance(range: ReportRange, kind: PerformanceKind
       sub: b.sub,
       achieved: b.activation,
       target: b.target,
+      identity: { BP: b.name, "BP Code": blankIfDash(b.code), RSO: blankIfDash(b.sub) },
     }));
   } else if (kind === "retailer") {
     pre = (await retailerReport(range)).map((r) => ({
@@ -242,6 +321,7 @@ export async function buildPerformance(range: ReportRange, kind: PerformanceKind
       c2s: r.c2s,
       ssoComplete: r.ssoComplete,
       lsoComplete: r.lsoComplete,
+      identity: retailerIdentity(r),
     }));
   } else {
     const summary = await rsoSummary(range);
@@ -255,6 +335,7 @@ export async function buildPerformance(range: ReportRange, kind: PerformanceKind
       target: r.gaTarget,
       c2c: r.c2c,
       c2s: r.c2s,
+      identity: personIdentity(r, kind === "supervisor" ? "supervisor" : "rso"),
     }));
   }
 
@@ -271,20 +352,19 @@ export async function buildPerformance(range: ReportRange, kind: PerformanceKind
   return {
     rows,
     exportRows: rows.map((r) => ({
-      "#": r.rank,
-      Name: r.name,
-      Code: r.code,
-      Context: r.sub,
+      Rank: r.rank,
+      ...r.identity,
       GA: r.achieved,
       ...(hasTargets
-        ? { Target: r.target, "Achievement %": r.target ? targetPercent(r.achieved, r.target) : "" }
+        ? { "GA Target": r.target, "Achievement %": r.target ? targetPercent(r.achieved, r.target) : "" }
         : {
             C2C: round(r.c2c ?? 0),
             C2S: round(r.c2s ?? 0),
-            // The screen shows these as a pair of badges under "Execution".
-            // A spreadsheet cannot show a badge, so it says the same thing in
-            // words rather than dropping the column.
-            Execution: `SSO ${r.ssoComplete ? "complete" : "pending"}, LSO ${r.lsoComplete ? "complete" : "pending"}`,
+            // The screen shows these as a pair of badges under one "Execution"
+            // heading. A sheet gets them as two columns, so "show me every
+            // outlet whose SSO is pending" is a filter rather than a search.
+            SSO: doneOrPending(!!r.ssoComplete),
+            LSO: doneOrPending(!!r.lsoComplete),
           }),
     })),
   };
@@ -303,7 +383,16 @@ export type ValueGroup = (typeof VALUE_GROUPS)[number]["key"];
 export const valueGroup = (v?: string): ValueGroup =>
   (VALUE_GROUPS.find((g) => g.key === v)?.key ?? "supervisor") as ValueGroup;
 
-export type ValueRow = { id: string; name: string; code: string; sub: string; value: number; target: number };
+export type ValueRow = {
+  id: string;
+  name: string;
+  code: string;
+  sub: string;
+  value: number;
+  target: number;
+  /** Identity as separate spreadsheet columns; see PerformanceRow.identity. */
+  identity: ExportRow;
+};
 
 export async function buildValue(
   range: ReportRange,
@@ -325,6 +414,7 @@ export async function buildValue(
       sub: `${r.supervisor} / ${r.employeeName}`,
       value: metric === "c2c" ? r.c2c : r.c2s,
       target: 0, // no per-retailer targets exist in this schema
+      identity: retailerIdentity(r),
     }));
   } else {
     const summary = await rsoSummary(range);
@@ -336,6 +426,7 @@ export async function buildValue(
       sub: group === "supervisor" ? `${r.retailerCount.toLocaleString()} retailers` : r.supervisor,
       value: metric === "c2c" ? r.c2c : r.c2s,
       target: metric === "c2c" ? r.c2cTarget : 0,
+      identity: personIdentity(r, group === "supervisor" ? "supervisor" : "rso"),
     }));
   }
 
@@ -349,16 +440,14 @@ export async function buildValue(
     total,
     totalTarget,
     exportRows: rows.map((r) => ({
-      Name: r.name,
-      Code: r.code,
-      Context: r.sub,
+      ...r.identity,
       [`${label} Value`]: round(r.value),
       ...(showTarget
-        ? { Target: round(r.target), "Achievement %": r.target ? targetPercent(r.value, r.target) : "" }
+        ? { [`${label} Target`]: round(r.target), "Achievement %": r.target ? targetPercent(r.value, r.target) : "" }
         : {}),
       // The screen has always had a Share column; the sheet had not, which made
       // the two disagree about how many columns the report has.
-      Share: total ? Math.round((r.value / total) * 1000) / 10 : "",
+      "Share %": total ? Math.round((r.value / total) * 1000) / 10 : "",
     })),
   };
 }
@@ -394,7 +483,7 @@ export async function buildTarget(range: ReportRange, group: TargetGroup): Promi
      * against the page found columns missing and no note saying why.
      */
     exportRows: rows.map((r) => ({
-      Name: r.name,
+      ...personIdentity(r, group),
       GA: r.ga,
       "GA Target": r.gaTarget,
       "GA %": r.gaTarget ? targetPercent(r.ga, r.gaTarget) : "",
@@ -425,14 +514,6 @@ export type LowC2sView = (typeof LOW_C2S_VIEWS)[number]["key"];
 export const lowC2sView = (v?: string): LowC2sView =>
   (LOW_C2S_VIEWS.find((x) => x.key === v)?.key ?? "all") as LowC2sView;
 
-export const retailerIdentityExport = (r: RetailerReportRow) => ({
-  Retailer: r.retailerName,
-  Code: r.retailerCode,
-  Supervisor: r.supervisor,
-  RSO: r.employeeName,
-  BP: r.bpName,
-});
-
 export async function buildSso(
   range: ReportRange,
 ): Promise<Built<RetailerReportRow> & { sellers: number; complete: number }> {
@@ -460,10 +541,11 @@ export async function buildSso(
     sellers: sellers.length,
     complete: sellers.length - rows.length,
     exportRows: rows.map((r) => ({
-      ...retailerIdentityExport(r),
+      ...retailerIdentity(r),
       "GA Done": r.ga,
-      Required: SSO_MIN_MONTHLY_STANDARD_GA,
-      Remaining: Math.max(SSO_MIN_MONTHLY_STANDARD_GA - r.ga, 0),
+      "GA Required": SSO_MIN_MONTHLY_STANDARD_GA,
+      "GA Remaining": Math.max(SSO_MIN_MONTHLY_STANDARD_GA - r.ga, 0),
+      SSO: doneOrPending(r.ssoComplete),
     })),
   };
 }
@@ -483,11 +565,12 @@ export async function buildLso(
     total: all.length,
     complete: all.length - rows.length,
     exportRows: rows.map((r) => ({
-      ...retailerIdentityExport(r),
+      ...retailerIdentity(r),
       "C2S Value": round(r.c2s),
-      Trx: r.c2sTransactions,
+      "C2S Trx": r.c2sTransactions,
       "Needs Amount": Math.max(LSO_MIN_MONTHLY_AMOUNT - r.c2s, 0),
       "Needs Trx": Math.max(LSO_MIN_MONTHLY_TRANSACTIONS - r.c2sTransactions, 0),
+      LSO: doneOrPending(r.lsoComplete),
     })),
   };
 }
@@ -513,10 +596,12 @@ export async function buildLowC2s(
     zero: all.filter((r) => r.c2s === 0).length,
     totalC2s: all.reduce((a, r) => a + r.c2s, 0),
     exportRows: rows.map((r) => ({
-      ...retailerIdentityExport(r),
+      ...retailerIdentity(r),
       "C2S Value": round(r.c2s),
-      Trx: r.c2sTransactions,
+      "C2S Trx": r.c2sTransactions,
       "C2C Value": round(r.c2c),
+      SSO: doneOrPending(r.ssoComplete),
+      LSO: doneOrPending(r.lsoComplete),
     })),
   };
 }
@@ -534,7 +619,7 @@ export async function buildOpeningBalance(
     withBalance: withBalance.length,
     totalBalance: withBalance.reduce((a, r) => a + (r.openingBalance ?? 0), 0),
     exportRows: rows.map((r) => ({
-      ...retailerIdentityExport(r),
+      ...retailerIdentity(r),
       // Blank, not 0 — the sheet must not assert a balance that was never
       // imported. A missing OB row means "not in the latest snapshot", which
       // is a different fact from "balance is zero".
@@ -570,9 +655,14 @@ export type CustomField = (typeof CUSTOM_FIELDS)[number]["key"];
 
 const DEFAULT_CUSTOM_FIELDS: CustomField[] = ["ga", "c2c", "c2s"];
 
-export type CustomRow = { id: string; name: string; code: string; sub: string } & Partial<
-  Record<CustomField, number | null>
->;
+export type CustomRow = {
+  id: string;
+  name: string;
+  code: string;
+  sub: string;
+  /** Identity as separate spreadsheet columns; see PerformanceRow.identity. */
+  identity: ExportRow;
+} & Partial<Record<CustomField, number | null>>;
 
 export const customLevel = (v?: string): CustomLevel =>
   (CUSTOM_LEVELS.find((l) => l.key === v)?.key ?? "supervisor") as CustomLevel;
@@ -599,6 +689,7 @@ export async function buildCustom(
       name: r.retailerName,
       code: r.retailerCode,
       sub: `${r.supervisor} / ${r.employeeName}`,
+      identity: retailerIdentity(r),
       ga: r.ga,
       c2c: r.c2c,
       c2s: r.c2s,
@@ -612,6 +703,7 @@ export async function buildCustom(
       name: r.name,
       code: r.code,
       sub: level === "supervisor" ? `${r.retailerCount.toLocaleString()} retailers` : r.supervisor,
+      identity: personIdentity(r, level === "supervisor" ? "supervisor" : "rso"),
       ga: r.ga,
       gaTarget: r.gaTarget,
       gaPct: r.gaTarget ? targetPercent(r.ga, r.gaTarget) : null,
@@ -643,7 +735,7 @@ export async function buildCustom(
   return {
     rows,
     exportRows: rows.map((r) => {
-      const out: ExportRow = { Name: r.name, Code: r.code, Context: r.sub };
+      const out: ExportRow = { ...r.identity };
       for (const k of active) {
         const v = r[k];
         out[labelOf(k)] = v === null || v === undefined ? "" : round(v);

@@ -373,6 +373,8 @@ export type RsoSummaryRow = {
   id: string;
   name: string;
   code: string;
+  /** The RSO's wallet number, kept apart from `code` so a sheet can show both. */
+  msisdn: string;
   supervisor: string;
   retailerCount: number;
   ga: number;
@@ -462,6 +464,7 @@ export async function rsoSummary(range: ReportRange): Promise<RsoSummaryRow[]> {
       id: e.id,
       name: e.name,
       code: e.employeeCode || e.rsoMsisdn,
+      msisdn: e.rsoMsisdn,
       supervisor: e.supervisor?.name ?? "Unassigned",
       retailerCount: a.retailerCount,
       ga: a.ga,
@@ -484,7 +487,9 @@ export function rollUpToSupervisor(rows: RsoSummaryRow[]): RsoSummaryRow[] {
   for (const r of rows) {
     const cur = bySup.get(r.supervisor);
     if (!cur) {
-      bySup.set(r.supervisor, { ...r, id: r.supervisor, name: r.supervisor, code: "—", supervisor: "" });
+      // A supervisor row is a rollup, not a person with a wallet: blanking the
+      // msisdn stops the first RSO in the group lending theirs to the total.
+      bySup.set(r.supervisor, { ...r, id: r.supervisor, name: r.supervisor, code: "—", msisdn: "—", supervisor: "" });
       continue;
     }
     cur.retailerCount += r.retailerCount;

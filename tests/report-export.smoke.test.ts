@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 import { REPORTS, reportExportHref } from "../lib/report-builders";
 import { REPORT_PAGE_SIZE, pageOf, parseReportPage, reportPageHref, reportPageLabel } from "../lib/report-paging";
 
@@ -53,8 +54,7 @@ function reportSources(): { file: string; src: string }[] {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) walk(full);
-      else if (e.name.endsWith(".tsx"))
-        out.push({ file: path.relative(ROOT, full), src: fs.readFileSync(full, "utf8") });
+      else if (e.name.endsWith(".tsx")) out.push({ file: relativeTo(ROOT)(full), src: fs.readFileSync(full, "utf8") });
     }
   };
   walk(REPORTS_DIR);

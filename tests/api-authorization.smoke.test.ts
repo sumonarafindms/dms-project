@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 
 /**
  * Every API handler is behind an authorisation gate, and the public ones are
@@ -320,7 +321,7 @@ describe("the credential hash stays inside the auth module", () => {
         if (e.isDirectory()) walk(full);
         else if (/\.tsx?$/.test(e.name)) {
           const src = stripComments(fs.readFileSync(full, "utf8"));
-          if (/credentialHash/.test(src)) offenders.push(path.relative(ROOT, full));
+          if (/credentialHash/.test(src)) offenders.push(relativeTo(ROOT)(full));
         }
       }
     };

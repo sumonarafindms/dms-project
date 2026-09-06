@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 
 /**
  * The RSO has ONE Business Partner menu, and tapping a partner opens its record.
@@ -72,7 +73,7 @@ describe("one BP menu for the RSO", () => {
           full !== __filename &&
           stripComments(fs.readFileSync(full, "utf8")).includes("/rso/bp/activations")
         )
-          offenders.push(path.relative(ROOT, full));
+          offenders.push(relativeTo(ROOT)(full));
       }
     };
     for (const d of ["app", "lib", "tests", "e2e"]) walk(path.join(ROOT, d));

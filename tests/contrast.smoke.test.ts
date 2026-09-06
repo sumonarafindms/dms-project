@@ -147,9 +147,7 @@ describe("the muted colour does not creep back", () => {
      * and icon fills, where no contrast minimum applies. As `color:` it is the
      * bug this update fixed, so that exact pairing is the one thing barred.
      */
-    const offenders = styleFiles
-      .filter((f) => /color:\s*var\(--color-slate-400\)/.test(f.src))
-      .map((f) => f.file);
+    const offenders = styleFiles.filter((f) => /color:\s*var\(--color-slate-400\)/.test(f.src)).map((f) => f.file);
     expect(offenders, "use --text-muted for muted text; slate-400 fails AA").toEqual([]);
   });
 

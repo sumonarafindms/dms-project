@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 import {
   MAX_FAILURES_BEFORE_LOCK,
   MIN_PASSWORD_LENGTH,
@@ -236,7 +237,7 @@ describe("the PIN rule is defined once", () => {
         if (e.isDirectory()) walk(full);
         else if (/\.tsx?$/.test(e.name)) {
           const src = stripComments(fs.readFileSync(full, "utf8"));
-          if (/pin[^\n]{0,40}\.length\s*[<>=]/i.test(src)) offenders.push(path.relative(ROOT, full));
+          if (/pin[^\n]{0,40}\.length\s*[<>=]/i.test(src)) offenders.push(relativeTo(ROOT)(full));
         }
       }
     };

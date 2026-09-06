@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 import { groupSizes, groupTotals, hasBp, teamTotals, withBp, type BpPortion, type RollupRow } from "../lib/bp-rollup";
 import { assignmentGaTarget, assignmentWindow } from "../lib/bp-period";
 
@@ -28,7 +29,7 @@ import { assignmentGaTarget, assignmentWindow } from "../lib/bp-period";
 
 const ROOT = path.join(__dirname, "..");
 const read = (...p: string[]) => fs.readFileSync(path.join(ROOT, ...p), "utf8");
-const rel = (f: string) => path.relative(ROOT, f);
+const rel = relativeTo(ROOT);
 const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 
 function sourceFiles(dir: string, acc: string[] = []): string[] {

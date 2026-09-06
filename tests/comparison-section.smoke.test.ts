@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 import { COMPARISON_KINDS, COMPARISON_KIND_LABEL, parseComparisonKind } from "../lib/comparison";
 
 /**
@@ -19,7 +20,7 @@ import { COMPARISON_KINDS, COMPARISON_KIND_LABEL, parseComparisonKind } from "..
 
 const ROOT = path.join(__dirname, "..");
 const APP = path.join(ROOT, "app");
-const rel = (f: string) => path.relative(ROOT, f);
+const rel = relativeTo(ROOT);
 const read = (...p: string[]) => fs.readFileSync(path.join(ROOT, ...p), "utf8");
 const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 

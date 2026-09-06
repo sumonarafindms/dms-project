@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 import { EXPECTED, PUBLIC } from "./route-map";
 
 /**
@@ -40,7 +41,7 @@ function pageFiles(dir = APP, acc: string[] = []): string[] {
 }
 
 function routeOf(file: string) {
-  const rel = path.relative(APP, path.dirname(file)).split(path.sep).join("/");
+  const rel = relativeTo(APP)(path.dirname(file));
   return rel === "" ? "/" : `/${rel}`;
 }
 

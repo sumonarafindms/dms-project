@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { rel as relativeTo } from "./paths";
 
 /**
  * No component takes a prop it ignores.
@@ -35,7 +36,7 @@ import path from "node:path";
  */
 
 const ROOT = path.join(__dirname, "..");
-const rel = (f: string) => path.relative(ROOT, f);
+const rel = relativeTo(ROOT);
 
 function sourceFiles(dir: string, acc: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

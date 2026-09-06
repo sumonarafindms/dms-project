@@ -17,6 +17,10 @@
  * It also takes `xlsx` (~400 KB) out of the browser bundle entirely, and
  * replaces a `blob:` download with an ordinary attachment response.
  *
+ * The workbook itself is built by `lib/report-workbook.ts` — bold frozen
+ * header, a width per column taken from its widest value, autofilter, and
+ * numbers stored as numbers. See that file for why it does not use `xlsx`.
+ *
  * ## The rule this route must never break
  *
  * **The export is the whole report, not the page being viewed.** Paging the
@@ -30,10 +34,10 @@
  */
 
 import { NextResponse } from "next/server";
-import * as XLSX from "xlsx";
 import { apiUser } from "@/lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { buildExport } from "@/lib/report-builders";
+import { reportWorkbook } from "@/lib/report-workbook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,9 +79,7 @@ export async function GET(req: Request) {
   // nothing, which is indistinguishable from one that failed to run.
   if (!built.rows.length) return new NextResponse(null, { status: 204 });
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(built.rows), "Report");
-  const bytes = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const bytes = await reportWorkbook(built.rows);
 
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
