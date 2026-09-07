@@ -17,11 +17,12 @@ import {
   activationGroup,
   buildActivation,
   reportExportHref,
+  searchReport,
 } from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
 import { targetPercent } from "../../../../lib/achievement";
 import { PageHeader, SummaryStrip } from "../../../components/Kit";
-import { ReportActionBar, ReportDateBar } from "../../../components/ReportShell";
+import { ReportActionBar, ReportDateBar, ReportSearch } from "../../../components/ReportShell";
 import { ReportTable } from "../../../components/ReportTable";
 import type { Column } from "../../../components/ReportTable";
 import { Icon } from "../../../components/icons";
@@ -31,13 +32,13 @@ export const dynamic = "force-dynamic";
 export default async function ActivationReport({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
   const group = activationGroup(sp.group);
-  const { rows: ordered } = await buildActivation(range, group);
+  const { rows: ordered, matched, unfiltered } = searchReport(await buildActivation(range, group), sp.q);
   const groupParam = group === "supervisor" ? undefined : group;
 
   const totalActivation = ordered.reduce((a, r) => a + r.activation, 0);
@@ -84,6 +85,7 @@ export default async function ActivationReport({
           </Link>
         ))}
       </div>
+      <ReportSearch matched={matched} total={unfiltered} noun={group === "bp" ? "BP" : group} />
       <SummaryStrip
         items={[
           { label: "Total Activation", value: totalActivation.toLocaleString(), tone: "teal" },

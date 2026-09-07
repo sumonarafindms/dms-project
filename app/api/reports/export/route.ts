@@ -23,10 +23,17 @@
  *
  * ## The rule this route must never break
  *
- * **The export is the whole report, not the page being viewed.** Paging the
- * screen and paging the file would mean a user on page 1 exports sixty rows
- * and believes they have the report. `?page=` is deliberately not read here,
- * and `tests/report-export.smoke.test.ts` fails if it ever is.
+ * **The export is the whole report, not the page being viewed, and not what a
+ * search happens to be showing.** Paging the screen and paging the file would
+ * mean a user on page 1 exports sixty rows and believes they have the report.
+ * Neither `?page=` nor `?q=` is read here, and
+ * `tests/report-export.smoke.test.ts` fails if either ever is.
+ *
+ * `q` is the owner's explicit choice: Export always gives the whole report, so
+ * what the button does never depends on something typed a minute ago. Because
+ * that makes a searched screen and its download disagree, `ReportSearch` says
+ * so on screen while a search is active — an unexplained disagreement about
+ * numbers is what destroys trust in a report.
  *
  * The rows come from `lib/report-builders.ts` — the same functions the pages
  * render from — so the file and the screen cannot disagree about ordering,
@@ -71,6 +78,7 @@ export async function GET(req: Request) {
     view: p("view"),
     kind: p("kind"),
     fields: p("fields"),
+    supervisor: p("supervisor"),
   });
   if (!built) return NextResponse.json({ error: "Unknown report" }, { status: 404 });
 

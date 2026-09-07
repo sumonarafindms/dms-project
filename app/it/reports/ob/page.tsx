@@ -9,7 +9,7 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange } from "../../../../lib/report-range";
-import { buildOpeningBalance, reportExportHref } from "../../../../lib/report-builders";
+import { buildOpeningBalance, reportExportHref, searchReport } from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
 import { RetailerReportView, identityColumns, money } from "../RetailerReportView";
 import type { Column } from "../../../components/ReportTable";
@@ -20,12 +20,15 @@ export const dynamic = "force-dynamic";
 export default async function OpeningBalance({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const { rows, total, withBalance, totalBalance } = await buildOpeningBalance(range);
+  const { rows, total, withBalance, totalBalance, matched, unfiltered } = searchReport(
+    await buildOpeningBalance(range),
+    sp.q,
+  );
 
   const columns: Column<RetailerReportRow>[] = [
     ...identityColumns,
@@ -45,6 +48,7 @@ export default async function OpeningBalance({
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("ob", range)}
+      search={{ matched, total: unfiltered, noun: "retailer" }}
       paging={{
         page: sp.page,
         noun: "retailer",

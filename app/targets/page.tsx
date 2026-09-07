@@ -46,6 +46,7 @@ import {
   PageHeader,
   SectionHead,
   SummaryStrip,
+  NumberInput,
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 
@@ -265,22 +266,12 @@ export default function TargetsPage() {
   /**
    * A number field inside the dialog.
    *
-   * `onWheel` blurs the input rather than preventing the event: preventing it
-   * would stop the page scrolling while the pointer happens to be over a field,
-   * which feels broken. Blurring lets the scroll through and takes the value
-   * out of harm's way, because an unfocused number input ignores the wheel.
+   * `NumberInput` rather than a raw input: the wheel guard lives in the kit now,
+   * because writing it here is what let two other fields ship without it.
    */
   const draftField = (k: NumericField, label: string) => (
     <Field key={k} label={label}>
-      <input
-        className="kit-input"
-        type="number"
-        min="0"
-        inputMode="numeric"
-        value={draft[k] ?? 0}
-        onWheel={(e) => e.currentTarget.blur()}
-        onChange={(e) => setDraftField(k, e.target.value)}
-      />
+      <NumberInput min="0" value={draft[k] ?? 0} onChange={(e) => setDraftField(k, e.target.value)} />
     </Field>
   );
 

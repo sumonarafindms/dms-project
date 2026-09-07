@@ -8,7 +8,7 @@
  * to fill the space.
  */
 
-import { VALUE_GROUPS, buildValue, reportExportHref } from "../../../lib/report-builders";
+import { VALUE_GROUPS, buildValue, reportExportHref, searchReport } from "../../../lib/report-builders";
 import type { ValueGroup, ValueRow } from "../../../lib/report-builders";
 import { reportPageHref } from "../../../lib/report-paging";
 import type { ReportRange } from "../../../lib/report-range";
@@ -24,16 +24,18 @@ export async function ValueReport({
   range,
   group,
   page,
+  q,
 }: {
   metric: "c2c" | "c2s";
   range: ReportRange;
   group: ValueGroup;
   page?: string;
+  q?: string;
 }) {
   const label = metric.toUpperCase();
   const hasTarget = metric === "c2c";
   const showTarget = hasTarget && group !== "retailer";
-  const { rows, total, totalTarget } = await buildValue(range, metric, group);
+  const { rows, total, totalTarget, matched, unfiltered } = searchReport(await buildValue(range, metric, group), q);
 
   const columns: Column<ValueRow>[] = [
     { key: "name", label: group === "retailer" ? "Retailer" : group === "rso" ? "RSO" : "Supervisor" },
@@ -69,6 +71,7 @@ export async function ValueReport({
       rows={rows}
       columns={columns}
       exportHref={reportExportHref(metric, range, groupParam ? { group: groupParam } : {})}
+      search={{ matched, total: unfiltered, noun: group === "retailer" ? "retailer" : "row" }}
       paging={{
         page,
         noun: group === "retailer" ? "retailer" : "row",

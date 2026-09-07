@@ -73,6 +73,84 @@ export type Built<T> = {
 
 const round = (n: number) => Math.round(n);
 
+/* ------------------------------------------------------------------ *
+ * Search
+ * ------------------------------------------------------------------ */
+
+/**
+ * Narrow a built report to the rows matching a search.
+ *
+ * ## Why it matches against the EXPORT rows
+ *
+ * `exportRows` is the report stated as one fact per column — the retailer, its
+ * code, its wallet, the supervisor, the RSO, the RSO's wallet, the BP, whether
+ * SSO is complete. Matching against those means a search covers every column a
+ * reader can see, in every one of the twelve reports, without each report
+ * having to declare which of its fields are searchable — a list that would be
+ * wrong the first time a column was added.
+ *
+ * The display rows and the export rows are built in lockstep from the same
+ * source, so index `i` is the same record in both. That is what lets this
+ * filter one and keep the other aligned.
+ *
+ * ## What it deliberately does not touch
+ *
+ * The summary figures above the table. Those describe the whole period, and
+ * searching for one supervisor must not make "Total Retailers: 2,431" read as
+ * 40. Every builder computes them before this runs, for exactly that reason.
+ */
+/**
+ * Bengali digits folded to Latin, for comparison only.
+ *
+ * Retailer and RSO wallet numbers are stored exactly as the carrier's
+ * spreadsheet wrote them, which is Latin digits: `01700000001`. A person typing
+ * on a Bengali keyboard produces `০১৭০০০০০০০০১` — the same number, not one
+ * character of which matches. The search would have found nothing and looked
+ * broken, and the operator would have had no way to tell why.
+ *
+ * Folded on both sides, so it works whichever way round the mismatch is, and
+ * only for matching — nothing displayed or exported is rewritten. U+09E6…U+09EF
+ * are the Bengali digits ০–৯ in order, so subtracting the base gives the value.
+ */
+export const foldDigits = (s: string) => s.replace(/[\u09e6-\u09ef]/g, (d) => String(d.charCodeAt(0) - 0x09e6));
+
+export function searchReport<B extends Built<unknown>>(
+  built: B,
+  q?: string,
+): B & { matched: number; unfiltered: number } {
+  /*
+   * The generic is `B extends Built<unknown>` rather than `Built<T>` so the
+   * builder's own extras — `sellers`, `zero`, `withBalance`, `totalC2s` — come
+   * through untouched. The first version returned `Built<T> & {…}`, which
+   * silently erased them and broke every summary strip.
+   *
+   * The count is `unfiltered`, not `total`: four builders already return a
+   * `total` of their own meaning something else (retailers in the period, not
+   * rows before the search), and reusing the name shadowed theirs.
+   */
+  const unfiltered = built.rows.length;
+  const needle = foldDigits((q ?? "").trim().toLowerCase());
+  if (!needle) return { ...built, matched: unfiltered, unfiltered };
+
+  const keep: number[] = [];
+  built.exportRows.forEach((row, i) => {
+    // Joined with a space so a query cannot accidentally span two columns —
+    // searching "Shuvo Pranto" should not match a row whose supervisor ends in
+    // "Shuvo" and whose next column begins "Pranto" only because the two were
+    // concatenated without a gap.
+    const hay = foldDigits(Object.values(row).join(" ").toLowerCase());
+    if (hay.includes(needle)) keep.push(i);
+  });
+
+  return {
+    ...built,
+    rows: keep.map((i) => built.rows[i]),
+    exportRows: keep.map((i) => built.exportRows[i]),
+    matched: keep.length,
+    unfiltered,
+  };
+}
+
 /*
  * ------------------------------------------------------------------ *
  * Spreadsheet identity blocks
@@ -132,9 +210,34 @@ export const personIdentity = (r: RsoSummaryRow, level: "supervisor" | "rso"): E
 /* ------------------------------------------------------------------ *
  * Daily Summary
  * ------------------------------------------------------------------ */
+
+/**
+ * Daily Summary answers the same question at three levels.
+ *
+ * It used to show supervisors and nothing else, and the supervisor's name was
+ * plain text — so the obvious gesture, clicking the name of the team you want
+ * to look at, did nothing. There was no way to get from "Shaheen's team did 7
+ * GA" to "which of Shaheen's ten RSOs did it".
+ *
+ * Now the level is in the URL, like the date range and the page, so a view of
+ * one team is a link someone can send.
+ */
+export const DAILY_LEVELS = [
+  { key: "supervisor", label: "By Supervisor" },
+  { key: "rso", label: "By RSO" },
+  { key: "bp", label: "By BP" },
+] as const;
+export type DailyLevel = (typeof DAILY_LEVELS)[number]["key"];
+
+export const dailyLevel = (v?: string): DailyLevel =>
+  (DAILY_LEVELS.find((l) => l.key === v)?.key ?? "supervisor") as DailyLevel;
+
 export type DailyRow = {
   id: string;
   name: string;
+  /** Blank at supervisor level, where the row IS the supervisor. */
+  supervisor: string;
+  /** RSOs under a supervisor; 0 for an RSO or BP row. */
   rsoCount: number;
   retailerCount: number;
   standardGa: number;
@@ -143,50 +246,122 @@ export type DailyRow = {
   achievement: number;
   c2cAmount: number;
   c2sAmount: number;
+  /**
+   * Whether this row has C2C/C2S at all.
+   *
+   * A BP's activations are counted through BpAssignment, which carries a GA
+   * target and nothing else — there is no per-BP recharge in this schema. The
+   * columns are therefore absent from the BP view rather than filled with
+   * zeros, which would read as "this BP sold nothing" instead of "this system
+   * does not track that for a BP".
+   */
+  hasValue: boolean;
 };
 
-export async function buildDaily(range: ReportRange): Promise<Built<DailyRow>> {
+export async function buildDaily(
+  range: ReportRange,
+  level: DailyLevel = "supervisor",
+  supervisor?: string,
+): Promise<Built<DailyRow>> {
   const mtd = monthToDate(range);
-  const [supervisors, mtdRows] = await Promise.all([
-    supervisorSummary(range),
-    // The GA target is a MONTHLY figure. Comparing one day's activations
-    // against it produced an "Achievement %" that read as catastrophic
-    // under-performance every morning; month-to-date is the comparison that
-    // matches the denominator. Skipped when the range already is the month.
-    isMonthToDate(range) ? Promise.resolve(null) : supervisorSummary(mtd),
-  ]);
-  const mtdGaById = new Map((mtdRows ?? supervisors).map((r: SupervisorSummaryRow) => [r.id, r.standardGa]));
+  // The GA target is a MONTHLY figure. Comparing one day's activations against
+  // it produced an "Achievement %" that read as catastrophic under-performance
+  // every morning; month-to-date is the comparison that matches the
+  // denominator. Skipped when the range already is the month.
+  const needsMtd = !isMonthToDate(range);
 
-  const rows: DailyRow[] = supervisors.map((s) => {
-    const mtdGa = mtdGaById.get(s.id) ?? s.standardGa;
-    return {
-      id: s.id,
-      name: s.name,
-      rsoCount: s.rsoCount,
-      retailerCount: s.retailerCount,
-      standardGa: s.standardGa,
-      mtdGa,
-      gaTarget: s.gaTarget,
-      achievement: targetPercent(mtdGa, s.gaTarget),
-      c2cAmount: s.c2cAmount,
-      c2sAmount: s.c2sAmount,
-    };
-  });
+  let rows: DailyRow[];
 
+  if (level === "bp") {
+    const [now, then] = await Promise.all([bpActivation(range), needsMtd ? bpActivation(mtd) : Promise.resolve(null)]);
+    const mtdById = new Map((then ?? now).map((b) => [b.id, b.activation]));
+    rows = now.map((b) => {
+      const mtdGa = mtdById.get(b.id) ?? b.activation;
+      return {
+        id: b.id,
+        name: b.name,
+        supervisor: b.sub, // the RSO this BP reports to
+        rsoCount: 0,
+        retailerCount: 0,
+        standardGa: b.activation,
+        mtdGa,
+        gaTarget: b.target,
+        achievement: targetPercent(mtdGa, b.target),
+        c2cAmount: 0,
+        c2sAmount: 0,
+        hasValue: false,
+      };
+    });
+  } else if (level === "rso") {
+    const [now, then] = await Promise.all([rsoSummary(range), needsMtd ? rsoSummary(mtd) : Promise.resolve(null)]);
+    const mtdById = new Map((then ?? now).map((r) => [r.id, r.ga]));
+    rows = now.map((r) => {
+      const mtdGa = mtdById.get(r.id) ?? r.ga;
+      return {
+        id: r.id,
+        name: r.name,
+        supervisor: r.supervisor,
+        rsoCount: 0,
+        retailerCount: r.retailerCount,
+        standardGa: r.ga,
+        mtdGa,
+        gaTarget: r.gaTarget,
+        achievement: targetPercent(mtdGa, r.gaTarget),
+        c2cAmount: r.c2c,
+        c2sAmount: r.c2s,
+        hasValue: true,
+      };
+    });
+    /*
+     * Drill-down from a supervisor's name.
+     *
+     * Filtered here rather than in the page so the row count in the summary and
+     * the pager agree with what is on screen, and so the link is a complete
+     * description of the view.
+     */
+    if (supervisor) rows = rows.filter((r) => r.supervisor === supervisor);
+  } else {
+    const [now, then] = await Promise.all([
+      supervisorSummary(range),
+      needsMtd ? supervisorSummary(mtd) : Promise.resolve(null),
+    ]);
+    const mtdById = new Map((then ?? now).map((r: SupervisorSummaryRow) => [r.id, r.standardGa]));
+    rows = now.map((s) => {
+      const mtdGa = mtdById.get(s.id) ?? s.standardGa;
+      return {
+        id: s.id,
+        name: s.name,
+        supervisor: "",
+        rsoCount: s.rsoCount,
+        retailerCount: s.retailerCount,
+        standardGa: s.standardGa,
+        mtdGa,
+        gaTarget: s.gaTarget,
+        achievement: targetPercent(mtdGa, s.gaTarget),
+        c2cAmount: s.c2cAmount,
+        c2sAmount: s.c2sAmount,
+        hasValue: true,
+      };
+    });
+  }
+
+  const who = level === "supervisor" ? "Supervisor" : level === "rso" ? "RSO" : "BP";
   return {
     rows,
     exportRows: rows.map((r) => ({
-      Supervisor: r.name,
+      [who]: r.name,
       // "RSOs"/"Retailers", not "RSO"/"Retailer": these are counts, and the
       // singular headings read as though the cell held a name.
-      RSOs: r.rsoCount,
-      Retailers: r.retailerCount,
+      ...(level === "supervisor"
+        ? { RSOs: r.rsoCount, Retailers: r.retailerCount }
+        : level === "rso"
+          ? { Supervisor: r.supervisor, Retailers: r.retailerCount }
+          : { RSO: blankIfDash(r.supervisor) }),
       "GA (period)": r.standardGa,
       "GA (MTD)": r.mtdGa,
       "Monthly GA Target": r.gaTarget,
       "MTD Achievement %": r.gaTarget ? r.achievement : "",
-      C2C: round(r.c2cAmount),
-      C2S: round(r.c2sAmount),
+      ...(r.hasValue ? { C2C: round(r.c2cAmount), C2S: round(r.c2sAmount) } : {}),
     })),
   };
 }
@@ -759,6 +934,8 @@ export type ExportQuery = {
   kind?: string;
   fields?: string;
   metric?: string;
+  /** Daily Summary's drill-down: one supervisor's RSOs. */
+  supervisor?: string;
 };
 
 type Entry = { build: (q: ExportQuery, range: ReportRange) => Promise<{ exportRows: ExportRow[] }>; stem: string };
@@ -772,7 +949,13 @@ type Entry = { build: (q: ExportQuery, range: ReportRange) => Promise<{ exportRo
  * cannot ship with an Export button that 404s.
  */
 export const REPORTS: Record<string, Entry> = {
-  daily: { stem: "daily-summary", build: (_q, r) => buildDaily(r) },
+  daily: {
+    stem: "daily-summary",
+    build: (q, r) => {
+      const level = dailyLevel(q.level);
+      return buildDaily(r, level, level === "rso" ? q.supervisor : undefined);
+    },
+  },
   activation: {
     stem: "activation",
     build: (q, r) => buildActivation(r, activationGroup(q.group)),
@@ -823,20 +1006,32 @@ export async function buildExport(key: string, q: ExportQuery) {
 /**
  * The Export Excel href for a report.
  *
- * **`page` is never included, and that is the point.** The screen shows sixty
- * rows; the file is the report. A `page` parameter here would silently turn
- * every export into whatever slice the reader happened to be looking at, and
- * they would have no way to tell from the file that rows were missing.
+ * **Neither `page` nor `q` is ever included, and that is the point.** The
+ * screen shows sixty rows of whatever the search matched; the file is the
+ * report. Either parameter here would silently turn every export into whatever
+ * slice the reader happened to be looking at, and they would have no way to
+ * tell from the file that rows were missing.
+ *
+ * Because that makes a searched screen and its download disagree, the search
+ * bar says so on screen while a search is active — see `ReportSearch`.
  */
 export function reportExportHref(key: string, range: ReportRange, extra: Record<string, string> = {}): string {
   const q = new URLSearchParams({ report: key, from: range.from, to: range.to });
   for (const [k, v] of Object.entries(extra)) {
-    // Dropped here rather than trusted not to be passed. The first version of
-    // this function copied `extra` wholesale and carried a comment promising
-    // it did not — a promise in a comment that the code did not keep, which is
-    // how a caller ends up exporting one page and nobody notices. The refusal
-    // belongs in the one place that builds every export URL.
-    if (k === "page") continue;
+    /*
+     * Dropped here rather than trusted not to be passed.
+     *
+     * The first version of this function copied `extra` wholesale and carried a
+     * comment promising it did not — a promise in a comment that the code did
+     * not keep, which is how a caller ends up exporting one page and nobody
+     * notices. The refusal belongs in the one place that builds every export
+     * URL.
+     *
+     * `q` joined the list in v154 for the same reason and was caught the same
+     * way: the search was added, the export URL quietly carried it, and only a
+     * test that asserted the absence found it.
+     */
+    if (k === "page" || k === "q") continue;
     if (v) q.set(k, v);
   }
   return `/api/reports/export?${q.toString()}`;

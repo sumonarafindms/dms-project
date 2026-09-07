@@ -14,7 +14,7 @@ import { rangeLabel, rangeQuery } from "../../../lib/report-range";
 import type { ReportRange } from "../../../lib/report-range";
 import type { RetailerReportRow } from "../../../lib/report-data";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
-import { ReportActionBar, ReportDateBar } from "../../components/ReportShell";
+import { ReportActionBar, ReportDateBar, ReportSearch } from "../../components/ReportShell";
 import { ReportTable } from "../../components/ReportTable";
 import type { Column, ReportPaging } from "../../components/ReportTable";
 import { Icon } from "../../components/icons";
@@ -30,6 +30,7 @@ export function RetailerReportView({
   exportHref,
   summaryItems,
   paging,
+  search,
   emptyTitle,
   emptyHint,
   children,
@@ -44,6 +45,8 @@ export function RetailerReportView({
   exportHref: string;
   summaryItems: { label: string; value: string; tone?: "teal" | "amber" }[];
   paging?: ReportPaging;
+  /** Rows matching the search, and rows in the report. Omit to hide the box. */
+  search?: { matched: number; total: number; noun: string };
   emptyTitle: string;
   emptyHint?: string;
   /** View switch, rendered between the date bar and the summary. */
@@ -62,6 +65,7 @@ export function RetailerReportView({
       <ReportDateBar range={range} />
       {children}
       <SummaryStrip items={summaryItems} />
+      {search && <ReportSearch matched={search.matched} total={search.total} noun={search.noun} />}
       <ReportTable columns={columns} rows={rows} emptyTitle={emptyTitle} emptyHint={emptyHint} paging={paging} />
     </main>
   );

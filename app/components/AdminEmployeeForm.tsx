@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SaveNotice } from "./AdminEmployeesUI";
 import { dhakaTodayYmd } from "../../lib/business-time";
-import { Btn, Card, Check, Field, LinkBtn, PageHeader } from "./Kit";
+import { Btn, Card, Check, Field, LinkBtn, NumberInput, PageHeader } from "./Kit";
 import { Icon } from "./icons";
 import { PIN_LENGTH } from "../../lib/credential-policy";
 
@@ -187,13 +187,7 @@ export default function AdminEmployeeForm({
                   </Field>
                 )}
                 <Field label="BP GA Target">
-                  <input
-                    className="kit-input"
-                    type="number"
-                    min="0"
-                    name="gaTarget"
-                    defaultValue={initial.gaTarget || 0}
-                  />
+                  <NumberInput min="0" name="gaTarget" defaultValue={initial.gaTarget || 0} />
                 </Field>
                 <Field label="BP Display Name">
                   <input className="kit-input" name="name" defaultValue={initial.name || ""} />

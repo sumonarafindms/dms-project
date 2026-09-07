@@ -354,10 +354,19 @@ monitors read 500 as "the app is broken" rather than "its database is".
   widths; see the reasoning above, including that `style-src-attr` and the
   `'unsafe-inline'` in `style-src` must go together, before spending the 101
   rules it costs.
-- **Upgrade `xlsx`** — blocked by this sandbox's egress; command above. The
-  prototype-pollution path is already neutralised by `normalizeHeader` (and
-  tested), and the ReDoS path is bounded by the size and row caps, but the
-  upgrade is still the real fix.
+- **`xlsx` stays, and this is a decision rather than a task.** `npm audit`
+  reports it high severity with _no fix available_, and there is no version to
+  upgrade to. Replacing it with `exceljs` was investigated in v155 and is not
+  possible: **`exceljs` has no legacy BIFF reader**, and the owner confirmed
+  that `.xls` files are uploaded. Removing `xlsx` would break every one of
+  them.
+
+  What limits the exposure instead: the prototype-pollution path is neutralised
+  by `normalizeHeader` (tested), the ReDoS path is bounded by the size and row
+  caps, and since v153 the package only ever _reads_ — every file the app hands
+  out is produced by `exceljs`. Revisit only if `xlsx` ships a fix or a
+  maintained BIFF reader appears.
+
 - **`postcss` and `deepmerge-ts`** report high-severity advisories that npm can
   only resolve with `npm audit fix --force`, which changes major versions.
   Not run: forcing a breaking upgrade of the CSS pipeline unattended is a worse

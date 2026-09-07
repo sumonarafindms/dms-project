@@ -9,7 +9,7 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange } from "../../../../lib/report-range";
-import { buildSso, reportExportHref } from "../../../../lib/report-builders";
+import { buildSso, reportExportHref, searchReport } from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
 import { SSO_MIN_MONTHLY_STANDARD_GA } from "../../../../lib/business-rules";
 import { RetailerReportView, identityColumns } from "../RetailerReportView";
@@ -21,12 +21,12 @@ export const dynamic = "force-dynamic";
 export default async function SsoPending({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const { rows, sellers, complete } = await buildSso(range);
+  const { rows, sellers, complete, matched, unfiltered } = searchReport(await buildSso(range), sp.q);
 
   const columns: Column<RetailerReportRow>[] = [
     ...identityColumns,
@@ -48,6 +48,7 @@ export default async function SsoPending({
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("sso", range)}
+      search={{ matched, total: unfiltered, noun: "retailer" }}
       paging={{
         page: sp.page,
         noun: "retailer",

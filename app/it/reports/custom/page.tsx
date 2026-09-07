@@ -19,6 +19,7 @@ import {
   customFieldsFor,
   customLevel,
   reportExportHref,
+  searchReport,
 } from "../../../../lib/report-builders";
 import type { CustomField, CustomLevel, CustomRow } from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
@@ -31,14 +32,14 @@ export const dynamic = "force-dynamic";
 export default async function CustomReport({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; level?: string; fields?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; level?: string; fields?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
   const level = customLevel(sp.level);
   const { available, active } = customFieldsFor(level, sp.fields);
-  const { rows } = await buildCustom(range, level, active);
+  const { rows, matched, unfiltered } = searchReport(await buildCustom(range, level, active), sp.q);
 
   const isMoney = (k: CustomField) => k === "c2c" || k === "c2s" || k === "ob";
   const show = (r: CustomRow, k: CustomField) => {
@@ -84,6 +85,7 @@ export default async function CustomReport({
         ...(levelParam ? { level: levelParam } : {}),
         fields: fieldsParam,
       })}
+      search={{ matched, total: unfiltered, noun: level === "retailer" ? "retailer" : "row" }}
       paging={{
         page: sp.page,
         noun: level === "retailer" ? "retailer" : "row",

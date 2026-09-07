@@ -12,7 +12,7 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange } from "../../../../lib/report-range";
-import { buildLso, reportExportHref } from "../../../../lib/report-builders";
+import { buildLso, reportExportHref, searchReport } from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
 import { LSO_MIN_MONTHLY_AMOUNT, LSO_MIN_MONTHLY_TRANSACTIONS } from "../../../../lib/business-rules";
 import { RetailerReportView, identityColumns, money } from "../RetailerReportView";
@@ -24,12 +24,12 @@ export const dynamic = "force-dynamic";
 export default async function LsoPending({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const { rows, total, complete } = await buildLso(range);
+  const { rows, total, complete, matched, unfiltered } = searchReport(await buildLso(range), sp.q);
 
   const columns: Column<RetailerReportRow>[] = [
     ...identityColumns,
@@ -57,6 +57,7 @@ export default async function LsoPending({
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("lso", range)}
+      search={{ matched, total: unfiltered, noun: "retailer" }}
       paging={{
         page: sp.page,
         noun: "retailer",

@@ -4,6 +4,7 @@ import path from "node:path";
 import { rel as relativeTo } from "./paths";
 import { EXCEL_DEFAULT_WIDTH, reportWorkbook } from "../lib/report-workbook";
 import { retailerIdentity } from "../lib/report-builders";
+import type { ExportRow } from "../lib/report-builders";
 
 /**
  * A spreadsheet column holds one fact, and the sheet is readable when opened.
@@ -125,7 +126,7 @@ describe("export column shape", () => {
 });
 
 describe("the workbook people open", () => {
-  const rows = [
+  const rows: ExportRow[] = [
     {
       Retailer: "1 to 99 STORE AND COMMUNICATION CENTRE",
       "Retailer Code": "R401748",
@@ -231,6 +232,43 @@ describe("the workbook people open", () => {
 describe("the targets page cannot be edited by scrolling", () => {
   const targets = () => codeOf(fs.readFileSync(path.join(ROOT, "app", "targets", "page.tsx"), "utf8"));
 
+  it("has no raw number input anywhere in the app", () => {
+    /*
+     * The rule that v153 wrote for one page, applied where it belongs.
+     *
+     * v153 replaced the Targets grid's number inputs with a dialog and guarded
+     * that page. v155 found the same unguarded `<input type="number">` twice
+     * more — both BP GA target fields — because the guard had been written
+     * where the bug was noticed rather than where number fields are made. The
+     * wheel hazard belongs to the control, so it lives in `NumberInput` and
+     * this check covers every file rather than one.
+     */
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else if (/\.tsx$/.test(e.name) && e.name !== "Kit.tsx") {
+          if (/type="number"/.test(codeOf(fs.readFileSync(full, "utf8")))) offenders.push(relativeTo(ROOT)(full));
+        }
+      }
+    };
+    walk(path.join(ROOT, "app"));
+    expect(
+      offenders,
+      `these use a raw number input instead of NumberInput, so a scroll can change their value:\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("guards the wheel inside NumberInput itself", () => {
+    const kit = codeOf(fs.readFileSync(path.join(ROOT, "app", "components", "Kit.tsx"), "utf8"));
+    expect(kit).toMatch(/export function NumberInput/);
+    // Blur, not preventDefault: stopping the event would freeze page scrolling
+    // whenever the pointer crossed a field.
+    expect(kit).toMatch(/onWheel=\{\(e\) => \{[\s\S]{0,120}currentTarget\.blur\(\)/);
+    expect(kit).not.toMatch(/onWheel[\s\S]{0,80}preventDefault/);
+  });
+
   it("has no number input outside the edit dialog", () => {
     /*
      * A focused `<input type="number">` changes value on a mouse wheel. Seven
@@ -239,15 +277,16 @@ describe("the targets page cannot be edited by scrolling", () => {
      * went to the database with everything else. Nothing would have said so.
      */
     const src = targets();
-    const numberInputs = [...src.matchAll(/type="number"/g)].length;
-    expect(numberInputs, "the targets table has more than the dialog's one field factory").toBe(1);
-    expect(src, "the one number input is the dialog's").toMatch(/draftField[\s\S]{0,400}type="number"/);
+    // The table renders figures; only the dialog's field factory makes an input.
+    expect([...src.matchAll(/<NumberInput\b/g)], "the targets table builds inputs again").toHaveLength(1);
+    expect(src, "the one field belongs to the dialog").toMatch(/draftField[\s\S]{0,400}<NumberInput/);
   });
 
   it("blurs a number field the wheel passes over", () => {
-    // Belt and braces for the dialog itself: it is short today, but "short
-    // enough not to scroll" is not a guarantee and the failure is silent.
-    expect(targets()).toMatch(/onWheel=\{\(e\) => e\.currentTarget\.blur\(\)\}/);
+    // The guard moved into the kit in v155; the page inherits it by using the
+    // component, which is checked above.
+    const kit = codeOf(fs.readFileSync(path.join(ROOT, "app", "components", "Kit.tsx"), "utf8"));
+    expect(kit).toMatch(/currentTarget\.blur\(\)/);
   });
 
   it("offers an edit control on every row it lets you edit", () => {

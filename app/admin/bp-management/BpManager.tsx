@@ -14,7 +14,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SaveNotice } from "../../components/AdminEmployeesUI";
 import { Icon } from "../../components/icons";
-import { Btn, Card, EmptyState, Field, Row, SectionHead, Table } from "../../components/Kit";
+import { Btn, Card, EmptyState, Field, NumberInput, Row, SectionHead, Table } from "../../components/Kit";
 import type { Column } from "../../components/Kit";
 import { dhakaTodayYmd } from "../../../lib/business-time";
 
@@ -176,7 +176,7 @@ export default function BpManager({
               <input className="kit-input" type="date" name="startDate" defaultValue={today} required />
             </Field>
             <Field label="BP GA target">
-              <input className="kit-input" type="number" min="0" name="gaTarget" defaultValue="0" inputMode="numeric" />
+              <NumberInput min="0" name="gaTarget" defaultValue="0" />
             </Field>
             {/* Search and select are two controls, so they are two fields: a
                 <label> points at its first control only, and the old single

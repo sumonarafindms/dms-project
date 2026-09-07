@@ -26,6 +26,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Btn, LinkBtn } from "./Kit";
+import { ServerSearchBar } from "./ServerSearchBar";
 import { Icon } from "./icons";
 import { rangeDayCount, rangeLabel, rangePresets } from "../../lib/report-range";
 import type { ReportRange } from "../../lib/report-range";
@@ -168,6 +169,49 @@ export function ReportActionBar({
             </Btn>
           </div>
         </div>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Search
+ * ------------------------------------------------------------------ */
+
+/**
+ * The search box every report carries.
+ *
+ * ## Why it is its own component rather than `ServerSearchBar`
+ *
+ * `ServerSearchBar` is the right machinery — soft navigation, debounce, caret
+ * survives, page number reset — and this reuses it. What it does not know is
+ * the one thing a reader has to be told here:
+ *
+ * **Export Excel ignores the search.** The owner chose that deliberately: the
+ * button always gives the whole report, so what it does never depends on
+ * something typed a minute ago. The cost is that a searched screen and its
+ * download disagree, and an unexplained disagreement about numbers is exactly
+ * the kind of thing that erodes trust in a report. So while a search is
+ * narrowing the table, the bar says so in as many words.
+ *
+ * The count is "N of M", never "N": a reader who searched needs to know both
+ * how many matched and how many there were.
+ */
+export function ReportSearch({ matched, total, noun }: { matched: number; total: number; noun: string }) {
+  const searching = matched !== total;
+  return (
+    <>
+      <ServerSearchBar
+        placeholder={`Search ${noun}, code, wallet or supervisor`}
+        resultCount={matched}
+        resultNoun={noun}
+      />
+      {searching && (
+        <p className="kit-hint is-xs no-print kit-mb-12">
+          Showing {matched.toLocaleString()} of {total.toLocaleString()} {noun}
+          {total === 1 ? "" : "s"}. <b>Export Excel still downloads the full report</b> — clear the search first if you
+          want only these rows.
+        </p>
       )}
     </>
   );

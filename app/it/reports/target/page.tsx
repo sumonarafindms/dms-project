@@ -9,7 +9,13 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange } from "../../../../lib/report-range";
-import { TARGET_GROUPS, buildTarget, reportExportHref, targetGroup } from "../../../../lib/report-builders";
+import {
+  TARGET_GROUPS,
+  buildTarget,
+  reportExportHref,
+  targetGroup,
+  searchReport,
+} from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
 import type { RsoSummaryRow } from "../../../../lib/report-data";
 import { targetPercent } from "../../../../lib/achievement";
@@ -23,13 +29,13 @@ const pctCell = (a: number, t: number) => (t ? `${targetPercent(a, t)}%` : "—"
 export default async function TargetReport({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
   const group = targetGroup(sp.group);
-  const { rows } = await buildTarget(range, group);
+  const { rows, matched, unfiltered } = searchReport(await buildTarget(range, group), sp.q);
 
   const columns: Column<RsoSummaryRow>[] = [
     { key: "name", label: group === "supervisor" ? "Supervisor" : "RSO" },
@@ -65,6 +71,7 @@ export default async function TargetReport({
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("target", range, groupParam ? { group: groupParam } : {})}
+      search={{ matched, total: unfiltered, noun: "row" }}
       paging={{
         page: sp.page,
         noun: group === "supervisor" ? "supervisor" : "RSO",

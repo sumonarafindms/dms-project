@@ -8,7 +8,13 @@
 
 import { requireUser } from "../../../../lib/auth";
 import { resolveRange, rangeQuery } from "../../../../lib/report-range";
-import { LOW_C2S_VIEWS, buildLowC2s, lowC2sView, reportExportHref } from "../../../../lib/report-builders";
+import {
+  LOW_C2S_VIEWS,
+  buildLowC2s,
+  lowC2sView,
+  reportExportHref,
+  searchReport,
+} from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
 import { RetailerReportView, identityColumns, money } from "../RetailerReportView";
 import type { Column } from "../../../components/ReportTable";
@@ -20,13 +26,13 @@ export const dynamic = "force-dynamic";
 export default async function LowC2s({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; view?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; view?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
   const view = lowC2sView(sp.view);
-  const { rows, total, zero, totalC2s } = await buildLowC2s(range, view);
+  const { rows, total, zero, totalC2s, matched, unfiltered } = searchReport(await buildLowC2s(range, view), sp.q);
 
   const columns: Column<RetailerReportRow>[] = [
     ...identityColumns,
@@ -48,6 +54,7 @@ export default async function LowC2s({
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("low-c2s", range, viewParam ? { view: viewParam } : {})}
+      search={{ matched, total: unfiltered, noun: "retailer" }}
       paging={{
         page: sp.page,
         noun: "retailer",

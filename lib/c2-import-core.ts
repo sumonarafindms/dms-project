@@ -21,7 +21,7 @@
  */
 
 import * as XLSX from "xlsx";
-import { assertRowLimit } from "./upload-safety";
+import { assertRowLimit, looksLikeWorkbook } from "./upload-safety";
 import crypto from "crypto";
 import { phoneKey } from "./phone";
 
@@ -170,12 +170,23 @@ export function parseTabText(bytes: Buffer): Matrix | null {
 }
 
 export function readMatrix(bytes: Buffer, kind: C2Kind): Matrix {
-  const tab = parseTabText(bytes);
-  if (tab) {
-    // The tab-separated export returns before the workbook path below, so it
-    // needs the same cap — a .txt file is not smaller by nature.
-    assertRowLimit(tab.length, `${kind} text export`);
-    return tab;
+  /*
+   * The workbook check comes FIRST, and that ordering is the whole fix.
+   *
+   * `parseTabText` used to run first and decide by looking for a tab and the
+   * word RETAILER_CODE in the decoded bytes. A legacy .xls is an OLE2 file
+   * whose strings are UTF-16, so decoded as text it contains both — the
+   * sniffer claimed every .xls, split the binary on tabs, and the real parser
+   * never ran. See `looksLikeWorkbook` for the full story.
+   */
+  if (!looksLikeWorkbook(bytes)) {
+    const tab = parseTabText(bytes);
+    if (tab) {
+      // The tab-separated export returns before the workbook path below, so it
+      // needs the same cap — a .txt file is not smaller by nature.
+      assertRowLimit(tab.length, `${kind} text export`);
+      return tab;
+    }
   }
 
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });

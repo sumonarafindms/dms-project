@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { assertRowLimit } from "./upload-safety";
+import { assertRowLimit, looksLikeWorkbook } from "./upload-safety";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -97,9 +97,20 @@ function parseTabText(bytes: Buffer): Matrix | null {
     .filter((line) => line.trim().length > 0)
     .map((line) => line.split("\t"));
 }
-function readMatrix(bytes: Buffer): Matrix {
-  const tab = parseTabText(bytes);
-  if (tab) return tab;
+/**
+ * Exported for `tests/import-formats.smoke.test.ts`.
+ *
+ * The rest of this module needs a database, so the only way to guard the
+ * format handling — the part that was broken for every `.xls` — without one is
+ * to reach the reader directly.
+ */
+export function readMatrix(bytes: Buffer): Matrix {
+  // Workbook first — see `looksLikeWorkbook`. Sniffing the text first made
+  // every .xls upload fail with a wall of mojibake.
+  if (!looksLikeWorkbook(bytes)) {
+    const tab = parseTabText(bytes);
+    if (tab) return tab;
+  }
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("No worksheet found in OB file.");

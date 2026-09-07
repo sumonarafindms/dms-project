@@ -21,6 +21,7 @@ import {
   buildPerformance,
   isPerformanceKind,
   reportExportHref,
+  searchReport,
 } from "../../../../../lib/report-builders";
 import type { PerformanceRow } from "../../../../../lib/report-builders";
 import { reportPageHref } from "../../../../../lib/report-paging";
@@ -36,7 +37,7 @@ export default async function Performance({
   searchParams,
 }: {
   params: Promise<{ kind: string }>;
-  searchParams: Promise<{ from?: string; to?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const { kind: raw } = await params;
@@ -44,7 +45,7 @@ export default async function Performance({
   const kind = raw;
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const { rows } = await buildPerformance(range, kind);
+  const { rows, matched, unfiltered } = searchReport(await buildPerformance(range, kind), sp.q);
 
   const hasTargets = kind !== "retailer";
   const columns: Column<PerformanceRow>[] = [
@@ -93,6 +94,7 @@ export default async function Performance({
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("performance", range, { kind })}
+      search={{ matched, total: unfiltered, noun: kind === "retailer" ? "retailer" : kind === "bp" ? "BP" : kind }}
       paging={{
         page: sp.page,
         noun: kind === "retailer" ? "retailer" : kind === "bp" ? "BP" : kind,

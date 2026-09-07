@@ -203,6 +203,51 @@ export function Btn({ variant = "primary", size = "md", block, className = "", .
   return <button {...props} className={btnClass(variant, size, block, className)} />;
 }
 
+/**
+ * A number field that a scroll cannot change.
+ *
+ * ## The bug, and why it is in the kit rather than in a page
+ *
+ * A focused `<input type="number">` changes its value when the mouse wheel
+ * moves over it. On the Targets page that was seven fields per RSO across
+ * twenty rows, all saved in one request — scrolling the page could silently
+ * rewrite a target and send it to the database with everything else, and
+ * nothing in the UI would say so.
+ *
+ * v153 fixed that page. v155 found the same unguarded input twice more, in the
+ * two BP GA target fields, because the fix had been written where the bug was
+ * noticed instead of where number fields are made. A hazard that belongs to a
+ * control belongs to the component for that control; otherwise every new field
+ * starts out broken and waits to be noticed.
+ *
+ * `onWheel` blurs rather than calling `preventDefault`. Preventing the event
+ * would stop the page scrolling whenever the pointer happened to be over a
+ * field, which feels broken; blurring lets the scroll through and takes the
+ * value out of reach, because an unfocused number input ignores the wheel.
+ *
+ * `inputMode="numeric"` comes along for free: it is what puts a digits-only
+ * keypad in front of the ninety per cent of this app's users who are on a
+ * phone.
+ */
+export function NumberInput({
+  className = "kit-input",
+  onWheel,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      type="number"
+      inputMode={props.inputMode ?? "numeric"}
+      className={className}
+      onWheel={(e) => {
+        e.currentTarget.blur();
+        onWheel?.(e);
+      }}
+    />
+  );
+}
+
 type LinkBtnProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
   href: string;
   variant?: BtnVariant;

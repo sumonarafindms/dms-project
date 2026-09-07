@@ -8,9 +8,17 @@ export const dynamic = "force-dynamic";
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; group?: string; page?: string; q?: string }>;
 }) {
   await requireUser(["ADMIN", "IT"]);
   const sp = await searchParams;
-  return <ValueReport metric="c2c" range={resolveRange(sp.from, sp.to)} group={valueGroup(sp.group)} page={sp.page} />;
+  return (
+    <ValueReport
+      metric="c2c"
+      range={resolveRange(sp.from, sp.to)}
+      group={valueGroup(sp.group)}
+      page={sp.page}
+      q={sp.q}
+    />
+  );
 }

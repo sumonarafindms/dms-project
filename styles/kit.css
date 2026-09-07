@@ -998,6 +998,17 @@
   .kit-report-table tbody tr:last-child td {
     border-bottom: 0;
   }
+  /* A name in a table cell that leads somewhere. Underlined on hover only, so
+     a column of them does not read as a wall of blue rules. */
+  .kit-tablelink {
+    color: var(--color-teal-700);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .kit-tablelink:hover,
+  .kit-tablelink:focus-visible {
+    text-decoration: underline;
+  }
   .kit-report-table .is-right {
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -1058,6 +1069,14 @@
   }
   .kit-note > svg {
     flex-shrink: 0;
+  }
+  /* Neutral information — a filter that is on, a view that is narrowed. Not a
+     warning: nothing is wrong, the reader simply needs to know why the list is
+     shorter than they expect. */
+  .kit-note.is-info {
+    border-color: var(--color-slate-200);
+    background: var(--color-slate-50);
+    color: var(--color-slate-700);
   }
   .kit-note.is-warn {
     border-color: var(--color-amber-200);
