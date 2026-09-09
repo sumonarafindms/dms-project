@@ -17,6 +17,7 @@ import { Icon } from "../../components/icons";
 import { Btn, Card, EmptyState, Field, NumberInput, Row, SectionHead, Table } from "../../components/Kit";
 import type { Column } from "../../components/Kit";
 import { dhakaTodayYmd } from "../../../lib/business-time";
+import { apiSend } from "@/lib/api-client";
 
 type Emp = { id: string; name: string; rsoMsisdn: string; supervisor: string };
 type Retailer = {
@@ -82,17 +83,13 @@ export default function BpManager({
     setMessage("");
     setOk(false);
     const body = Object.fromEntries(new FormData(e.currentTarget));
-    const r = await fetch("/api/admin/bp-assignments", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const d = await r.json();
+    const r = await apiSend<{ updated?: boolean; code?: string }>("/api/admin/bp-assignments", "POST", body);
     setBusy(false);
     if (!r.ok) {
-      setMessage(d.error || "Could not assign BP");
+      setMessage(r.message);
       return;
     }
+    const d = r.data;
     setOk(true);
     // No more "existing BP login moved": adding a BP no longer ends this RSO's
     // previous one, so nothing is moved. `updated` distinguishes editing an
@@ -112,14 +109,9 @@ export default function BpManager({
     if (!window.confirm("End this BP assignment?")) return;
     setMessage("");
     setOk(false);
-    const r = await fetch("/api/admin/bp-assignments", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, active: false }),
-    });
-    const d = await r.json();
+    const r = await apiSend("/api/admin/bp-assignments", "PATCH", { id, active: false });
     if (!r.ok) {
-      setMessage(d.error || "Could not end assignment");
+      setMessage(r.message);
       return;
     }
     setOk(true);

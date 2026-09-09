@@ -17,6 +17,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "../components/icons";
+import { apiSend } from "@/lib/api-client";
 
 const CAPABILITIES = [
   { title: "People & access", note: "Roles, logins, permissions" },
@@ -34,21 +35,23 @@ export default function AdminAccess() {
     setBusy(true);
     setError("");
     const f = new FormData(e.currentTarget);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ identifier: f.get("identifier"), credential: f.get("credential"), admin: true }),
-      });
-      const d = await res.json();
-      setBusy(false);
-      if (!res.ok) return setError(d.error || "Sign in failed");
-      router.replace(d.redirect);
-      router.refresh();
-    } catch {
-      setBusy(false);
-      setError("Unable to reach the sign-in service. Please try again.");
-    }
+    /*
+     * The hand-rolled try/catch this replaces had no timeout, so a request that
+     * never came back left the button saying "Signing in…" indefinitely. The
+     * server's own wording still reaches the operator here — "Invalid login
+     * credentials." is a 401 too, and must not be reworded into anything about
+     * sessions.
+     */
+    const res = await apiSend<{ redirect: string }>(
+      "/api/auth/login",
+      "POST",
+      { identifier: f.get("identifier"), credential: f.get("credential"), admin: true },
+      { timeoutMs: 20_000 },
+    );
+    setBusy(false);
+    if (!res.ok) return setError(res.message);
+    router.replace(res.data.redirect);
+    router.refresh();
   }
 
   return (

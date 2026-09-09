@@ -3,7 +3,6 @@ import { assertRowLimit } from "./upload-safety";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { expectedSimSwapPrice } from "@/lib/ga-product";
 
 type Cell = string | number | boolean | Date | null | undefined;
 
@@ -113,7 +112,16 @@ function normalizeTime(value: Cell): string | null {
   return asText(value) || null;
 }
 
-export async function importGaActivationWorkbook(fileName: string, bytes: Buffer) {
+/**
+ * Everything the GA importer decides before it touches the database.
+ *
+ * Split out so the rules a row must satisfy can be tested against a real
+ * workbook without a Postgres. The rule that broke — a swap had to cost exactly
+ * 350 — lived in here and was only reachable through a function that opened a
+ * transaction, which is a large part of why nobody noticed until the tariff
+ * moved and every upload started failing.
+ */
+export function parseGaWorkbook(bytes: Buffer) {
   const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("No worksheet found in Excel file.");
@@ -166,15 +174,21 @@ export async function importGaActivationWorkbook(fileName: string, bytes: Buffer
       preErrors.push({ rowNumber: i + 1, message: "SELLING_PRICE is invalid", rawData: { retailerCode, simNo } });
       continue;
     }
-    const expectedSwapPrice = expectedSimSwapPrice(productCode);
-    if (expectedSwapPrice !== null && sellingPrice !== expectedSwapPrice) {
-      preErrors.push({
-        rowNumber: i + 1,
-        message: `${productCode} must have SELLING_PRICE ${expectedSwapPrice} for SIM SWAP verification`,
-        rawData: { retailerCode, simNo, productCode, sellingPrice, expectedSwapPrice },
-      });
-      continue;
-    }
+    /*
+     * No price check here, deliberately.
+     *
+     * This used to require a SIMWAP row to cost exactly 350 and an EV-SWAP row
+     * exactly 100, and rejected the row otherwise. The moment the swap price
+     * moved to 150 that turned into a wall: every swap row in every new GA file
+     * failed with "SIMWAP must have SELLING_PRICE 350 for SIM SWAP
+     * verification", so the whole upload could not update the list.
+     *
+     * The price is a tariff. It changes, and it will change again. What makes a
+     * row a replacement rather than a new activation is its PRODUCT_CODE, and
+     * that is what classifies it — see `classifyGaActivation`. The price is
+     * still read and stored, because it is real data worth keeping; it simply
+     * no longer decides whether the row is allowed in.
+     */
     if (!activationDate) {
       preErrors.push({ rowNumber: i + 1, message: "ACTIVATION_DATE is invalid", rawData: { retailerCode, simNo } });
       continue;
@@ -202,6 +216,15 @@ export async function importGaActivationWorkbook(fileName: string, bytes: Buffer
     );
   }
   if (!parsedRows.length) throw new Error("No valid activation rows were found in the uploaded file.");
+
+  // `preErrors` is empty by the time we get here — the throw above sees to
+  // that — but it is returned rather than dropped so the caller's accounting
+  // stays literally the same as before this split.
+  return { parsedRows, sourceRows, sheetName, preErrors };
+}
+
+export async function importGaActivationWorkbook(fileName: string, bytes: Buffer) {
+  const { parsedRows, sourceRows, sheetName, preErrors } = parseGaWorkbook(bytes);
 
   const activationDates = parsedRows.map((row) => row.activationDate.getTime());
   const reportStartDate = new Date(Math.min(...activationDates));

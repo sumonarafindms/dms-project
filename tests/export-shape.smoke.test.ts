@@ -299,11 +299,24 @@ describe("the targets page cannot be edited by scrolling", () => {
   });
 
   it("still writes only through Save all changes", () => {
-    // The dialog moved where a number is typed, not when it is persisted.
+    /*
+     * The dialog moved where a number is typed, not when it is persisted.
+     *
+     * This used to count occurrences of the string `method: "POST"`, and broke
+     * the moment the page's requests moved behind `apiSend`/`apiUpload` — while
+     * the behaviour it was protecting had not changed at all. Counting the
+     * write CALLS instead survives how a request happens to be spelled, which
+     * is what the rule was always about.
+     */
     const src = targets();
-    const posts = [...src.matchAll(/method: "POST"/g)].length;
-    expect(posts, "the dialog must not have gained a write of its own").toBe(2); // save() and upload()
+    const writes = [...src.matchAll(/\bapi(Send|Upload)\s*[<(]|method:\s*"(POST|PUT|PATCH|DELETE)"/g)].length;
+    expect(writes, "the dialog must not have gained a write of its own").toBe(2); // save() and upload()
+    // And the dialog's own confirm still only touches local state.
     expect(src).toMatch(/function applyDraft\(\)[\s\S]{0,500}setRows/);
+    expect(
+      /function applyDraft\(\)[\s\S]{0,600}?\n  \}/.exec(src)?.[0] ?? "",
+      "applyDraft sends something to the server",
+    ).not.toMatch(/api(Send|Upload|Fetch)|fetch\(/);
   });
 
   it("does not let Cancel discard other rows' unsaved edits", () => {

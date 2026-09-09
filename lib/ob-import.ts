@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { assertRowLimit, looksLikeWorkbook } from "./upload-safety";
+import { createMissingRetailers, describeCreatedRetailers } from "./retailer-autocreate";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -127,6 +128,35 @@ function findHeaderRow(matrix: Matrix, required: string[]) {
   return -1;
 }
 
+export type ObMappedRow = { retailerId: string; amount: number; transactionCount: number };
+
+/**
+ * One row per retailer, whatever the file does.
+ *
+ * `ObRecord` is unique on `(retailerId, date)`, and the carrier's exports are
+ * known to repeat a retailer: the StockLifting file lists a BP once per RSO
+ * that serves it, and eight retailers were duplicated that way in the owner's
+ * real file — which aborted the whole C2C import on a constraint error. The
+ * same shape in a Balance file would lose the whole snapshot the same way, so
+ * the rows are combined here with the same arithmetic as `mergeRowsByRetailer`
+ * in c2-import-core.
+ *
+ * Today's Balance file has no duplicates. That is not a reason to leave the
+ * crash in place; it is the reason this is cheap to add now.
+ */
+export function mergeObRowsByRetailer(rows: ObMappedRow[]): ObMappedRow[] {
+  const merged = new Map<string, ObMappedRow>();
+  for (const row of rows) {
+    const seen = merged.get(row.retailerId);
+    if (!seen) merged.set(row.retailerId, { ...row });
+    else {
+      seen.amount += row.amount;
+      seen.transactionCount += row.transactionCount;
+    }
+  }
+  return [...merged.values()];
+}
+
 export async function importObWorkbook(fileName: string, bytes: Buffer) {
   const matrix = readMatrix(bytes);
   if (matrix.length < 2) throw new Error("The Opening Balance report is empty.");
@@ -164,12 +194,25 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
     );
   const snapshotDate = dateCols[0].date;
 
+  // Optional columns, present in the carrier's Balance export and used only to
+  // fill in an outlet the Retailer Master has not caught up with yet.
+  const optional = (key: string) => {
+    const i = headers.indexOf(key);
+    return i < 0 ? null : i;
+  };
+  const nameCol = optional("RETAILER_NAME"),
+    itopCol = optional("RETAILER_ITOPUP_NO"),
+    sellerCol = optional("ITOPUPSELLER");
+
   const parsed: Array<{
     rowNumber: number;
     retailerCode: string;
     amount: number;
     transactionCount: number;
     srNumber: string;
+    retailerName: string;
+    iTopUpNumber: string;
+    iTopUpSeller: string;
   }> = [];
   const errors: Array<{ rowNumber: number; message: string; rawData: object }> = [];
   for (let r = headerRowIndex + 1; r < matrix.length; r++) {
@@ -196,15 +239,50 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
       errors.push({ rowNumber: r + 1, message: "TRANSACTION_COUNT is invalid", rawData: { retailerCode } });
       continue;
     }
-    parsed.push({ rowNumber: r + 1, retailerCode, amount, transactionCount, srNumber: digits(row[idx.SRNUMBER]) });
+    parsed.push({
+      rowNumber: r + 1,
+      retailerCode,
+      amount,
+      transactionCount,
+      srNumber: digits(row[idx.SRNUMBER]),
+      retailerName: nameCol === null ? "" : text(row[nameCol]),
+      iTopUpNumber: itopCol === null ? "" : digits(row[itopCol]),
+      iTopUpSeller: sellerCol === null ? "" : text(row[sellerCol]),
+    });
   }
   if (!parsed.length) throw new Error("No valid retailer rows were found in the OB report.");
 
   const retailerCodes = [...new Set(parsed.map((r) => r.retailerCode))];
-  const retailers = await prisma.retailer.findMany({
+  const retailerSelect = { id: true, retailerCode: true, employee: { select: { rsoMsisdn: true } } };
+  let retailers = await prisma.retailer.findMany({
     where: { retailerCode: { in: retailerCodes } },
-    select: { id: true, retailerCode: true, employee: { select: { rsoMsisdn: true } } },
+    select: retailerSelect,
   });
+
+  /*
+   * OB was the harshest of the three: one unknown retailer code and the entire
+   * snapshot was refused, with a message telling the operator to fix a file
+   * that was correct. The report names the outlet and its RSO, so it is created
+   * here instead. See lib/retailer-autocreate.ts.
+   */
+  const known = new Set(retailers.map((r) => r.retailerCode.toUpperCase()));
+  const autoCreated = await createMissingRetailers(
+    parsed.map((r) => ({
+      retailerCode: r.retailerCode,
+      retailerName: r.retailerName,
+      iTopUpNumber: r.iTopUpNumber,
+      srNumber: r.srNumber,
+      iTopUpSeller: r.iTopUpSeller,
+    })),
+    known,
+    `OB import: ${fileName}`,
+  );
+  if (autoCreated.created.length)
+    retailers = await prisma.retailer.findMany({
+      where: { retailerCode: { in: retailerCodes } },
+      select: retailerSelect,
+    });
+
   const map = new Map(retailers.map((r) => [r.retailerCode.toUpperCase(), r]));
   const mapped: Array<{ retailerId: string; amount: number; transactionCount: number }> = [];
   let assignmentWarnings = 0;
@@ -226,6 +304,8 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
       assignmentWarnings++;
     mapped.push({ retailerId: retailer.id, amount: row.amount, transactionCount: row.transactionCount });
   }
+
+  const obRows = mergeObRowsByRetailer(mapped);
 
   if (errors.length) {
     const preview = errors
@@ -252,9 +332,9 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
   try {
     await prisma.$transaction(async (tx) => {
       await tx.obRecord.deleteMany({});
-      if (mapped.length)
+      if (obRows.length)
         await tx.obRecord.createMany({
-          data: mapped.map((row) => ({
+          data: obRows.map((row) => ({
             retailerId: row.retailerId,
             date: snapshotDate,
             transactionCount: row.transactionCount,
@@ -298,6 +378,8 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
       successRows: mapped.length,
       failedRows: errors.length,
       assignmentWarnings,
+      newRetailers: autoCreated.created.length,
+      newRetailerNote: describeCreatedRetailers(autoCreated),
       totalOpeningBalance,
       status: errors.length ? ImportStatus.COMPLETED_WITH_ERRORS : ImportStatus.COMPLETED,
     };

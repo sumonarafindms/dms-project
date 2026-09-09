@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiSend } from "@/lib/api-client";
 
 export default function SetupForm() {
   const r = useRouter(),
@@ -11,15 +12,10 @@ export default function SetupForm() {
     setBusy(true);
     setError("");
     const f = new FormData(e.currentTarget);
-    const res = await fetch("/api/auth/setup", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(f)),
-    });
-    const d = await res.json();
+    const res = await apiSend<{ redirect: string }>("/api/auth/setup", "POST", Object.fromEntries(f));
     setBusy(false);
-    if (!res.ok) return setError(d.error || "Setup failed");
-    r.replace(d.redirect);
+    if (!res.ok) return setError(res.message);
+    r.replace(res.data.redirect);
     r.refresh();
   }
   return (

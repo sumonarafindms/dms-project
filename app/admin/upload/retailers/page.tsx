@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useCan } from "../../../components/PermissionContext";
 import { Icon } from "../../../components/icons";
 import { Btn, Card, DropZone, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
+import { apiFetch, apiUpload } from "@/lib/api-client";
 
 type Summary = { retailers: number; mappedRetailers: number; unassignedRetailers: number };
 type ImportResult = {
@@ -25,6 +26,8 @@ type ImportResult = {
   mappedRows?: number;
   unassignedRows?: number;
   failedRows?: number;
+  /** Set when the file imported but connected to no RSO. See lib/master-import.ts. */
+  mappingWarning?: string | null;
 };
 
 const FIELDS = [
@@ -50,8 +53,8 @@ export default function Page() {
     [summary, setSummary] = useState<Summary>({ retailers: 0, mappedRetailers: 0, unassignedRetailers: 0 });
 
   const refresh = useCallback(async () => {
-    const r = await fetch("/api/master/summary", { cache: "no-store" });
-    if (r.ok) setSummary(await r.json());
+    const r = await apiFetch<Summary>("/api/master/summary", { cache: "no-store" });
+    if (r.ok) setSummary(r.data);
   }, []);
   useEffect(() => {
     refresh();
@@ -64,14 +67,13 @@ export default function Page() {
     setResult(null);
     const form = new FormData();
     form.append("file", file);
-    const r = await fetch("/api/master/import/retailers", { method: "POST", body: form });
-    const d = await r.json();
+    const r = await apiUpload<ImportResult>("/api/master/import/retailers", form);
     setBusy(false);
     if (!r.ok) {
-      setMessage(d.error || "Retailer import failed");
+      setMessage(r.message);
       return;
     }
-    setResult(d);
+    setResult(r.data);
     setMessage("Retailer import completed.");
     setFile(null);
     await refresh();
@@ -135,6 +137,18 @@ export default function Page() {
               <div className={`kit-note is-${tone} is-last`} role={tone === "bad" ? "alert" : "status"}>
                 <Icon name={tone === "ok" ? "check" : tone === "bad" ? "alert" : "info"} />
                 <span>{message}</span>
+              </div>
+            )}
+
+            {result?.mappingWarning && (
+              /*
+               * Above the counts, not beside them. The counts were always
+               * shown — "mapped 0 · unassigned 2190" — and still read as a
+               * successful import, because a number is not a diagnosis.
+               */
+              <div className="kit-note is-bad is-last kit-mt-12" role="alert">
+                <Icon name="alert" />
+                <span>{result.mappingWarning}</span>
               </div>
             )}
 

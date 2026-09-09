@@ -208,6 +208,60 @@ export async function importEmployees(buffer: Buffer, fileName: string, actor: A
   return { batchId: batch.id, sheetName, totalRows: rows.length, successRows, failedRows };
 }
 
+/**
+ * Says out loud when a retailer master imported but connected to nothing.
+ *
+ * ## Why this exists
+ *
+ * A retailer is matched to its RSO by `I_TOP_UP_SR_NUMBER` — **the RSO's**
+ * mobile number, not the retailer's. Put the wrong column there and every row
+ * still imports: valid code, valid name, no complaint. The upload reports
+ * `Imported 2190/2190` in a success tone, and every screen that depends on RSO
+ * assignment is empty afterwards with nothing anywhere saying why.
+ *
+ * That is not hypothetical. Loading the owner's real files, I made exactly this
+ * mistake, read `mapped 0 · unassigned 2190` on a green success message, and
+ * had to open the importer's source to work out what had happened. An operator
+ * will not do that; they will conclude the app is broken.
+ *
+ * The counts were always on screen. A number is not a diagnosis — this turns it
+ * into one, and names the likelier of the two causes rather than listing both.
+ */
+export function diagnoseRetailerMapping(params: {
+  successRows: number;
+  mappedRows: number;
+  employeeCount: number;
+  unmatchedNumbers: string[];
+}): string | null {
+  const { successRows, mappedRows, employeeCount, unmatchedNumbers } = params;
+  if (!successRows) return null;
+
+  const example = unmatchedNumbers.length ? ` Example from your file: ${unmatchedNumbers[0]}.` : "";
+
+  if (!employeeCount)
+    return (
+      `No RSO exists yet, so none of these ${successRows.toLocaleString()} retailers could be assigned to one. ` +
+      "Upload the RSO master first, then this file again."
+    );
+
+  if (!mappedRows)
+    return (
+      `None of these ${successRows.toLocaleString()} retailers matched an RSO. ` +
+      "I_TOP_UP_SR_NUMBER must hold the RSO's mobile number, not the retailer's — check that column." +
+      `${example} Until it matches, every report that groups by RSO will be empty.`
+    );
+
+  // A partial miss is normal (a genuinely unassigned outlet), so the bar for
+  // saying anything is set where it stops looking like ordinary attrition.
+  if (mappedRows * 2 < successRows)
+    return (
+      `Only ${mappedRows.toLocaleString()} of ${successRows.toLocaleString()} retailers matched an RSO. ` +
+      `Check I_TOP_UP_SR_NUMBER against your RSO master.${example}`
+    );
+
+  return null;
+}
+
 export async function importRetailers(buffer: Buffer, fileName: string, actor: AuditActor | null = null) {
   const required = ["RETAILER_CODE", "RETAILER_NAME", "I_TOP_UP_SR_NUMBER"];
   const { rows, sheetName } = rowsFromWorkbook(buffer, required);
@@ -245,6 +299,7 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
   const errors: Array<{ batchId: string; rowNumber: number; message: string; rawData: object }> = [],
     ops = [];
   const seenRetailerCodes = new Set<string>();
+  const unmatchedNumbers: string[] = [];
   // Every retailer whose RSO this upload moves. Without this the previous
   // owner is overwritten and gone — see lib/assignment-history.ts.
   const reassignments: AssignmentChange[] = [];
@@ -274,7 +329,12 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
     const iTopUpSrNumber = text(row["I_TOP_UP_SR_NUMBER"]),
       employeeId = employeeByMsisdn.get(phoneKey(iTopUpSrNumber)) ?? null;
     if (employeeId) mappedRows++;
-    else unassignedRows++;
+    else {
+      unassignedRows++;
+      // Kept so the warning below can show the operator an actual value from
+      // their own file rather than describing the problem in the abstract.
+      if (iTopUpSrNumber && unmatchedNumbers.length < 3) unmatchedNumbers.push(iTopUpSrNumber);
+    }
     const next = {
       retailerName: text(row["RETAILER_NAME"]) || null,
       simSeller: text(row["SIM_SELLER"]) || null,
@@ -348,6 +408,12 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
   const historyRows = await recordAssignmentChanges(actor, reassignments, `retailer master: ${fileName}`);
   const successRows = ops.length,
     failedRows = 0;
+  const mappingWarning = diagnoseRetailerMapping({
+    successRows,
+    mappedRows,
+    employeeCount: employees.length,
+    unmatchedNumbers,
+  });
   await prisma.importBatch.update({
     where: { id: batch.id },
     data: { successRows, failedRows, status: failedRows ? "COMPLETED_WITH_ERRORS" : "COMPLETED" },
@@ -361,6 +427,7 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
     failedRows,
     mappedRows,
     unassignedRows,
+    mappingWarning,
     newRows,
     updatedRows,
     unchangedRows,

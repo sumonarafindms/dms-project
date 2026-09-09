@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn, Card, Check, Field, SectionHead } from "./Kit";
 import { Icon } from "./icons";
+import { apiSend } from "@/lib/api-client";
 
 type U = { id: string; name: string; role: string; mobile: string; custom: number };
 
@@ -46,14 +47,13 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
     if (!selected.length) return report(false, "Select at least one user.");
     setBusy(true);
     setMsg("");
-    const r = await fetch("/api/admin/permissions/bulk", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ mode: "preset", userIds: selected, preset }),
+    const r = await apiSend<{ updated: number }>("/api/admin/permissions/bulk", "POST", {
+      mode: "preset",
+      userIds: selected,
+      preset,
     });
-    const d = await r.json();
     setBusy(false);
-    report(r.ok, r.ok ? `Updated ${d.updated} user(s).` : d.error || "Could not apply preset.");
+    report(r.ok, r.ok ? `Updated ${r.data.updated} user(s).` : r.message);
     if (r.ok) router.refresh();
   }
 
@@ -63,14 +63,13 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
     if (!targets.length) return report(false, "Select at least one target user.");
     setBusy(true);
     setMsg("");
-    const r = await fetch("/api/admin/permissions/bulk", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ mode: "copy", sourceId, targetIds: targets }),
+    const r = await apiSend<{ updated: number }>("/api/admin/permissions/bulk", "POST", {
+      mode: "copy",
+      sourceId,
+      targetIds: targets,
     });
-    const d = await r.json();
     setBusy(false);
-    report(r.ok, r.ok ? `Copied permissions to ${d.updated} user(s).` : d.error || "Could not copy permissions.");
+    report(r.ok, r.ok ? `Copied permissions to ${r.data.updated} user(s).` : r.message);
     if (r.ok) router.refresh();
   }
 

@@ -17,6 +17,7 @@ import {
   OpsFreshness,
 } from "../components/OperationsPremiumUI";
 import { Btn } from "../components/Kit";
+import { apiFetch, apiUpload } from "@/lib/api-client";
 
 type EmployeeRow = {
   employeeId: string;
@@ -44,6 +45,19 @@ type RetailerDailyRow = {
   ga150: number;
   ga300: number;
   simSwap: number;
+};
+
+/** What /api/ga/summary and /api/import/GA send back, as this page reads them. */
+type GaSummary = { rows?: EmployeeRow[]; retailerDaily?: RetailerDailyRow[]; importHistory?: History[] };
+type GaImportResult = {
+  duplicate?: boolean;
+  businessDate?: string;
+  reportStartDate?: string;
+  reportEndDate?: string;
+  insertedRows?: number;
+  updatedRows?: number;
+  duplicateRows?: number;
+  failedRows?: number;
 };
 
 type History = {
@@ -94,15 +108,14 @@ export default function GaPage() {
       to: nextTo,
       _: String(Date.now()),
     });
-    const res = await fetch(`/api/ga/summary?${params.toString()}`, { cache: "no-store" });
-    const data = await res.json();
+    const res = await apiFetch<GaSummary>(`/api/ga/summary?${params.toString()}`, { cache: "no-store" });
     if (!res.ok) {
-      setMessage(data.error || "Failed to load GA data");
+      setMessage(res.message);
       return;
     }
-    setRows(data.rows || []);
-    setRetailerDaily(data.retailerDaily || []);
-    setHistory(data.importHistory || []);
+    setRows(res.data.rows || []);
+    setRetailerDaily(res.data.retailerDaily || []);
+    setHistory(res.data.importHistory || []);
   }
 
   useEffect(() => {
@@ -146,14 +159,14 @@ export default function GaPage() {
     const body = new FormData();
     body.append("file", input.files[0]);
 
-    const res = await fetch("/api/import/GA", { method: "POST", body });
-    const data = await res.json();
+    const res = await apiUpload<GaImportResult>("/api/import/GA", body);
     setLoading(false);
 
     if (!res.ok) {
-      setMessage(data.error || "GA import failed");
+      setMessage(res.message);
       return;
     }
+    const data = res.data;
 
     if (data.duplicate) {
       setMessage(`This exact file was already imported for ${prettyDate(data.businessDate)}. No GA was counted twice.`);
@@ -211,10 +224,11 @@ export default function GaPage() {
       message={message}
       rule={
         <>
-          <b>GA counting rule:</b> PRODUCT_CODE <b>MMST / MMSTs</b> = 300 SIM, <b>MMSTC</b> = 170 SIM. <b>SIMWAP</b>{" "}
-          must have <b>SELLING_PRICE 350</b>; <b>EV-SWAP</b> must have <b>SELLING_PRICE 100</b>. Both are counted only
-          under <b>SIM SWAP</b> and are excluded from GA achievement, GA target progress and SSO. SIM_NO still prevents
-          duplicate import.
+          <b>GA counting rule:</b> PRODUCT_CODE decides everything. <b>MMST / MMSTs</b> = 300 SIM, <b>MMSTC</b> = 170
+          SIM. <b>SIMWAP</b> and <b>EV-SWAP</b> are replacements: counted only under <b>SIM SWAP</b> and excluded from
+          GA achievement, GA target progress and SSO. <b>SELLING_PRICE is stored but never validated</b> — a swap
+          imports at whatever it cost that day, so a tariff change needs no change here. SIM_NO still prevents duplicate
+          import.
         </>
       }
     >

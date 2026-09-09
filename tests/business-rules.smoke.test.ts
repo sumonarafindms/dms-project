@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  EV_SWAP_SELLING_PRICE,
+  LEGACY_EV_SWAP_PRICE,
   LSO_MIN_MONTHLY_AMOUNT,
   LSO_MIN_MONTHLY_TRANSACTIONS,
-  SIMWAP_SELLING_PRICE,
+  LEGACY_SIMWAP_PRICE,
   SSO_MIN_MONTHLY_STANDARD_GA,
   addGaActivation,
   classifyGaActivation,
@@ -35,22 +35,22 @@ describe("GA product classification", () => {
   });
 
   it("treats SIMWAP at 350 as a replacement, never as GA", () => {
-    expect(classifyGaActivation(row("SIMWAP", SIMWAP_SELLING_PRICE))).toBe("SIM_SWAP");
-    expect(isStandardGaActivation(row("SIMWAP", SIMWAP_SELLING_PRICE))).toBe(false);
-    expect(isSimSwapActivation(row("SIMWAP", SIMWAP_SELLING_PRICE))).toBe(true);
+    expect(classifyGaActivation(row("SIMWAP", LEGACY_SIMWAP_PRICE))).toBe("SIM_SWAP");
+    expect(isStandardGaActivation(row("SIMWAP", LEGACY_SIMWAP_PRICE))).toBe(false);
+    expect(isSimSwapActivation(row("SIMWAP", LEGACY_SIMWAP_PRICE))).toBe(true);
   });
 
   it("treats EV-SWAP at 100 as a replacement, never as GA", () => {
-    expect(classifyGaActivation(row("EV-SWAP", EV_SWAP_SELLING_PRICE))).toBe("SIM_SWAP");
-    expect(isStandardGaActivation(row("EV-SWAP", EV_SWAP_SELLING_PRICE))).toBe(false);
+    expect(classifyGaActivation(row("EV-SWAP", LEGACY_EV_SWAP_PRICE))).toBe("SIM_SWAP");
+    expect(isStandardGaActivation(row("EV-SWAP", LEGACY_EV_SWAP_PRICE))).toBe(false);
   });
 
   it("recognises every documented swap spelling variant", () => {
     for (const code of ["EV-SWAP", "EV SWAP", "EV_SWAP", "EVSWAP"]) {
-      expect(classifyGaActivation(row(code, EV_SWAP_SELLING_PRICE))).toBe("SIM_SWAP");
+      expect(classifyGaActivation(row(code, LEGACY_EV_SWAP_PRICE))).toBe("SIM_SWAP");
     }
     for (const code of ["SIMWAP", "SIM-WAP", "SIM_WAP", "SIM WAP"]) {
-      expect(classifyGaActivation(row(code, SIMWAP_SELLING_PRICE))).toBe("SIM_SWAP");
+      expect(classifyGaActivation(row(code, LEGACY_SIMWAP_PRICE))).toBe("SIM_SWAP");
     }
   });
 
@@ -63,8 +63,8 @@ describe("GA product classification", () => {
   it("classifies legacy rows without a product code by selling price", () => {
     expect(classifyGaActivation(row(null, 170))).toBe("GA_170");
     expect(classifyGaActivation(row(null, 300))).toBe("GA_300");
-    expect(classifyGaActivation(row(null, SIMWAP_SELLING_PRICE))).toBe("SIM_SWAP");
-    expect(classifyGaActivation(row(null, EV_SWAP_SELLING_PRICE))).toBe("SIM_SWAP");
+    expect(classifyGaActivation(row(null, LEGACY_SIMWAP_PRICE))).toBe("SIM_SWAP");
+    expect(classifyGaActivation(row(null, LEGACY_EV_SWAP_PRICE))).toBe("SIM_SWAP");
     expect(classifyGaActivation(row(null, 275))).toBe("UNKNOWN");
   });
 });
@@ -83,8 +83,8 @@ describe("Total GA", () => {
       ...Array.from({ length: 149 }, () => row("MMSTC", 170)),
       ...Array.from({ length: 20 }, () => row("MMST", 300)),
       ...Array.from({ length: 3 }, () => row("MMSTS", 300)),
-      ...Array.from({ length: 11 }, () => row("SIMWAP", SIMWAP_SELLING_PRICE)),
-      ...Array.from({ length: 4 }, () => row("EV_SWAP", EV_SWAP_SELLING_PRICE)),
+      ...Array.from({ length: 11 }, () => row("SIMWAP", LEGACY_SIMWAP_PRICE)),
+      ...Array.from({ length: 4 }, () => row("EV_SWAP", LEGACY_EV_SWAP_PRICE)),
       row("MMXYZ", 300),
     ];
     const breakdown = summarizeGaActivations(rows);
@@ -98,8 +98,8 @@ describe("Total GA", () => {
 
   it("keeps a swap-only retailer at zero Total GA", () => {
     const breakdown = summarizeGaActivations([
-      row("SIMWAP", SIMWAP_SELLING_PRICE),
-      row("EV-SWAP", EV_SWAP_SELLING_PRICE),
+      row("SIMWAP", LEGACY_SIMWAP_PRICE),
+      row("EV-SWAP", LEGACY_EV_SWAP_PRICE),
     ]);
     expect(breakdown.total).toBe(0);
     expect(breakdown.simSwap).toBe(2);
@@ -109,7 +109,7 @@ describe("Total GA", () => {
     const breakdown = emptyGaBreakdown();
     addGaActivation(breakdown, row("MMSTC", 170), 149);
     addGaActivation(breakdown, row("MMSTS", 300), 23);
-    addGaActivation(breakdown, row("SIMWAP", SIMWAP_SELLING_PRICE), 9);
+    addGaActivation(breakdown, row("SIMWAP", LEGACY_SIMWAP_PRICE), 9);
     expect(breakdown.total).toBe(172);
     expect(breakdown.simSwap).toBe(9);
   });
@@ -137,7 +137,7 @@ describe("SSO", () => {
   });
 
   it("does not let SIM swaps close an SSO gap", () => {
-    const monthRows = [row("MMSTC", 170), row("SIMWAP", SIMWAP_SELLING_PRICE), row("EV-SWAP", EV_SWAP_SELLING_PRICE)];
+    const monthRows = [row("MMSTC", 170), row("SIMWAP", LEGACY_SIMWAP_PRICE), row("EV-SWAP", LEGACY_EV_SWAP_PRICE)];
     expect(isSsoComplete("Y", countStandardGa(monthRows))).toBe(false);
   });
 });

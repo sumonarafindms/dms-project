@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { PermissionProvider, type ClientPermissionMap } from "./PermissionContext";
+import { apiFetch } from "@/lib/api-client";
 
 /**
  * `group` places the item in the collapsible admin sidebar. It exists because
@@ -301,7 +302,14 @@ export default function AppShell({
             className="sidebar-link sidebar-button"
             aria-label="Sign out"
             onClick={async () => {
-              await fetch("/api/auth/logout", { method: "POST" });
+              /*
+               * The navigation is not conditional on the request. A logout that
+               * cannot reach the server used to leave the operator sitting on
+               * the page with the button apparently doing nothing; sending them
+               * to the sign-in screen is right either way, and the session
+               * cookie is httpOnly so the server clears it on the next request.
+               */
+              await apiFetch("/api/auth/logout", { method: "POST", timeoutMs: 8_000 });
               location.href = "/login";
             }}
           >

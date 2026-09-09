@@ -12,6 +12,7 @@ import {
   EmptyState,
 } from "../components/OperationsPremiumUI";
 import { Btn } from "../components/Kit";
+import { apiFetch, apiUpload } from "@/lib/api-client";
 
 type Row = {
   retailerCode: string;
@@ -30,6 +31,33 @@ type Batch = {
   failedRows: number;
   status: string;
 } | null;
+/** The two payloads this page reads, as it reads them. */
+type Pagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+type ObSummary = {
+  rows?: Row[];
+  batch?: Batch;
+  snapshotDate?: string | null;
+  pagination?: Pagination;
+  retailerCount?: number;
+  totalOpeningBalance?: number;
+};
+type ObImportResult = {
+  snapshotDate?: string;
+  successRows?: number;
+  failedRows?: number;
+  totalOpeningBalance?: number;
+  assignmentWarnings?: number;
+  /** Set when the file named outlets the Retailer Master did not have yet. */
+  newRetailerNote?: string | null;
+};
+
 function money(n: number) {
   return new Intl.NumberFormat("en-BD", { maximumFractionDigits: 2 }).format(n);
 }
@@ -52,9 +80,9 @@ export default function ObPage() {
   });
   const [totalBalance, setTotalBalance] = useState(0);
   async function load(nextPage = page) {
-    const res = await fetch(`/api/ob/summary?page=${nextPage}&pageSize=50`, { cache: "no-store" });
-    const d = await res.json();
-    if (!res.ok) return setMessage(d.error || "Failed to load OB");
+    const res = await apiFetch<ObSummary>(`/api/ob/summary?page=${nextPage}&pageSize=50`, { cache: "no-store" });
+    if (!res.ok) return setMessage(res.message);
+    const d = res.data;
     setRows(d.rows || []);
     setBatch(d.batch || null);
     setSnapshotDate(d.snapshotDate || null);
@@ -81,12 +109,12 @@ export default function ObPage() {
     setMessage("Replacing current Opening Balance snapshot...");
     const body = new FormData();
     body.append("file", input.files[0]);
-    const res = await fetch("/api/import/OB", { method: "POST", body });
-    const d = await res.json();
+    const res = await apiUpload<ObImportResult>("/api/import/OB", body);
     setLoading(false);
-    if (!res.ok) return setMessage(d.error || "OB import failed");
+    if (!res.ok) return setMessage(res.message);
+    const d = res.data;
     setMessage(
-      `Opening Balance replaced for ${d.snapshotDate}. ${d.successRows} retailers mapped, ${d.failedRows} failed. Current total balance: ${money(d.totalOpeningBalance)}.${d.assignmentWarnings ? ` ${d.assignmentWarnings} RSO assignment warning(s).` : ""}`,
+      `Opening Balance replaced for ${d.snapshotDate}. ${d.successRows} retailers mapped, ${d.failedRows} failed. Current total balance: ${money(d.totalOpeningBalance ?? 0)}.${d.assignmentWarnings ? ` ${d.assignmentWarnings} RSO assignment warning(s).` : ""}${d.newRetailerNote ? ` ${d.newRetailerNote}` : ""}`,
     );
     input.value = "";
     await load();

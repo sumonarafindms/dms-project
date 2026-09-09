@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Btn, Card, Check, EmptyState, PageHeader, Skeleton } from "./Kit";
 import { Icon } from "./icons";
+import { apiFetch, apiSend } from "@/lib/api-client";
 
 type Perm = "view" | "add" | "edit" | "update";
 type Row = { key: string; label: string; group: string } & Record<Perm, boolean>;
@@ -28,13 +29,19 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
     [msgTone, setMsgTone] = useState<"ok" | "bad">("ok");
 
   useEffect(() => {
-    fetch(`/api/admin/permissions/${userId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setRows(d.modules || []);
-        setBusy(false);
-        setLoaded(true);
-      });
+    void (async () => {
+      const r = await apiFetch<{ modules?: Row[] }>(`/api/admin/permissions/${userId}`);
+      setBusy(false);
+      if (!r.ok) {
+        // Without this the panel showed an empty permission grid, which reads
+        // as "this user has no permissions" rather than "nothing loaded".
+        setMsgTone("bad");
+        setMsg(r.message);
+        return;
+      }
+      setRows(r.data.modules || []);
+      setLoaded(true);
+    })();
   }, [userId]);
 
   function change(i: number, key: Perm, value: boolean) {
@@ -65,22 +72,26 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
   async function save() {
     setBusy(true);
     setMsg("");
-    const r = await fetch(`/api/admin/permissions/${userId}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        permissions: rows.map((x) => ({ module: x.key, view: x.view, add: x.add, edit: x.edit, update: x.update })),
-      }),
+    const r = await apiSend(`/api/admin/permissions/${userId}`, "PUT", {
+      permissions: rows.map((x) => ({ module: x.key, view: x.view, add: x.add, edit: x.edit, update: x.update })),
     });
     setBusy(false);
     setMsgTone(r.ok ? "ok" : "bad");
-    setMsg(r.ok ? "Permissions saved." : "Could not save permissions.");
+    setMsg(r.ok ? "Permissions saved." : r.message);
   }
 
   async function reset() {
     if (!confirm("Reset this user to role-default permissions?")) return;
     setBusy(true);
-    await fetch(`/api/admin/permissions/${userId}`, { method: "DELETE" });
+    const r = await apiFetch(`/api/admin/permissions/${userId}`, { method: "DELETE" });
+    if (!r.ok) {
+      // Reloading on a failed reset showed the old permissions back, which
+      // looks exactly like a reset that worked and then did nothing.
+      setBusy(false);
+      setMsgTone("bad");
+      setMsg(r.message);
+      return;
+    }
     location.reload();
   }
 

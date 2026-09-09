@@ -30,7 +30,8 @@ const definitions: Record<string, { name: string; sheet: string; rows: Record<st
         RETAILER_CODE: "R000001",
         SIM_NO: "899110000000000003",
         PRODUCT_CODE: "SIMWAP",
-        SELLING_PRICE: 350,
+        // The tariff of the day. It is illustrative only — nothing validates it.
+        SELLING_PRICE: 150,
         ACTIVATION_DATE: "25-Aug-2026",
         ACTIVATION_TIME: "12:10:00 PM",
       },
@@ -38,7 +39,11 @@ const definitions: Record<string, { name: string; sheet: string; rows: Record<st
         RETAILER_CODE: "R000002",
         SIM_NO: "899110000000000004",
         PRODUCT_CODE: "EV-SWAP",
-        SELLING_PRICE: 350,
+        // Deliberately a different number from the SIMWAP row above: the two
+        // swaps are the same kind of row whatever they cost. This sample used
+        // to say 350 here while the importer demanded 100, so the file the app
+        // handed out as an example was one the app itself would have rejected.
+        SELLING_PRICE: 100,
         ACTIVATION_DATE: "25-Aug-2026",
         ACTIVATION_TIME: "01:20:00 PM",
       },

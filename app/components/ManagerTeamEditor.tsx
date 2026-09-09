@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn, Card, Check, SectionHead } from "./Kit";
 import { Icon } from "./icons";
+import { apiSend } from "@/lib/api-client";
 
 export default function ManagerTeamEditor({
   managerId,
@@ -37,16 +38,11 @@ export default function ManagerTeamEditor({
   async function save() {
     setBusy(true);
     setMsg("");
-    const r = await fetch("/api/admin/manager-team", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ managerId, supervisorIds: ids }),
-    });
-    const d = await r.json();
+    const r = await apiSend<{ count: number }>("/api/admin/manager-team", "PATCH", { managerId, supervisorIds: ids });
     setBusy(false);
     setOk(r.ok);
-    if (!r.ok) return setMsg(d.error || "Could not update manager team");
-    setMsg(`${d.count} supervisor assigned.`);
+    if (!r.ok) return setMsg(r.message);
+    setMsg(`${r.data.count} supervisor assigned.`);
     router.refresh();
   }
 

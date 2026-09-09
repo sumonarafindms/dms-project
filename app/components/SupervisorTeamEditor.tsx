@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn, Card, Check, SectionHead } from "./Kit";
 import { Icon } from "./icons";
+import { apiSend } from "@/lib/api-client";
 
 export default function SupervisorTeamEditor({
   supervisorId,
@@ -39,16 +40,11 @@ export default function SupervisorTeamEditor({
   async function save() {
     setBusy(true);
     setMsg("");
-    const r = await fetch("/api/admin/supervisor-team", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ supervisorId, rsoIds: ids }),
-    });
-    const d = await r.json();
+    const r = await apiSend<{ count: number }>("/api/admin/supervisor-team", "PATCH", { supervisorId, rsoIds: ids });
     setBusy(false);
     setOk(r.ok);
-    if (!r.ok) return setMsg(d.error || "Could not update team");
-    setMsg(`${d.count} RSO assigned.`);
+    if (!r.ok) return setMsg(r.message);
+    setMsg(`${r.data.count} RSO assigned.`);
     router.refresh();
   }
 

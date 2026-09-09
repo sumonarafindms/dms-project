@@ -26,17 +26,14 @@ export function isStandardGaProduct(value: string | null | undefined) {
   return isGa170Product(value) || isGa300Product(value);
 }
 
-export const SIMWAP_SELLING_PRICE = 350;
-export const EV_SWAP_SELLING_PRICE = 100;
-
-export function expectedSimSwapPrice(productCode: string | null | undefined) {
-  const code = normalizeGaProductCode(productCode);
-  if (code === "SIMWAP" || code === "SIM-WAP") return SIMWAP_SELLING_PRICE;
-  if (code === "EV-SWAP" || code === "EVSWAP") return EV_SWAP_SELLING_PRICE;
-  return null;
-}
-
-export function hasExpectedSimSwapPrice(productCode: string | null | undefined, sellingPrice: number) {
-  const expected = expectedSimSwapPrice(productCode);
-  return expected === null || sellingPrice === expected;
-}
+/*
+ * The swap prices and the `expectedSimSwapPrice` / `hasExpectedSimSwapPrice`
+ * helpers used to live here.
+ *
+ * They existed for one caller: a check in the GA importer that rejected any
+ * swap row not priced at the tariff of the day. That check is gone — a tariff
+ * is not an identity, and hard-coding one made every upload fail the day the
+ * price changed. Nothing classifies by price now except the frozen legacy path
+ * in lib/business-rules.ts, which applies only to rows that have no product
+ * code at all.
+ */

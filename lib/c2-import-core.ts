@@ -40,6 +40,13 @@ export type ParsedC2Row = {
   totalAmount: number;
   srNumber: string;
   daily: Array<{ date: Date; amount: number }>;
+  /**
+   * Everything the file knows about the outlet itself, which is enough to
+   * create it if the Retailer Master has not caught up yet. Optional because
+   * only RETAILER_CODE is required of these reports — a file without a name
+   * column still imports, it just cannot name a retailer it creates.
+   */
+  identity: { retailerName: string; iTopUpSeller: string; enabled: string };
 };
 
 export type C2PreError = { rowNumber: number; message: string; rawData: object };
@@ -247,6 +254,20 @@ export function parseC2Workbook(bytes: Buffer, kind: C2Kind): C2ParseResult {
     idx[key] = found;
   }
 
+  /*
+   * Optional columns. The carrier's Sales and Balance exports carry
+   * RETAILER_NAME, ITOPUPSELLER and ENABLED; StockLifting carries only the
+   * name. None is required, so a missing one is an absent value rather than a
+   * failed import.
+   */
+  const optional = (key: string) => {
+    const found = headers.indexOf(key);
+    return found < 0 ? null : found;
+  };
+  const nameCol = optional("RETAILER_NAME"),
+    sellerCol = optional("ITOPUPSELLER"),
+    enabledCol = optional("ENABLED");
+
   const dateColumns: DateColumn[] = [];
   for (let i = 0; i < headerRow.length; i++) {
     const date = parseHeaderDate(headerRow[i]);
@@ -322,6 +343,11 @@ export function parseC2Workbook(bytes: Buffer, kind: C2Kind): C2ParseResult {
       totalAmount,
       srNumber: digits(row[idx.SRNUMBER]),
       daily,
+      identity: {
+        retailerName: nameCol === null ? "" : text(row[nameCol]),
+        iTopUpSeller: sellerCol === null ? "" : text(row[sellerCol]),
+        enabled: enabledCol === null ? "" : text(row[enabledCol]),
+      },
     });
   }
 
@@ -413,13 +439,66 @@ export type C2ReplacementPlan = {
  * retailers appear in `mapped`, so a retailer absent from the new file has no
  * insert entry and therefore no data left for the month once this plan runs.
  */
+/**
+ * Combines the rows of one retailer into one.
+ *
+ * ## Why this is necessary
+ *
+ * A BP retailer served by more than one RSO gets **one line per RSO** in the
+ * carrier's StockLifting export. In the owner's real file, eight retailers
+ * appeared twice or three times — every one of them a BP — and one of them
+ * appeared twice under the same RSO code:
+ *
+ *     R341946  R.R Enterprise BP-15  RS041549 …
+ *     R341946  R.R Enterprise BP-15  RS055606 …
+ *     R341946  R.R Enterprise BP-15  RS041549 …
+ *
+ * Both storage tables are unique on the retailer — `C2cDaily(retailerId, date)`
+ * and `C2cMonthlySummary(retailerId, month)` — so the second line of a repeated
+ * retailer violated the constraint and **the entire upload was rolled back**.
+ * Not that retailer's row: the whole file, all 1,936 rows of it, with a Prisma
+ * constraint error on screen. A daily upload could not complete at all.
+ *
+ * ## Why summing is the right answer
+ *
+ * The amounts are the same retailer's, arriving through different RSOs. What
+ * that outlet lifted this month is what came through all of them, so the
+ * figures add. Keeping only the first line would silently discard the rest —
+ * which is worse than the crash, because nothing would say so. On the owner's
+ * current file every duplicate happens to be zero, so this changes no number
+ * today; it changes what happens the day one of those BPs actually lifts stock
+ * through two RSOs.
+ */
+export function mergeRowsByRetailer(mapped: MappedC2Row[]): MappedC2Row[] {
+  const byRetailer = new Map<string, MappedC2Row>();
+  for (const row of mapped) {
+    const seen = byRetailer.get(row.retailerId);
+    if (!seen) {
+      // Copied, not referenced — the caller's rows must not be mutated.
+      byRetailer.set(row.retailerId, { ...row, daily: row.daily.map((d) => ({ ...d })) });
+      continue;
+    }
+    seen.transactionCount += row.transactionCount;
+    seen.totalAmount += row.totalAmount;
+    for (const day of row.daily) {
+      const key = day.date.getTime();
+      const existing = seen.daily.find((d) => d.date.getTime() === key);
+      if (existing) existing.amount += day.amount;
+      else seen.daily.push({ ...day });
+    }
+  }
+  for (const row of byRetailer.values()) row.daily.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return [...byRetailer.values()];
+}
+
 export function planMonthReplacement(params: {
   month: Date;
   batchId: string;
   reportEndDate: Date;
   mapped: MappedC2Row[];
 }): C2ReplacementPlan {
-  const { month, batchId, reportEndDate, mapped } = params;
+  const { month, batchId, reportEndDate } = params;
+  const mapped = mergeRowsByRetailer(params.mapped);
   const monthEnd = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1));
 
   const dailyRecords: C2DailyRecordInput[] = [];

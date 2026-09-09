@@ -37,6 +37,7 @@ import {
   SummaryStrip,
   Tile,
 } from "../components/Kit";
+import { apiFetch } from "@/lib/api-client";
 
 type ApiRow = {
   employeeId: string;
@@ -86,20 +87,16 @@ export default function Dashboard() {
     (async () => {
       setLoading(true);
       setError("");
-      try {
-        const res = await fetch(`/api/dashboard/summary?month=${month}&_=${Date.now()}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Could not load dashboard");
-        if (active) setRows(data.rows || []);
-      } catch (e) {
-        if (active && !(e instanceof DOMException && e.name === "AbortError"))
-          setError(e instanceof Error ? e.message : "Could not load dashboard");
-      } finally {
-        if (active) setLoading(false);
-      }
+      const res = await apiFetch<{ rows?: ApiRow[] }>(`/api/dashboard/summary?month=${month}&_=${Date.now()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (!active) return;
+      setLoading(false);
+      // A deliberate abort (the month changed) reports an empty message, which
+      // must not be painted over the dashboard as an error.
+      if (!res.ok) return void (res.message && setError(res.message));
+      setRows(res.data.rows || []);
     })();
     return () => {
       active = false;
@@ -112,22 +109,16 @@ export default function Dashboard() {
     let active = true;
     (async () => {
       setComparisonLoading(true);
-      try {
-        const res = await fetch(`/api/dashboard/comparison?kind=${compareKind}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Could not load the comparison");
-        if (active) setComparison(data.metrics || []);
-      } catch (e) {
-        // Deliberately not routed into the page-level `error` banner. A failed
-        // comparison must not make the KPI row above it look broken, and an
-        // empty metric list already renders as "no data uploaded yet".
-        if (active && !(e instanceof DOMException && e.name === "AbortError")) setComparison([]);
-      } finally {
-        if (active) setComparisonLoading(false);
-      }
+      const res = await apiFetch<{ metrics?: MetricComparison[] }>(`/api/dashboard/comparison?kind=${compareKind}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (!active) return;
+      setComparisonLoading(false);
+      // Deliberately not routed into the page-level `error` banner. A failed
+      // comparison must not make the KPI row above it look broken, and an empty
+      // metric list already renders as "no data uploaded yet".
+      setComparison(res.ok ? res.data.metrics || [] : []);
     })();
     return () => {
       active = false;

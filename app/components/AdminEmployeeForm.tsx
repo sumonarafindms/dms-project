@@ -16,6 +16,7 @@ import { dhakaTodayYmd } from "../../lib/business-time";
 import { Btn, Card, Check, Field, LinkBtn, NumberInput, PageHeader } from "./Kit";
 import { Icon } from "./icons";
 import { PIN_LENGTH } from "../../lib/credential-policy";
+import { apiSend } from "@/lib/api-client";
 
 type Option = { id: string; name: string; meta?: string; employeeId?: string };
 type Initial = {
@@ -66,21 +67,16 @@ export default function AdminEmployeeForm({
       body: Record<string, unknown> = Object.fromEntries(fd.entries());
     body.active = active;
     if (edit) body.id = initial.id;
-    const r = await fetch(`/api/admin/employees/${role}`, {
-      method: edit ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const d = await r.json();
+    const r = await apiSend<{ id?: string }>(`/api/admin/employees/${role}`, edit ? "PATCH" : "POST", body);
     setBusy(false);
     if (!r.ok) {
-      setMessage(d.error || "Could not save");
+      setMessage(r.message);
       return;
     }
     setOk(true);
     setMessage(edit ? "Changes saved successfully." : "Employee created successfully.");
-    if (!edit && d.id) {
-      router.push(`/admin/employees/${role}/${d.id}`);
+    if (!edit && r.data.id) {
+      router.push(`/admin/employees/${role}/${r.data.id}`);
       router.refresh();
     } else router.refresh();
   }

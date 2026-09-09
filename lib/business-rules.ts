@@ -9,8 +9,11 @@
  *
  * Verified rules encoded here (see MASTER HANDOFF §7, §10, §12, §30):
  *   - Total GA = MMSTC count + MMST/MMSTS count only
- *   - SIMWAP (350) and EV-SWAP (100) are replacements: excluded from Total GA,
- *     GA achievement, GA target progress, SSO and dashboard GA
+ *   - SIMWAP and EV-SWAP are replacements: excluded from Total GA, GA
+ *     achievement, GA target progress, SSO and dashboard GA. Identified by
+ *     PRODUCT_CODE at any selling price — the tariff moves and must not gate an
+ *     import; see the LEGACY_ price block below for the one exception, which is
+ *     rows that have no product code at all
  *   - Unknown product codes never count as standard GA
  *   - SSO: a SIM-seller retailer with >= 2 standard GA in one calendar month
  *   - LSO: monthly C2S amount >= 500 AND transaction count >= 7
@@ -28,7 +31,7 @@ export {
 } from "./ga-product";
 
 /* ------------------------------------------------------------------ *
- * GA product codes and prices
+ * GA product codes, and the prices that only history uses
  * ------------------------------------------------------------------ */
 
 /** 170 taka SIM category. Counts as standard GA. */
@@ -40,10 +43,26 @@ export const GA_300_PRODUCT_CODES = ["MMST", "MMSTS"] as const;
 /** Replacement SIM product codes, canonical spelling. */
 export const SIM_SWAP_PRODUCT_CODES = ["SIMWAP", "SIM-WAP", "EV-SWAP"] as const;
 
-export const GA_170_SELLING_PRICE = 170;
-export const GA_300_SELLING_PRICE = 300;
-export const SIMWAP_SELLING_PRICE = 350;
-export const EV_SWAP_SELLING_PRICE = 100;
+/**
+ * Frozen history. Not the current price of anything.
+ *
+ * These are the tariffs that were in force before `GaActivation.productCode`
+ * existed, and they are here for exactly one purpose: reading rows imported
+ * before migration `20260826140000_add_ga_product_code_sim_swap`, which added
+ * the column with no backfill. Those rows have a NULL product code and the
+ * price is the only evidence left of what they were.
+ *
+ * Prices move — the swap tariff went from 350 to 150, which is what broke the
+ * GA importer and prompted the `LEGACY_` prefix on these names. Nothing on an
+ * import path may consult them, and nothing may compare a price on a row that
+ * HAS a product code; both are guarded in tests/ga-product.smoke.test.ts. If a
+ * future tariff needs to be recorded, it belongs in data, not here: adding a
+ * number to this block would only be correct for rows that predate it.
+ */
+export const LEGACY_GA_170_PRICE = 170;
+export const LEGACY_GA_300_PRICE = 300;
+export const LEGACY_SIMWAP_PRICE = 350;
+export const LEGACY_EV_SWAP_PRICE = 100;
 
 export type GaCategory = "GA_170" | "GA_300" | "SIM_SWAP" | "UNKNOWN";
 
@@ -106,9 +125,9 @@ export const SIM_SWAP_MATCH_CODES = matchCodes(SIM_SWAP_PRODUCT_CODES);
  */
 export function classifyLegacyGaByPrice(sellingPrice: Prisma.Decimal | number | string | null | undefined): GaCategory {
   const price = toNumber(sellingPrice);
-  if (price === GA_170_SELLING_PRICE) return "GA_170";
-  if (price === GA_300_SELLING_PRICE) return "GA_300";
-  if (price === SIMWAP_SELLING_PRICE || price === EV_SWAP_SELLING_PRICE) return "SIM_SWAP";
+  if (price === LEGACY_GA_170_PRICE) return "GA_170";
+  if (price === LEGACY_GA_300_PRICE) return "GA_300";
+  if (price === LEGACY_SIMWAP_PRICE || price === LEGACY_EV_SWAP_PRICE) return "SIM_SWAP";
   return "UNKNOWN";
 }
 
@@ -189,22 +208,22 @@ export function countStandardGa(rows: readonly GaClassifiable[]) {
 const standardGaFilter: Prisma.GaActivationWhereInput = {
   OR: [
     { productCode: { in: STANDARD_GA_MATCH_CODES } },
-    { productCode: null, sellingPrice: { in: [GA_170_SELLING_PRICE, GA_300_SELLING_PRICE] } },
+    { productCode: null, sellingPrice: { in: [LEGACY_GA_170_PRICE, LEGACY_GA_300_PRICE] } },
   ],
 };
 
 const ga170Filter: Prisma.GaActivationWhereInput = {
-  OR: [{ productCode: { in: GA_170_MATCH_CODES } }, { productCode: null, sellingPrice: GA_170_SELLING_PRICE }],
+  OR: [{ productCode: { in: GA_170_MATCH_CODES } }, { productCode: null, sellingPrice: LEGACY_GA_170_PRICE }],
 };
 
 const ga300Filter: Prisma.GaActivationWhereInput = {
-  OR: [{ productCode: { in: GA_300_MATCH_CODES } }, { productCode: null, sellingPrice: GA_300_SELLING_PRICE }],
+  OR: [{ productCode: { in: GA_300_MATCH_CODES } }, { productCode: null, sellingPrice: LEGACY_GA_300_PRICE }],
 };
 
 const simSwapFilter: Prisma.GaActivationWhereInput = {
   OR: [
     { productCode: { in: SIM_SWAP_MATCH_CODES } },
-    { productCode: null, sellingPrice: { in: [SIMWAP_SELLING_PRICE, EV_SWAP_SELLING_PRICE] } },
+    { productCode: null, sellingPrice: { in: [LEGACY_SIMWAP_PRICE, LEGACY_EV_SWAP_PRICE] } },
   ],
 };
 

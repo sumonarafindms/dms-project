@@ -49,6 +49,7 @@ import {
   NumberInput,
 } from "../components/Kit";
 import { Icon } from "../components/icons";
+import { apiFetch, apiSend, apiUpload } from "@/lib/api-client";
 
 type TargetRow = {
   employeeId: string;
@@ -73,6 +74,7 @@ type BpRow = {
   rsoMsisdn: string;
   gaTarget: number;
 };
+type TargetsPayload = { rows?: TargetRow[]; bpRows?: BpRow[] };
 type ImportResult = { totalRows?: number; updated?: number; failed?: number; errors?: string[] };
 
 const numericFields = [
@@ -125,12 +127,11 @@ export default function TargetsPage() {
 
   async function load() {
     setLoading(true);
-    const r = await fetch(`/api/targets?month=${month}`, { cache: "no-store" });
-    const d = await r.json();
+    const r = await apiFetch<TargetsPayload>(`/api/targets?month=${month}`, { cache: "no-store" });
     if (r.ok) {
-      setRows(d.rows || []);
-      setBpRows(d.bpRows || []);
-    } else setMessage(d.error || "Could not load targets");
+      setRows(r.data.rows || []);
+      setBpRows(r.data.bpRows || []);
+    } else setMessage(r.message);
     setLoading(false);
   }
   useEffect(() => {
@@ -187,14 +188,9 @@ export default function TargetsPage() {
   async function save() {
     setSaving(true);
     setMessage("");
-    const r = await fetch("/api/targets", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ month, rows, bpRows }),
-    });
-    const d = await r.json();
+    const r = await apiSend("/api/targets", "POST", { month, rows, bpRows });
     setSaving(false);
-    setMessage(r.ok ? `Saved targets for ${month}.` : d.error || "Save failed");
+    setMessage(r.ok ? `Saved targets for ${month}.` : r.message);
     if (r.ok) await load();
   }
 
@@ -206,15 +202,14 @@ export default function TargetsPage() {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("month", month);
-    const r = await fetch("/api/targets/import", { method: "POST", body: fd });
-    const d = await r.json();
+    const r = await apiUpload<ImportResult>("/api/targets/import", fd);
     setUploading(false);
     if (!r.ok) {
-      setMessage(d.error || "Target import failed");
+      setMessage(r.message);
       return;
     }
-    setUploadResult(d);
-    setMessage(`Target upload complete: ${d.updated} updated, ${d.failed} failed.`);
+    setUploadResult(r.data);
+    setMessage(`Target upload complete: ${r.data.updated} updated, ${r.data.failed} failed.`);
     setFile(null);
     await load();
   }

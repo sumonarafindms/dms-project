@@ -8,6 +8,7 @@ import {
   planMonthReplacement,
   type C2RetailerRef,
 } from "./c2-import-core";
+import { createMissingRetailers, describeCreatedRetailers } from "./retailer-autocreate";
 
 export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
   const parsed = parseC2Workbook(bytes, "C2S");
@@ -31,15 +32,41 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
   }
 
   const retailerCodes = [...new Set(sourceRows.map((r) => r.retailerCode))];
-  const retailers = await prisma.retailer.findMany({
+  const retailerSelect = {
+    id: true,
+    retailerCode: true,
+    employeeId: true,
+    employee: { select: { rsoMsisdn: true } },
+  };
+  let retailers = await prisma.retailer.findMany({
     where: { retailerCode: { in: retailerCodes } },
-    select: {
-      id: true,
-      retailerCode: true,
-      employeeId: true,
-      employee: { select: { rsoMsisdn: true } },
-    },
+    select: retailerSelect,
   });
+
+  /*
+   * An outlet the carrier has added since the last Retailer Master upload used
+   * to fail the ENTIRE file — three unknown codes out of 2,190 stored nothing
+   * at all. The report already names the outlet and its RSO, so it is created
+   * here and the day's numbers go in. See lib/retailer-autocreate.ts.
+   */
+  const known = new Set(retailers.map((r) => r.retailerCode.toUpperCase()));
+  const autoCreated = await createMissingRetailers(
+    sourceRows.map((r) => ({
+      retailerCode: r.retailerCode,
+      retailerName: r.identity.retailerName,
+      iTopUpNumber: r.retailerItopupNo,
+      srNumber: r.srNumber,
+      iTopUpSeller: r.identity.iTopUpSeller,
+    })),
+    known,
+    `C2S import: ${fileName}`,
+  );
+  if (autoCreated.created.length)
+    retailers = await prisma.retailer.findMany({
+      where: { retailerCode: { in: retailerCodes } },
+      select: retailerSelect,
+    });
+
   const retailerMap = new Map<string, C2RetailerRef>(retailers.map((r) => [r.retailerCode.toUpperCase(), r]));
 
   const batch = await prisma.importBatch.create({
@@ -121,6 +148,8 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
       successRows: mapped.length,
       failedRows,
       assignmentWarnings,
+      newRetailers: autoCreated.created.length,
+      newRetailerNote: describeCreatedRetailers(autoCreated),
       dailyRecordsStored: plan.dailyRecords.length,
       replacedMonth: iso(month),
       status,

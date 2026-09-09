@@ -27,6 +27,7 @@ import {
   Table,
 } from "../components/Kit";
 import { Icon } from "../components/icons";
+import { apiFetch, apiUpload } from "@/lib/api-client";
 
 type EmployeeRow = {
   id: string;
@@ -85,15 +86,25 @@ function UploadBox({
     setMessage("");
     const form = new FormData();
     form.append("file", file);
-    const response = await fetch(`/api/master/import/${type}`, { method: "POST", body: form });
-    const data = await response.json();
+    const response = await apiUpload<MasterImportResult>(`/api/master/import/${type}`, form);
     if (!response.ok) {
       setTone("bad");
-      setMessage(data.error ?? "Import failed");
+      setMessage(response.message);
     } else {
+      const data = response.data;
       const mapping = type === "retailers" ? ` • mapped ${data.mappedRows} • unassigned ${data.unassignedRows}` : "";
-      setTone("ok");
-      setMessage(`Imported ${data.successRows}/${data.totalRows}${mapping}`);
+      /*
+       * A retailer file that matched no RSO imports perfectly and leaves every
+       * RSO-grouped screen empty. Reporting that in the success tone is how an
+       * operator ends up believing the app is broken — so the warning both
+       * changes the tone and says what to check.
+       */
+      setTone(data.mappingWarning ? "bad" : "ok");
+      setMessage(
+        data.mappingWarning
+          ? `Imported ${data.successRows}/${data.totalRows}${mapping}. ${data.mappingWarning}`
+          : `Imported ${data.successRows}/${data.totalRows}${mapping}`,
+      );
       onDone();
     }
     setBusy(false);
@@ -129,6 +140,15 @@ function UploadBox({
   );
 }
 
+type MasterImportResult = {
+  successRows?: number;
+  totalRows?: number;
+  mappedRows?: number;
+  unassignedRows?: number;
+  /** Set when the file imported but connected to no RSO. See lib/master-import.ts. */
+  mappingWarning?: string | null;
+};
+
 export default function MasterDataPage() {
   const [summary, setSummary] = useState<Summary>(emptySummary);
   const [loading, setLoading] = useState(true);
@@ -136,8 +156,10 @@ export default function MasterDataPage() {
 
   const refresh = useCallback(async (nextPage: number) => {
     setLoading(true);
-    const response = await fetch(`/api/master/summary?page=${nextPage}&pageSize=50`, { cache: "no-store" });
-    if (response.ok) setSummary(await response.json());
+    const response = await apiFetch<Summary>(`/api/master/summary?page=${nextPage}&pageSize=50`, {
+      cache: "no-store",
+    });
+    if (response.ok) setSummary(response.data);
     setLoading(false);
   }, []);
 

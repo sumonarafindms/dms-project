@@ -16,6 +16,7 @@ import {
 } from "../components/OperationsPremiumUI";
 import { Btn } from "../components/Kit";
 import { dhakaTodayYmd } from "../../lib/business-time";
+import { apiFetch, apiUpload } from "@/lib/api-client";
 
 type Row = {
   employeeId: string;
@@ -39,6 +40,20 @@ type DailyRow = {
   supervisor: string;
   amount: number;
 };
+/** The two payloads this page reads, as it reads them. */
+type SummaryPayload = { rows?: Row[]; dailyRows?: DailyRow[]; importHistory?: History[] };
+type ImportPayload = {
+  duplicate?: boolean;
+  reportStartDate?: string;
+  reportEndDate?: string;
+  successRows?: number;
+  failedRows?: number;
+  dailyRecordsStored?: number;
+  assignmentWarnings?: number;
+  /** Set when the file named outlets the Retailer Master did not have yet. */
+  newRetailerNote?: string | null;
+};
+
 type History = {
   id: string;
   fileName: string;
@@ -80,12 +95,11 @@ export default function C2sPage() {
       to: nextTo,
       _: String(Date.now()),
     });
-    const res = await fetch(`/api/c2s/summary?${p}`, { cache: "no-store" });
-    const data = await res.json();
-    if (!res.ok) return setMessage(data.error || "Failed to load C2S data");
-    setRows(data.rows || []);
-    setDailyRows(data.dailyRows || []);
-    setHistory(data.importHistory || []);
+    const res = await apiFetch<SummaryPayload>(`/api/c2s/summary?${p}`, { cache: "no-store" });
+    if (!res.ok) return setMessage(res.message);
+    setRows(res.data.rows || []);
+    setDailyRows(res.data.dailyRows || []);
+    setHistory(res.data.importHistory || []);
   }
   useEffect(() => {
     load();
@@ -98,14 +112,14 @@ export default function C2sPage() {
     setMessage("Reading month-to-date C2S report and rebuilding date-wise retailer sales...");
     const body = new FormData();
     body.append("file", input.files[0]);
-    const res = await fetch("/api/import/C2S", { method: "POST", body });
-    const data = await res.json();
+    const res = await apiUpload<ImportPayload>("/api/import/C2S", body);
     setLoading(false);
-    if (!res.ok) return setMessage(data.error || "C2S import failed");
+    if (!res.ok) return setMessage(res.message);
+    const data = res.data;
     if (data.duplicate) setMessage("This exact C2S file was already imported. Nothing was counted twice.");
     else {
       setMessage(
-        `C2S updated ${data.reportStartDate} → ${data.reportEndDate}. ${data.successRows} retailers mapped, ${data.failedRows} failed, ${data.dailyRecordsStored} non-zero retailer/day sales stored.${data.assignmentWarnings ? ` ${data.assignmentWarnings} RSO assignment mismatch warning(s).` : ""}`,
+        `C2S updated ${data.reportStartDate} → ${data.reportEndDate}. ${data.successRows} retailers mapped, ${data.failedRows} failed, ${data.dailyRecordsStored} non-zero retailer/day sales stored.${data.assignmentWarnings ? ` ${data.assignmentWarnings} RSO assignment mismatch warning(s).` : ""}${data.newRetailerNote ? ` ${data.newRetailerNote}` : ""}`,
       );
       if (data.reportStartDate && data.reportEndDate) {
         const nextMonth = data.reportEndDate.slice(0, 7);

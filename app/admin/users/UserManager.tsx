@@ -27,6 +27,7 @@ import {
   SectionHead,
   SummaryStrip,
 } from "../../components/Kit";
+import { apiSend } from "@/lib/api-client";
 
 type Opt = { id: string; name: string; meta?: string };
 type U = {
@@ -72,15 +73,10 @@ export default function UserManager({
     const f = new FormData(form);
     const body: Record<string, unknown> = Object.fromEntries(f);
     body.role = role;
-    const r = await fetch("/api/admin/users", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const d = await r.json();
+    const r = await apiSend("/api/admin/users", "POST", body);
     if (!r.ok) {
       setMsgTone("bad");
-      return setMsg(d.error || "Could not create user");
+      return setMsg(r.message);
     }
     setMsgTone("ok");
     setMsg("User created successfully.");
@@ -97,15 +93,10 @@ export default function UserManager({
    * would mean a phone call to read it out every time.
    */
   async function unlock(u: U) {
-    const r = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: u.id, unlock: true }),
-    });
-    const d = await r.json();
+    const r = await apiSend("/api/admin/users", "PATCH", { id: u.id, unlock: true });
     if (!r.ok) {
       setMsgTone("bad");
-      setMsg(d.error || "Could not unlock account");
+      setMsg(r.message);
       return;
     }
     setMsgTone("ok");
@@ -114,15 +105,10 @@ export default function UserManager({
   }
 
   async function toggle(id: string, active: boolean) {
-    const r = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, active }),
-    });
-    const d = await r.json();
+    const r = await apiSend("/api/admin/users", "PATCH", { id, active });
     if (!r.ok) {
       setMsgTone("bad");
-      setMsg(d.error || "Could not update account");
+      setMsg(r.message);
       return;
     }
     router.refresh();
@@ -137,15 +123,10 @@ export default function UserManager({
     const body: Record<string, unknown> = Object.fromEntries(f);
     body.id = editing.id;
     try {
-      const r = await fetch("/api/admin/users", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const d = await r.json();
+      const r = await apiSend("/api/admin/users", "PATCH", body);
       if (!r.ok) {
         setMsgTone("bad");
-        setMsg(d.error || "Could not update account");
+        setMsg(r.message);
         return;
       }
       setMsgTone("ok");
