@@ -34,13 +34,53 @@ describe("upload content checks", () => {
     expect(validateUploadContent("book.xls", ole2())).toBeNull();
   });
 
-  it("rejects a file whose bytes do not match its name", () => {
+  it("rejects what cannot possibly be a report", () => {
     // The attack this exists for: anything renamed to .xlsx to reach the
     // spreadsheet parser.
-    expect(validateUploadContent("evil.xlsx", elf())).toMatch(/not a valid Excel/i);
-    expect(validateUploadContent("evil.xlsx", Buffer.from("<html>hello</html>"))).toMatch(/not a valid Excel/i);
-    // An xlsx (zip) renamed to .xls is still wrong: the parser branches on it.
-    expect(validateUploadContent("book.xls", zip())).toMatch(/not a valid \.xls/i);
+    expect(validateUploadContent("evil.xlsx", elf())).toMatch(/is a program/i);
+    expect(validateUploadContent("evil.xls", Buffer.from([0x4d, 0x5a, 0x90, 0x00]))).toMatch(/is a program/i);
+    // A saved web page is text, so the text rule below would admit it — and the
+    // spreadsheet library would parse its <table> and fail three steps later.
+    expect(validateUploadContent("evil.xlsx", Buffer.from("<html>hello</html>"))).toMatch(/saved web page/i);
+    // Neither a container nor text: a PDF, an image, a database file.
+    expect(validateUploadContent("evil.xls", Buffer.from("%PDF-1.7\n\x01\x02\x03\x04\x05\x06\x07\x0b"))).toMatch(
+      /neither a spreadsheet nor a text export/i,
+    );
+  });
+
+  it("accepts the carrier's .xls that is really a text export", () => {
+    /*
+     * The bug this replaces an assertion for.
+     *
+     * The owner's real C2C, C2S and Opening Balance files are named `.xls` and
+     * begin with the letters `CLUSTER_NAME` — tab-separated text saved under a
+     * spreadsheet extension. This function ran before any parser and refused
+     * all three:
+     *
+     *     That file is not a valid .xls workbook. Please re-save it from Excel.
+     *
+     * So the daily upload could not start, and the message blamed a file that
+     * was never wrong. Every importer reads these correctly; deciding workbook
+     * versus text is their job, not this one's.
+     */
+    const carrier = Buffer.from("CLUSTER_NAME\tREGION_NAME\tRETAILER_CODE\r\nCentral\tDhk-West\tR000001\r\n", "utf8");
+    expect(validateUploadContent("ITop_Up_Sales_785.xls", carrier)).toBeNull();
+    expect(validateUploadContent("ITop_Up_Balance.xls", carrier)).toBeNull();
+    // And the UTF-16 form the same portal sometimes produces.
+    expect(
+      validateUploadContent("ITop_Up_StockLifting.xls", Buffer.from("CLUSTER_NAME\tRETAILER_CODE\r\n", "utf16le")),
+    ).toBeNull();
+  });
+
+  it("no longer refuses a workbook for wearing the other spreadsheet name", () => {
+    /*
+     * This used to be rejected, on the grounds that "the parser branches on
+     * it". It does not: `looksLikeWorkbook` branches on the file's first bytes,
+     * never on its name (v156). The old rule was refusing a file the app can
+     * read perfectly, so it is gone.
+     */
+    expect(validateUploadContent("book.xls", zip())).toBeNull();
+    expect(validateUploadContent("book.xlsx", ole2())).toBeNull();
   });
 
   it("accepts UTF-16 text exports, which are full of NUL bytes", () => {
@@ -57,7 +97,7 @@ describe("upload content checks", () => {
   });
 
   it("still rejects a binary wearing a .txt name", () => {
-    expect(validateUploadContent("c2s.txt", elf())).toMatch(/not a text export/i);
+    expect(validateUploadContent("c2s.txt", elf())).toMatch(/is a program/i);
     expect(validateUploadContent("c2s.txt", zip())).toMatch(/not a text export/i);
   });
 });

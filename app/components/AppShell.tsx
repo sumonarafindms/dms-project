@@ -27,10 +27,16 @@ type NavGroup = "Overview" | "Reports" | "Performance" | "Data Operations" | "Ma
  * item there would simply not be drawn, which is the failure this whole change
  * is about.
  */
-type NavItem = { href: string; label: string; icon: string; module?: string; group?: NavGroup };
+/**
+ * `live` marks the one entry that shows a pulsing dot — Live GA. It is a flag
+ * rather than a special case in the renderer so the indicator belongs to the
+ * item, and so there can only ever be one kind of it.
+ */
+type NavItem = { href: string; label: string; icon: string; module?: string; group?: NavGroup; live?: boolean };
 type RoleConfig = { name: string; title: string; initials: string; home: string; nav: NavItem[]; bottom: NavItem[] };
 const adminNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "home", module: "dashboard", group: "Overview" },
+  { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", group: "Overview", live: true },
   // Reports were IT-only in the demos, but the routes have always allowed
   // ADMIN too, and an admin who cannot reach the Reporting Center from the
   // menu has to know the URL. Both roles get the group.
@@ -110,6 +116,7 @@ const configs: Record<string, RoleConfig> = {
     home: "/manager",
     nav: [
       { href: "/manager", label: "Overview", icon: "home", module: "dashboard" },
+      { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       { href: "/manager/attention", label: "Attention", icon: "target", module: "attention" },
       { href: "/manager/supervisors", label: "Supervisors", icon: "users", module: "employees" },
       { href: "/manager/rsos", label: "RSOs", icon: "chart", module: "performance" },
@@ -124,6 +131,7 @@ const configs: Record<string, RoleConfig> = {
     home: "/supervisor",
     nav: [
       { href: "/supervisor", label: "Overview", icon: "home", module: "dashboard" },
+      { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       { href: "/supervisor/attention", label: "Attention", icon: "target", module: "attention" },
       { href: "/supervisor/rsos", label: "My RSOs", icon: "users", module: "employees" },
       { href: "/supervisor/retailers", label: "Retailers", icon: "shop", module: "retailers" },
@@ -138,6 +146,7 @@ const configs: Record<string, RoleConfig> = {
     home: "/accounts",
     nav: [
       { href: "/accounts", label: "Overview", icon: "home", module: "dashboard" },
+      { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       { href: "/accounts/operations", label: "Operations", icon: "upload", module: "ga" },
       { href: "/accounts/retailers", label: "Retailer Search", icon: "search", module: "retailers" },
       { href: "/accounts/attention", label: "Opportunity", icon: "target", module: "attention" },
@@ -153,6 +162,7 @@ const configs: Record<string, RoleConfig> = {
     home: "/rso",
     nav: [
       { href: "/rso", label: "Home", icon: "home", module: "dashboard" },
+      { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       // SSO and LSO are the RSO's daily worklists in the approved demo, so they sit
       // above the general Attention page rather than buried under it.
       { href: "/rso/sso", label: "SSO", icon: "phone", module: "attention" },
@@ -182,6 +192,7 @@ const configs: Record<string, RoleConfig> = {
     home: "/bp",
     nav: [
       { href: "/bp", label: "Home", icon: "home", module: "dashboard" },
+      { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       { href: "/bp/sales", label: "Sales", icon: "sim", module: "ga" },
     ],
     bottom: [],
@@ -373,9 +384,17 @@ export default function AppShell({
                   prefetch={true}
                   onPointerEnter={() => router.prefetch(i.href)}
                   onClick={() => setNavPending(i.href)}
-                  className={`bottom-link ${active(path, i.href) ? "active" : ""}`}
+                  className={`bottom-link ${active(path, i.href) ? "active" : ""}${i.live ? " is-live" : ""}`}
                 >
                   <Icon name={i.icon} />
+                  {/*
+                    The bottom bar needs the dot more than the sidebar does.
+                    Below 900px the sidebar is `display: none`, so on the phones
+                    that nine in ten of this app's users hold, this bar IS the
+                    navigation — an indicator that lived only in the sidebar
+                    would be invisible to exactly the people it is for.
+                  */}
+                  {i.live ? <span className="nav-live-dot is-corner" aria-hidden="true" /> : null}
                   <span>{i.label}</span>
                 </Link>
               ))}
@@ -465,10 +484,16 @@ function NavLink({ item, path, onNavigate }: { item: NavItem; path: string; onNa
       onClick={() => {
         if (!isActive) onNavigate(item.href);
       }}
-      className={`sidebar-link ${isActive ? "active" : ""}`}
+      className={`sidebar-link ${isActive ? "active" : ""}${item.live ? " is-live" : ""}`}
     >
       <Icon name={item.icon} />
       <span className="sidebar-link-label">{item.label}</span>
+      {/*
+        The pulsing dot the owner asked for. `aria-hidden` because it carries no
+        information a screen reader needs — the label already says Live GA — and
+        an unlabelled animated dot announced on every focus would be noise.
+      */}
+      {item.live ? <span className="nav-live-dot" aria-hidden="true" /> : null}
     </Link>
   );
 }

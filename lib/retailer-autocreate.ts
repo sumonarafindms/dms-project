@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { phoneKey } from "./phone";
+import { buildEmployeeIndex, linkEmployee } from "./rso-link";
 import { recordAssignmentChanges } from "./assignment-history";
 import type { AuditActor } from "./audit";
 
@@ -51,8 +51,12 @@ export type RetailerSeed = {
   retailerCode: string;
   retailerName?: string;
   iTopUpNumber?: string;
-  /** The RSO's own number, which is how the master maps a retailer to an RSO. */
+  /** The RSO's number as the master holds it (`ITOPUPSRNUMBER`). */
+  iTopUpSrNumber?: string;
+  /** The RSO's number on the transaction line (`SRNUMBER`). */
   srNumber?: string;
+  /** The RSO's code, which is what rescues a row whose numbers are blank. */
+  rsoCode?: string;
   iTopUpSeller?: string;
 };
 
@@ -97,18 +101,22 @@ export async function createMissingRetailers(
    * ("1937614430") is not what the column stores ("01937614430"). The first
    * version of this filtered the query by those keys, matched nothing, and
    * created every new outlet unassigned — a silent failure that looked exactly
-   * like success. The master importer already loads all employees and maps by
-   * key for this reason; there are tens of RSOs, not thousands.
+   * like success. There are tens of RSOs, not thousands.
    */
-  const employees = await prisma.employee.findMany({ select: { id: true, rsoMsisdn: true, name: true } });
-  const employeeByMsisdn = new Map(employees.map((e) => [phoneKey(e.rsoMsisdn), e]));
+  const employees = await prisma.employee.findMany({
+    select: { id: true, rsoMsisdn: true, employeeCode: true, name: true },
+  });
+  const index = buildEmployeeIndex(employees);
 
   const created: string[] = [];
   let createdMapped = 0;
   const history = [];
 
   for (const [code, seed] of wanted) {
-    const employee = employeeByMsisdn.get(phoneKey(seed.srNumber ?? "")) ?? null;
+    // Number first, RSO code as the fallback — the same rule the Retailer
+    // Master follows, so an outlet created here lands where a master upload
+    // would have put it.
+    const { employee } = linkEmployee(index, seed);
     if (employee) createdMapped++;
     /*
      * `createMany` with `skipDuplicates` would be one round trip, but it cannot
@@ -123,7 +131,8 @@ export async function createMissingRetailers(
         retailerCode: code,
         retailerName: seed.retailerName?.trim() || null,
         iTopUpNumber: seed.iTopUpNumber?.trim() || null,
-        iTopUpSrNumber: seed.srNumber?.trim() || null,
+        iTopUpSrNumber: seed.iTopUpSrNumber?.trim() || seed.srNumber?.trim() || null,
+        rsoCode: seed.rsoCode?.trim() || null,
         iTopUpSeller: seed.iTopUpSeller?.trim() || null,
         employeeId: employee?.id ?? null,
         active: true,
@@ -138,7 +147,7 @@ export async function createMissingRetailers(
         fromId: null,
         fromName: null,
         toId: employee.id,
-        toName: employee.name,
+        toName: employee.name ?? null,
       });
   }
 

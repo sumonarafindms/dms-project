@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { assertRowLimit, looksLikeWorkbook } from "./upload-safety";
 import { createMissingRetailers, describeCreatedRetailers } from "./retailer-autocreate";
+import { IMPORT_TX_OPTIONS } from "./c2-import-core";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -202,7 +203,9 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
   };
   const nameCol = optional("RETAILER_NAME"),
     itopCol = optional("RETAILER_ITOPUP_NO"),
-    sellerCol = optional("ITOPUPSELLER");
+    sellerCol = optional("ITOPUPSELLER"),
+    itopSrCol = optional("ITOPUPSRNUMBER"),
+    rsoCodeCol = optional("RSOCODE");
 
   const parsed: Array<{
     rowNumber: number;
@@ -213,6 +216,8 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
     retailerName: string;
     iTopUpNumber: string;
     iTopUpSeller: string;
+    iTopUpSrNumber: string;
+    rsoCode: string;
   }> = [];
   const errors: Array<{ rowNumber: number; message: string; rawData: object }> = [];
   for (let r = headerRowIndex + 1; r < matrix.length; r++) {
@@ -248,6 +253,8 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
       retailerName: nameCol === null ? "" : text(row[nameCol]),
       iTopUpNumber: itopCol === null ? "" : digits(row[itopCol]),
       iTopUpSeller: sellerCol === null ? "" : text(row[sellerCol]),
+      iTopUpSrNumber: itopSrCol === null ? "" : digits(row[itopSrCol]),
+      rsoCode: rsoCodeCol === null ? "" : text(row[rsoCodeCol]),
     });
   }
   if (!parsed.length) throw new Error("No valid retailer rows were found in the OB report.");
@@ -271,7 +278,9 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
       retailerCode: r.retailerCode,
       retailerName: r.retailerName,
       iTopUpNumber: r.iTopUpNumber,
+      iTopUpSrNumber: r.iTopUpSrNumber,
       srNumber: r.srNumber,
+      rsoCode: r.rsoCode,
       iTopUpSeller: r.iTopUpSeller,
     })),
     known,
@@ -330,6 +339,12 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
     },
   });
   try {
+    /*
+     * The same budget as C2C/C2S. OB already writes its rows in one
+     * `createMany`, so it was never the 1,927-round-trip case — but it deletes
+     * and rewrites the entire snapshot in one transaction, and on a hosted
+     * database that is not guaranteed to fit in Prisma's default 5 seconds.
+     */
     await prisma.$transaction(async (tx) => {
       await tx.obRecord.deleteMany({});
       if (obRows.length)
@@ -368,7 +383,7 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
       // left the Upload Center with a single row no matter how many OB files
       // had ever been processed. The batch rows are metadata about the upload,
       // not the snapshot, and Data Operations is required to show them.
-    });
+    }, IMPORT_TX_OPTIONS);
     const totalOpeningBalance = mapped.reduce((s, r) => s + r.amount, 0);
     return {
       fileName,

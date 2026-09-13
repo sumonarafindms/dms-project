@@ -7,6 +7,8 @@ import {
   parseC2Workbook,
   planMonthReplacement,
   type C2RetailerRef,
+  IMPORT_TX_OPTIONS,
+  writeMonthPlan,
 } from "./c2-import-core";
 import { createMissingRetailers, describeCreatedRetailers } from "./retailer-autocreate";
 
@@ -55,7 +57,9 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
       retailerCode: r.retailerCode,
       retailerName: r.identity.retailerName,
       iTopUpNumber: r.retailerItopupNo,
+      iTopUpSrNumber: r.identity.iTopUpSrNumber,
       srNumber: r.srNumber,
+      rsoCode: r.identity.rsoCode,
       iTopUpSeller: r.identity.iTopUpSeller,
     })),
     known,
@@ -99,20 +103,25 @@ export async function importC2sWorkbook(fileName: string, bytes: Buffer) {
     // Replace the whole stored month so removed/changed retailers never retain stale sales.
     const plan = planMonthReplacement({ month, batchId: batch.id, reportEndDate, mapped });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.c2sRecord.deleteMany({ where: plan.deleteDailyWhere });
-      await tx.c2sMonthlySummary.deleteMany({ where: plan.deleteSummaryWhere });
-      for (let i = 0; i < plan.dailyRecords.length; i += 1000) {
-        await tx.c2sRecord.createMany({
-          data: plan.dailyRecords.slice(i, i + 1000).map((r) => ({ ...r, amount: new Prisma.Decimal(r.amount) })),
-        });
-      }
-      for (const summary of plan.monthlySummaries) {
-        await tx.c2sMonthlySummary.create({
-          data: { ...summary, totalAmount: new Prisma.Decimal(summary.totalAmount) },
-        });
-      }
-    });
+    await prisma.$transaction(
+      (tx) =>
+        writeMonthPlan(
+          {
+            deleteDaily: (where) => tx.c2sRecord.deleteMany({ where }),
+            deleteSummaries: (where) => tx.c2sMonthlySummary.deleteMany({ where }),
+            createDaily: (rows) =>
+              tx.c2sRecord.createMany({
+                data: rows.map((r) => ({ ...r, amount: new Prisma.Decimal(r.amount) })),
+              }),
+            createSummaries: (rows) =>
+              tx.c2sMonthlySummary.createMany({
+                data: rows.map((r) => ({ ...r, totalAmount: new Prisma.Decimal(r.totalAmount) })),
+              }),
+          },
+          plan,
+        ),
+      IMPORT_TX_OPTIONS,
+    );
 
     if (errors.length) {
       await prisma.importError.createMany({

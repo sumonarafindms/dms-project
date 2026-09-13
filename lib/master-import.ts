@@ -3,6 +3,7 @@ import { assertRowLimit } from "./upload-safety";
 import { recordAssignmentChanges, type AssignmentChange } from "./assignment-history";
 import type { AuditActor } from "./audit";
 import { normalizeHeader } from "./sheet-headers";
+import { buildEmployeeIndex, linkEmployee } from "./rso-link";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 
@@ -267,8 +268,10 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
   const { rows, sheetName } = rowsFromWorkbook(buffer, required);
   const batch = await prisma.importBatch.create({ data: { type: "RETAILERS", fileName, totalRows: rows.length } });
 
-  const employees = await prisma.employee.findMany({ select: { id: true, rsoMsisdn: true, name: true } });
-  const employeeByMsisdn = new Map(employees.map((employee) => [phoneKey(employee.rsoMsisdn), employee.id]));
+  const employees = await prisma.employee.findMany({
+    select: { id: true, rsoMsisdn: true, employeeCode: true, name: true },
+  });
+  const employeeIndex = buildEmployeeIndex(employees);
   // Names, so a history row reads "moved from Karim to Rahim" rather than
   // from one cuid to another.
   const employeeName = new Map(employees.map((employee) => [employee.id, employee.name]));
@@ -327,7 +330,15 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
     }
     seenRetailerCodes.add(retailerCode);
     const iTopUpSrNumber = text(row["I_TOP_UP_SR_NUMBER"]),
-      employeeId = employeeByMsisdn.get(phoneKey(iTopUpSrNumber)) ?? null;
+      rsoCode = text(row["RSOCODE"]);
+    /*
+     * The number first, exactly as before; RSOCODE only when the number does
+     * not resolve. Nine of the owner's retailers reach their RSO by code alone
+     * — see lib/rso-link.ts — and no retailer that matched by number before can
+     * match differently now.
+     */
+    const { employee: linkedEmployee } = linkEmployee(employeeIndex, { iTopUpSrNumber, rsoCode });
+    const employeeId = linkedEmployee?.id ?? null;
     if (employeeId) mappedRows++;
     else {
       unassignedRows++;
@@ -343,7 +354,7 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
       iTopUpSrNumber: iTopUpSrNumber || null,
       iTopUpNumber: text(row["I_TOP_UP_NUMBER"]) || null,
       category: text(row["CATEGORY"]) || null,
-      rsoCode: text(row["RSOCODE"]) || null,
+      rsoCode: rsoCode || null,
       route: text(row["ROUTE"]) || null,
       employeeId,
       active: true,

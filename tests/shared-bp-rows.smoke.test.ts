@@ -48,7 +48,7 @@ function row(retailerId: string, over: Partial<MappedC2Row> = {}): MappedC2Row {
     totalAmount: 0,
     srNumber: "01900000001",
     daily: [],
-    identity: { retailerName: "OUTLET", iTopUpSeller: "Y", enabled: "Y" },
+    identity: { retailerName: "OUTLET", iTopUpSeller: "Y", enabled: "Y", iTopUpSrNumber: "", rsoCode: "" },
     retailerId,
     ...over,
   };

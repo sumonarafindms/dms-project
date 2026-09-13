@@ -46,7 +46,14 @@ export type ParsedC2Row = {
    * only RETAILER_CODE is required of these reports — a file without a name
    * column still imports, it just cannot name a retailer it creates.
    */
-  identity: { retailerName: string; iTopUpSeller: string; enabled: string };
+  identity: {
+    retailerName: string;
+    iTopUpSeller: string;
+    enabled: string;
+    /** The RSO's number as the master holds it, and the RSO's code. */
+    iTopUpSrNumber: string;
+    rsoCode: string;
+  };
 };
 
 export type C2PreError = { rowNumber: number; message: string; rawData: object };
@@ -266,7 +273,9 @@ export function parseC2Workbook(bytes: Buffer, kind: C2Kind): C2ParseResult {
   };
   const nameCol = optional("RETAILER_NAME"),
     sellerCol = optional("ITOPUPSELLER"),
-    enabledCol = optional("ENABLED");
+    enabledCol = optional("ENABLED"),
+    itopSrCol = optional("ITOPUPSRNUMBER"),
+    rsoCodeCol = optional("RSOCODE");
 
   const dateColumns: DateColumn[] = [];
   for (let i = 0; i < headerRow.length; i++) {
@@ -347,6 +356,8 @@ export function parseC2Workbook(bytes: Buffer, kind: C2Kind): C2ParseResult {
         retailerName: nameCol === null ? "" : text(row[nameCol]),
         iTopUpSeller: sellerCol === null ? "" : text(row[sellerCol]),
         enabled: enabledCol === null ? "" : text(row[enabledCol]),
+        iTopUpSrNumber: itopSrCol === null ? "" : digits(row[itopSrCol]),
+        rsoCode: rsoCodeCol === null ? "" : text(row[rsoCodeCol]),
       },
     });
   }
@@ -403,6 +414,36 @@ export function mapRetailersForC2Rows(sourceRows: ParsedC2Row[], retailerMap: Ma
 export function computeImportHash(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
+
+/**
+ * How long one import's write transaction may take, and how long it may wait
+ * for a connection.
+ *
+ * ## Why these are not the defaults
+ *
+ * Prisma allows an interactive transaction 5 seconds. That is generous on a
+ * database running on the same machine and nowhere near enough on a hosted one,
+ * where every round trip costs real network time. The owner's upload failed
+ * with:
+ *
+ *     Transaction API error: Transaction already closed: A query cannot be
+ *     executed on an expired transaction. The timeout for this transaction was
+ *     5000 ms, however 5041 ms passed since the start of the transaction.
+ *
+ * 5041 ms — it ran out by 41 milliseconds. The same file imports in about two
+ * seconds against a local Postgres, which is why nothing here ever showed it.
+ *
+ * The round trips were the real fault and are fixed separately (see the
+ * `createMany` below). This budget exists because the remaining work is still
+ * proportional to the file: a 250,000-row import is allowed to take minutes,
+ * and a slow link must not turn a correct import into a rollback. The route
+ * itself is capped at 60 seconds, so this is a ceiling rather than a promise.
+ */
+/** Rows per `createMany`. Large enough to be few round trips, small enough to
+ *  stay under any driver's parameter limit. */
+export const IMPORT_CHUNK = 1000;
+
+export const IMPORT_TX_OPTIONS = { maxWait: 30_000, timeout: 120_000 } as const;
 
 export type C2DailyRecordInput = {
   retailerId: string;
@@ -530,4 +571,51 @@ export function planMonthReplacement(params: {
     dailyRecords,
     monthlySummaries,
   };
+}
+
+/**
+ * The four writes a month replacement needs, independent of which table.
+ *
+ * C2C and C2S do the same thing to different models, and Prisma's transaction
+ * client types them as unrelated. This interface is what lets both share one
+ * implementation — and, more usefully, what lets a test count the statements
+ * without a database.
+ */
+export type C2MonthWriter = {
+  deleteDaily(where: C2ReplacementPlan["deleteDailyWhere"]): Promise<unknown>;
+  deleteSummaries(where: C2ReplacementPlan["deleteSummaryWhere"]): Promise<unknown>;
+  createDaily(rows: C2DailyRecordInput[]): Promise<unknown>;
+  createSummaries(rows: C2MonthlySummaryInput[]): Promise<unknown>;
+};
+
+/**
+ * Writes one month, in as few statements as the chunk size allows.
+ *
+ * ## The bug this shape exists to prevent
+ *
+ * The summaries used to be written one row at a time — `create` in a loop,
+ * 1,927 of them for the owner's real file, inside one interactive transaction.
+ * Against a database on the same machine that is about two seconds and nobody
+ * notices. Against a hosted one, every statement is a network round trip, and
+ * the upload died with:
+ *
+ *     Transaction API error: Transaction already closed … The timeout for this
+ *     transaction was 5000 ms, however 5041 ms passed since the start of the
+ *     transaction.
+ *
+ * The whole transaction rolled back, so a file that was entirely valid stored
+ * nothing at all. The daily records beside it were already batched; only the
+ * summaries were not.
+ *
+ * The number of statements here depends on the CHUNK COUNT, never on the row
+ * count. That is the property worth holding, and it is what
+ * tests/import-write-batching.smoke.test.ts measures.
+ */
+export async function writeMonthPlan(writer: C2MonthWriter, plan: C2ReplacementPlan): Promise<void> {
+  await writer.deleteDaily(plan.deleteDailyWhere);
+  await writer.deleteSummaries(plan.deleteSummaryWhere);
+  for (let i = 0; i < plan.dailyRecords.length; i += IMPORT_CHUNK)
+    await writer.createDaily(plan.dailyRecords.slice(i, i + IMPORT_CHUNK));
+  for (let i = 0; i < plan.monthlySummaries.length; i += IMPORT_CHUNK)
+    await writer.createSummaries(plan.monthlySummaries.slice(i, i + IMPORT_CHUNK));
 }

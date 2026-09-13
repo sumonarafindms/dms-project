@@ -223,7 +223,7 @@ describe("planMonthReplacement — authoritative month snapshot", () => {
       totalAmount,
       srNumber: "",
       daily,
-      identity: { retailerName: "", iTopUpSeller: "", enabled: "" },
+      identity: { retailerName: "", iTopUpSeller: "", enabled: "", iTopUpSrNumber: "", rsoCode: "" },
       retailerId,
     };
   }

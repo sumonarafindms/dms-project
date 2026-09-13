@@ -86,6 +86,7 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/it/reports/performance/[kind]": ["ADMIN", "IT"],
   "/it/reports/sso": ["ADMIN", "IT"],
   "/it/reports/target": ["ADMIN", "IT"],
+  "/live-ga": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   "/login": "PUBLIC",
   "/manager": ["MANAGER"],
   "/manager/attention": ["MANAGER"],

@@ -61,6 +61,32 @@ export function validateUploadFile(file: File, extensions: string[]) {
  */
 export function validateUploadContent(name: string, bytes: Uint8Array) {
   const lower = name.toLowerCase();
+
+  /*
+   * A `.xls` from this carrier is very often not a workbook at all.
+   *
+   * The owner's real C2C, C2S and Opening Balance exports are named `.xls` and
+   * begin with the letters `CLUSTER_NAME` — they are tab-separated text that
+   * the portal saves under a spreadsheet extension. Every importer already
+   * reads that correctly (see `looksLikeWorkbook` below, and v156), but this
+   * function ran first and rejected all three outright:
+   *
+   *     That file is not a valid .xls workbook. Please re-save it from Excel.
+   *
+   * So the daily upload could not even start, and the message blamed the file
+   * and prescribed a fix — re-save it from Excel — that would have been extra
+   * work for a file that was never wrong. The guard was written before anyone
+   * had seen one of these files.
+   *
+   * What this check is actually for is stopping a renamed executable or a
+   * booby-trapped archive from reaching the spreadsheet parser. That is what it
+   * still does. Deciding whether the bytes are a workbook or a text export is
+   * the importer's job, and it is equipped for it; refusing the file on a name
+   * mismatch was never the security boundary, only a guess about intent.
+   */
+  if (startsWith(bytes, ELF) || startsWith(bytes, MZ))
+    return "That file is a program, not a spreadsheet or a text export.";
+
   if (lower.endsWith(".txt")) {
     // Do NOT test "is this text" by looking for NUL bytes. The C2C/C2S
     // exports are frequently UTF-16LE, in which roughly every second byte IS
@@ -69,17 +95,64 @@ export function validateUploadContent(name: string, bytes: Uint8Array) {
     //
     // So this asks the answerable question instead: are these the bytes of a
     // known binary container wearing a .txt name?
-    for (const sig of [ZIP, OLE2, ELF, MZ])
+    for (const sig of [ZIP, OLE2])
       if (startsWith(bytes, sig)) return "That file is not a text export. Please upload the original .txt file.";
     return null;
   }
-  if (lower.endsWith(".xls")) {
-    if (!startsWith(bytes, OLE2)) return "That file is not a valid .xls workbook. Please re-save it from Excel.";
-    return null;
+
+  /*
+   * `.xls`, `.xlsx`, `.xlsm`: a real workbook container, or a text export under
+   * a spreadsheet name. Anything else — a PDF, an image, a random binary — has
+   * no chance of parsing and is worth refusing here, with a message that says
+   * what was actually wrong rather than telling the operator to re-save a file
+   * that is fine.
+   */
+  if (startsWith(bytes, ZIP) || startsWith(bytes, OLE2)) return null;
+  /*
+   * A saved web page is text, so the permissive rule above would let it
+   * through — and the spreadsheet library will cheerfully parse the `<table>`
+   * in it, producing a confusing failure three steps later. Someone who saved
+   * the portal page instead of exporting the report deserves to be told that
+   * here, where it is still obvious what they did.
+   */
+  if (looksLikeHtml(bytes)) return "That looks like a saved web page. Please export the report from the portal.";
+  if (looksLikeTextExport(bytes)) return null;
+  return "That file is neither a spreadsheet nor a text export. Please upload the report as it came from the portal.";
+}
+
+/** A saved web page rather than a report export. */
+export function looksLikeHtml(bytes: Uint8Array) {
+  // UTF-16 puts a NUL between every character, so the NULs are stripped before
+  // looking — otherwise a UTF-16 HTML file would slip past.
+  const head = Buffer.from(bytes.subarray(0, 1024))
+    .toString("latin1")
+    .replace(/\0/g, "")
+    .trimStart()
+    .toLowerCase();
+  return head.startsWith("<!doctype html") || head.startsWith("<html") || /^<\?xml[^>]*>\s*<html/.test(head);
+}
+
+/**
+ * Are these bytes plausibly the carrier's text export?
+ *
+ * Deliberately permissive, and deliberately not a NUL-byte test: these exports
+ * are frequently UTF-16LE, where roughly every second byte is NUL. What it
+ * rejects is a binary blob — a PDF, a JPEG, a database file — by looking for
+ * control characters that no text export contains.
+ */
+export function looksLikeTextExport(bytes: Uint8Array) {
+  const sample = bytes.subarray(0, 4096);
+  if (!sample.length) return false;
+  let odd = 0;
+  for (const b of sample) {
+    // Tab, LF, CR and everything printable are fine; so is any high byte,
+    // which is how UTF-8 Bengali and UTF-16 both look.
+    if (b === 0x09 || b === 0x0a || b === 0x0d || b >= 0x20) continue;
+    // NUL is expected in UTF-16LE and does not count against the file.
+    if (b === 0x00) continue;
+    odd++;
   }
-  // .xlsx / .xlsm
-  if (!startsWith(bytes, ZIP)) return "That file is not a valid Excel workbook. Please re-save it from Excel.";
-  return null;
+  return odd / sample.length < 0.05;
 }
 
 /**
