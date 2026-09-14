@@ -41,12 +41,15 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    // Matches --color-teal-600, so the system chrome continues the app rather
-    // than framing it in browser grey.
-    theme_color: "#0d9488",
-    // The splash background. Slate-50 from the kit, which is the page ground —
+    // Matches --color-brand-700, the dark end of the mobile topbar the status
+    // bar sits directly above. The first Banglalink draft used ink instead,
+    // because the topbar was near-black and an orange strip above it would have
+    // read as two apps stacked. The topbar is the brand now, so continuity and
+    // recognition finally want the same colour.
+    theme_color: "#b23d05",
+    // The splash background. Neutral-50 from the kit, which is the page ground —
     // a white splash flashes brighter than the app that follows it.
-    background_color: "#f8fafc",
+    background_color: "#fdf9f6",
     lang: "en",
     dir: "ltr",
     categories: ["business", "productivity"],

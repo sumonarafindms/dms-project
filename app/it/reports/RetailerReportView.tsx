@@ -43,7 +43,7 @@ export function RetailerReportView({
   columns: Column<RetailerReportRow>[];
   /** `/api/reports/export?report=…`, carrying every parameter except `page`. */
   exportHref: string;
-  summaryItems: { label: string; value: string; tone?: "teal" | "amber" }[];
+  summaryItems: { label: string; value: string; tone?: "brand" | "amber" }[];
   paging?: ReportPaging;
   /** Rows matching the search, and rows in the report. Omit to hide the box. */
   search?: { matched: number; total: number; noun: string };

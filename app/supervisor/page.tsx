@@ -98,7 +98,7 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
         items={[
           { label: "My RSOs", value: rows.length.toLocaleString() },
           { label: "Retailers", value: retailers.toLocaleString() },
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "teal" },
+          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "brand" },
           { label: "Latest C2C", value: `৳${Math.round(daily.c2cTotal).toLocaleString()}` },
         ]}
       />
@@ -148,9 +148,9 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
           href="/supervisor/rsos"
           count={lowPerformers.length}
           label="Low performing RSO"
-          tone={lowPerformers.length ? "rose" : "teal"}
+          tone={lowPerformers.length ? "rose" : "brand"}
         />
-        <StatusTile href="/supervisor/bp-activations" count={rows.length} label="Team members" tone="teal" />
+        <StatusTile href="/supervisor/bp-activations" count={rows.length} label="Team members" tone="brand" />
       </div>
 
       {lowPerformers.length > 0 && (

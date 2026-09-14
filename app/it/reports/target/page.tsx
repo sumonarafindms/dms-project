@@ -78,7 +78,7 @@ export default async function TargetReport({
         hrefFor: (p) => reportPageHref("/it/reports/target", { from: range.from, to: range.to, group: groupParam }, p),
       }}
       summaryItems={[
-        { label: "GA", value: `${t.ga} / ${t.gaTarget}`, tone: "teal" },
+        { label: "GA", value: `${t.ga} / ${t.gaTarget}`, tone: "brand" },
         { label: "GA Achievement", value: pctCell(t.ga, t.gaTarget) },
         { label: "SSO", value: `${t.sso} / ${t.ssoTarget}` },
         { label: "LSO", value: `${t.lso} / ${t.lsoTarget}` },

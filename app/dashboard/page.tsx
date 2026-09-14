@@ -231,7 +231,7 @@ export default function Dashboard() {
           items={[
             { label: "Field Force", value: fmt(rows.length) },
             { label: "Retailers", value: fmt(totals.retailerCount) },
-            { label: "On Track", value: fmt(onTrack), tone: "teal" },
+            { label: "On Track", value: fmt(onTrack), tone: "brand" },
             { label: "Target Coverage", value: `${targetCoverage}%` },
           ]}
         />

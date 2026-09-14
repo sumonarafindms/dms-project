@@ -42,7 +42,7 @@ export default async function Page({
           { label: "Active Retailers", value: rows.length.toLocaleString() },
           { label: "SIM Sellers", value: sim.toLocaleString() },
           { label: "Flagged", value: flagged.toLocaleString(), tone: "amber" },
-          { label: "Clear", value: (rows.length - flagged).toLocaleString(), tone: "teal" },
+          { label: "Clear", value: (rows.length - flagged).toLocaleString(), tone: "brand" },
         ]}
       />
 

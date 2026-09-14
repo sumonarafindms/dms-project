@@ -79,7 +79,7 @@ export async function ValueReport({
           reportPageHref(`/it/reports/${metric}`, { from: range.from, to: range.to, group: groupParam }, p),
       }}
       summaryItems={[
-        { label: `Total ${label}`, value: money(total), tone: "teal" },
+        { label: `Total ${label}`, value: money(total), tone: "brand" },
         ...(showTarget
           ? [
               { label: "Total Target", value: money(totalTarget) },

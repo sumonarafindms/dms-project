@@ -111,7 +111,7 @@ export default async function BP() {
         percent={targetPercent(monthlyGa, target)}
         figures={[
           { label: "Target", value: target || "—" },
-          { label: "Activated", value: monthlyGa, tone: "teal" },
+          { label: "Activated", value: monthlyGa, tone: "brand" },
           { label: "Remaining", value: target ? remaining : "—", tone: "amber" },
         ]}
       />

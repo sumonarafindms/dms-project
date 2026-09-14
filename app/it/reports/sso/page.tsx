@@ -56,7 +56,7 @@ export default async function SsoPending({
       }}
       summaryItems={[
         { label: "SIM Seller Outlets", value: sellers.toLocaleString() },
-        { label: "SSO Complete", value: complete.toLocaleString(), tone: "teal" },
+        { label: "SSO Complete", value: complete.toLocaleString(), tone: "brand" },
         { label: "SSO Pending", value: rows.length.toLocaleString(), tone: "amber" },
         { label: "Completion", value: sellers ? `${Math.round((complete / sellers) * 100)}%` : "—" },
       ]}

@@ -101,7 +101,7 @@ export default async function Performance({
         hrefFor: (p) => reportPageHref(`/it/reports/performance/${kind}`, { from: range.from, to: range.to }, p),
       }}
       summaryItems={[
-        { label: "Total GA", value: totalAchieved.toLocaleString(), tone: "teal" },
+        { label: "Total GA", value: totalAchieved.toLocaleString(), tone: "brand" },
         ...(hasTargets
           ? [
               { label: "Total Target", value: totalTarget.toLocaleString() },

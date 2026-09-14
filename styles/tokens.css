@@ -1,72 +1,146 @@
 /**
- * Design tokens — DMS premium theme (Deep Navy + Slate).
- * Tailwind v4 CSS-first config: everything below becomes a `bg-navy-900`,
- * `text-accent-600`, `rounded-card`, `shadow-panel` utility automatically.
+ * Design tokens — Banglalink theme.
+ *
+ * Tailwind v4 CSS-first config: everything below becomes a `bg-brand-600`,
+ * `text-ink-900`, `rounded-card`, `shadow-panel` utility automatically.
  * Change values here to re-theme the entire application.
+ *
+ * ## Where the colours come from
+ *
+ * The whole palette is derived from one thing: the Banglalink mark, a heart
+ * drawn as a gradient from a deep orange into an amber. Those two colours are
+ * `--color-brand-500` (#f26722) and `--color-glow-400` (#fba919), and the
+ * gradient between them is `--grad-brand`. Everything else is that pair either
+ * darkened for legibility, tinted for surfaces, or deliberately held apart
+ * from it so that status never reads as branding.
+ *
+ * The previous theme was teal + navy + blue. The tokens were renamed rather
+ * than merely re-valued, because a token called `--color-teal-600` holding an
+ * orange is a trap for whoever edits this next:
+ *
+ *     --color-teal-*   ->  --color-brand-*    the mark's orange
+ *     --color-navy-*   ->  --color-ink-*      the dark chrome
+ *     --color-slate-*  ->  --color-neutral-*  page, borders, body text
+ *
+ * ## Three rules this palette keeps
+ *
+ * 1. **Brand is chrome, never status.** Nav, buttons, links, focus rings and
+ *    hero surfaces are brand orange. A bar that means "you hit target" is
+ *    green, because a user must be able to tell "this is Banglalink" from
+ *    "this is going well" without reading the label.
+ *
+ * 2. **Neutrals are warm.** A cool blue-grey under an orange brand reads as
+ *    two unrelated products sharing a page. The neutral ramp is the same
+ *    greys tilted a few degrees toward the brand hue, which is why the app
+ *    feels orange even on screens that show almost no orange.
+ *
+ * 3. **Fill and text are different steps of the same colour.** Orange is a
+ *    light hue: white on `--color-brand-500` is 3.12:1, nowhere near AA. So
+ *    -500/-600 are fills (bars, dots, rings, where nothing is read off them)
+ *    and -700 is the text-and-button step. Same rule the teal theme kept, and
+ *    tests/contrast.smoke.test.ts computes it rather than trusting this note.
  */
 @theme {
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 
-  /* Brand navy — sidebar, headers, dark surfaces */
-  --color-navy-50: #eef2f8;
-  --color-navy-100: #dbe4f0;
-  --color-navy-200: #b7c8e1;
-  --color-navy-300: #8ea7cc;
-  --color-navy-400: #5c7fac;
-  --color-navy-500: #3c5f8a;
-  --color-navy-600: #2a4770;
-  --color-navy-700: #1f3760;
-  --color-navy-800: #172a4a;
-  --color-navy-900: #111f38;
-  --color-navy-950: #0a1526;
+  /* ------------------------------------------------------------------
+     Brand — the mark's orange. Nav, buttons, links, active states, hero.
+     ------------------------------------------------------------------ */
+  --color-brand-50: #fff4ec;
+  --color-brand-100: #ffe3d1;
+  --color-brand-200: #ffc4a1;
+  --color-brand-300: #fda06f;
+  --color-brand-400: #fa7f38;
+  --color-brand-500: #f26722; /* the logo orange */
+  --color-brand-600: #dd4f0a; /* fills: rings, bars, dots */
+  --color-brand-700: #b23d05; /* text + solid buttons — 5.89:1 on white */
+  --color-brand-800: #8c3006;
+  --color-brand-900: #6e2607;
 
-  /* Neutral slate — page background, borders, body text */
-  --color-slate-50: #f8fafc;
-  --color-slate-100: #f1f5f9;
-  --color-slate-200: #e2e8f0;
-  --color-slate-300: #cbd5e1;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-600: #475569;
-  --color-slate-700: #334155;
-  --color-slate-800: #1e293b;
-  --color-slate-900: #0f172a;
-  --color-slate-950: #020617;
+  /* Glow — the amber end of the mark. Gradient partner only: it is far too
+     light to carry text, and using it flat would put it in competition with
+     the amber that means "near target". */
+  --color-glow-200: #fee4b0;
+  --color-glow-300: #fdc94e;
+  --color-glow-400: #fba919; /* the logo amber */
+  --color-glow-500: #f0930c;
 
-  /* Primary accent — buttons, links, active states */
-  --color-accent-50: #eff6ff;
-  --color-accent-100: #dbeafe;
-  --color-accent-200: #bfdbfe;
-  --color-accent-300: #93c5fd;
-  --color-accent-400: #60a5fa;
-  --color-accent-500: #3b82f6;
-  --color-accent-600: #2563eb;
-  --color-accent-700: #1d4ed8;
-  --color-accent-800: #1e40af;
+  /* ------------------------------------------------------------------
+     Ink — the dark chrome: sidebar, mobile topbar, auth panels.
+     A warm near-black rather than a navy, so the brand orange sits on it as
+     one family instead of as an accent borrowed from somewhere else.
+     ------------------------------------------------------------------ */
+  --color-ink-50: #f9f5f2;
+  --color-ink-100: #efe7e0;
+  --color-ink-200: #ded0c5;
+  --color-ink-300: #c8a48f;
+  --color-ink-400: #ab8069;
+  --color-ink-500: #8f6349;
+  --color-ink-600: #744a33;
+  --color-ink-700: #5d3a27;
+  --color-ink-800: #4a2e1f;
+  --color-ink-900: #3a2419;
+  --color-ink-950: #2a1a14;
 
-  /* Teal — the approved role-UI primary. In the six role demos teal is both
-     the brand colour and the "target achieved" colour, so every ring, bar,
-     badge and active nav item resolves to this scale. */
-  --color-teal-50: #f0fdfa;
-  --color-teal-100: #ccfbf1;
-  --color-teal-200: #99f6e4;
-  --color-teal-300: #5eead4;
-  --color-teal-400: #2dd4bf;
-  --color-teal-500: #14b8a6;
-  --color-teal-600: #0d9488;
-  --color-teal-700: #0f766e;
-  --color-teal-800: #115e59;
+  /* ------------------------------------------------------------------
+     Neutral — page background, borders, body text. Warm, per rule 2 above.
+     ------------------------------------------------------------------ */
+  --color-neutral-50: #fdf9f6;
+  --color-neutral-100: #f7f2ed;
+  --color-neutral-200: #ece4dd;
+  --color-neutral-300: #dad0c8;
+  --color-neutral-400: #ab9e95; /* borders and icon fills only — fails AA as text */
+  --color-neutral-500: #73665e;
+  --color-neutral-600: #5a4f48;
+  --color-neutral-700: #453b35;
+  --color-neutral-800: #2d2521;
+  --color-neutral-900: #1c1512;
+  --color-neutral-950: #0f0a08;
 
-  /* Amber — "near target" (80–99%). Warning semantics only, never decoration. */
+  /* Accent — kept as a name because two dozen rules across forms, tables and
+     the shell ask for it, but it is no longer a second colour. It points at
+     the brand, so a rule written against either resolves to the same orange
+     and the product reads as one palette. */
+  --color-accent-50: #fff4ec;
+  --color-accent-100: #ffe3d1;
+  --color-accent-200: #ffc4a1;
+  --color-accent-300: #fda06f;
+  --color-accent-400: #fa7f38;
+  --color-accent-500: #f26722;
+  --color-accent-600: #dd4f0a;
+  --color-accent-700: #b23d05;
+  --color-accent-800: #8c3006;
+
+  /* ------------------------------------------------------------------
+     Status — held away from the brand hue on purpose (rule 1).
+     ------------------------------------------------------------------ */
+
+  /* Success / "target achieved" — green. Under a teal brand this scale and the
+     brand were the same colour; under an orange one they must not be, or every
+     achieved bar would read as decoration. */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-success-800: #065f46;
+
+  /* Amber — "near target" (80–99%). Pulled toward yellow, away from the brand:
+     the old #b45309 is a burnt orange three degrees of hue from
+     --color-brand-700, and a "near target" figure that looks like a link is
+     worse than no colour at all. Warning semantics only, never decoration. */
   --color-amber-50: #fffbeb;
-  --color-amber-100: #fef3c7;
+  --color-amber-100: #fef5ca;
   --color-amber-200: #fde68a;
-  --color-amber-300: #fcd34d;
-  --color-amber-400: #fbbf24;
-  --color-amber-500: #f59e0b;
-  --color-amber-600: #d97706;
-  --color-amber-700: #b45309;
+  --color-amber-300: #fbd24e;
+  --color-amber-400: #f2ba16;
+  --color-amber-500: #d69e08;
+  --color-amber-600: #ac7d05;
+  --color-amber-700: #8a6209; /* 6.17:1 on white */
 
   /* Rose — "behind target" (< 80%). */
   --color-rose-50: #fff1f2;
@@ -77,42 +151,36 @@
   --color-rose-600: #e11d48;
   --color-rose-700: #be123c;
 
-  /* Sky — "processing / info" only. */
+  /* Sky — "processing / info" only. The one cool colour left, and it earns its
+     place: an in-progress state must not look like either the brand or a
+     warning while a file is being read. */
   --color-sky-50: #f0f9ff;
   --color-sky-200: #bae6fd;
   --color-sky-500: #0ea5e9;
   --color-sky-600: #0284c7;
   --color-sky-700: #0369a1;
 
-  /* Indigo — the second brand accent called for by the visual-elevation
-     directive. Used for identity surfaces only (sidebar brand mark, active
-     nav rail, gradient headers) so the product reads as two-tone rather than
-     a generic single-teal template. Never used for status. */
-  --color-indigo-50: #eef2ff;
-  --color-indigo-200: #c7d2fe;
-  --color-indigo-400: #818cf8;
-  --color-indigo-500: #6366f1;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-700: #4338ca;
+  /* Indigo — retained for the two module-icon rules that name it. Pointed at
+     the brand tint so nothing renders in a colour the mark does not contain. */
+  --color-indigo-50: #fff4ec;
+  --color-indigo-200: #ffc4a1;
+  --color-indigo-400: #fa7f38;
+  --color-indigo-500: #f26722;
+  --color-indigo-600: #b23d05;
+  --color-indigo-700: #8c3006;
 
   /* Ring / band colours, resolved once so JSX never hardcodes a hex. */
-  --band-achieved: var(--color-teal-600);
+  --band-achieved: var(--color-success-600);
   --band-near: var(--color-amber-600);
   --band-behind: var(--color-rose-600);
-  --band-track: var(--color-slate-200);
-
-  /* Semantic */
-  --color-success-50: #ecfdf5;
-  --color-success-100: #d1fae5;
-  --color-success-500: #10b981;
-  --color-success-600: #059669;
-  --color-success-700: #047857;
+  --band-track: var(--color-neutral-200);
 
   --color-warning-50: #fffbeb;
-  --color-warning-100: #fef3c7;
-  --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
-  --color-warning-700: #b45309;
+  --color-warning-100: #fef5ca;
+  --color-warning-400: #f2ba16;
+  --color-warning-500: #d69e08;
+  --color-warning-600: #ac7d05;
+  --color-warning-700: #8a6209;
 
   --color-danger-50: #fef2f2;
   --color-danger-100: #fee2e2;
@@ -120,62 +188,168 @@
   --color-danger-600: #dc2626;
   --color-danger-700: #b91c1c;
 
-  --color-gold-500: #eab308;
-  --color-gold-600: #ca8a04;
+  --color-gold-500: #f2ba16;
+  --color-gold-600: #ac7d05;
+
+  /* ------------------------------------------------------------------
+     Gradients — the mark, reusable.
+     ------------------------------------------------------------------
+
+     The owner's brief was the logo's gradient, not just its colour, so the
+     ramp is a token rather than a hand-written `linear-gradient` in forty
+     rules. Two of them exist for one reason:
+
+       --grad-brand         the mark itself, orange into amber. Decorative
+                            surfaces only — brand marks, rails, bars, dots.
+                            Its light end is #fba919, which carries no text.
+       --grad-brand-strong  the same idea dark enough for WHITE TEXT. Its
+                            lightest stop is #c0450a (5.13:1), so a button or
+                            badge painted with it is legible end to end. */
+  --grad-brand: linear-gradient(135deg, var(--color-brand-500) 0%, var(--color-glow-400) 100%);
+  --grad-brand-strong: linear-gradient(135deg, #b23d05 0%, #c14306 58%, #c94508 100%);
+  --grad-brand-hover: linear-gradient(135deg, #8c3006 0%, #a63805 58%, #b8400a 100%);
+  --grad-brand-soft: linear-gradient(135deg, var(--color-brand-50) 0%, #fff8e9 100%);
+
+  /* The dark chrome: a warm near-black lit from one corner by the mark. */
+  --grad-ink: linear-gradient(180deg, var(--color-ink-900) 0%, var(--color-ink-950) 58%, #341f18 100%);
+  --grad-ink-lit:
+    radial-gradient(100% 46% at 0% 0%, rgb(242 103 34 / 0.34) 0%, transparent 64%),
+    radial-gradient(80% 40% at 100% 100%, rgb(251 169 25 / 0.12) 0%, transparent 62%),
+    linear-gradient(180deg, var(--color-ink-900) 0%, var(--color-ink-950) 58%, #341f18 100%);
+
+  /*
+   * The desktop sidebar — deep brand, not dark neutral.
+   *
+   * The first Banglalink draft painted it near-black on the theory that the
+   * orange should be the accent. The owner's verdict on the whole build was
+   * "basi dark lagce", and the sidebar is a quarter of every desktop screen,
+   * so it was the largest single cause. This is the mark's own scale taken to
+   * its deepest steps and lit from the top-left corner.
+   *
+   * The brightest point of the composite is #a73e0d. Everything written on it
+   * is checked against THAT, not against the base: white is 6.29:1 and
+   * --color-brand-100 is 5.14:1, which is why the links are those two and not
+   * a step further down the ramp (brand-200 is 4.09:1 in that corner).
+   */
+  --grad-sidebar:
+    radial-gradient(95% 42% at 0% 0%, rgb(242 103 34 / 0.26) 0%, transparent 62%),
+    radial-gradient(70% 36% at 100% 100%, rgb(251 169 25 / 0.13) 0%, transparent 62%),
+    linear-gradient(180deg, var(--color-brand-800) 0%, var(--color-brand-900) 54%, #7d2c07 100%);
+
+  /* The auth pages' brand panel. Same reasoning, same arithmetic: its lightest
+     stop is #b23d05 (5.89:1 for white, 4.82:1 for --color-brand-100), and the
+     amber bloom is placed over the DARK end so it cannot lift anything past
+     the point where the copy stops being readable. */
+  --grad-auth:
+    radial-gradient(65% 48% at 92% 90%, rgb(251 169 25 / 0.26) 0%, transparent 60%),
+    linear-gradient(152deg, var(--color-brand-700) 0%, #97320a 46%, var(--color-brand-900) 100%);
+
+  /* Hero surfaces: a tint that fades into the card rather than a flat block. */
+  --grad-hero:
+    radial-gradient(120% 90% at 100% 0%, rgb(251 169 25 / 0.16) 0%, transparent 58%),
+    linear-gradient(165deg, var(--color-brand-100) 0%, #fff3dc 34%, var(--surface-card, #fff) 76%);
+
+  /* The dark chrome on a phone. A near-black bar above the fold made the whole
+     app read as dark on the screen nine users in ten actually hold; the same
+     bar in the brand is the single biggest thing that stopped it. Its lightest
+     stop is #c94508 (4.84:1), so the white title on it clears AA. */
+  --grad-topbar: linear-gradient(100deg, #b23d05 0%, #c14306 52%, #c94508 100%);
+
+  /* The mark's own glow, for shadows under brand-coloured surfaces. */
+  --glow-brand-sm: 0 4px 12px -2px rgb(242 103 34 / 0.45);
+  --glow-brand-md: 0 8px 22px -6px rgb(242 103 34 / 0.55);
+  --glow-brand-lg: 0 14px 32px -8px rgb(242 103 34 / 0.6);
 
   /*
    * Text colours, by the job they do rather than by their place on a scale.
    *
-   * `--color-slate-400` was the muted-text colour in fifty-eight rules, and it
-   * fails WCAG AA everywhere it appears: #94a3b8 on white is 2.56:1 against a
-   * 4.5:1 requirement, and inside a `.kit-card.is-done` it fell to 1.88:1. That
-   * is not a theoretical score. Roughly nine in ten of this app's users read it
-   * on a phone, outdoors, in Dhaka daylight.
+   * `--color-neutral-400` (then named slate-400) was the muted-text colour in
+   * fifty-eight rules, and it fails WCAG AA everywhere it appears. That is not
+   * a theoretical score. Roughly nine in ten of this app's users read it on a
+   * phone, outdoors, in Dhaka daylight.
    *
-   * So muted text has its own name and its own rule: whatever it points at MUST
-   * clear 4.5:1 on both the card white and the page slate-50. Slate-400 keeps
-   * its place in the scale for borders, dividers and icon fills, where no
-   * contrast minimum applies.
+   * So muted text has its own name and its own rule: whatever it points at
+   * MUST clear 4.5:1 on both the card white and the page neutral-50. The -400
+   * step keeps its place in the scale for borders, dividers and icon fills,
+   * where no contrast minimum applies.
    *
    * Guarded by tests/contrast.smoke.test.ts, which computes the ratios rather
    * than trusting this comment.
    */
-  --text-muted: var(--color-slate-500);
-  --text-body: var(--color-slate-700);
+  --text-muted: var(--color-neutral-500);
+  --text-body: var(--color-neutral-700);
+
+  /*
+   * Muted text ON THE DARK CHROME — sidebar, mobile topbar, auth panels.
+   *
+   * `--text-muted` is tuned for white and neutral-50. Reused on the dark chrome
+   * it measured 3.34:1, and the teal theme before it was no better (3.46–3.84:1).
+   * The browser accessibility sweep never caught either, because axe cannot
+   * compute a ratio against a gradient and reports those elements as
+   * "incomplete" rather than failing them — so the sidebar's brand subtitle,
+   * section labels and profile role were under AA for the whole life of this app.
+   *
+   * It points at brand-100 rather than a grey because the surfaces it appears
+   * on are now the deep brand: 5.14:1 at the brightest point of the sidebar and
+   * 4.82:1 on the lightest stop of the auth panel. A warm tint against the white
+   * of the links is also how the two levels stay distinguishable once the
+   * ground stopped being neutral.
+   */
+  --text-muted-dark: var(--color-brand-100);
 
   /*
    * Status colours WHEN THEY ARE TEXT.
    *
    * The -600 step is the fill: rings, bars, dots, active states, where no
    * contrast minimum applies because nothing is being read off it. As text at
-   * body size the same step fails — teal-600 is 3.74:1 on white and amber-600
-   * is 3.19:1, both under AA's 4.5:1. The -700 step is the same hue one stop
-   * darker and clears it (5.48:1 and 5.02:1).
+   * body size the same step fails. The -700 step is the same hue one stop
+   * darker and clears it.
    *
    * Keeping the two apart by name is the point: a ring and a number can mean
    * the same thing and still need different colours, and nobody should have to
    * remember which is which.
    */
-  --text-success: var(--color-teal-700);
+  --text-success: var(--color-success-700);
   --text-warning: var(--color-amber-700);
   --text-danger: var(--color-rose-700);
 
   /*
    * The primary action colour, as a BACKGROUND for white text.
    *
-   * Teal-600 is the brand fill and stays the brand fill everywhere contrast
-   * does not apply — rings, bars, dots, active states. But white on teal-600 is
-   * 3.74:1, which is below AA for the button label sizes this app uses, so a
-   * solid button that carries white text uses teal-700 (5.48:1). One step on
-   * the same scale, same hue, legible.
+   * Brand-500 is the mark and stays the mark everywhere contrast does not
+   * apply — rings, bars, dots, active states. But white on #f26722 is 3.12:1,
+   * which is not close to AA at any size this app uses, so a solid surface
+   * carrying white text uses brand-700 (5.89:1). Same scale, same hue, legible.
    */
-  --surface-primary: var(--color-teal-700);
+  --surface-primary: var(--color-brand-700);
+  /* The vivid end of the mark, for fills that carry no text — dots, rails,
+     rings, share bars. Named so a rule can ask for "the bright one" without
+     reaching for a step that a future palette might darken. */
+  --surface-brand-vivid: var(--color-brand-500);
 
-  /* Elevation */
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
-  --shadow-panel: 0 4px 6px -2px rgb(15 23 42 / 0.05), 0 10px 20px -4px rgb(15 23 42 / 0.08);
-  --shadow-elevated: 0 12px 24px -6px rgb(15 23 42 / 0.16), 0 4px 8px -2px rgb(15 23 42 / 0.08);
-  --shadow-sidebar: 4px 0 24px -8px rgb(10 21 38 / 0.35);
+  /*
+   * What may be written ON the bright gradient.
+   *
+   * `--grad-brand` runs into #fba919, and white on that amber is 1.95:1 — the
+   * mark's own letter, the auth logo tile and every avatar's initials were
+   * sitting on it. The browser sweep never said so, because axe cannot measure
+   * contrast against a gradient and marks those elements "incomplete".
+   *
+   * A dark letter on a bright chip is both the fix and the better look: this
+   * value clears AA at BOTH ends of the ramp (5.36:1 on the orange, 8.59:1 on
+   * the amber), so it cannot fail wherever the gradient happens to land.
+   */
+  --text-on-brand: var(--color-ink-950);
+  /* The brand tint a link or a label is read off — used behind --text-brand. */
+  --surface-brand-tint: var(--color-brand-50);
+  --text-brand: var(--color-brand-700);
+
+  /* Elevation — warmed to match the neutrals. A blue-black shadow under a
+     warm-grey card is the detail that makes a theme look half-converted. */
+  --shadow-card: 0 1px 2px 0 rgb(92 55 32 / 0.05), 0 1px 3px 0 rgb(92 55 32 / 0.07);
+  --shadow-panel: 0 4px 6px -2px rgb(92 55 32 / 0.07), 0 10px 20px -4px rgb(92 55 32 / 0.1);
+  --shadow-elevated: 0 12px 24px -6px rgb(92 55 32 / 0.16), 0 4px 8px -2px rgb(92 55 32 / 0.09);
+  --shadow-sidebar: 4px 0 24px -8px rgb(42 26 20 / 0.4);
 
   /* Radius scale used across cards, controls, pills */
   --radius-card: 0.875rem;

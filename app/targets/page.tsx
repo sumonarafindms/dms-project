@@ -291,7 +291,7 @@ export default function TargetsPage() {
           { label: "GA", value: totals.ga.toLocaleString() },
           { label: "C2C", value: totals.c2c.toLocaleString() },
           { label: "SC", value: totals.sc.toLocaleString() },
-          { label: "Recharge", value: totals.recharge.toLocaleString(), tone: "teal" },
+          { label: "Recharge", value: totals.recharge.toLocaleString(), tone: "brand" },
           { label: "SSO", value: totals.sso.toLocaleString() },
           { label: "LSO", value: totals.lso.toLocaleString() },
         ]}

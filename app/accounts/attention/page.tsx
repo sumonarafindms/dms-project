@@ -50,7 +50,7 @@ export default async function Page({
           { label: "Retailers in scope", value: all.length.toLocaleString() },
           { label: "Needs review", value: flagged.toLocaleString(), tone: "amber" },
           { label: "High priority", value: high.toLocaleString() },
-          { label: "Clear", value: (all.length - flagged).toLocaleString(), tone: "teal" },
+          { label: "Clear", value: (all.length - flagged).toLocaleString(), tone: "brand" },
         ]}
       />
 

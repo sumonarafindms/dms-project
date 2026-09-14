@@ -65,7 +65,7 @@ export default async function LsoPending({
       }}
       summaryItems={[
         { label: "Total Retailers", value: total.toLocaleString() },
-        { label: "LSO Complete", value: complete.toLocaleString(), tone: "teal" },
+        { label: "LSO Complete", value: complete.toLocaleString(), tone: "brand" },
         { label: "LSO Pending", value: rows.length.toLocaleString(), tone: "amber" },
         { label: "Completion", value: total ? `${Math.round((complete / total) * 100)}%` : "—" },
       ]}

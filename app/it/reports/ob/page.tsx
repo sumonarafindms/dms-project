@@ -56,7 +56,7 @@ export default async function OpeningBalance({
       }}
       summaryItems={[
         { label: "Retailers", value: total.toLocaleString() },
-        { label: "With Balance", value: withBalance.toLocaleString(), tone: "teal" },
+        { label: "With Balance", value: withBalance.toLocaleString(), tone: "brand" },
         { label: "Not In Snapshot", value: (total - withBalance).toLocaleString(), tone: "amber" },
         { label: "Total Balance", value: money(totalBalance) },
       ]}

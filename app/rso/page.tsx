@@ -90,10 +90,10 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
 
       <SummaryStrip
         items={[
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "teal" },
+          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "brand" },
           { label: "Latest C2C", value: `৳${Math.round(daily.c2cTotal).toLocaleString()}` },
           { label: "My Retailers", value: r.retailerCount.toLocaleString() },
-          { label: "Need Focus", value: focus.length.toLocaleString(), tone: focus.length ? "amber" : "teal" },
+          { label: "Need Focus", value: focus.length.toLocaleString(), tone: focus.length ? "amber" : "brand" },
         ]}
       />
 
@@ -139,7 +139,7 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
           href="/rso/bp"
           count={bpCount}
           label={bpCount === 1 ? "My BP" : "My BPs"}
-          tone={bpCount ? "teal" : "rose"}
+          tone={bpCount ? "brand" : "rose"}
         />
       </div>
 

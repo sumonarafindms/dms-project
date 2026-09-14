@@ -110,7 +110,7 @@ export default async function Page({
 
       <SummaryStrip
         items={[
-          { label: "Total GA", value: total.toLocaleString(), tone: "teal" },
+          { label: "Total GA", value: total.toLocaleString(), tone: "brand" },
           { label: "170 GA", value: ga150.toLocaleString() },
           { label: "300 GA", value: ga300.toLocaleString() },
           // Shown, but deliberately outside the GA total — a swap replaces a

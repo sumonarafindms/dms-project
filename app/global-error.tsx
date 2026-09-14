@@ -19,7 +19,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
             placeItems: "center",
             padding: 24,
             fontFamily: "Arial,sans-serif",
-            background: "#f8fafc",
+            background: "#fdf9f6",
           }}
         >
           <div
@@ -28,13 +28,13 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
               padding: 28,
               borderRadius: 20,
               background: "#fff",
-              border: "1px solid #e2e8f0",
+              border: "1px solid #ece4dd",
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#7c3aed" }}>DMS SYSTEM ERROR</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#b23d05" }}>DMS SYSTEM ERROR</div>
             <h1 style={{ fontSize: 28, margin: "8px 0" }}>The application could not start.</h1>
-            <p style={{ color: "#64748b", lineHeight: 1.6 }}>
+            <p style={{ color: "#73665e", lineHeight: 1.6 }}>
               Please retry. If the problem continues, check the deployment and database connection.
             </p>
             <button
@@ -44,7 +44,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
                 padding: "0 18px",
                 border: 0,
                 borderRadius: 10,
-                background: "#4f46e5",
+                background: "#b23d05",
                 color: "#fff",
                 fontWeight: 800,
                 cursor: "pointer",

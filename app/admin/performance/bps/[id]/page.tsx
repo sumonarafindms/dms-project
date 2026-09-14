@@ -35,7 +35,7 @@ export default async function Page({
       <SummaryStrip
         items={[
           { label: "GA Target", value: a.gaTarget.toLocaleString() },
-          { label: "GA Achieved", value: d.total.toLocaleString(), tone: "teal" },
+          { label: "GA Achieved", value: d.total.toLocaleString(), tone: "brand" },
           { label: "GA Remaining", value: Math.max(0, a.gaTarget - d.total).toLocaleString(), tone: "amber" },
           // Shown, never added: a replacement SIM is not a new activation.
           { label: "SIM Swap", value: d.simSwap.toLocaleString() },

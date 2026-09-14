@@ -164,7 +164,7 @@ export function EmployeeDetailView({
           {
             label: `SSO · ${pct(p.ssoAchieved, p.ssoTarget)}%`,
             value: `${p.ssoAchieved}/${p.ssoTarget}`,
-            tone: "teal",
+            tone: "brand",
           },
           { label: `LSO · ${pct(p.lsoAchieved, p.lsoTarget)}%`, value: `${p.lsoAchieved}/${p.lsoTarget}` },
         ]}

@@ -117,7 +117,7 @@ export async function BpActivationDetailView({
 
       <SummaryStrip
         items={[
-          { label: "Total GA", value: d.total.toLocaleString(), tone: "teal" },
+          { label: "Total GA", value: d.total.toLocaleString(), tone: "brand" },
           { label: "150", value: d.total150.toLocaleString() },
           { label: "300", value: d.total300.toLocaleString() },
           { label: "SIM SWAP", value: d.simSwap.toLocaleString(), tone: "amber" },

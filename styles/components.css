@@ -27,9 +27,9 @@
     height: 2.5rem;
     padding: 0 1rem;
     border-radius: var(--radius-control);
-    border: 1px solid var(--color-slate-200);
+    border: 1px solid var(--color-neutral-200);
     background: white;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
     font-size: 0.84rem;
     font-weight: 600;
     cursor: pointer;
@@ -40,8 +40,8 @@
       transform 0.06s var(--ease-premium);
   }
   .page button:not(.kit-btn):not(.kit-icon-btn):hover {
-    border-color: var(--color-slate-300);
-    background: var(--color-slate-50);
+    border-color: var(--color-neutral-300);
+    background: var(--color-neutral-50);
   }
   .page button:not(.kit-btn):not(.kit-icon-btn):active {
     transform: translateY(1px);

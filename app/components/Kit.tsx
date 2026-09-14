@@ -344,7 +344,7 @@ export function Card({
   );
 }
 
-export function SummaryStrip({ items }: { items: { label: string; value: ReactNode; tone?: "teal" | "amber" }[] }) {
+export function SummaryStrip({ items }: { items: { label: string; value: ReactNode; tone?: "brand" | "amber" }[] }) {
   return (
     <div className="kit-summary-strip">
       {items.map((it) => (
@@ -434,7 +434,7 @@ export function HeroRing({
 }: {
   label: string;
   percent: number;
-  figures: { label: string; value: ReactNode; tone?: "teal" | "amber" }[];
+  figures: { label: string; value: ReactNode; tone?: "brand" | "amber" }[];
 }) {
   return (
     <Card className="kit-hero-ring">
@@ -454,10 +454,26 @@ export function HeroRing({
 }
 
 /** Initials chip. Used wherever a list shows people rather than metrics. */
+/**
+ * Initials from the first letters of the first two WORDS, not the first two
+ * characters.
+ *
+ * `name.slice(0, 2)` turned "Md Mashiujjaman shuvo" and "MD SHAHIN RAHMAN
+ * KHAN" into the same "MD", and "R.R Enterprise- BP 01" into "R." — a full
+ * stop as an avatar. Punctuation is skipped, and a single-word name still
+ * falls back to its first two letters.
+ */
+export function initialsOf(name: string) {
+  const words = (name || "").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  if (!words.length) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
 export function Avatar({ name }: { name: string }) {
   return (
     <span className="kit-avatar" aria-hidden="true">
-      {name.slice(0, 2).toUpperCase()}
+      {initialsOf(name)}
     </span>
   );
 }
@@ -595,7 +611,7 @@ export function Modal({
   );
 }
 
-/** A checkbox with its label, sized and coloured like the demos' accent-teal. */
+/** A checkbox with its label, sized and coloured in the brand accent. */
 export function Check({
   label,
   sub,
@@ -995,7 +1011,7 @@ export function StatusTile({
   href: string;
   count: number;
   label: string;
-  tone?: "amber" | "rose" | "teal";
+  tone?: "amber" | "rose" | "brand";
 }) {
   return (
     <Link href={href} className={`kit-card is-clickable kit-status-tile tone-${tone}`}>

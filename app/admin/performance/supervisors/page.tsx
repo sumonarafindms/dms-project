@@ -106,7 +106,7 @@ export default async function Page({
         items={[
           { label: "Supervisors", value: data.length.toLocaleString() },
           { label: "Total Target", value: `৳${Math.round(totalT).toLocaleString()}` },
-          { label: "Achieved", value: `৳${Math.round(totalA).toLocaleString()}`, tone: "teal" },
+          { label: "Achieved", value: `৳${Math.round(totalA).toLocaleString()}`, tone: "brand" },
           { label: "Remaining", value: `৳${Math.max(0, Math.round(totalT - totalA)).toLocaleString()}`, tone: "amber" },
         ]}
       />

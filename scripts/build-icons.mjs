@@ -28,7 +28,9 @@ import path from "node:path";
 const ROOT = path.join(import.meta.dirname, "..");
 const SRC = path.join(ROOT, "app", "icon.svg");
 const OUT = path.join(ROOT, "public", "icons");
-const GROUND = "#0d9488"; // --color-teal-600
+const GROUND = "#e75b12"; // the midpoint of --grad-brand, so the inset ground
+// under a maskable icon matches the artwork it is padding rather than banding
+// against it.
 
 const SIZES = [192, 512];
 

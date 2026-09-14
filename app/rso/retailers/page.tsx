@@ -29,8 +29,8 @@ export default async function Page({
         items={[
           { label: "Assigned", value: rows.length.toLocaleString() },
           { label: "SIM Sellers", value: sim.toLocaleString() },
-          { label: "Need Focus", value: flagged.toLocaleString(), tone: flagged ? "amber" : "teal" },
-          { label: "On Track", value: (rows.length - flagged).toLocaleString(), tone: "teal" },
+          { label: "Need Focus", value: flagged.toLocaleString(), tone: flagged ? "amber" : "brand" },
+          { label: "On Track", value: (rows.length - flagged).toLocaleString(), tone: "brand" },
         ]}
       />
       <SectionHead title="Search & review" sub="Open any retailer for full sales and activity detail." />

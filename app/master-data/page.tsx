@@ -187,7 +187,7 @@ export default function MasterDataPage() {
           { label: "Supervisors", value: dash(summary.supervisors) },
           { label: "Employees", value: dash(summary.employees) },
           { label: "Retailers", value: dash(summary.retailers) },
-          { label: "Mapped", value: dash(summary.mappedRetailers), tone: "teal" },
+          { label: "Mapped", value: dash(summary.mappedRetailers), tone: "brand" },
           { label: "Unassigned", value: dash(summary.unassignedRetailers), tone: "amber" },
         ]}
       />

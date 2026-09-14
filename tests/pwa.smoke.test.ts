@@ -216,8 +216,12 @@ describe("the manifest", () => {
       expect(fs.existsSync(path.join(ROOT, "public", String(icon.src))), String(icon.src)).toBe(true);
   });
 
-  it("uses the kit's own teal rather than a new colour", () => {
-    expect(m.theme_color).toBe("#0d9488");
+  it("uses the kit's own tokens rather than new colours", () => {
+    // brand-700: the dark end of the mobile topbar the OS status bar butts
+    // against, so the two do not read as two separate bars.
+    expect(m.theme_color).toBe("#b23d05");
+    // neutral-50: the page ground, so the splash does not flash white.
+    expect(m.background_color).toBe("#fdf9f6");
   });
 });
 

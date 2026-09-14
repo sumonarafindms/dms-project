@@ -17,7 +17,7 @@
   /* Per-tone gradients and glows, so a card's accent, its icon chip and its
      progress fill all pull from one source. */
   --color-warning-400: #fbbf24;
-  --color-teal-300: #5eead4;
+  --color-brand-300: #fcaa78;
 }
 
 @layer components {
@@ -25,12 +25,12 @@
      7. Tables — tinted header, accent hover rail
      ================================================================== */
   table thead th {
-    background: linear-gradient(180deg, var(--color-slate-100), var(--color-slate-50));
-    color: var(--color-slate-600);
-    border-bottom-color: var(--color-slate-200);
+    background: linear-gradient(180deg, var(--color-neutral-100), var(--color-neutral-50));
+    color: var(--color-neutral-600);
+    border-bottom-color: var(--color-neutral-200);
   }
   table tbody tr:hover {
-    background: linear-gradient(90deg, rgb(37 99 235 / 0.07), rgb(20 184 166 / 0.04));
+    background: linear-gradient(90deg, rgb(242 103 34 / 0.1), rgb(251 169 25 / 0.06));
   }
   table tbody td:first-child {
     box-shadow: inset 3px 0 0 transparent;
@@ -43,20 +43,21 @@
   /* ==================================================================
      9. Sidebar — richer active state
      ================================================================== */
+  /* This file loads last, so anything it names here WINS over shell.css.
+     It used to re-declare the sidebar's ground in ink, which silently undid
+     the deep-brand one; both now point at the same token. */
   .desktop-sidebar {
-    background:
-      radial-gradient(90% 40% at 0% 0%, rgb(59 130 246 / 0.16) 0%, transparent 60%),
-      linear-gradient(180deg, var(--color-navy-950), var(--color-navy-900) 55%, var(--color-navy-950));
+    background: var(--grad-sidebar);
   }
   .sidebar-link.active {
-    background: linear-gradient(90deg, rgb(59 130 246 / 0.3), rgb(20 184 166 / 0.08));
+    background: linear-gradient(90deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0.07));
     box-shadow:
-      inset 3px 0 0 var(--color-accent-400),
-      0 4px 14px -6px rgb(59 130 246 / 0.5);
+      inset 3px 0 0 var(--color-glow-400),
+      0 4px 14px -6px rgb(110 38 7 / 0.6);
   }
   .brand-mark {
     box-shadow:
-      0 4px 12px -2px rgb(37 99 235 / 0.55),
+      var(--glow-brand-md),
       inset 0 1px 0 rgb(255 255 255 / 0.25);
   }
   .bottom-link.active {
@@ -68,8 +69,8 @@
      ================================================================== */
   body {
     background:
-      radial-gradient(70% 45% at 100% 0%, rgb(37 99 235 / 0.05) 0%, transparent 60%),
-      radial-gradient(60% 40% at 0% 100%, rgb(20 184 166 / 0.05) 0%, transparent 60%), var(--color-slate-50);
+      radial-gradient(70% 45% at 100% 0%, rgb(242 103 34 / 0.1) 0%, transparent 60%),
+      radial-gradient(60% 40% at 0% 100%, rgb(251 169 25 / 0.1) 0%, transparent 60%), var(--color-neutral-50);
     background-attachment: fixed;
   }
   /* NOTE — a broken comment used to start here. Its closing delimiter was

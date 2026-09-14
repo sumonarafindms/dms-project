@@ -26,12 +26,12 @@ export const metadata = {
 };
 
 /**
- * Tints the browser and system chrome to the kit's teal so an installed app
+ * Tints the browser and system chrome to the Banglalink orange so an installed app
  * does not sit inside a grey frame. Separate from `metadata` because Next.js
  * takes viewport-level values from their own export.
  */
 export const viewport = {
-  themeColor: "#0d9488",
+  themeColor: "#b23d05",
   // The app is mobile-first and its tables scroll inside their own containers,
   // so the page itself never needs zooming out — but zoom is NOT disabled.
   // `maximum-scale=1` is the usual way that gets done and it stops a

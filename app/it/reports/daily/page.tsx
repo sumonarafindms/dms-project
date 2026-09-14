@@ -187,7 +187,7 @@ export default async function DailySummary({
 
       <SummaryStrip
         items={[
-          { label: "Total GA", value: totals.standardGa.toLocaleString(), tone: "teal" },
+          { label: "Total GA", value: totals.standardGa.toLocaleString(), tone: "brand" },
           { label: "SIM Swap", value: totals.simSwap.toLocaleString() },
           { label: "Total C2C", value: money(totals.c2cAmount) },
           { label: `Total C2S · ${totals.c2sTransactions.toLocaleString()} trx`, value: money(totals.c2sAmount) },

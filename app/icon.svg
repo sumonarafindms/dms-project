@@ -12,9 +12,12 @@
     in a browser tab, which is where most icons of this kind fall apart.
 
     Colours are the kit's own tokens, not new ones:
-      #0d9488  color-teal-600  (ground)
-      #5eead4  color-teal-300  (nodes)
-      #2dd4bf  color-teal-400  (bars)
+      #f26722  color-brand-500  (ground, top of the gradient)
+      #dd4f0a  color-brand-600  (ground, bottom)
+      #fba919  color-glow-400   (nodes — the amber end of the Banglalink mark)
+
+    The ground is the Banglalink gradient itself rather than a flat fill, so a
+    launcher icon, a browser tab and the sidebar mark are all the same ramp.
 
     (Token names written without their leading dashes: a double hyphen is
     illegal inside an XML comment and makes the file unparseable.)
@@ -22,9 +25,9 @@
     sizes under public/icons are generated from this by scripts/build-icons.mjs.
   -->
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#14b8a6" />
-      <stop offset="1" stop-color="#0d9488" />
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f26722" />
+      <stop offset="1" stop-color="#dd4f0a" />
     </linearGradient>
   </defs>
 
@@ -55,7 +58,7 @@
   </g>
 
   <circle cx="256" cy="140" r="34" fill="#ffffff" />
-  <circle cx="170" cy="318" r="30" fill="#5eead4" />
-  <circle cx="256" cy="318" r="30" fill="#5eead4" />
-  <circle cx="342" cy="318" r="30" fill="#5eead4" />
+  <circle cx="170" cy="318" r="30" fill="#fba919" />
+  <circle cx="256" cy="318" r="30" fill="#fba919" />
+  <circle cx="342" cy="318" r="30" fill="#fba919" />
 </svg>

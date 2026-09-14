@@ -87,7 +87,7 @@ export default async function Page({
       <PageHeader title={sup.name} subtitle={`${rows.length} RSOs · ${bpStats.length} BP assignments`} />
       <SummaryStrip
         items={[
-          { label: "Recharge", value: `${pct(rechargeAchieved, rechargeTarget)}%`, tone: "teal" },
+          { label: "Recharge", value: `${pct(rechargeAchieved, rechargeTarget)}%`, tone: "brand" },
           { label: "RSO GA", value: `${rsoGaA} / ${rsoGaT}` },
           // BP GA is a separate target from RSO GA and is never added to it.
           // Before v136 this was only half true: `rows` still had the BP SIMs

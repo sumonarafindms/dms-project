@@ -93,7 +93,7 @@ export default async function Page({
       <SummaryStrip
         items={[
           { label: "Total Events", value: total.toLocaleString() },
-          { label: "Today", value: today.toLocaleString(), tone: "teal" },
+          { label: "Today", value: today.toLocaleString(), tone: "brand" },
           { label: "Logins Today", value: logins.toLocaleString() },
           { label: "Shown", value: rows.length.toLocaleString() },
         ]}

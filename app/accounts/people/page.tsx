@@ -50,7 +50,7 @@ export default async function Page() {
           {
             label: "Owned Retailers",
             value: rsos.reduce((n, x) => n + x._count.retailers, 0).toLocaleString(),
-            tone: "teal",
+            tone: "brand",
           },
         ]}
       />

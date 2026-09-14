@@ -87,7 +87,7 @@ export default async function Page() {
         items={[
           { label: "Field Force", value: (supervisors + rsos).toLocaleString() },
           { label: "Active BPs", value: bps.toLocaleString() },
-          { label: "Login Accounts", value: logins.toLocaleString(), tone: "teal" },
+          { label: "Login Accounts", value: logins.toLocaleString(), tone: "brand" },
           { label: "IT Users", value: itUsers.toLocaleString() },
         ]}
       />

@@ -7,11 +7,12 @@ import path from "node:path";
  *
  * ## What was wrong
  *
- * `--color-slate-400` (#94a3b8) was the muted-text colour in fifty-eight CSS
- * rules. On a white card that is **2.56:1**, against AA's 4.5:1 for body text.
- * Inside a `.kit-card.is-done`, which faded the whole card with `opacity: 0.7`,
- * the same text landed at **1.88:1**. The "Complete" badge was 2.98:1, the
- * primary button's white-on-teal label 3.74:1, and the amber figures 3.19:1.
+ * `--color-neutral-400` (then `--color-slate-400`) was the muted-text colour in
+ * fifty-eight CSS rules. On a white card that was **2.56:1**, against AA's
+ * 4.5:1 for body text. Inside a `.kit-card.is-done`, which faded the whole card
+ * with `opacity: 0.7`, the same text landed at **1.88:1**. The "Complete" badge
+ * was 2.98:1, the primary button's white-on-teal label 3.74:1, and the amber
+ * figures 3.19:1.
  *
  * None of that shows up in a screenshot, a layout test, or a type checker. It
  * shows up when an RSO tries to read a phone outdoors in Dhaka, which is what
@@ -72,12 +73,34 @@ export function contrast(a: string, b: string) {
   return (x + 0.05) / (y + 0.05);
 }
 
+/**
+ * Angular distance between two hues, 0–180.
+ *
+ * Contrast answers "can this be read". It cannot answer "can these two be told
+ * apart", which is a separate question and the one an orange brand raises: two
+ * colours can both clear AA against white and still be the same colour to the
+ * reader. Hue is the cheap stand-in for that.
+ */
+export function hueGap(a: string, b: string) {
+  const hue = (hex: string) => {
+    const [r, g, bl] = rgb(hex).map((v) => v / 255);
+    const max = Math.max(r, g, bl);
+    const min = Math.min(r, g, bl);
+    const d = max - min;
+    if (d === 0) return 0;
+    const h = max === r ? ((g - bl) / d) % 6 : max === g ? (bl - r) / d + 2 : (r - g) / d + 4;
+    return (h * 60 + 360) % 360;
+  };
+  const raw = Math.abs(hue(a) - hue(b));
+  return raw > 180 ? 360 - raw : raw;
+}
+
 const AA_BODY = 4.5;
 
 /** The surfaces text actually sits on in this app. */
 const SURFACES: Record<string, string> = {
   "card white": "#ffffff",
-  "page slate-50": resolve("var(--color-slate-50)"),
+  "page neutral-50": resolve("var(--color-neutral-50)"),
 };
 
 describe("the ratio maths", () => {
@@ -95,11 +118,16 @@ describe("the ratio maths", () => {
      * makes the maths lenient enough to pass it, the guard has stopped
      * guarding, and this is the line that says so.
      */
-    const slate400 = resolve("var(--color-slate-400)");
-    expect(slate400).toBe("#94a3b8");
-    expect(contrast(slate400, "#ffffff")).toBeLessThan(3);
-    // And the old primary button: white on teal-600.
-    expect(contrast("#ffffff", resolve("var(--color-teal-600)"))).toBeLessThan(AA_BODY);
+    const muted400 = resolve("var(--color-neutral-400)");
+    expect(contrast(muted400, "#ffffff")).toBeLessThan(3);
+    /*
+     * And the reason --surface-primary is a step darker than the brand fill.
+     * Under the teal theme this was white-on-teal-600 at 3.74:1; the Banglalink
+     * orange is lighter still, so brand-600 is 4.40:1 — closer, and just as
+     * unusable. If a future palette makes this line pass, --surface-primary can
+     * stop being a special case; until then it must not quietly become the fill.
+     */
+    expect(contrast("#ffffff", resolve("var(--color-brand-600)"))).toBeLessThan(AA_BODY);
   });
 });
 
@@ -117,16 +145,198 @@ describe("text tokens clear AA on every surface they appear on", () => {
     }
   }
 
-  it("--text-success is readable on the pale teal tiles it is used on", () => {
-    // Avatar initials and module icons sit on teal-50, not on white.
-    const ratio = contrast(resolve("var(--text-success)"), resolve("var(--color-teal-50)"));
-    expect(ratio, `teal text on teal-50 is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_BODY);
+  it("--text-brand is readable on the pale brand tiles it is used on", () => {
+    // Avatar initials, chips and module icons sit on brand-50, not on white.
+    const ratio = contrast(resolve("var(--text-brand)"), resolve("var(--surface-brand-tint)"));
+    expect(ratio, `brand text on brand-50 is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_BODY);
+  });
+
+  it("--text-success is readable on its own pale tile", () => {
+    // "On track", "Complete", "Online" — a green figure on a green tint.
+    const ratio = contrast(resolve("var(--text-success)"), resolve("var(--color-success-50)"));
+    expect(ratio, `success text on success-50 is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_BODY);
+  });
+
+  it("keeps the brand apart from the colour that means 'nearly there'", () => {
+    /*
+     * A Banglalink-specific hazard, and the reason the amber scale moved.
+     *
+     * The brand is an orange; "near target" was a burnt orange (#b45309) three
+     * degrees of hue away from it. Side by side in a summary strip — "Flagged"
+     * beside "On Track" — they were the same colour to anyone not looking for
+     * the difference, which defeats the point of colouring them at all.
+     *
+     * Distance in sRGB is a crude measure, but it is the one that fails loudly
+     * if someone re-values either scale back toward the other.
+     */
+    const gap = hueGap(resolve("var(--text-brand)"), resolve("var(--text-warning)"));
+    expect(gap, `--text-brand and --text-warning are ${gap.toFixed(0)}° apart in hue`).toBeGreaterThan(18);
+
+    /*
+     * The yardstick, and the reason this is measured in degrees rather than in
+     * sRGB distance. The two colours it must separate are both dark and both
+     * muted, so straight-line distance barely moves between a pair that is
+     * obviously confusable and a pair that is not: the old brand/amber pairing
+     * is 33 apart and the new one 47, which says almost nothing. In hue the
+     * same two pairings are 7° and 23° — the difference you actually see.
+     */
+    expect(hueGap("#a63c0c", "#b45309"), "the pairing this rule replaced").toBeLessThan(10);
+  });
+
+  it("keeps 'achieved' off the brand scale entirely", () => {
+    /*
+     * Under the teal theme, brand and success were the same colour and that was
+     * fine — teal reads as "good". An orange does not, so the bands moved to
+     * green. If someone points --band-achieved back at the brand, a chart full
+     * of orange bars stops distinguishing "hit target" from "this is the
+     * company colour".
+     */
+    const achieved = resolve("var(--band-achieved)");
+    for (const step of [400, 500, 600, 700])
+      expect(achieved, `--band-achieved is the brand's own ${step}`).not.toBe(resolve(`var(--color-brand-${step})`));
+    expect(achieved).toBe(resolve("var(--color-success-600)"));
   });
 
   it("white on the primary surface clears AA", () => {
     // The main action button in the app. Teal-600 was 3.74:1.
     const ratio = contrast("#ffffff", resolve("var(--surface-primary)"));
     expect(ratio, `white on --surface-primary is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_BODY);
+  });
+});
+
+describe("the brand's fill steps are never used as text", () => {
+  /*
+   * The rule the token file states, enforced.
+   *
+   * Orange is a light hue. `--color-brand-600` is 4.40:1 on white — it looks
+   * perfectly solid, it is the right colour for a bar or a dot, and as text it
+   * is under AA. The teal theme had the same split and the same trap at a
+   * different number, and six rules walked into it the moment the palette
+   * changed underneath them: the login overline, the help link, three figure
+   * tones and an icon. None of them was touched by the retheme; they simply
+   * asked for "the brand fill" and the brand fill got lighter.
+   *
+   * So: on a light surface, brand and accent below -700 may paint anything
+   * except text. `--text-brand` is the text step and it is one token away.
+   *
+   * The dark chrome is exempt by hue rather than by hand: -200 and -300 exist
+   * precisely to be read off ink-950, where they measure 10:1 and better.
+   */
+  const LIGHT_TEXT_STEPS = [400, 500, 600];
+
+  const styleFiles = fs
+    .readdirSync(path.join(ROOT, "styles"))
+    .filter((f) => f.endsWith(".css"))
+    .map((f) => ({ file: f, src: fs.readFileSync(path.join(ROOT, "styles", f), "utf8") }));
+
+  it("is looking at the right token steps", () => {
+    // If the scale is renumbered and these steps stop existing, the sweep below
+    // would pass by matching nothing at all.
+    for (const step of LIGHT_TEXT_STEPS) {
+      expect(TOKEN.has(`--color-brand-${step}`), `--color-brand-${step}`).toBe(true);
+      expect(contrast("#ffffff", resolve(`var(--color-brand-${step})`))).toBeLessThan(AA_BODY);
+    }
+  });
+
+  it("finds none in the stylesheets", () => {
+    const offenders: string[] = [];
+    for (const { file, src } of styleFiles)
+      for (const scale of ["brand", "accent"])
+        for (const step of LIGHT_TEXT_STEPS) {
+          const re = new RegExp(`(^|[^-])color:\\s*var\\(--color-${scale}-${step}\\)`, "gm");
+          for (const _ of src.matchAll(re)) offenders.push(`${file}: color: var(--color-${scale}-${step})`);
+        }
+    expect(offenders, `use --text-brand (brand-700) for brand text:\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+
+  it("would notice one if it came back", () => {
+    /*
+     * The guard above passes trivially if the regex is wrong, and its `[^-]`
+     * prefix — there to stop `border-color:` and `background-color:` matching —
+     * is exactly the kind of detail that silently stops matching anything. So
+     * it is run against a line known to be bad, and against the two it must not
+     * flag.
+     */
+    const bad = "  .x { color: var(--color-brand-600); }";
+    const fine = [
+      "  .x { border-color: var(--color-brand-600); }",
+      "  .x { background-color: var(--color-accent-500); }",
+    ];
+    const re = /(^|[^-])color:\s*var\(--color-(brand|accent)-(400|500|600)\)/gm;
+    expect([...bad.matchAll(re)]).toHaveLength(1);
+    for (const line of fine) expect([...line.matchAll(re)], line).toHaveLength(0);
+  });
+});
+
+describe("nothing white is written on the bright gradient", () => {
+  /*
+   * The failure axe structurally cannot see.
+   *
+   * `--grad-brand` is the mark: #f26722 into #fba919. White on that amber is
+   * **1.95:1**. Three elements were sitting on it — the sidebar's brand letter,
+   * the auth pages' logo tile, and every avatar's initials — and the browser
+   * sweep passed every time, because axe cannot compute a ratio against a
+   * background-image and reports those elements as "incomplete" rather than
+   * failing them. A gradient is a blind spot in the tool, so it needs a guard
+   * that reads the source instead.
+   *
+   * `--text-on-brand` is the answer and it clears AA at BOTH ends of the ramp,
+   * so it cannot fail wherever the gradient happens to land under a glyph.
+   */
+  const styleFiles = fs
+    .readdirSync(path.join(ROOT, "styles"))
+    .filter((f) => f.endsWith(".css"))
+    .map((f) => ({ file: f, src: fs.readFileSync(path.join(ROOT, "styles", f), "utf8") }));
+
+  /** Every `{ ... }` block, with its selector, flattened out of a stylesheet. */
+  function rules(src: string) {
+    const out: { selector: string; body: string }[] = [];
+    const re = /([^{}]+)\{([^{}]*)\}/g;
+    for (const m of src.matchAll(re)) out.push({ selector: m[1].trim(), body: m[2] });
+    return out;
+  }
+
+  it("clears AA at both ends of the ramp", () => {
+    // The claim the token makes about itself, computed.
+    const fg = resolve("var(--text-on-brand)");
+    for (const stop of ["--color-brand-500", "--color-glow-400"]) {
+      const ratio = contrast(fg, resolve(`var(${stop})`));
+      expect(ratio, `--text-on-brand on ${stop} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_BODY);
+    }
+    // And the colour it replaced, still failing, so this is not a tautology.
+    expect(contrast("#ffffff", resolve("var(--color-glow-400)"))).toBeLessThan(2.5);
+  });
+
+  it("finds no rule pairing --grad-brand with white text", () => {
+    const offenders: string[] = [];
+    for (const { file, src } of styleFiles)
+      for (const r of rules(src))
+        if (
+          /background(-image)?:\s*var\(--grad-brand\)/.test(r.body) &&
+          /(^|[^-])color:\s*(#fff(f{3})?\b|white\b)/i.test(r.body)
+        )
+          offenders.push(`${file}: ${r.selector}`);
+    expect(offenders, `use --text-on-brand on --grad-brand:\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+
+  it("would notice one if it came back", () => {
+    /*
+     * Two regexes and a hand-rolled rule splitter — plenty of room for a guard
+     * that matches nothing and reports success. So it is run against the exact
+     * shape it is looking for, and against the three it must not flag.
+     */
+    const find = (css: string) =>
+      rules(css).filter(
+        (r) =>
+          /background(-image)?:\s*var\(--grad-brand\)/.test(r.body) &&
+          /(^|[^-])color:\s*(#fff(f{3})?\b|white\b)/i.test(r.body),
+      );
+    expect(find(".x { background: var(--grad-brand); color: white; }")).toHaveLength(1);
+    expect(find(".x { background-image: var(--grad-brand); color: #fff; }")).toHaveLength(1);
+    // The legitimate shapes.
+    expect(find(".x { background: var(--grad-brand); color: var(--text-on-brand); }")).toHaveLength(0);
+    expect(find(".x { background: var(--grad-brand-strong); color: white; }")).toHaveLength(0);
+    expect(find(".x { background: var(--grad-brand); border-color: white; }")).toHaveLength(0);
   });
 });
 
@@ -143,12 +353,12 @@ describe("the muted colour does not creep back", () => {
 
   it("uses no scale token directly as a text colour where a semantic one exists", () => {
     /*
-     * `--color-slate-400` keeps its place in the scale for borders, dividers
+     * `--color-neutral-400` keeps its place in the scale for borders, dividers
      * and icon fills, where no contrast minimum applies. As `color:` it is the
-     * bug this update fixed, so that exact pairing is the one thing barred.
+     * bug that update fixed, so that exact pairing is the one thing barred.
      */
-    const offenders = styleFiles.filter((f) => /color:\s*var\(--color-slate-400\)/.test(f.src)).map((f) => f.file);
-    expect(offenders, "use --text-muted for muted text; slate-400 fails AA").toEqual([]);
+    const offenders = styleFiles.filter((f) => /color:\s*var\(--color-neutral-400\)/.test(f.src)).map((f) => f.file);
+    expect(offenders, "use --text-muted for muted text; neutral-400 fails AA").toEqual([]);
   });
 
   it("does not fade a card full of text with opacity", () => {

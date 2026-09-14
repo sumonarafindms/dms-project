@@ -88,7 +88,7 @@ export const DAY_STATE_RANK: Record<DayState, number> = {
 /**
  * Styling hook — one of the kit's EXISTING badge tones, never a new colour.
  *
- * `Badge` already owns teal/amber/rose/grey through `styles/kit.css`, so the
+ * `Badge` already owns green/amber/rose/grey through `styles/kit.css`, so the
  * readiness grid borrows that vocabulary rather than introducing a fifth set of
  * status colours for the same four meanings.
  */

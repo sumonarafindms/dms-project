@@ -60,7 +60,7 @@ export default async function Page({
             value: byOutlet.size.toLocaleString(),
           },
           { label: "GA Target", value: totalT.toLocaleString() },
-          { label: "GA Achieved", value: totalA.toLocaleString(), tone: "teal" },
+          { label: "GA Achieved", value: totalA.toLocaleString(), tone: "brand" },
           { label: "GA Remaining", value: Math.max(0, totalT - totalA).toLocaleString(), tone: "amber" },
         ]}
       />

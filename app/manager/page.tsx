@@ -124,7 +124,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
           { label: "Assigned Teams", value: supervisors.length.toLocaleString() },
           { label: "RSOs", value: rows.length.toLocaleString() },
           { label: "Retailers", value: retailers.toLocaleString() },
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "teal" },
+          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "brand" },
         ]}
       />
 
@@ -182,7 +182,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
           label="RSO behind target"
           tone="rose"
         />
-        <StatusTile href="/manager/supervisors" count={supervisors.length} label="Assigned teams" tone="teal" />
+        <StatusTile href="/manager/supervisors" count={supervisors.length} label="Assigned teams" tone="brand" />
       </div>
 
       <SectionHead

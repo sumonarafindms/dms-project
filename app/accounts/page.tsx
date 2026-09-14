@@ -74,7 +74,7 @@ export default async function Accounts() {
           {
             label: "Feeds Current",
             value: `${feeds.length - behind}/${feeds.length}`,
-            tone: behind ? "amber" : "teal",
+            tone: behind ? "amber" : "brand",
           },
           { label: "Latest GA", value: daily.gaTotal.toLocaleString() },
           { label: "Active Retailers", value: retailers.toLocaleString() },

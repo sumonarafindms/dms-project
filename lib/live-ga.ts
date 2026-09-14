@@ -100,7 +100,14 @@ export type LiveGa = {
   /** "Supervisors", "RSOs", "Retailers" … whatever the headline counts over. */
   scope: string;
   sections: LiveSection[];
-  lastUpload: { at: Date; fileName: string } | null;
+  /*
+   * The time only. The file name used to be here and on screen; the owner asked
+   * for it gone. It was the upload's name, not the reader's business — what a
+   * supervisor needs from this line is "how fresh is this number", and a
+   * filename like "ActivationDetailsReport (3).xlsx" answers a question nobody
+   * asked while making the useful half harder to find.
+   */
+  lastUpload: { at: Date } | null;
   /** Set when a supervisor's name is being drilled into. */
   focus: string | null;
 };
@@ -110,9 +117,9 @@ export async function lastGaUpload() {
   const batch = await prisma.importBatch.findFirst({
     where: { type: ImportType.GA, status: { in: ["COMPLETED", "COMPLETED_WITH_ERRORS"] } },
     orderBy: { uploadedAt: "desc" },
-    select: { uploadedAt: true, fileName: true },
+    select: { uploadedAt: true },
   });
-  return batch ? { at: batch.uploadedAt, fileName: batch.fileName } : null;
+  return batch ? { at: batch.uploadedAt } : null;
 }
 
 /**
@@ -172,15 +179,15 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
 
   /* ---------------------------------------------------------------- BP */
   if (viewer.role === "BP") {
-    if (!viewer.bpRetailerId) return { ...base, total: 0, scope: "Today", sections: [] };
+    if (!viewer.bpRetailerId) return { ...base, total: 0, scope: "Your activations", sections: [] };
     const rows = await bpRows(ymd, { retailerId: viewer.bpRetailerId });
-    return { ...base, total: rows.reduce((n, r) => n + r.count, 0), scope: "Your activations today", sections: [] };
+    return { ...base, total: rows.reduce((n, r) => n + r.count, 0), scope: "Your activations", sections: [] };
   }
 
   /* --------------------------------------------------------------- RSO */
   if (viewer.role === "RSO") {
     const employeeId = viewer.employeeId;
-    if (!employeeId) return { ...base, total: 0, scope: "Today", sections: [] };
+    if (!employeeId) return { ...base, total: 0, scope: "Your activations", sections: [] };
 
     const retailers = await prisma.retailer.findMany({
       where: { employeeId, active: true },
@@ -210,7 +217,7 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
         counts,
         retailers.map((r) => r.id),
       ),
-      scope: "Your activations today",
+      scope: "Your activations",
       sections: [
         { key: "retailers", title: "Retailers", empty: "No retailer has activated a SIM yet today.", rows: active },
         { key: "bps", title: "BPs", empty: "No BP is assigned to you.", rows: bps },
@@ -221,8 +228,8 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
   /* -------------------------------------------------- SUPERVISOR level */
   if (viewer.role === "SUPERVISOR") {
     const supervisorId = viewer.supervisorId;
-    if (!supervisorId) return { ...base, total: 0, scope: "Today", sections: [] };
-    return teamView(ymd, { supervisorId, active: true }, { employee: { supervisorId } }, base, "Your team today");
+    if (!supervisorId) return { ...base, total: 0, scope: "Your team", sections: [] };
+    return teamView(ymd, { supervisorId, active: true }, { employee: { supervisorId } }, base, "Your team");
   }
 
   /* --------------------------------------- ADMIN / IT / MANAGER level */
@@ -243,7 +250,7 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
           { supervisorId: supervisor.id, active: true },
           { employee: { supervisorId: supervisor.id } },
           base,
-          `${supervisor.name}'s team today`,
+          `${supervisor.name}'s team`,
         )),
         focus: supervisor.name,
       };
@@ -283,7 +290,7 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
   return {
     ...base,
     total: rows.reduce((n, r) => n + r.count, 0),
-    scope: "Everyone today",
+    scope: "Everyone",
     sections: [{ key: "supervisors", title: "Supervisors", empty: "No supervisor is active.", rows }],
   };
 }

@@ -2,9 +2,15 @@
 
 `app/globals.css` loads Tailwind v4 and then these files, in this exact order:
 
-1. `tokens.css` — the Deep Navy + Slate design system as a Tailwind v4
-   `@theme` block (colors, radius, shadow, font, easing). Change the look of
-   the whole app here.
+1. `tokens.css` — the Banglalink design system as a Tailwind v4 `@theme`
+   block (colors, gradients, radius, shadow, font, easing). Change the look of
+   the whole app here. The palette is derived from the Banglalink mark: an
+   orange (`--color-brand-500`) into an amber (`--color-glow-400`), with warm
+   neutrals underneath and a warm near-black (`--color-ink-*`) for the dark
+   chrome. Three rules the file states and `tests/contrast.smoke.test.ts`
+   enforces: brand is chrome and never status, neutrals are warm, and the -500
+   and -600 steps are fills while -700 is the text step — orange is light
+   enough that white on `--color-brand-600` is 4.40:1, under AA.
 2. `base.css` — resets, `body` / `h1`–`h4` defaults, scrollbar, `.page`.
 3. `patterns.css`, `shell.css`, `tables.css`, `forms.css`, `components.css`,
    `premium.css` — the app shell (sidebar, mobile topbar, bottom nav), the

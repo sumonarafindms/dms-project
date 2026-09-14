@@ -69,7 +69,7 @@ export default async function ReadinessPage({
       <SummaryStrip
         items={[
           { label: "Feed-days due", value: due.toLocaleString() },
-          { label: "Imported", value: covered.toLocaleString(), tone: "teal" },
+          { label: "Imported", value: covered.toLocaleString(), tone: "brand" },
           { label: "Needs attention", value: problems.length.toLocaleString() },
           { label: "Latest due day", value: report.lastDue },
         ]}

@@ -187,7 +187,7 @@ export default function UserManager({
       <SummaryStrip
         items={[
           { label: "Total Accounts", value: users.length.toLocaleString() },
-          { label: "Active", value: activeCount.toLocaleString(), tone: "teal" },
+          { label: "Active", value: activeCount.toLocaleString(), tone: "brand" },
           { label: "Disabled", value: (users.length - activeCount).toLocaleString(), tone: "amber" },
           { label: "Locked out", value: lockedCount.toLocaleString(), tone: lockedCount ? "amber" : undefined },
         ]}

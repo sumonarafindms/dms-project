@@ -3,9 +3,9 @@
  *
  * One block per team: the team's name and scope on the left, then two kit
  * bars — recharge achievement and GA achievement. The bars carry the kit's
- * own achievement bands (teal at 80%+, amber, rose), so a team that is behind
+ * own achievement bands (green at 80%+, amber, rose), so a team that is behind
  * on GA but fine on recharge reads at a glance, which the old fixed
- * indigo/teal pair could not show.
+ * flat two-colour pair could not show.
  *
  * The caller supplies percentages already computed by lib/performance; nothing
  * is recalculated here beyond clamping the bar width.

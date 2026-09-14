@@ -583,3 +583,24 @@
 - Removed unused GA page/importer symbols introduced by recent GA changes.
 - Fixed AppShell sidebar ref cleanup warning without changing navigation behavior.
 - No schema, API contract, auth, permission, import-rule or calculation changes.
+
+## v166 - Banglalink theme
+- Retheme: the whole palette now derives from the Banglalink mark — orange `#f26722` into amber `#fba919`.
+- Renamed the scales rather than re-valuing them in place: `--color-teal-*` → `--color-brand-*`, `--color-navy-*` → `--color-ink-*`, `--color-slate-*` → `--color-neutral-*`.
+- Neutrals are now warm, so the app reads orange even on screens showing little orange; the dark chrome is a warm near-black instead of a navy.
+- Added gradient tokens (`--grad-brand`, `--grad-brand-strong`, `--grad-brand-hover`, `--grad-brand-soft`, `--grad-ink`, `--grad-ink-lit`, `--grad-hero`) and brand glows, applied to the sidebar, brand mark, primary buttons, LIVE badge, share bars, progress fills, icon tiles, auth panels and the page canvas.
+- "Target achieved", "on track", "complete" and "online" moved off the brand scale to green; the brand is chrome, never status.
+- Moved the "near target" amber toward yellow (23° from the brand instead of 7°) so a warning can no longer be mistaken for a link.
+- Fixed six rules that used a brand fill step as text — legal under teal, under AA under orange — and added a guard so the fill/text split cannot collapse again.
+- Fixed the dark chrome's muted text, which had been under AA for the life of the app (3.34–3.84:1) because axe cannot measure contrast against a gradient: new `--text-muted-dark`, 8.41:1.
+- Redrew `app/icon.svg` in the brand gradient and regenerated every home-screen PNG; PWA theme colour now matches the mobile topbar.
+
+## v167 - Brighter Banglalink theme
+- The owner's verdict on v166 was "basi dark lagce" — too dark. The chrome was the cause, so the chrome changed sides: it now carries the brand instead of framing it.
+- The desktop sidebar is the mark's deepest steps lit from the corner (`--grad-sidebar`) instead of a near-black neutral.
+- The phone's top bar — the first and often only chrome on the screen nine users in ten hold — is the brand gradient (`--grad-topbar`) instead of near-black.
+- Both auth pages: the team door is a vivid orange panel (`--grad-auth`); the administrator door stays the deep one, which now reads as "restricted" rather than as the house style.
+- Brighter brand ramp (`-600` #dd4f0a, `-700` #b23d05), warmer neutrals and warmer shadows; the ink scale is a warm sienna rather than a near-black.
+- PWA theme colour follows the topbar again, now that the topbar is the brand; icon regenerated.
+- Fixed white text on `--grad-brand`: the sidebar's brand letter, the auth logo tile and every avatar's initials sat on a gradient whose amber end takes white at 1.95:1. New `--text-on-brand`, which clears AA at both ends of the ramp, plus a guard — axe cannot measure contrast against a gradient, so this class of bug needs a source check rather than a browser sweep.
+- `premium.css` was re-declaring the sidebar ground and silently winning over `shell.css`; both now name one token.

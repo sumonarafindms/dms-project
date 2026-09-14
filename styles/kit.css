@@ -32,7 +32,7 @@
      ================================================================== */
   .kit-card {
     background: #fff;
-    border: 1px solid var(--color-slate-200);
+    border: 1px solid var(--color-neutral-200);
     border-radius: 0.75rem;
   }
   .kit-card.is-clickable {
@@ -43,7 +43,7 @@
       transform 0.15s var(--ease-premium);
   }
   .kit-card.is-clickable:hover {
-    border-color: var(--color-teal-300);
+    border-color: var(--color-brand-300);
     box-shadow: var(--shadow-panel);
   }
   /* Hover lift is a pointer affordance; a touch device has no hover state to
@@ -68,7 +68,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.025em;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-label-sm {
     font-size: 0.625rem;
@@ -84,7 +84,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.025em;
-    color: var(--color-teal-700);
+    color: var(--color-brand-700);
   }
 
   /* The action wraps below the title rather than squeezing it. A month picker
@@ -106,12 +106,12 @@
     font-size: 1.125rem;
     font-weight: 700;
     letter-spacing: -0.015em;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-page-head p {
     margin-top: 0.125rem;
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   @media (min-width: 640px) {
     .kit-page-head h1 {
@@ -165,7 +165,7 @@
     font-size: var(--kit-ring-font, 0.75rem);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
 
   /* ==================================================================
@@ -174,7 +174,7 @@
   .kit-bar {
     height: 0.5rem;
     border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
+    background: var(--color-neutral-100);
     overflow: hidden;
   }
   .kit-bar.is-thin {
@@ -188,7 +188,7 @@
   }
   /* Gradient fills, per the visual-elevation directive. */
   .kit-bar.band-achieved > i {
-    background: linear-gradient(to right, var(--color-teal-500), var(--color-teal-400));
+    background: linear-gradient(to right, var(--color-success-600), var(--color-success-400));
   }
   .kit-bar.band-near > i {
     background: linear-gradient(to right, var(--color-amber-500), var(--color-amber-400));
@@ -220,7 +220,7 @@
   }
   .kit-metric-value > b {
     font-weight: 700;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-metric-value > span {
     color: var(--text-muted);
@@ -232,7 +232,7 @@
   }
   .band-achieved > .kit-metric-head .kit-metric-value > em,
   .kit-metric-value > em.band-achieved {
-    color: var(--color-teal-700);
+    color: var(--text-success);
   }
   .band-near > .kit-metric-head .kit-metric-value > em,
   .kit-metric-value > em.band-near {
@@ -262,9 +262,9 @@
   .kit-badge.tone-success,
   .kit-badge.tone-complete,
   .kit-badge.tone-online {
-    background: var(--color-teal-50);
-    color: var(--color-teal-700);
-    border-color: var(--color-teal-200);
+    background: var(--color-success-50);
+    color: var(--text-success);
+    border-color: var(--color-success-200);
   }
   .kit-badge.tone-near,
   .kit-badge.tone-pending {
@@ -285,14 +285,14 @@
   }
   .kit-badge.tone-inactive,
   .kit-badge.tone-loggedout {
-    background: var(--color-slate-100);
-    color: var(--color-slate-500);
-    border-color: var(--color-slate-200);
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-500);
+    border-color: var(--color-neutral-200);
   }
   .kit-badge.tone-neutral {
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
-    border-color: var(--color-slate-200);
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-600);
+    border-color: var(--color-neutral-200);
   }
 
   /* ==================================================================
@@ -325,34 +325,47 @@
   .kit-btn.size-lg {
     padding: 0.625rem 1rem;
   }
-  /* Teal-700, not teal-600: white on teal-600 is 3.74:1, below AA for label
-     sizes this app uses. One step down the same scale is 5.48:1. */
+  /* The mark, as a gradient, dark enough to read.
+     --grad-brand-strong runs brand-700 -> brand-600, so its LIGHTEST stop is
+     #d14d0b at 4.40:1 against white… which is under AA, so the stop that
+     actually sits behind the label is pinned at #c94508 (4.84:1) and the
+     gradient never gets lighter than that. The flat --surface-primary stays
+     the fallback for anything that cannot paint a gradient.
+
+     `background-image: none` on hover/active is not optional: setting only
+     `background-color` under a live gradient changes nothing on screen, which
+     is how a button ends up with no hover state at all. */
   .kit-btn.is-primary {
     background: var(--surface-primary);
+    background-image: var(--grad-brand-strong);
     color: #fff;
-    box-shadow: 0 1px 2px rgb(13 148 136 / 0.2);
+    box-shadow:
+      0 1px 2px rgb(166 60 12 / 0.25),
+      inset 0 1px 0 rgb(255 255 255 / 0.16);
   }
   .kit-btn.is-primary:hover:not(:disabled) {
-    background: var(--color-teal-800);
-    box-shadow: 0 6px 16px -6px rgb(13 148 136 / 0.5);
+    background-color: var(--color-brand-800);
+    background-image: var(--grad-brand-hover);
+    box-shadow: var(--glow-brand-md);
   }
   .kit-btn.is-primary:active:not(:disabled) {
-    background: var(--color-teal-800);
+    background-color: var(--color-brand-800);
+    background-image: var(--grad-brand-hover);
     transform: translateY(1px);
   }
   .kit-btn.is-secondary {
     background: #fff;
-    color: var(--color-slate-700);
-    border-color: var(--color-slate-300);
+    color: var(--color-neutral-700);
+    border-color: var(--color-neutral-300);
   }
   .kit-btn.is-secondary:hover:not(:disabled) {
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
   }
   .kit-btn.is-ghost {
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
   .kit-btn.is-ghost:hover:not(:disabled) {
-    background: var(--color-slate-100);
+    background: var(--color-neutral-100);
   }
   .kit-btn.is-danger {
     background: var(--color-rose-600);
@@ -374,12 +387,12 @@
     border: 0;
     border-radius: var(--radius-control);
     background: transparent;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     cursor: pointer;
   }
   .kit-icon-btn:hover {
-    background: var(--color-slate-100);
-    color: var(--color-slate-700);
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-700);
   }
 
   /* ==================================================================
@@ -388,12 +401,12 @@
   .kit-input,
   .kit-select {
     width: 100%;
-    border: 1px solid var(--color-slate-300);
+    border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-control);
     background: #fff;
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-input::placeholder {
     color: var(--text-muted);
@@ -401,8 +414,8 @@
   .kit-input:focus,
   .kit-select:focus {
     outline: none;
-    border-color: var(--color-teal-500);
-    box-shadow: 0 0 0 2px var(--color-teal-200);
+    border-color: var(--color-brand-500);
+    box-shadow: 0 0 0 2px var(--color-brand-200);
   }
   .kit-field {
     display: block;
@@ -412,7 +425,7 @@
     margin-bottom: 0.375rem;
     font-size: 0.75rem;
     font-weight: 500;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
   .kit-search {
     position: relative;
@@ -438,10 +451,10 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.25rem 0.375rem 0.25rem 0.625rem;
-    border: 1px solid var(--color-teal-200);
+    border: 1px solid var(--color-brand-200);
     border-radius: var(--radius-pill);
-    background: var(--color-teal-50);
-    color: var(--color-teal-700);
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
     font-size: 0.75rem;
     font-weight: 500;
   }
@@ -455,14 +468,14 @@
     cursor: pointer;
   }
   .kit-chip > button:hover {
-    background: var(--color-teal-100);
+    background: var(--color-brand-100);
   }
 
   .kit-tabs {
     display: flex;
     gap: 0.25rem;
     padding: 0 0.25rem;
-    border-bottom: 1px solid var(--color-slate-200);
+    border-bottom: 1px solid var(--color-neutral-200);
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -478,21 +491,21 @@
     background: none;
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     cursor: pointer;
     transition: color 0.15s var(--ease-premium);
   }
   .kit-tabs > button:hover {
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-tabs > button[aria-selected="true"] {
-    border-bottom-color: var(--color-teal-600);
-    color: var(--color-teal-700);
+    border-bottom-color: var(--color-brand-600);
+    color: var(--text-brand);
   }
 
   .kit-stat-pill {
     border-radius: var(--radius-control);
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
     padding: 0.5rem;
     text-align: center;
   }
@@ -502,7 +515,7 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-stat-pill > span {
     display: block;
@@ -529,7 +542,7 @@
   .kit-section-head h2 {
     font-size: 0.875rem;
     font-weight: 700;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-section-head p {
     margin-top: 0.125rem;
@@ -540,7 +553,7 @@
     flex-shrink: 0;
     font-size: 0.8125rem;
     font-weight: 500;
-    color: var(--color-teal-700);
+    color: var(--color-brand-700);
   }
 
   .kit-tile {
@@ -557,7 +570,7 @@
     height: 2.25rem;
     width: 2.25rem;
     border-radius: var(--radius-control);
-    background: var(--color-teal-50);
+    background: var(--grad-brand-soft);
     /* Initials are read, not decoration: teal-600 on teal-50 is under AA. */
     color: var(--text-success);
   }
@@ -568,13 +581,13 @@
     display: block;
     font-size: 0.875rem;
     font-weight: 700;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-tile span {
     display: block;
     margin-top: 0.125rem;
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   /* Indigo marks identity/administration surfaces, teal marks data ones —
      the two-tone split from the visual-elevation directive. Never status. */
@@ -638,10 +651,10 @@
     font-size: 1.25rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
-  .kit-summary-strip strong.tone-teal {
-    color: var(--color-teal-600);
+  .kit-summary-strip strong.tone-brand {
+    color: var(--text-brand);
   }
   .kit-summary-strip strong.tone-amber {
     color: var(--text-warning);
@@ -666,19 +679,19 @@
     height: 3rem;
     width: 3rem;
     border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
+    background: var(--color-neutral-100);
     color: var(--text-muted);
   }
   /* The demos deliberately say "All SSO Complete", not "No data" — a positive
      empty state gets the teal treatment so it does not read as an error. */
   .kit-empty.is-positive > .kit-empty-icon {
-    background: var(--color-teal-50);
-    color: var(--color-teal-500);
+    background: var(--color-success-50);
+    color: var(--color-success-600);
   }
   .kit-empty > strong {
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-empty > p {
     max-width: 20rem;
@@ -688,7 +701,7 @@
 
   .kit-skeleton {
     border-radius: var(--radius-control);
-    background: var(--color-slate-200);
+    background: var(--color-neutral-200);
     animation: kit-pulse 1.6s ease-in-out infinite;
   }
   @keyframes kit-pulse {
@@ -706,14 +719,14 @@
     inset-inline: 0;
     z-index: 70;
     height: 2px;
-    background: var(--color-teal-100);
+    background: var(--color-brand-100);
     overflow: hidden;
   }
   .kit-loading-bar > i {
     display: block;
     height: 100%;
     width: 33%;
-    background: var(--color-teal-600);
+    background: var(--grad-brand);
     animation: kit-loadingbar 0.6s ease-in-out infinite;
   }
   @keyframes kit-loadingbar {
@@ -739,7 +752,7 @@
     position: fixed;
     inset: 0;
     z-index: 60;
-    background: rgb(15 23 42 / 0.4);
+    background: rgb(19 14 12 / 0.45);
   }
   .kit-sheet {
     position: fixed;
@@ -791,10 +804,10 @@
   .kit-sheet-head {
     justify-content: space-between;
     padding-block: 1rem;
-    border-bottom: 1px solid var(--color-slate-100);
+    border-bottom: 1px solid var(--color-neutral-100);
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-sheet-body {
     display: flex;
@@ -804,7 +817,7 @@
     overflow-y: auto;
   }
   .kit-sheet-foot {
-    border-top: 1px solid var(--color-slate-100);
+    border-top: 1px solid var(--color-neutral-100);
   }
   .kit-sheet-foot > .kit-btn {
     flex: 1;
@@ -827,11 +840,11 @@
     border: 0;
     background: none;
     font-size: 0.875rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     cursor: pointer;
   }
   .kit-detail-back:hover {
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   /* The shared `arrow` glyph points right (it reads "continue" after a label).
      A back link is the same glyph reversed, so mirror it here rather than
@@ -853,7 +866,7 @@
     background: #fff;
   }
   .kit-card {
-    border-color: var(--color-slate-300);
+    border-color: var(--color-neutral-300);
     box-shadow: none;
     break-inside: avoid;
   }
@@ -890,18 +903,18 @@
     gap: 0.375rem;
   }
   .kit-preset {
-    border: 1px solid var(--color-slate-300);
+    border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-pill);
     background: #fff;
     padding: 0.375rem 0.75rem;
     font-size: 0.75rem;
     font-weight: 500;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
     cursor: pointer;
     transition: background-color 0.15s var(--ease-premium);
   }
   .kit-preset:hover {
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
   }
   /* White on teal-600 is 3.74:1 at this 12px size; `--surface-primary`
      (teal-700) is 5.48:1. Same rule as .kit-btn.is-primary. */
@@ -917,7 +930,7 @@
   }
   .kit-report-period b {
     font-weight: 500;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
 
   .kit-report-actions {
@@ -977,8 +990,8 @@
     font-size: 0.875rem;
   }
   .kit-report-table thead tr {
-    background: var(--color-slate-50);
-    border-bottom: 1px solid var(--color-slate-200);
+    background: var(--color-neutral-50);
+    border-bottom: 1px solid var(--color-neutral-200);
   }
   .kit-report-table th {
     padding: 0.625rem 1rem;
@@ -987,13 +1000,13 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.025em;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     white-space: nowrap;
   }
   .kit-report-table td {
     padding: 0.625rem 1rem;
-    color: var(--color-slate-700);
-    border-bottom: 1px solid var(--color-slate-100);
+    color: var(--color-neutral-700);
+    border-bottom: 1px solid var(--color-neutral-100);
   }
   .kit-report-table tbody tr:last-child td {
     border-bottom: 0;
@@ -1001,7 +1014,7 @@
   /* A name in a table cell that leads somewhere. Underlined on hover only, so
      a column of them does not read as a wall of blue rules. */
   .kit-tablelink {
-    color: var(--color-teal-700);
+    color: var(--color-brand-700);
     font-weight: 600;
     text-decoration: none;
   }
@@ -1014,7 +1027,7 @@
     font-variant-numeric: tabular-nums;
   }
   .kit-report-table tbody tr:hover td {
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
   }
 
   .kit-report-cardrow {
@@ -1031,7 +1044,7 @@
     font-size: 0.75rem;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
     text-align: right;
   }
 }
@@ -1074,9 +1087,9 @@
      warning: nothing is wrong, the reader simply needs to know why the list is
      shorter than they expect. */
   .kit-note.is-info {
-    border-color: var(--color-slate-200);
-    background: var(--color-slate-50);
-    color: var(--color-slate-700);
+    border-color: var(--color-neutral-200);
+    background: var(--color-neutral-50);
+    color: var(--color-neutral-700);
   }
   .kit-note.is-warn {
     border-color: var(--color-amber-200);
@@ -1084,9 +1097,9 @@
     color: var(--color-amber-700);
   }
   .kit-note.is-ok {
-    border-color: var(--color-teal-200);
-    background: var(--color-teal-50);
-    color: var(--color-teal-700);
+    border-color: var(--color-success-200);
+    background: var(--color-success-50);
+    color: var(--text-success);
   }
   .kit-note.is-bad {
     border-color: var(--color-rose-200);
@@ -1124,7 +1137,7 @@
     width: 100%;
     margin-top: 1.25rem;
     padding-top: 1.25rem;
-    border-top: 1px solid var(--color-slate-100);
+    border-top: 1px solid var(--color-neutral-100);
   }
   .kit-hero-figures > div > strong {
     display: block;
@@ -1132,7 +1145,7 @@
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-hero-figures > div > span {
     display: block;
@@ -1142,8 +1155,8 @@
     letter-spacing: 0.025em;
     color: var(--text-muted);
   }
-  .kit-hero-figures > div > strong.tone-teal {
-    color: var(--color-teal-600);
+  .kit-hero-figures > div > strong.tone-brand {
+    color: var(--text-brand);
   }
   .kit-hero-figures > div > strong.tone-amber {
     color: var(--text-warning);
@@ -1160,7 +1173,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.625rem 0;
-    border-bottom: 1px solid var(--color-slate-100);
+    border-bottom: 1px solid var(--color-neutral-100);
   }
   .kit-row:last-child {
     border-bottom: 0;
@@ -1172,7 +1185,7 @@
     height: 2rem;
     width: 2rem;
     border-radius: var(--radius-control);
-    background: var(--color-teal-50);
+    background: var(--grad-brand-soft);
     /* Initials are read, not decoration: teal-600 on teal-50 is under AA. */
     color: var(--text-success);
   }
@@ -1184,7 +1197,7 @@
     display: block;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1203,7 +1216,7 @@
     font-size: 0.9375rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-row-value > span {
     display: block;
@@ -1222,14 +1235,14 @@
   }
   @media (hover: hover) {
     .kit-row.is-link:hover {
-      background: var(--color-slate-50);
+      background: var(--color-neutral-50);
     }
   }
   .kit-row > .kit-row-chevron {
     flex-shrink: 0;
     font-size: 1.125rem;
     line-height: 1;
-    color: var(--color-slate-300);
+    color: var(--color-neutral-300);
   }
   /* An is-link row needs breathing room inside its own hover background; a
      plain row sits flush with the card padding. */
@@ -1287,8 +1300,8 @@
     height: 2.25rem;
     width: 2.25rem;
     border-radius: var(--radius-control);
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-600);
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -1306,7 +1319,7 @@
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-pair span {
     display: block;
@@ -1422,7 +1435,7 @@
     font-weight: 700;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-kpi-meta > span:last-child {
     display: block;
@@ -1437,7 +1450,7 @@
   }
   .kit-kpi-foot b {
     font-weight: 500;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
 
   /* Clickable status tile — the demo's "SSO Pending / LSO Pending" row.
@@ -1463,15 +1476,15 @@
   .kit-status-tile.tone-rose strong {
     color: var(--color-rose-600);
   }
-  .kit-status-tile.tone-teal strong {
-    color: var(--color-teal-600);
+  .kit-status-tile.tone-brand strong {
+    color: var(--text-brand);
   }
   .kit-status-tile span {
     display: block;
     margin-top: 0.375rem;
     font-size: 0.6875rem;
     font-weight: 500;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
 
   /* A worklist group heading: "Pending (8)" / "Completed (6)". */
@@ -1486,7 +1499,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.025em;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
   .kit-group-dot {
     display: inline-block;
@@ -1496,7 +1509,7 @@
     background: var(--color-amber-500);
   }
   .kit-group-dot.is-done {
-    background: var(--color-teal-500);
+    background: var(--color-success-500);
   }
   /*
    * Completed entries recede, but their text stays readable.
@@ -1512,8 +1525,8 @@
    * is still verifiable, which was always the point.
    */
   .kit-card.is-done {
-    background: var(--color-slate-50);
-    border-color: var(--color-slate-200);
+    background: var(--color-neutral-50);
+    border-color: var(--color-neutral-200);
   }
   .kit-remaining {
     margin-top: 0.5rem;
@@ -1543,7 +1556,7 @@
     display: block;
     font-size: 0.875rem;
     font-weight: 700;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1580,7 +1593,7 @@
     gap: 0.5rem;
     margin-top: 0.875rem;
     padding-top: 0.75rem;
-    border-top: 1px solid var(--color-slate-100);
+    border-top: 1px solid var(--color-neutral-100);
     font-size: 0.6875rem;
     color: var(--text-muted);
   }
@@ -1642,7 +1655,7 @@
   .kit-list-caption {
     margin: -0.25rem 0 0.75rem;
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-filter-note {
     display: inline-flex;
@@ -1700,16 +1713,16 @@
   }
   .kit-flow > span {
     padding: 0.375rem 0.625rem;
-    border: 1px solid var(--color-slate-200);
+    border: 1px solid var(--color-neutral-200);
     border-radius: var(--radius-pill);
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-flow > b {
     font-size: 0.875rem;
-    color: var(--color-slate-300);
+    color: var(--color-neutral-300);
   }
 
   .kit-form-actions {
@@ -1724,15 +1737,15 @@
      so the form does not silently lose the row. */
   .kit-readonly {
     padding: 0.5rem 0.75rem;
-    border: 1px dashed var(--color-slate-300);
+    border: 1px dashed var(--color-neutral-300);
     border-radius: var(--radius-control);
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
   }
   .kit-readonly > strong {
     display: block;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-readonly > span {
     display: block;
@@ -1746,15 +1759,15 @@
     margin-top: 1rem;
     padding: 0.75rem 0.875rem;
     border-radius: var(--radius-control);
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-guide > strong {
     display: block;
     margin-bottom: 0.25rem;
     font-size: 0.8125rem;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-guide > ol {
     margin: 0.5rem 0;
@@ -1779,7 +1792,7 @@
     margin-top: 0.125rem;
     height: 1rem;
     width: 1rem;
-    accent-color: var(--color-teal-600);
+    accent-color: var(--color-brand-600);
     cursor: pointer;
   }
   .kit-check > input[type="checkbox"]:disabled {
@@ -1790,7 +1803,7 @@
     display: block;
     font-size: 0.8125rem;
     font-weight: 500;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-check-copy > small {
     display: block;
@@ -1808,7 +1821,7 @@
   .kit-bulk-count > b {
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     white-space: nowrap;
   }
 
@@ -1829,7 +1842,7 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    background: rgb(15 23 42 / 0.5);
+    background: rgb(19 14 12 / 0.55);
   }
   @media (min-width: 640px) {
     .kit-modal-backdrop {
@@ -1874,12 +1887,12 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--color-slate-100);
+    border-bottom: 1px solid var(--color-neutral-100);
   }
   .kit-modal-head h2 {
     font-size: 0.9375rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-modal-head p {
     margin-top: 0.125rem;
@@ -1896,7 +1909,7 @@
     justify-content: flex-end;
     gap: 0.5rem;
     padding: 0.75rem 1.25rem;
-    border-top: 1px solid var(--color-slate-100);
+    border-top: 1px solid var(--color-neutral-100);
   }
   .kit-icon-btn {
     display: grid;
@@ -1913,8 +1926,8 @@
     cursor: pointer;
   }
   .kit-icon-btn:hover {
-    background: var(--color-slate-100);
-    color: var(--color-slate-600);
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-600);
   }
 
   /* Table on desktop, cards below 640px. Both are rendered; each breakpoint
@@ -1943,19 +1956,19 @@
   }
   .kit-table th {
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--color-slate-200);
+    border-bottom: 1px solid var(--color-neutral-200);
     text-align: left;
     font-size: 0.6875rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     white-space: nowrap;
   }
   .kit-table td {
     padding: 0.625rem 0.75rem;
-    border-bottom: 1px solid var(--color-slate-100);
-    color: var(--color-slate-700);
+    border-bottom: 1px solid var(--color-neutral-100);
+    color: var(--color-neutral-700);
     vertical-align: middle;
   }
   .kit-table tr:last-child > td {
@@ -1981,7 +1994,7 @@
     min-width: 0;
     text-align: right;
     font-size: 0.75rem;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   /* A cell whose desktop renderer stacks a caption under the value (a BP code
      with the outlet name below it) keeps that shape in the phone card too —
@@ -2019,7 +2032,7 @@
   }
   .kit-matrix-row {
     padding: 0.75rem 0;
-    border-bottom: 1px solid var(--color-slate-100);
+    border-bottom: 1px solid var(--color-neutral-100);
   }
   .kit-matrix-row:last-child {
     border-bottom: 0;
@@ -2028,7 +2041,7 @@
     display: block;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-matrix-name > small {
     display: block;
@@ -2044,7 +2057,7 @@
   .kit-matrix-cell-label {
     font-size: 0.75rem;
     text-transform: capitalize;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
 
   @media (min-width: 640px) {
@@ -2057,12 +2070,12 @@
     }
     .kit-matrix-head {
       padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--color-slate-200);
+      border-bottom: 1px solid var(--color-neutral-200);
       font-size: 0.6875rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      color: var(--color-slate-500);
+      color: var(--color-neutral-500);
     }
     .kit-matrix-head > span:not(:first-child),
     .kit-matrix-cell {
@@ -2094,7 +2107,7 @@
        laid out against the page and can widen the document. */
     position: relative;
     padding: 1.5rem 1rem;
-    border: 2px dashed var(--color-slate-300);
+    border: 2px dashed var(--color-neutral-300);
     border-radius: var(--radius-card);
     text-align: center;
     cursor: pointer;
@@ -2104,19 +2117,19 @@
   }
   @media (hover: hover) {
     .kit-drop:hover {
-      border-color: var(--color-teal-400);
-      background: var(--color-teal-50);
+      border-color: var(--color-brand-400);
+      background: var(--color-brand-50);
     }
   }
   /* :focus-within, not :focus — the focusable element is the input inside. */
   .kit-drop:focus-within {
-    border-color: var(--color-teal-500);
-    background: var(--color-teal-50);
+    border-color: var(--color-brand-500);
+    background: var(--color-brand-50);
   }
   .kit-drop.is-filled {
     border-style: solid;
-    border-color: var(--color-teal-400);
-    background: var(--color-teal-50);
+    border-color: var(--color-brand-400);
+    background: var(--color-brand-50);
   }
   /* Hidden from view but not from the accessibility tree or the keyboard —
      display:none would make the field unreachable by tab. */
@@ -2131,7 +2144,7 @@
     font-size: 0.875rem;
     font-weight: 600;
     overflow-wrap: anywhere;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-drop > span {
     display: block;
@@ -2157,7 +2170,7 @@
     height: 2.25rem;
     width: 2.25rem;
     border-radius: var(--radius-control);
-    background: var(--color-teal-50);
+    background: var(--grad-brand-soft);
     color: var(--text-success);
   }
   .kit-module-main {
@@ -2167,7 +2180,7 @@
     display: block;
     font-size: 0.9375rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-module-main > span {
     display: block;
@@ -2178,7 +2191,7 @@
     flex: 1;
     font-size: 0.75rem;
     line-height: 1.5;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-module .kit-form-actions {
     margin-top: 0;
@@ -2195,7 +2208,7 @@
   .kit-feed-file {
     margin-top: 0.625rem;
     font-size: 0.75rem;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2206,7 +2219,7 @@
     gap: 0.5rem;
     margin-top: 0.625rem;
     padding-top: 0.625rem;
-    border-top: 1px solid var(--color-slate-100);
+    border-top: 1px solid var(--color-neutral-100);
     font-size: 0.6875rem;
   }
   .kit-feed-meta span {
@@ -2216,7 +2229,7 @@
   .kit-feed-meta b {
     display: block;
     font-weight: 600;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-feed-counts {
     display: flex;
@@ -2229,7 +2242,7 @@
   .kit-feed-counts b {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-feed-counts .is-warn b {
     color: var(--color-rose-600);
@@ -2264,17 +2277,17 @@
     height: 1.75rem;
     width: 1.75rem;
     border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
+    background: var(--color-neutral-100);
     font-size: 0.6875rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
   .kit-step strong {
     display: block;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-step small {
     display: block;
@@ -2291,12 +2304,12 @@
   }
   .kit-codes > code {
     padding: 0.1875rem 0.4375rem;
-    border: 1px solid var(--color-slate-200);
+    border: 1px solid var(--color-neutral-200);
     border-radius: var(--radius-control);
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: 0.6875rem;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
 
   /* Result counts after an import. */
@@ -2312,14 +2325,14 @@
   }
   .kit-result-grid > div {
     padding: 0.5rem 0.625rem;
-    border: 1px solid var(--color-slate-200);
+    border: 1px solid var(--color-neutral-200);
     border-radius: var(--radius-control);
-    background: var(--color-slate-50);
+    background: var(--color-neutral-50);
   }
   .kit-result-grid span {
     display: block;
     font-size: 0.6875rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-result-grid strong {
     display: block;
@@ -2327,7 +2340,7 @@
     font-size: 1.0625rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-result-grid > div.is-warn {
     border-color: var(--color-rose-200);
@@ -2355,7 +2368,7 @@
   .is-ok,
   .kit-outlet-metrics strong.is-ok,
   .kit-pair .kit-card > strong.is-ok {
-    color: var(--color-teal-700);
+    color: var(--text-success);
   }
   .is-warn,
   .kit-outlet-metrics strong.is-warn,
@@ -2386,7 +2399,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     padding-top: 0.625rem;
-    border-top: 1px solid var(--color-slate-100);
+    border-top: 1px solid var(--color-neutral-100);
   }
   @media (min-width: 480px) {
     .kit-outlet-metrics {
@@ -2407,7 +2420,7 @@
     font-size: 0.8125rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2435,7 +2448,7 @@
     font-weight: 700;
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2467,7 +2480,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.75rem 0 0.75rem 1.25rem;
-    border-bottom: 1px solid var(--color-slate-100);
+    border-bottom: 1px solid var(--color-neutral-100);
   }
   .kit-timeline-row:last-child {
     border-bottom: 0;
@@ -2480,7 +2493,7 @@
     height: 0.5rem;
     width: 0.5rem;
     border-radius: var(--radius-pill);
-    background: var(--color-teal-400);
+    background: var(--color-brand-400);
   }
   /* The rail joins one event to the next but must not hang below the last. */
   .kit-timeline-row::after {
@@ -2490,7 +2503,7 @@
     top: 1.625rem;
     bottom: 0;
     width: 1px;
-    background: var(--color-slate-200);
+    background: var(--color-neutral-200);
   }
   .kit-timeline-row:last-child::after {
     display: none;
@@ -2510,7 +2523,7 @@
     display: inline;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-timeline-main > em {
     margin-left: 0.375rem;
@@ -2521,7 +2534,7 @@
   .kit-timeline-main > p {
     margin-top: 0.125rem;
     font-size: 0.8125rem;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
   .kit-timeline-main > small {
     display: block;
@@ -2537,7 +2550,7 @@
     display: block;
     font-size: 0.6875rem;
     font-weight: 600;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
   .kit-timeline-meta > span {
     display: block;
@@ -2594,7 +2607,7 @@
   .kit-table td > strong,
   .kit-table td > b {
     font-weight: 700;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
 
   .kit-cell-person {
@@ -2611,7 +2624,7 @@
   .kit-cell-person b {
     display: block;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
     white-space: nowrap;
   }
   .kit-cell-person small {
@@ -2632,14 +2645,14 @@
   }
   /* A bare progress bar with no band class still needs a fill colour. */
   .kit-cell-progress > .kit-bar > i {
-    background: linear-gradient(to right, var(--color-teal-500), var(--color-teal-400));
+    background: var(--grad-brand);
   }
   .kit-cell-progress > b {
     flex-shrink: 0;
     font-size: 0.75rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
 
   /* Metrics row on an import workspace: 2 up on a phone, 3 then 4 wider. */
@@ -2674,25 +2687,25 @@
     flex: 1 1 18rem;
     display: block;
     padding: 0.75rem 0.875rem;
-    border: 2px dashed var(--color-slate-300);
+    border: 2px dashed var(--color-neutral-300);
     border-radius: var(--radius-card);
     cursor: pointer;
   }
   @media (hover: hover) {
     .kit-file-field:hover {
-      border-color: var(--color-teal-400);
-      background: var(--color-teal-50);
+      border-color: var(--color-brand-400);
+      background: var(--color-brand-50);
     }
   }
   .kit-file-field:focus-within {
-    border-color: var(--color-teal-500);
-    background: var(--color-teal-50);
+    border-color: var(--color-brand-500);
+    background: var(--color-brand-50);
   }
   .kit-file-field > span {
     display: block;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-file-field > small {
     display: block;
@@ -2705,11 +2718,11 @@
     display: inline-block;
     padding: 0.125rem 0.4375rem;
     border-radius: var(--radius-pill);
-    background: var(--color-slate-100);
+    background: var(--color-neutral-100);
     font-size: 0.75rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-600);
+    color: var(--color-neutral-600);
   }
 
   /* A date picker sitting in a section heading rather than a filter bar. */
@@ -2728,18 +2741,18 @@
     gap: 0.75rem;
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid var(--color-slate-100);
+    border-top: 1px solid var(--color-neutral-100);
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-pagination > button {
     padding: 0.375rem 0.75rem;
-    border: 1px solid var(--color-slate-300);
+    border: 1px solid var(--color-neutral-300);
     border-radius: var(--radius-control);
     background: #fff;
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
     cursor: pointer;
   }
   .kit-pagination > button:disabled {
@@ -2796,12 +2809,12 @@
     gap: 0.75rem;
     margin-top: 0.5rem;
     padding: 0.75rem 1rem;
-    border: 1px solid var(--color-slate-200);
+    border: 1px solid var(--color-neutral-200);
     border-radius: var(--radius-card);
     background: #fff;
     box-shadow: var(--shadow-elevated);
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   @media (min-width: 900px) {
     .kit-save-bar {
@@ -2812,12 +2825,12 @@
   .kit-details {
     margin-top: 0.75rem;
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-details > summary {
     cursor: pointer;
     font-weight: 600;
-    color: var(--color-slate-700);
+    color: var(--color-neutral-700);
   }
   .kit-details > div {
     margin-top: 0.25rem;
@@ -2843,7 +2856,7 @@
     display: grid;
     gap: 0.5rem;
     padding-bottom: 0.875rem;
-    border-bottom: 1px solid var(--color-slate-100);
+    border-bottom: 1px solid var(--color-neutral-100);
   }
   .kit-compare-row:last-child {
     padding-bottom: 0;
@@ -2863,7 +2876,7 @@
     display: block;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -3072,7 +3085,7 @@
   /* The primary line of a list row. */
   .kit-rowtitle {
     font-size: 0.875rem;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
   }
   .kit-rowtitle.is-block {
     display: block;
@@ -3170,7 +3183,7 @@
   .kit-pace {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
-    border-top: 1px dashed var(--color-slate-200);
+    border-top: 1px dashed var(--color-neutral-200);
   }
   .kit-pace-head {
     display: flex;
@@ -3192,7 +3205,7 @@
     color: var(--band-behind);
   }
   .kit-pace.tone-neutral .kit-pace-status {
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-pace-days {
     font-size: 0.6875rem;
@@ -3202,11 +3215,11 @@
   .kit-pace-line {
     margin-top: 0.25rem;
     font-size: 0.6875rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-pace-line b {
     font-weight: 700;
-    color: var(--color-slate-800);
+    color: var(--color-neutral-800);
     font-variant-numeric: tabular-nums;
   }
   .kit-pace-line.is-muted {
@@ -3230,7 +3243,7 @@
     font-weight: 700;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-delta {
     flex-shrink: 0;
@@ -3241,16 +3254,16 @@
     font-variant-numeric: tabular-nums;
   }
   .kit-delta.tone-good {
-    background: var(--color-teal-50);
-    color: var(--color-teal-700);
+    background: var(--color-success-50);
+    color: var(--text-success);
   }
   .kit-delta.tone-low {
     background: var(--color-rose-50);
     color: var(--color-rose-700);
   }
   .kit-delta.tone-neutral {
-    background: var(--color-slate-100);
-    color: var(--color-slate-500);
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-500);
   }
   .kit-compare-foot {
     margin-top: 0.25rem;
@@ -3296,7 +3309,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.5rem 0;
-    border-bottom: 1px solid var(--color-slate-100);
+    border-bottom: 1px solid var(--color-neutral-100);
   }
   .kit-readiness-row:last-child {
     border-bottom: 0;
@@ -3315,12 +3328,12 @@
     font-size: 0.8125rem;
     font-weight: 600;
     line-height: 1.25;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
   }
   .kit-readiness-head > span:not(.kit-badge) {
     display: block;
     font-size: 0.6875rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     font-variant-numeric: tabular-nums;
   }
   .kit-readiness-days {
@@ -3337,7 +3350,7 @@
   /* Same four tones as .kit-badge, so a cell and a badge saying the same
      thing look the same. */
   .kit-readiness-day.tone-complete {
-    background: var(--color-teal-500);
+    background: var(--color-success-500);
   }
   .kit-readiness-day.tone-pending {
     background: var(--color-amber-400);
@@ -3346,8 +3359,8 @@
     background: var(--color-rose-500);
   }
   .kit-readiness-day.tone-inactive {
-    background: var(--color-slate-100);
-    border-color: var(--color-slate-200);
+    background: var(--color-neutral-100);
+    border-color: var(--color-neutral-200);
   }
   .kit-readiness-legend {
     display: flex;
@@ -3355,7 +3368,7 @@
     gap: 0.75rem;
     margin-top: 0.75rem;
     font-size: 0.6875rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
   }
   .kit-readiness-legend > span {
     display: inline-flex;
@@ -3369,7 +3382,7 @@
     border: 1px solid transparent;
   }
   .kit-readiness-key.tone-complete {
-    background: var(--color-teal-500);
+    background: var(--color-success-500);
   }
   .kit-readiness-key.tone-pending {
     background: var(--color-amber-400);
@@ -3378,8 +3391,8 @@
     background: var(--color-rose-500);
   }
   .kit-readiness-key.tone-inactive {
-    background: var(--color-slate-100);
-    border-color: var(--color-slate-200);
+    background: var(--color-neutral-100);
+    border-color: var(--color-neutral-200);
   }
 }
 
@@ -3401,7 +3414,7 @@
   }
   .kit-pager-label {
     font-size: 0.8125rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     font-variant-numeric: tabular-nums;
   }
   .kit-pager-controls {
@@ -3411,7 +3424,7 @@
   }
   .kit-pager-position {
     font-size: 0.75rem;
-    color: var(--color-slate-500);
+    color: var(--color-neutral-500);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -3434,110 +3447,187 @@
 /* ------------------------------------------------------------------ *
  * Live GA
  *
- * The one screen that answers a single day rather than a period, so it is
- * deliberately plainer than the dashboards: one big number, a timestamp, and
- * lists that are readable with a thumb. Every colour is a token, and the
- * pulsing dot stops moving when the reader has asked for less motion.
+ * One number, then the people behind it. The page is deliberately quieter
+ * than the dashboards — no rings, no KPI grid — because it answers a single
+ * question and the answer should be the loudest thing on it.
+ *
+ * Every colour is a token, the rows clear the 44px touch target, and the two
+ * pulsing dots stop moving when the reader has asked for less motion.
  * ------------------------------------------------------------------ */
 
-.live-hero {
+.live-hero-card {
+  background: var(--grad-hero);
+  border-color: var(--color-brand-200);
+}
+
+.live-hero-top {
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.live-hero > div {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.live-total {
-  font-size: 42px;
+/*
+ * The LIVE badge: the one place the page raises its voice.
+ *
+ * `--color-brand-600` on white measures 4.04:1 — below the 4.5:1 that 11px bold
+ * text needs, and the accessibility sweep in e2e/a11y.spec.ts failed the teal
+ * equivalent of this badge on every role before v165 shipped. `--color-brand-700`
+ * is the same colour family at 5.89:1, which is also what `--surface-primary`
+ * already uses for white text elsewhere in the app. The gradient behind it never
+ * gets lighter than #c94508 (4.84:1), so the whole pill is legible.
+ */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-700);
+  background-image: var(--grad-brand-strong);
+  color: #fff;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--color-navy-900);
-  letter-spacing: -0.02em;
+  letter-spacing: 0.1em;
+  box-shadow: var(--glow-brand-sm);
 }
 
-.live-total-label {
+.live-day {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-slate-500);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  color: var(--color-brand-700);
 }
 
-/* The "it is live" dot beside the headline. */
 .live-dot {
-  width: 12px;
-  height: 12px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--color-teal-600);
-  box-shadow: 0 0 0 0 var(--color-teal-400);
-  animation: live-pulse 2s ease-out infinite;
+  background: #fff;
   flex: none;
+  animation: live-pulse 2s ease-out infinite;
 }
 
 @keyframes live-pulse {
   0% {
-    box-shadow: 0 0 0 0 var(--color-teal-400);
+    opacity: 1;
+    transform: scale(1);
   }
-  70% {
-    box-shadow: 0 0 0 10px rgba(0, 0, 0, 0);
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+    opacity: 1;
+    transform: scale(1);
   }
+}
+
+.live-total {
+  margin: 14px 0 0;
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--color-ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-total-label {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
 }
 
 .live-updated {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 14px 0 0;
+  gap: 7px;
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-brand-100);
   font-size: 13px;
-  color: var(--color-slate-600);
+  color: var(--color-neutral-600);
 }
 
 .live-updated svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   flex: none;
-  color: var(--color-teal-600);
+  color: var(--text-brand);
+}
+
+.live-updated.is-warn {
+  color: var(--text-warning);
 }
 
 .live-updated.is-warn svg {
   color: var(--color-amber-600);
 }
 
-.live-updated span {
-  display: flex;
-  flex-direction: column;
-}
-
-.live-updated small {
-  color: var(--color-slate-500);
-  font-size: 12px;
-}
-
 .live-note {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   font-size: 13px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
 }
 
 .live-focus {
-  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-neutral-50);
   font-size: 13px;
-  color: var(--color-slate-600);
+  color: var(--color-neutral-600);
 }
 
-/* "Show every supervisor" is the way back out of a drill-down, so it has to
-   read as something you can click rather than as more of the sentence. */
+.live-focus svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--text-muted);
+}
+
 .live-focus a {
-  color: var(--color-teal-700);
+  color: var(--color-brand-700);
   font-weight: 600;
   text-decoration: underline;
+}
+
+.live-section {
+  margin-bottom: 22px;
+}
+
+.live-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 2px 10px;
+}
+
+.live-section-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink-900);
+}
+
+.live-section-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.live-section-meta strong {
+  color: var(--color-brand-700);
+  font-weight: 700;
 }
 
 .live-list {
@@ -3546,72 +3636,116 @@
   padding: 0;
 }
 
-.live-list-row {
+.live-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 4px;
-  border-bottom: 1px solid var(--color-slate-100);
+  padding: 12px 14px;
   min-height: 44px;
   color: inherit;
   text-decoration: none;
+  border-bottom: 1px solid var(--color-neutral-100);
 }
 
-.live-list li:last-child .live-list-row {
+.live-list li:last-child .live-row {
   border-bottom: 0;
 }
 
-.live-list-row.is-link:hover {
-  background: var(--color-slate-50);
+.live-row.is-link:hover,
+.live-row.is-link:focus-visible {
+  background: var(--color-neutral-50);
 }
 
-.live-list-row svg {
+.live-row > svg {
   width: 16px;
   height: 16px;
   flex: none;
   color: var(--text-muted);
 }
 
-.live-list-name {
+.live-row-body {
   display: flex;
   flex-direction: column;
+  gap: 3px;
   min-width: 0;
   flex: 1;
 }
 
-.live-list-name strong {
+.live-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.live-row-head strong {
   font-size: 14px;
-  color: var(--color-navy-900);
+  font-weight: 600;
+  color: var(--color-ink-900);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.live-list-name small {
+.live-row-body small {
   font-size: 12px;
-  color: var(--color-slate-500);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.live-list-count {
-  font-size: 18px;
+.live-row-count {
+  font-size: 17px;
   font-weight: 700;
-  color: var(--color-teal-700);
+  color: var(--color-brand-700);
   flex: none;
   font-variant-numeric: tabular-nums;
 }
 
-.live-list-count.is-zero {
+.live-row-count.is-zero {
   color: var(--text-muted);
   font-weight: 600;
+}
+
+/* Share of the busiest row — a ranking you can read without reading numbers. */
+.live-row-bar {
+  display: block;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-100);
+  overflow: hidden;
+}
+
+.live-row-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--grad-brand);
+}
+
+.live-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 /* The pulsing dot on the Live GA menu entry. */
 .sidebar-link.is-live,
 .bottom-link.is-live {
   position: relative;
+}
+
+.nav-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--grad-brand);
+  margin-left: auto;
+  flex: none;
+  animation: live-pulse 2s ease-out infinite;
 }
 
 /*
@@ -3625,14 +3759,16 @@
   margin-left: 6px;
 }
 
-.nav-live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-teal-500);
-  margin-left: auto;
-  flex: none;
-  animation: live-pulse 2s ease-out infinite;
+/* On the sidebar the ground is itself the brand, so an orange dot sinks into
+   it. The amber end of the mark is the one that reads there (6.10:1). */
+.sidebar-link .nav-live-dot {
+  background: var(--color-glow-400);
+}
+
+@media (max-width: 480px) {
+  .live-total {
+    font-size: 48px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

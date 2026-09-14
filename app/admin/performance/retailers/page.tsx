@@ -40,12 +40,12 @@ export default async function Page({
           {
             label: "SSO Ready",
             value: filtered.filter((x) => x.ssoComplete).length.toLocaleString(),
-            tone: "teal",
+            tone: "brand",
           },
           {
             label: "LSO Ready",
             value: filtered.filter((x) => x.lsoComplete).length.toLocaleString(),
-            tone: "teal",
+            tone: "brand",
           },
         ]}
       />

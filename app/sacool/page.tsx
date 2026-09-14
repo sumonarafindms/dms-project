@@ -4,7 +4,7 @@
  * Administrator sign-in.
  *
  * Same split-panel shape as the team login (`/login`) so the two doors read as
- * one system, with `is-admin` switching the accent from blue to teal and the
+ * one system, with `is-admin` switching the brand orange for its deepest step and the
  * copy to the restricted framing — an administrator can tell at a glance which
  * entrance they are at.
  *

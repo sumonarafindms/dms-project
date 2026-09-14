@@ -35,8 +35,8 @@ export default async function Page({
         items={[
           { label: "Retailers", value: rows.length.toLocaleString() },
           { label: "SIM Sellers", value: sim.toLocaleString() },
-          { label: "Flagged", value: flagged.toLocaleString(), tone: flagged ? "amber" : "teal" },
-          { label: "On Track", value: (rows.length - flagged).toLocaleString(), tone: "teal" },
+          { label: "Flagged", value: flagged.toLocaleString(), tone: flagged ? "amber" : "brand" },
+          { label: "On Track", value: (rows.length - flagged).toLocaleString(), tone: "brand" },
         ]}
       />
       <SectionHead title="Search & review" sub="GA, C2S, SSO and LSO status for the selected dates." />

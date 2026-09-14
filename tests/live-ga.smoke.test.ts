@@ -104,16 +104,29 @@ describe("the rules the screen must keep", () => {
     expect(page).toMatch(/sp\.date!?\s*:\s*today/);
   });
 
-  it("shows the last GA upload time", () => {
+  it("shows when the data was last refreshed — the time, and only the time", () => {
     const lib = codeOf(read("lib", "live-ga.ts"));
     expect(lib).toMatch(/ImportType\.GA/);
     expect(lib).toMatch(/orderBy:\s*\{\s*uploadedAt:\s*"desc"/);
-    const page = read("app", "live-ga", "page.tsx");
-    expect(page).toMatch(/Last GA upload/);
+
+    const page = codeOf(read("app", "live-ga", "page.tsx"));
+    expect(page).toMatch(/Updated \{updated\}/);
     // In Dhaka time, so every role reads the same clock.
     expect(page).toMatch(/timeZone:\s*"Asia\/Dhaka"/);
     // And it says so plainly when there is no upload at all to report.
     expect(page).toMatch(/No GA file has been uploaded yet/);
+
+    /*
+     * The file name is gone, and stays gone.
+     *
+     * It used to sit under the timestamp — "ActivationDetailsReport (3).xlsx" —
+     * answering a question nobody asked while crowding the half that matters.
+     * The strongest way to hold that is for the name never to leave the
+     * database: `lastGaUpload` selects the time alone, so there is nothing for
+     * a later edit to put back on screen by accident.
+     */
+    expect(lib, "the upload's file name is being read again").not.toMatch(/fileName/);
+    expect(page).not.toMatch(/fileName/);
   });
 
   it("counts in grouped queries, not one per row", () => {
@@ -243,5 +256,48 @@ describe("the menu entry", () => {
         blocks.some((b) => b.includes(dot) && /animation:\s*none/.test(b)),
         `${dot} still animates when the reader has asked for reduced motion`,
       ).toBe(true);
+  });
+});
+
+describe("small wording and initials details", () => {
+  it("does not say 'today' twice in the headline", async () => {
+    /*
+     * The label under the number already reads "GA today", so a scope of
+     * "Everyone today" produced "GA TODAY · EVERYONE TODAY". Caught by looking
+     * at the rendered page rather than the code.
+     */
+    const lib = read("lib", "live-ga.ts");
+    const scopes = [...lib.matchAll(/scope: "([^"]+)"/g)].map((m) => m[1]);
+    expect(scopes.length).toBeGreaterThan(3);
+    for (const s of scopes) expect(s.toLowerCase(), `scope "${s}" repeats "today"`).not.toContain("today");
+    // The label that carries the word is still there, once.
+    expect(read("app", "live-ga", "page.tsx")).toMatch(/GA today · \{live\.scope\}/);
+  });
+
+  it("builds initials from words, not from the first two characters", async () => {
+    /*
+     * `name.slice(0, 2)` gave "Md Mashiujjaman shuvo" and "MD SHAHIN RAHMAN
+     * KHAN" the same "MD" — two supervisors, one avatar — and turned
+     * "R.R Enterprise- BP 01" into "R.", a full stop in a circle.
+     */
+    const { initialsOf } = await import("../app/components/Kit");
+    expect(initialsOf("Md Mashiujjaman shuvo")).toBe("MM");
+    expect(initialsOf("MD SHAHIN RAHMAN KHAN")).toBe("MS");
+    /*
+     * "R.R Enterprise" gives "RR", not "RE": splitting on punctuation makes
+     * "R" and "R" the first two words, which is the distributor's own initials
+     * and reads correctly. My first expectation here was "RE" — the code was
+     * right and the test was guessing. What matters is only that the full stop
+     * never becomes the avatar.
+     */
+    expect(initialsOf("R.R Enterprise- BP 01")).toBe("RR");
+    expect(initialsOf("R.R Enterprise- BP 01"), "punctuation became the initial").not.toMatch(/[^A-Z0-9]/);
+    expect(initialsOf("PHOTO COLY TELECOM CENTER")).toBe("PC");
+    // A single word still has to produce something.
+    expect(initialsOf("Shuvo")).toBe("SH");
+    expect(initialsOf("X")).toBe("X");
+    // And nothing at all must not crash a whole list.
+    expect(initialsOf("")).toBe("?");
+    expect(initialsOf("—")).toBe("?");
   });
 });

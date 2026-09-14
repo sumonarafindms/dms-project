@@ -27,7 +27,7 @@ export default async function Page() {
         items={[
           { label: "Login Users", value: users.length.toLocaleString() },
           { label: "Role Default", value: defaults.toLocaleString() },
-          { label: "Customized", value: custom.toLocaleString(), tone: "teal" },
+          { label: "Customized", value: custom.toLocaleString(), tone: "brand" },
           { label: "Roles", value: new Set(users.map((x) => x.role)).size.toLocaleString() },
         ]}
       />

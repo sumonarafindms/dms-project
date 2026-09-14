@@ -102,7 +102,7 @@ export default async function ReportsHome({ searchParams }: { searchParams: Prom
       <SectionHead title="Performance" sub="Totals across the selected period." />
       <SummaryStrip
         items={[
-          { label: "Total GA", value: totals.standardGa.toLocaleString(), tone: "teal" },
+          { label: "Total GA", value: totals.standardGa.toLocaleString(), tone: "brand" },
           { label: "SIM Swap", value: totals.simSwap.toLocaleString() },
           { label: "Total C2C", value: `৳${Math.round(totals.c2cAmount).toLocaleString()}` },
           { label: "Total C2S", value: `৳${Math.round(totals.c2sAmount).toLocaleString()}` },

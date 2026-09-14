@@ -40,7 +40,7 @@ export default async function Page({
         items={[
           { label: "RSOs", value: rows.length.toLocaleString() },
           { label: "Retailers", value: company.retailerCount.toLocaleString() },
-          { label: "Achieved", value: `৳${Math.round(a).toLocaleString()}`, tone: "teal" },
+          { label: "Achieved", value: `৳${Math.round(a).toLocaleString()}`, tone: "brand" },
           { label: "Remaining", value: `৳${Math.max(0, Math.round(t - a)).toLocaleString()}`, tone: "amber" },
         ]}
       />

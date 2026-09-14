@@ -15,8 +15,8 @@
 
   body {
     margin: 0;
-    background: var(--color-slate-50);
-    color: var(--color-slate-800);
+    background: var(--color-neutral-50);
+    color: var(--color-neutral-800);
     font-family: var(--font-sans);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
@@ -30,7 +30,7 @@
   h4 {
     font-weight: 700;
     letter-spacing: -0.01em;
-    color: var(--color-slate-900);
+    color: var(--color-neutral-900);
     margin: 0;
   }
 
@@ -66,19 +66,19 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-slate-300);
+    background: var(--color-neutral-300);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-slate-400);
+    background: var(--color-neutral-400);
     background-clip: content-box;
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-slate-300) transparent;
+    scrollbar-color: var(--color-neutral-300) transparent;
   }
 }
 

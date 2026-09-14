@@ -71,7 +71,7 @@ export default async function Page({
           {
             label: "Recharge Progress",
             value: `${pct(team.totalRechargeAchieved, team.totalRechargeTarget)}%`,
-            tone: "teal",
+            tone: "brand",
           },
           { label: "Showing", value: rows.length.toLocaleString() },
         ]}

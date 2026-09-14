@@ -88,7 +88,7 @@ export default async function ActivationReport({
       <ReportSearch matched={matched} total={unfiltered} noun={group === "bp" ? "BP" : group} />
       <SummaryStrip
         items={[
-          { label: "Total Activation", value: totalActivation.toLocaleString(), tone: "teal" },
+          { label: "Total Activation", value: totalActivation.toLocaleString(), tone: "brand" },
           { label: "Total Target", value: totalTarget.toLocaleString() },
           {
             label: "Achievement",

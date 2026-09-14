@@ -96,7 +96,7 @@ export default function Page() {
       <SummaryStrip
         items={[
           { label: "Total Retailers", value: summary.retailers.toLocaleString() },
-          { label: "Mapped", value: summary.mappedRetailers.toLocaleString(), tone: "teal" },
+          { label: "Mapped", value: summary.mappedRetailers.toLocaleString(), tone: "brand" },
           { label: "Unassigned", value: summary.unassignedRetailers.toLocaleString(), tone: "amber" },
         ]}
       />

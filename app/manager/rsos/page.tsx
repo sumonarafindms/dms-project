@@ -36,7 +36,7 @@ export default async function Page({
       <SummaryStrip
         items={[
           { label: "Active RSOs", value: all.length.toLocaleString() },
-          { label: "On Track", value: onTrack.toLocaleString(), tone: "teal" },
+          { label: "On Track", value: onTrack.toLocaleString(), tone: "brand" },
           { label: "Below Target", value: (all.length - onTrack).toLocaleString(), tone: "amber" },
           { label: "Showing", value: rows.length.toLocaleString() },
         ]}
