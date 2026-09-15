@@ -18,6 +18,7 @@ import { BpAssignmentList } from "./BpAssignmentList";
 import { SimActivationList } from "./SimActivationList";
 import type { BpViewer } from "../../lib/bp-activations";
 import { bpAssignmentDetail, listBpAssignments } from "../../lib/bp-activations";
+import { GA_CATEGORY_LABEL, gaRowLabel } from "../../lib/business-rules";
 
 export async function BpActivationListView({
   user,
@@ -118,8 +119,8 @@ export async function BpActivationDetailView({
       <SummaryStrip
         items={[
           { label: "Total GA", value: d.total.toLocaleString("en-US"), tone: "brand" },
-          { label: "150", value: d.total150.toLocaleString("en-US") },
-          { label: "300", value: d.total300.toLocaleString("en-US") },
+          { label: GA_CATEGORY_LABEL.GA_170, value: d.total170.toLocaleString("en-US") },
+          { label: GA_CATEGORY_LABEL.GA_300, value: d.total300.toLocaleString("en-US") },
           { label: "SIM SWAP", value: d.simSwap.toLocaleString("en-US"), tone: "amber" },
           { label: "GA Target", value: d.assignment.gaTarget || "—" },
           { label: "Days with GA", value: d.daily.length.toLocaleString("en-US") },
@@ -147,9 +148,16 @@ export async function BpActivationDetailView({
           date: x.activationDate.toISOString().slice(0, 10),
           time: x.activationTime || "",
           price: Number(x.sellingPrice),
-          // These rows are standard GA only, so price maps cleanly onto the
-          // two packs: 170 is the 150 pack, everything else is 300.
-          category: Number(x.sellingPrice) === 170 ? "150 pack" : "300 pack",
+          /*
+           * The shared rules, not a price comparison.
+           *
+           * This read `Number(x.sellingPrice) === 170 ? "150 pack" : "300 pack"`
+           * — the last hardcoded tariff left in the app after v157 and v172
+           * took them out of everything else. The day the carrier moves the
+           * price, every row on this one screen would have been labelled wrong
+           * while the counts above it stayed right.
+           */
+          category: gaRowLabel(x, new Set(d.ga170Tariff)),
         }))}
         month={d.month}
         from={from}

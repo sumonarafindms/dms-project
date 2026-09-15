@@ -39,7 +39,7 @@ export type EmployeePerformance = {
   supervisor: string;
   gaTarget: number;
   gaAchieved: number;
-  ga150: number;
+  ga170: number;
   ga300: number;
   ssoTarget: number;
   ssoAchieved: number;
@@ -210,7 +210,7 @@ export async function employeePerformance(month: string, employeeIds?: string[],
         totalRetailerCount: e._count.retailers,
         gaTarget: targets.ga,
         gaAchieved: 0,
-        ga150: 0,
+        ga170: 0,
         ga300: 0,
         ssoTarget: targets.sso,
         ssoAchieved: 0,
@@ -255,7 +255,7 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     }),
   ]);
 
-  const gaBy = new Map<string, { t: number; a150: number; a300: number }>(),
+  const gaBy = new Map<string, { t: number; a170: number; a300: number }>(),
     retailerGaMonth = new Map<string, { eid: string; count: number; simSeller: string | null }>(),
     // Keyed by retailer-month, and it carries the retailer and a day inside
     // that month: SSO is credited to whoever HELD the BP, which is no longer
@@ -291,9 +291,9 @@ export async function employeePerformance(month: string, employeeIds?: string[],
       bpGaMonth.set(bpKey, br);
       continue;
     }
-    const g = gaBy.get(eid) || { t: 0, a150: 0, a300: 0 };
+    const g = gaBy.get(eid) || { t: 0, a170: 0, a300: 0 };
     g.t += count;
-    if (category === "GA_170") g.a150 += count;
+    if (category === "GA_170") g.a170 += count;
     else g.a300 += count;
     gaBy.set(eid, g);
     const key = `${x.retailerId}|${x.activationDate.toISOString().slice(0, 7)}`,
@@ -369,7 +369,7 @@ export async function employeePerformance(month: string, employeeIds?: string[],
       (sum, m) => sum + (fullMonthKeys.has(m.month.toISOString().slice(0, 7)) ? Number(m.scAchieved || 0) : 0),
       0,
     );
-    const g = gaBy.get(e.id) || { t: 0, a150: 0, a300: 0 },
+    const g = gaBy.get(e.id) || { t: 0, a170: 0, a300: 0 },
       c = c2cBy.get(e.id) || 0,
       cs = c2sBy.get(e.id) || { amount: 0, trx: 0, lso: 0 };
     const bp: BpPortion = ledger.portionFor(e.id);
@@ -402,7 +402,7 @@ export async function employeePerformance(month: string, employeeIds?: string[],
       totalRetailerCount: totalByEmployee.get(e.id) ?? e._count.retailers,
       gaTarget: targets.ga,
       gaAchieved: g.t,
-      ga150: g.a150,
+      ga170: g.a170,
       ga300: g.a300,
       ssoTarget: targets.sso,
       ssoAchieved: sso.get(e.id) || 0,

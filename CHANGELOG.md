@@ -637,3 +637,10 @@
 - Total GA needs no price at all, so `withStandardGa` stays synchronous in all thirty of its call sites; only the tier breakdown takes a tariff, on four screens.
 - Every import now reports the shape of the file it read — tier counts, the tariff it learned, and every unfamiliar code with its row count — so a new code announces itself instead of vanishing.
 - For the owner's file: **1,948 normal SIM** (1,433 at the 170 tier, 515 at the 300 tier) and **579 swaps**, with nothing left over. Previously 1,939 and 9.
+
+## v173 - One name per GA category
+- The same 170-tier count was labelled three different ways: "150" on `/ga` (under a note reading "selling price 170"), "170 GA" on `/bp/sales`, and "150 pack" in the BP activation list. The field holding it was `ga150` in eleven files, named after a tariff that had already moved twice.
+- All four category names now come from `lib/ga-category.ts` — "GA 170", "GA 300", "SIM swap", "Unclassified". They are category names, not prices: what a 170 SIM costs today is read from the data, and the notes asserting a price are gone.
+- Removed the last hardcoded tariff in the app: the BP activation list decided each row's label with `Number(x.sellingPrice) === 170`, so it would have disagreed with its own totals the day the price moved. It uses the shared rules and the same learned tariff now.
+- Renamed `ga150` / `total150` / `a150` to `ga170` / `total170` / `a170`, and replaced two hand-written category ladders with the shared mapping.
+- Guarded: no frozen tier label (including table headers), no field named after an old tariff, and no comparison of a selling price to a literal anywhere in `app/` or `lib/`.

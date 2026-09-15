@@ -71,7 +71,16 @@ export const LEGACY_GA_300_PRICE = 300;
 export const LEGACY_SIMWAP_PRICE = 350;
 export const LEGACY_EV_SWAP_PRICE = 100;
 
-export type GaCategory = "GA_170" | "GA_300" | "SIM_SWAP" | "UNKNOWN";
+/* The category names and their on-screen labels live in lib/ga-category.ts so a
+   client component can read them without pulling Prisma into the browser. */
+export { GA_CATEGORY_LABEL, gaCategoryLabel } from "./ga-category";
+export type { GaCategory } from "./ga-category";
+import { type GaCategory, gaCategoryLabel } from "./ga-category";
+
+/** The label for one activation, worked out from the same rules as the counts. */
+export function gaRowLabel(row: GaClassifiable, tariff?: ReadonlySet<number>) {
+  return gaCategoryLabel(classifyGaActivation(row, tariff));
+}
 
 /** A GA activation row, or any object carrying enough fields to classify one. */
 export type GaClassifiable = {

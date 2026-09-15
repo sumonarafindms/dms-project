@@ -19,6 +19,7 @@ import {
 import { Btn } from "../components/Kit";
 import { apiFetch, apiUpload } from "@/lib/api-client";
 import { fmtDate, fmtDateTime } from "../../lib/format";
+import { GA_CATEGORY_LABEL } from "../../lib/ga-category";
 
 type EmployeeRow = {
   employeeId: string;
@@ -27,7 +28,7 @@ type EmployeeRow = {
   rsoMsisdn: string;
   supervisor: string;
   retailerCount: number;
-  ga150: number;
+  ga170: number;
   ga300: number;
   gaAchieved: number;
   gaTarget: number;
@@ -43,7 +44,7 @@ type RetailerDailyRow = {
   rsoMsisdn: string;
   supervisor: string;
   total: number;
-  ga150: number;
+  ga170: number;
   ga300: number;
   simSwap: number;
 };
@@ -197,12 +198,12 @@ export default function GaPage() {
         (a, r) => ({
           target: a.target + r.gaTarget,
           achieved: a.achieved + r.gaAchieved,
-          ga150: a.ga150 + r.ga150,
+          ga170: a.ga170 + r.ga170,
           ga300: a.ga300 + r.ga300,
           ssoT: a.ssoT + r.ssoTarget,
           ssoA: a.ssoA + r.ssoAchieved,
         }),
-        { target: 0, achieved: 0, ga150: 0, ga300: 0, ssoT: 0, ssoA: 0 },
+        { target: 0, achieved: 0, ga170: 0, ga300: 0, ssoT: 0, ssoA: 0 },
       ),
     [rows],
   );
@@ -210,8 +211,8 @@ export default function GaPage() {
   const dayTotals = useMemo(
     () =>
       retailerDaily.reduce(
-        (a, r) => ({ total: a.total + r.total, ga150: a.ga150 + r.ga150, ga300: a.ga300 + r.ga300 }),
-        { total: 0, ga150: 0, ga300: 0 },
+        (a, r) => ({ total: a.total + r.total, ga170: a.ga170 + r.ga170, ga300: a.ga300 + r.ga300 }),
+        { total: 0, ga170: 0, ga300: 0 },
       ),
     [retailerDaily],
   );
@@ -277,10 +278,14 @@ export default function GaPage() {
         <OpsMetric
           label="Total GA"
           value={dayTotals.total.toLocaleString("en-US")}
-          note={`${dayTotals.ga150.toLocaleString("en-US")} + ${dayTotals.ga300.toLocaleString("en-US")} · standard GA only`}
+          note={`${dayTotals.ga170.toLocaleString("en-US")} + ${dayTotals.ga300.toLocaleString("en-US")} · standard GA only`}
         />
-        <OpsMetric label="150" value={dayTotals.ga150.toLocaleString("en-US")} note="MMSTC · selling price 170" />
-        <OpsMetric label="300" value={dayTotals.ga300.toLocaleString("en-US")} note="MMST / MMSTs" />
+        <OpsMetric label={GA_CATEGORY_LABEL.GA_170} value={dayTotals.ga170.toLocaleString("en-US")} note="MMSTC" />
+        <OpsMetric
+          label={GA_CATEGORY_LABEL.GA_300}
+          value={dayTotals.ga300.toLocaleString("en-US")}
+          note="MMST / MMSTS"
+        />
         <OpsMetric
           label="Active Retailers"
           value={activeGaRetailers.toLocaleString("en-US")}
@@ -301,9 +306,9 @@ export default function GaPage() {
                 <th>Employee</th>
                 <th>Retailer</th>
                 <th className="is-right">Total GA</th>
-                <th className="is-right">SIM SWAP</th>
-                <th className="is-right">150</th>
-                <th className="is-right">300</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.SIM_SWAP}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_170}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_300}</th>
               </tr>
             </thead>
             <tbody>
@@ -328,7 +333,7 @@ export default function GaPage() {
                       {r.simSwap}
                     </span>
                   </td>
-                  <td className="is-right">{r.ga150}</td>
+                  <td className="is-right">{r.ga170}</td>
                   <td className="is-right">{r.ga300}</td>
                 </tr>
               ))}
@@ -350,8 +355,8 @@ export default function GaPage() {
       <div className="kit-metrics-grid">
         <OpsMetric label="GA Target" value={totals.target.toLocaleString("en-US")} note="Monthly target" />
         <OpsMetric label="GA Achieved" value={totals.achieved.toLocaleString("en-US")} note="Completed GA" />
-        <OpsMetric label="150" value={totals.ga150.toLocaleString("en-US")} note="Price = 170" />
-        <OpsMetric label="300" value={totals.ga300.toLocaleString("en-US")} note="MMST / MMSTs" />
+        <OpsMetric label={GA_CATEGORY_LABEL.GA_170} value={totals.ga170.toLocaleString("en-US")} note="MMSTC" />
+        <OpsMetric label={GA_CATEGORY_LABEL.GA_300} value={totals.ga300.toLocaleString("en-US")} note="MMST / MMSTS" />
         <OpsMetric
           label="GA %"
           value={totals.target ? `${((totals.achieved / totals.target) * 100).toFixed(1)}%` : "0%"}
@@ -376,8 +381,8 @@ export default function GaPage() {
                 <th>Supervisor</th>
                 <th>Employee</th>
                 <th className="is-right">Retailers</th>
-                <th className="is-right">150</th>
-                <th className="is-right">300</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_170}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_300}</th>
                 <th className="is-right">GA Target</th>
                 <th className="is-right">GA Achieved</th>
                 <th>GA Progress</th>
@@ -396,7 +401,7 @@ export default function GaPage() {
                   <td className="is-right">
                     <span className="kit-count-pill">{r.retailerCount}</span>
                   </td>
-                  <td className="is-right">{r.ga150}</td>
+                  <td className="is-right">{r.ga170}</td>
                   <td className="is-right">{r.ga300}</td>
                   <td className="is-right">{r.gaTarget}</td>
                   <td className="is-right">

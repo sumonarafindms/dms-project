@@ -14,6 +14,7 @@
 import Link from "next/link";
 import { Icon } from "./icons";
 import { Badge, Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";
+import { GA_CATEGORY_LABEL } from "../../lib/business-rules";
 
 /** Prisma returns money as Decimal; every caller here may hand us Decimal,
     number or string, so one coercion covers all three. */
@@ -44,7 +45,7 @@ type RetailerDetail = {
   };
   bp?: unknown;
   gaTotal: number;
-  ga150: number;
+  ga170: number;
   ga300: number;
   simSwap: number;
   c2cAmount: number;
@@ -98,7 +99,11 @@ export function RetailerDetailView({ d, month, backHref }: { d: RetailerDetail; 
       <SectionHead title="Period totals" sub="Everything below is for the selected date range." />
       {/* Five figures: 3-up leaves one gap on the second row, 4-up leaves three. */}
       <div className="kit-card-grid kit-mb-20">
-        <Figure label="GA Total" value={d.gaTotal} sub={`${d.ga150} × 170 · ${d.ga300} × 300`} />
+        <Figure
+          label="GA Total"
+          value={d.gaTotal}
+          sub={`${d.ga170} ${GA_CATEGORY_LABEL.GA_170} · ${d.ga300} ${GA_CATEGORY_LABEL.GA_300}`}
+        />
         <Figure label="SIM Swap" value={d.simSwap} sub="Replacement · not counted in GA" />
         <Figure label="C2C" value={money(d.c2cAmount)} sub={`${d.c2cTrx} transactions`} />
         <Figure label="C2S" value={money(d.c2sAmount)} sub={`${d.c2sTrx} transactions`} />

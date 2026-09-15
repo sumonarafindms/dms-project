@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, EmptyState, MetricBar, PageHeader, Row, SectionHead, SummaryStrip } from "../../../../components/Kit";
 import { Icon } from "../../../../components/icons";
 import { FilterForm } from "../../../../components/DrillUI";
+import { GA_CATEGORY_LABEL } from "../../../../../lib/business-rules";
 export default async function Page({
   params,
   searchParams,
@@ -44,7 +45,8 @@ export default async function Page({
       <Card className="kit-mb-20" padded>
         <MetricBar label="Selected-range GA progress" achieved={d.total} target={a.gaTarget} />
         <p className="kit-hint kit-mt-8">
-          170 GA {d.total150} · 300 GA {d.total300} · SIM swap {d.simSwap} (excluded from achievement)
+          {GA_CATEGORY_LABEL.GA_170} {d.total170} · {GA_CATEGORY_LABEL.GA_300} {d.total300} ·{" "}
+          {GA_CATEGORY_LABEL.SIM_SWAP} {d.simSwap} (excluded from achievement)
         </p>
       </Card>
       <SectionHead title="Recent SIM activations" sub={`${Math.min(d.rows.length, 100)} of ${d.rows.length} shown.`} />

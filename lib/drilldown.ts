@@ -65,7 +65,7 @@ export async function retailerMonthDetail(retailerId: string, month: string, fro
   const breakdown = emptyGaBreakdown();
   for (const x of ga) addGaActivation(breakdown, x);
   const gaTotal = breakdown.total,
-    ga150 = breakdown.ga170,
+    ga170 = breakdown.ga170,
     ga300 = breakdown.ga300,
     simSwap = breakdown.simSwap;
   const c2cAmount = c2c.reduce((a, x) => a + Number(x.amount), 0),
@@ -85,7 +85,7 @@ export async function retailerMonthDetail(retailerId: string, month: string, fro
     retailer,
     ga: gaRows,
     gaTotal,
-    ga150,
+    ga170,
     ga300,
     simSwap,
     c2c,

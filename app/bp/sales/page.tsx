@@ -15,7 +15,15 @@ import { prisma } from "../../../lib/prisma";
 import { monthBounds } from "../../../lib/month";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { parseYmd, monthStartsInRange } from "../../../lib/date-range";
-import { classifyGaActivation, withGa170, withGa300, withSimSwap, withStandardGa } from "../../../lib/business-rules";
+import {
+  GA_CATEGORY_LABEL,
+  classifyGaActivation,
+  gaCategoryLabel,
+  withGa170,
+  withGa300,
+  withSimSwap,
+  withStandardGa,
+} from "../../../lib/business-rules";
 import { currentGa170Tariff } from "../../../lib/ga-tariff";
 import { targetPercent } from "../../../lib/achievement";
 import { SimActivationList } from "../../components/SimActivationList";
@@ -84,7 +92,7 @@ export default async function Page({
   const where = rangeWhere;
 
   const tariff = await currentGa170Tariff();
-  const [rows, total, ga150, ga300, simSwap] = await Promise.all([
+  const [rows, total, ga170, ga300, simSwap] = await Promise.all([
     prisma.gaActivation.findMany({
       where,
       orderBy: [{ activationDate: "desc" }, { activationTime: "desc" }],
@@ -113,8 +121,8 @@ export default async function Page({
       <SummaryStrip
         items={[
           { label: "Total GA", value: total.toLocaleString("en-US"), tone: "brand" },
-          { label: "170 GA", value: ga150.toLocaleString("en-US") },
-          { label: "300 GA", value: ga300.toLocaleString("en-US") },
+          { label: GA_CATEGORY_LABEL.GA_170, value: ga170.toLocaleString("en-US") },
+          { label: GA_CATEGORY_LABEL.GA_300, value: ga300.toLocaleString("en-US") },
           // Shown, but deliberately outside the GA total — a swap replaces a
           // SIM, it does not add a subscriber.
           { label: "SIM Swap", value: simSwap.toLocaleString("en-US"), tone: "amber" },
@@ -138,14 +146,9 @@ export default async function Page({
             date: x.activationDate.toISOString().slice(0, 10),
             time: x.activationTime || "",
             price: Number(x.sellingPrice),
-            category:
-              category === "GA_170"
-                ? "170 GA"
-                : category === "GA_300"
-                  ? "300 GA"
-                  : category === "SIM_SWAP"
-                    ? "SIM swap"
-                    : "Not counted",
+            // One mapping, in one place — this ladder was a fourth spelling of
+            // the same four words.
+            category: gaCategoryLabel(category),
           };
         })}
         month={month}

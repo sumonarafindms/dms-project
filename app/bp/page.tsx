@@ -16,7 +16,7 @@ import { requirePagePermission } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { monthBounds } from "../../lib/month";
 import { dhakaMonth, dhakaTodayYmd } from "../../lib/business-time";
-import { classifyGaActivation, withStandardGa } from "../../lib/business-rules";
+import { classifyGaActivation, gaCategoryLabel, withStandardGa } from "../../lib/business-rules";
 import { targetPercent } from "../../lib/achievement";
 import { pacing } from "../../lib/pacing";
 import { Btn, Card, EmptyState, HeroRing, PaceFoot, PageHeader, Row, SectionHead, StatPill } from "../components/Kit";
@@ -162,15 +162,7 @@ export default async function BP() {
                   title={`SIM ${x.simNo}`}
                   sub={`${x.activationDate.toISOString().slice(0, 10)}${x.activationTime ? ` · ${x.activationTime}` : ""}`}
                   value={`৳${Number(x.sellingPrice)}`}
-                  valueSub={
-                    category === "GA_170"
-                      ? "170"
-                      : category === "GA_300"
-                        ? "300"
-                        : category === "SIM_SWAP"
-                          ? "SWAP"
-                          : "—"
-                  }
+                  valueSub={gaCategoryLabel(category)}
                 />
               );
             })}

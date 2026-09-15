@@ -221,7 +221,7 @@ export async function bpAssignmentDetail(
   // The 170/300 split is the one figure that needs the current tariff; Total GA
   // and the swap count do not. See lib/ga-tariff.ts.
   const tariff = await currentGa170Tariff();
-  const [rows, total, simSwap, total150] = await Promise.all([
+  const [rows, total, simSwap, total170] = await Promise.all([
     prisma.gaActivation.findMany({
       where,
       orderBy: [{ activationDate: "desc" }, { activationTime: "desc" }],
@@ -232,7 +232,7 @@ export async function bpAssignmentDetail(
     prisma.gaActivation.count({ where: swapWhere }),
     prisma.gaActivation.count({ where: withGa170(tariff, commonWhere) }),
   ]);
-  const total300 = total - total150;
+  const total300 = total - total170;
   const dailyRaw = await prisma.gaActivation.groupBy({
     by: ["activationDate"],
     where,
@@ -245,9 +245,16 @@ export async function bpAssignmentDetail(
     capped: rows.length >= 500,
     assignment: assignmentView,
     total,
-    total150,
+    total170,
     total300,
     simSwap,
+    /*
+     * Handed to the view so the per-row label is decided by the same rules, and
+     * the same tariff, as the totals above it. The list used to label its rows
+     * with `sellingPrice === 170`, which would disagree with these counts the
+     * moment the carrier moved the price.
+     */
+    ga170Tariff: [...tariff],
     rows,
     daily: dailyRaw.map((x) => ({ date: x.activationDate, count: x._count._all })),
     effectiveStart,

@@ -206,7 +206,7 @@ export async function GET(req: NextRequest) {
         rsoMsisdn: employee.rsoMsisdn,
         supervisor: employee.supervisor?.name ?? "Unassigned",
         retailerCount: employee._count.retailers,
-        ga150: ga.ga170,
+        ga170: ga.ga170,
         ga300: ga.ga300,
         simSwap: ga.simSwap,
         gaAchieved: ga.total,
@@ -240,9 +240,9 @@ export async function GET(req: NextRequest) {
       dailyMap.set(activation.retailerId, current);
     }
 
-    // API contract unchanged: the 170 bucket is still published as `ga150`.
+    // API contract unchanged: the 170 bucket is still published as `ga170`.
     const retailerDaily = [...dailyMap.values()]
-      .map(({ ga170, unknown, ...rest }) => ({ ...rest, ga150: ga170, unknown }))
+      .map(({ ga170, unknown, ...rest }) => ({ ...rest, ga170: ga170, unknown }))
       .sort((a, b) => b.total - a.total || b.simSwap - a.simSwap || a.retailerCode.localeCompare(b.retailerCode));
 
     return NextResponse.json({
