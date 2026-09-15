@@ -68,9 +68,9 @@ export default async function ReadinessPage({
 
       <SummaryStrip
         items={[
-          { label: "Feed-days due", value: due.toLocaleString() },
-          { label: "Imported", value: covered.toLocaleString(), tone: "brand" },
-          { label: "Needs attention", value: problems.length.toLocaleString() },
+          { label: "Feed-days due", value: due.toLocaleString("en-US") },
+          { label: "Imported", value: covered.toLocaleString("en-US"), tone: "brand" },
+          { label: "Needs attention", value: problems.length.toLocaleString("en-US") },
           { label: "Latest due day", value: report.lastDue },
         ]}
       />
@@ -105,10 +105,10 @@ export default async function ReadinessPage({
                       className={`kit-readiness-day tone-${dayStateTone(d.state)}`}
                       // The only text a screen reader or a hover gets, so it
                       // carries the evidence, not just the verdict.
-                      title={`${d.date} · ${DAY_STATE_LABEL[d.state]} · ${d.rows.toLocaleString()} rows · ${
+                      title={`${d.date} · ${DAY_STATE_LABEL[d.state]} · ${d.rows.toLocaleString("en-US")} rows · ${
                         d.batch ? "batch recorded" : "no batch"
                       }`}
-                      aria-label={`${d.date}: ${DAY_STATE_LABEL[d.state]}, ${d.rows.toLocaleString()} rows`}
+                      aria-label={`${d.date}: ${DAY_STATE_LABEL[d.state]}, ${d.rows.toLocaleString("en-US")} rows`}
                     />
                   ))}
                 </div>
@@ -138,7 +138,7 @@ export default async function ReadinessPage({
                     {d.label} · {d.date}
                   </strong>
                   <span>
-                    {d.batch ? "An import was recorded" : "No import recorded"} · {d.rows.toLocaleString()} rows
+                    {d.batch ? "An import was recorded" : "No import recorded"} · {d.rows.toLocaleString("en-US")} rows
                   </span>
                 </div>
                 <Badge tone={dayStateTone(d.state)}>{DAY_STATE_LABEL[d.state]}</Badge>
@@ -155,7 +155,8 @@ export default async function ReadinessPage({
         )}
         {problems.length > 60 && (
           <p className="kit-hint is-xs kit-mt-8">
-            Showing the 60 most urgent of {problems.length.toLocaleString()}. Narrow the date range to see the rest.
+            Showing the 60 most urgent of {problems.length.toLocaleString("en-US")}. Narrow the date range to see the
+            rest.
           </p>
         )}
       </Card>

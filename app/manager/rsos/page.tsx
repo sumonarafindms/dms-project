@@ -35,10 +35,10 @@ export default async function Page({
       <PageHeader title="RSO Performance" subtitle="Assigned RSOs compared by target execution." />
       <SummaryStrip
         items={[
-          { label: "Active RSOs", value: all.length.toLocaleString() },
-          { label: "On Track", value: onTrack.toLocaleString(), tone: "brand" },
-          { label: "Below Target", value: (all.length - onTrack).toLocaleString(), tone: "amber" },
-          { label: "Showing", value: rows.length.toLocaleString() },
+          { label: "Active RSOs", value: all.length.toLocaleString("en-US") },
+          { label: "On Track", value: onTrack.toLocaleString("en-US"), tone: "brand" },
+          { label: "Below Target", value: (all.length - onTrack).toLocaleString("en-US"), tone: "amber" },
+          { label: "Showing", value: rows.length.toLocaleString("en-US") },
         ]}
       />
       <EntityGrid

@@ -57,11 +57,11 @@ export default async function Page({
             // RSOs the two numbers differ, and "12 assignments" beside a GA
             // total covering 9 outlets is the kind of mismatch nobody can
             // reconcile from the screen.
-            value: byOutlet.size.toLocaleString(),
+            value: byOutlet.size.toLocaleString("en-US"),
           },
-          { label: "GA Target", value: totalT.toLocaleString() },
-          { label: "GA Achieved", value: totalA.toLocaleString(), tone: "brand" },
-          { label: "GA Remaining", value: Math.max(0, totalT - totalA).toLocaleString(), tone: "amber" },
+          { label: "GA Target", value: totalT.toLocaleString("en-US") },
+          { label: "GA Achieved", value: totalA.toLocaleString("en-US"), tone: "brand" },
+          { label: "GA Remaining", value: Math.max(0, totalT - totalA).toLocaleString("en-US"), tone: "amber" },
         ]}
       />
       <EntityGrid

@@ -34,7 +34,7 @@ import { Icon } from "../../../components/icons";
 
 export const dynamic = "force-dynamic";
 
-const money = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+const money = (n: number) => `৳${Math.round(n).toLocaleString("en-US")}`;
 
 export default async function DailySummary({
   searchParams,
@@ -92,13 +92,25 @@ export default async function DailySummary({
     ...(level === "bp"
       ? []
       : ([
-          { key: "retailerCount", label: "Retailers", align: "right", render: (r) => r.retailerCount.toLocaleString() },
+          {
+            key: "retailerCount",
+            label: "Retailers",
+            align: "right",
+            render: (r) => r.retailerCount.toLocaleString("en-US"),
+          },
         ] as Column<Row>[])),
-    { key: "standardGa", label: "GA (period)", align: "right", render: (r) => r.standardGa.toLocaleString() },
+    { key: "standardGa", label: "GA (period)", align: "right", render: (r) => r.standardGa.toLocaleString("en-US") },
     ...(isMonthToDate(range)
       ? []
-      : [{ key: "mtdGa", label: "GA (MTD)", align: "right" as const, render: (r: Row) => r.mtdGa.toLocaleString() }]),
-    { key: "gaTarget", label: "Monthly GA Target", align: "right", render: (r) => r.gaTarget.toLocaleString() },
+      : [
+          {
+            key: "mtdGa",
+            label: "GA (MTD)",
+            align: "right" as const,
+            render: (r: Row) => r.mtdGa.toLocaleString("en-US"),
+          },
+        ]),
+    { key: "gaTarget", label: "Monthly GA Target", align: "right", render: (r) => r.gaTarget.toLocaleString("en-US") },
     {
       key: "achievement",
       // Named for what it divides: month-to-date GA over the monthly target.
@@ -119,15 +131,15 @@ export default async function DailySummary({
     `Period: ${rangeLabel(range)}`,
     ...(supervisor ? [`Supervisor: ${supervisor}`] : []),
     ``,
-    `Total GA: ${totals.standardGa.toLocaleString()}`,
-    `SIM Swap: ${totals.simSwap.toLocaleString()}`,
-    ...(totals.unknownGa ? [`Unrecognised product codes: ${totals.unknownGa.toLocaleString()}`] : []),
+    `Total GA: ${totals.standardGa.toLocaleString("en-US")}`,
+    `SIM Swap: ${totals.simSwap.toLocaleString("en-US")}`,
+    ...(totals.unknownGa ? [`Unrecognised product codes: ${totals.unknownGa.toLocaleString("en-US")}`] : []),
     `Total C2C: ${money(totals.c2cAmount)}`,
-    `Total C2S: ${money(totals.c2sAmount)} (${totals.c2sTransactions.toLocaleString()} trx)`,
+    `Total C2S: ${money(totals.c2sAmount)} (${totals.c2sTransactions.toLocaleString("en-US")} trx)`,
     ``,
     `${who}s: ${rows.length}`,
     ...(level === "supervisor" ? [`RSOs: ${rows.reduce((a, r) => a + r.rsoCount, 0)}`] : []),
-    ...(hasValue ? [`Retailers: ${rows.reduce((a, r) => a + r.retailerCount, 0).toLocaleString()}`] : []),
+    ...(hasValue ? [`Retailers: ${rows.reduce((a, r) => a + r.retailerCount, 0).toLocaleString("en-US")}`] : []),
   ].join("\n");
 
   const levelParam = level === "supervisor" ? undefined : level;
@@ -187,10 +199,13 @@ export default async function DailySummary({
 
       <SummaryStrip
         items={[
-          { label: "Total GA", value: totals.standardGa.toLocaleString(), tone: "brand" },
-          { label: "SIM Swap", value: totals.simSwap.toLocaleString() },
+          { label: "Total GA", value: totals.standardGa.toLocaleString("en-US"), tone: "brand" },
+          { label: "SIM Swap", value: totals.simSwap.toLocaleString("en-US") },
           { label: "Total C2C", value: money(totals.c2cAmount) },
-          { label: `Total C2S · ${totals.c2sTransactions.toLocaleString()} trx`, value: money(totals.c2sAmount) },
+          {
+            label: `Total C2S · ${totals.c2sTransactions.toLocaleString("en-US")} trx`,
+            value: money(totals.c2sAmount),
+          },
         ]}
       />
       <ReportSearch matched={matched} total={unfiltered} noun={who === "BP" ? "BP" : who.toLowerCase()} />

@@ -46,7 +46,7 @@ export default async function CustomReport({
     const v = r[k];
     if (v === null || v === undefined) return "—";
     if (k === "gaPct") return `${v}%`;
-    return isMoney(k) ? money(v) : v.toLocaleString();
+    return isMoney(k) ? money(v) : v.toLocaleString("en-US");
   };
 
   const columns: Column<CustomRow>[] = [
@@ -98,7 +98,7 @@ export default async function CustomReport({
       }}
       summaryItems={[
         { label: "Level", value: CUSTOM_LEVELS.find((l) => l.key === level)!.label },
-        { label: "Rows", value: rows.length.toLocaleString() },
+        { label: "Rows", value: rows.length.toLocaleString("en-US") },
         { label: "Columns", value: String(active.length) },
         { label: "Period", value: `${rangeDayCount(range)} day${rangeDayCount(range) === 1 ? "" : "s"}` },
       ]}

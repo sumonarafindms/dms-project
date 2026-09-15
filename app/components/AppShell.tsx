@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { PermissionProvider, type ClientPermissionMap } from "./PermissionContext";
-import { apiFetch } from "@/lib/api-client";
+import { AccountMenu } from "./AccountMenu";
 
 /**
  * `group` places the item in the collapsible admin sidebar. It exists because
@@ -309,31 +309,19 @@ export default function AppShell({
             visibleNav.map((i) => <NavLink key={i.href} item={i} path={path} onNavigate={setNavPending} />)
           )}
           <div className="sidebar-spacer" />
-          <button
-            className="sidebar-link sidebar-button"
-            aria-label="Sign out"
-            onClick={async () => {
-              /*
-               * The navigation is not conditional on the request. A logout that
-               * cannot reach the server used to leave the operator sitting on
-               * the page with the button apparently doing nothing; sending them
-               * to the sign-in screen is right either way, and the session
-               * cookie is httpOnly so the server clears it on the next request.
-               */
-              await apiFetch("/api/auth/logout", { method: "POST", timeoutMs: 8_000 });
-              location.href = "/login";
-            }}
-          >
-            <Icon name="logout" />
-            Sign out
-          </button>
-          <div className="sidebar-profile">
-            <div className="avatar">{role.initials}</div>
-            <div>
-              <div className="profile-name">{profileName}</div>
-              <div className="profile-role">{role.title}</div>
-            </div>
-          </div>
+          {/* Sign out used to be a button of its own here and nowhere else —
+              so below 900px, where this sidebar is display:none, there was no
+              way to sign out at all and no way to change a PIN on any width.
+              Both now live behind the profile block, which is the thing people
+              already reach for, and the same sheet opens from the phone's
+              avatar. */}
+          <AccountMenu
+            variant="profile"
+            name={profileName}
+            roleTitle={role.title}
+            role={user?.role || ""}
+            initials={role.initials}
+          />
         </aside>
         <a className="skip-link" href="#main-content">
           Skip to main content
@@ -344,9 +332,13 @@ export default function AppShell({
               <Brand href={role.home} />
               <span>{currentLabel(path, visibleNav, role.home)}</span>
             </div>
-            <Link href={role.home} className="avatar avatar-link" aria-label={`${role.title} home`}>
-              {role.initials}
-            </Link>
+            <AccountMenu
+              variant="avatar"
+              name={profileName}
+              roleTitle={role.title}
+              role={user?.role || ""}
+              initials={role.initials}
+            />
           </header>
           {children}
           {visibleBottom.length > 0 && (

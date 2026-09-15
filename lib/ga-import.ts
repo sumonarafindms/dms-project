@@ -3,8 +3,14 @@ import { assertRowLimit } from "./upload-safety";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { IMPORT_CHUNK, IMPORT_TX_OPTIONS } from "./c2-import-core";
+import { classifyGaActivation, ga170Tariff, isStandardGaProduct, isSimSwapProduct } from "./business-rules";
+import { forgetGaTariff } from "./ga-tariff";
 
 type Cell = string | number | boolean | Date | null | undefined;
+
+/** A row the import could not accept, as it is stored against the batch. */
+export type ImportErrorRow = { rowNumber: number; message: string; rawData: object };
 
 type ParsedActivation = {
   rowNumber: number;
@@ -143,7 +149,7 @@ export function parseGaWorkbook(bytes: Buffer) {
   for (const header of required) index[header] = headers.indexOf(header);
 
   const parsedRows: ParsedActivation[] = [];
-  const preErrors: Array<{ rowNumber: number; message: string; rawData: object }> = [];
+  const preErrors: ImportErrorRow[] = [];
   let sourceRows = 0;
 
   for (let i = 1; i < rows.length; i++) {
@@ -223,6 +229,221 @@ export function parseGaWorkbook(bytes: Buffer) {
   return { parsedRows, sourceRows, sheetName, preErrors };
 }
 
+/** One activation as it will be written. `id`/`createdAt` are set only on a rewrite. */
+export type GaWriteRow = {
+  id?: string;
+  createdAt?: Date;
+  simNo: string;
+  retailerId: string;
+  activationDate: Date;
+  activationTime: string | null;
+  sellingPrice: Prisma.Decimal;
+  productCode: string;
+  batchId: string;
+};
+
+export type GaWritePlan = {
+  /** Every row to land in the table — new activations and rewritten ones. */
+  rows: GaWriteRow[];
+  /** The ids being replaced, cleared first so the unique simNo is free. */
+  replacedIds: string[];
+};
+
+/** The database calls writeGaPlan makes, so the plan can be tested without one. */
+export interface GaWriter {
+  deleteActivations(ids: string[]): Promise<unknown>;
+  createActivations(rows: GaWriteRow[]): Promise<unknown>;
+}
+
+export type GaExistingRow = {
+  id: string;
+  retailerId: string;
+  activationDate: Date;
+  activationTime: string | null;
+  sellingPrice: Prisma.Decimal | number;
+  productCode: string | null;
+  createdAt: Date;
+};
+
+export type GaPlanInput = {
+  parsedRows: ParsedActivation[];
+  /** RETAILER_CODE (upper case) to retailer id. */
+  retailerMap: Map<string, string>;
+  /** SIM_NO to the row already stored under it. */
+  existing: Map<string, GaExistingRow>;
+  batchId: string;
+  preErrors: ImportErrorRow[];
+};
+
+/**
+ * Decide what the import will write, without touching the database.
+ *
+ * Pure on purpose, and split out for the same reason `planMonthReplacement` is:
+ * the interesting rules — which row is new, which is a correction, which is the
+ * same row arriving twice, and the fact that a correction keeps its `id` and
+ * `createdAt` — can then be tested by reading the plan rather than by standing
+ * up Postgres and reading it back.
+ */
+export function planGaWrite(input: GaPlanInput) {
+  const { parsedRows, retailerMap, existing, batchId, preErrors } = input;
+  const plan: GaWritePlan = { rows: [], replacedIds: [] };
+  const errors: ImportErrorRow[] = [...preErrors];
+  const seenInFile = new Set<string>();
+  let insertedRows = 0;
+  let updatedRows = 0;
+  let duplicateRows = 0;
+
+  for (const row of parsedRows) {
+    // The same SIM twice in one file is the file's problem, not a correction:
+    // the second line is counted and dropped rather than rewriting the first.
+    if (seenInFile.has(row.simNo)) {
+      duplicateRows++;
+      continue;
+    }
+    seenInFile.add(row.simNo);
+
+    const retailerId = retailerMap.get(row.retailerCode);
+    if (!retailerId) {
+      errors.push({
+        rowNumber: row.rowNumber,
+        message: `Retailer ${row.retailerCode} does not exist in Retailer Master`,
+        rawData: { retailerCode: row.retailerCode, simNo: row.simNo },
+      });
+      continue;
+    }
+
+    const written = {
+      simNo: row.simNo,
+      retailerId,
+      activationDate: row.activationDate,
+      activationTime: row.activationTime,
+      sellingPrice: new Prisma.Decimal(row.sellingPrice),
+      productCode: row.productCode,
+      batchId,
+    };
+
+    const old = existing.get(row.simNo);
+    if (!old) {
+      insertedRows++;
+      plan.rows.push(written);
+      continue;
+    }
+
+    const unchanged =
+      old.retailerId === retailerId &&
+      isoDate(old.activationDate) === isoDate(row.activationDate) &&
+      (old.activationTime ?? "") === (row.activationTime ?? "") &&
+      Number(old.sellingPrice) === row.sellingPrice &&
+      (old.productCode ?? "") === row.productCode;
+
+    if (unchanged) {
+      duplicateRows++;
+      continue;
+    }
+
+    /*
+     * A changed row is rewritten, not updated in place — and it carries its own
+     * `id` and `createdAt` across, so the swap is invisible to every reader.
+     * That is what makes the batching safe; see writeGaPlan for why an update
+     * cannot be batched and a rewrite can.
+     */
+    updatedRows++;
+    plan.replacedIds.push(old.id);
+    plan.rows.push({ id: old.id, createdAt: old.createdAt, ...written });
+  }
+
+  return { plan, insertedRows, updatedRows, duplicateRows, errors };
+}
+
+/**
+ * Write a GA import in a handful of statements instead of one per row.
+ *
+ * ## What was wrong
+ *
+ * The importer built one `prisma.gaActivation.create()` or `.update()` per row
+ * and handed the whole array to `$transaction`. A 9,000-row GA file was 9,000
+ * statements, measured at **8,974 ms against a Postgres on the same machine**.
+ * On the owner's hosted database every one of those is a network round trip —
+ * the C2C importer died at 2.6 ms each — and `/api/import/[type]` is capped at
+ * `maxDuration = 60`. The file does not have to be much larger than a normal
+ * day before the route is killed mid-transaction, which rolls the whole thing
+ * back and stores nothing.
+ *
+ * This is the third time this project has paid for per-row writes (v156 OB,
+ * v163 C2C/C2S). The guard written in v163 listed the importers by name and GA
+ * was not among them, which is exactly the failure mode its own comment warned
+ * about — "fixing two importers and forgetting the third".
+ *
+ * ## Why a rewrite rather than an update
+ *
+ * `createMany` batches inserts, and nothing batches per-row updates: each one
+ * carries a different payload, so `updateMany` cannot express them. A changed
+ * row is therefore deleted and re-inserted **carrying its original `id` and
+ * `createdAt`**, which makes the two paths identical in cost and the swap
+ * invisible: no column any reader can see changes value, nothing holds a
+ * foreign key to GaActivation, and both statements run inside one transaction.
+ *
+ * Cost is now `1 + ceil(rows / IMPORT_CHUNK)` statements, and it stops growing
+ * with the file.
+ */
+export async function writeGaPlan(writer: GaWriter, plan: GaWritePlan) {
+  /*
+   * Deletes first, and all of them before any insert. A rewritten row re-uses
+   * its own simNo, which is unique — inserting it before its old copy is gone
+   * is a constraint violation, and doing the two chunk-by-chunk would trip over
+   * rows in a later chunk.
+   */
+  if (plan.replacedIds.length)
+    for (let i = 0; i < plan.replacedIds.length; i += IMPORT_CHUNK)
+      await writer.deleteActivations(plan.replacedIds.slice(i, i + IMPORT_CHUNK));
+
+  for (let i = 0; i < plan.rows.length; i += IMPORT_CHUNK)
+    await writer.createActivations(plan.rows.slice(i, i + IMPORT_CHUNK));
+}
+
+/**
+ * What the file turned out to contain, in the app's own terms.
+ *
+ * Returned with every import so a new product code announces itself instead of
+ * disappearing. That is the whole lesson of the September file: `SIMSWAP`,
+ * `ESIMSWAP`, `MMSTSC` and `MMST1911` — 579 of 2,527 rows — were classified as
+ * "unknown" and silently left out of every total, and nothing on any screen
+ * said so. The rules now place them automatically; this line is how anybody
+ * notices that a decision was made on their behalf.
+ */
+export function gaShape(rows: readonly ParsedActivation[]) {
+  const tariff = ga170Tariff(rows);
+  let ga170 = 0,
+    ga300 = 0,
+    simSwap = 0;
+  const unfamiliar = new Map<string, number>();
+  for (const row of rows) {
+    switch (classifyGaActivation(row, tariff)) {
+      case "GA_170":
+        ga170++;
+        break;
+      case "GA_300":
+        ga300++;
+        break;
+      case "SIM_SWAP":
+        simSwap++;
+        break;
+    }
+    // "Unfamiliar" is not "uncounted": every one of these was placed. It is
+    // reported because a code the app has never seen is worth a human glance.
+    if (!isStandardGaProduct(row.productCode) && !isSimSwapProduct(row.productCode))
+      unfamiliar.set(row.productCode, (unfamiliar.get(row.productCode) ?? 0) + 1);
+  }
+  return {
+    standardGa: ga170 + ga300,
+    ga170,
+    ga300,
+    simSwap,
+    ga170Tariff: [...tariff].sort((a, b) => a - b),
+    unfamiliarCodes: [...unfamiliar.entries()].sort((a, b) => b[1] - a[1]).map(([code, count]) => ({ code, count })),
+  };
+}
+
 export async function importGaActivationWorkbook(fileName: string, bytes: Buffer) {
   const { parsedRows, sourceRows, sheetName, preErrors } = parseGaWorkbook(bytes);
 
@@ -272,16 +493,11 @@ export async function importGaActivationWorkbook(fileName: string, bytes: Buffer
       activationTime: true,
       sellingPrice: true,
       productCode: true,
+      // Carried through a replacement rather than re-stamped. See writeGaPlan.
+      createdAt: true,
     },
   });
   const existingMap = new Map(existing.map((row) => [row.simNo, row]));
-
-  const seenInFile = new Set<string>();
-  const errors = [...preErrors];
-  let insertedRows = 0;
-  let updatedRows = 0;
-  let duplicateRows = 0;
-  let failedRows = preErrors.length;
 
   const batch = await prisma.importBatch.create({
     data: {
@@ -294,80 +510,39 @@ export async function importGaActivationWorkbook(fileName: string, bytes: Buffer
     },
   });
 
-  const operations: Prisma.PrismaPromise<unknown>[] = [];
-
-  for (const row of parsedRows) {
-    if (seenInFile.has(row.simNo)) {
-      duplicateRows++;
-      continue;
-    }
-    seenInFile.add(row.simNo);
-
-    const retailerId = retailerMap.get(row.retailerCode);
-    if (!retailerId) {
-      failedRows++;
-      errors.push({
-        rowNumber: row.rowNumber,
-        message: `Retailer ${row.retailerCode} does not exist in Retailer Master`,
-        rawData: { retailerCode: row.retailerCode, simNo: row.simNo },
-      });
-      continue;
-    }
-
-    const old = existingMap.get(row.simNo);
-    if (!old) {
-      insertedRows++;
-      operations.push(
-        prisma.gaActivation.create({
-          data: {
-            simNo: row.simNo,
-            retailerId,
-            activationDate: row.activationDate,
-            activationTime: row.activationTime,
-            sellingPrice: new Prisma.Decimal(row.sellingPrice),
-            productCode: row.productCode,
-            batchId: batch.id,
-          },
-        }),
-      );
-      continue;
-    }
-
-    const unchanged =
-      old.retailerId === retailerId &&
-      isoDate(old.activationDate) === isoDate(row.activationDate) &&
-      (old.activationTime ?? "") === (row.activationTime ?? "") &&
-      Number(old.sellingPrice) === row.sellingPrice &&
-      (old.productCode ?? "") === row.productCode;
-
-    if (unchanged) {
-      duplicateRows++;
-      continue;
-    }
-
-    updatedRows++;
-    operations.push(
-      prisma.gaActivation.update({
-        where: { simNo: row.simNo },
-        data: {
-          retailerId,
-          activationDate: row.activationDate,
-          activationTime: row.activationTime,
-          sellingPrice: new Prisma.Decimal(row.sellingPrice),
-          productCode: row.productCode,
-          batchId: batch.id,
-        },
-      }),
-    );
-  }
+  const { plan, insertedRows, updatedRows, duplicateRows, errors } = planGaWrite({
+    parsedRows,
+    retailerMap,
+    existing: existingMap,
+    batchId: batch.id,
+    preErrors,
+  });
+  const failedRows = errors.length;
 
   try {
-    if (operations.length) await prisma.$transaction(operations);
+    if (plan.rows.length)
+      await prisma.$transaction(
+        async (tx) =>
+          writeGaPlan(
+            {
+              deleteActivations: (ids) => tx.gaActivation.deleteMany({ where: { id: { in: ids } } }),
+              createActivations: (rows) => tx.gaActivation.createMany({ data: rows }),
+            },
+            plan,
+          ),
+        IMPORT_TX_OPTIONS,
+      );
     if (errors.length) {
       await prisma.importError.createMany({
         data: errors.map((error) => ({ batchId: batch.id, ...error })),
       });
     }
+
+    /*
+     * The tariff has just moved, if it moved at all — the next screen must not
+     * read a cached one from before this file landed.
+     */
+    forgetGaTariff();
 
     const successRows = insertedRows + updatedRows;
     const status = failedRows ? ImportStatus.COMPLETED_WITH_ERRORS : ImportStatus.COMPLETED;
@@ -391,6 +566,7 @@ export async function importGaActivationWorkbook(fileName: string, bytes: Buffer
       duplicateRows,
       failedRows,
       status,
+      ...gaShape(parsedRows),
     };
   } catch (error) {
     await prisma.importBatch.update({

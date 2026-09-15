@@ -122,7 +122,7 @@ export function ServerSearchBar({
             <Icon name="filter" /> Live filter
           </>
         ) : (
-          `${resultCount.toLocaleString()} ${resultNoun}${resultCount === 1 ? "" : "s"}`
+          `${resultCount.toLocaleString("en-US")} ${resultNoun}${resultCount === 1 ? "" : "s"}`
         )}
       </span>
     </div>

@@ -61,9 +61,9 @@ export default async function LowC2s({
         hrefFor: (p) => reportPageHref("/it/reports/low-c2s", { from: range.from, to: range.to, view: viewParam }, p),
       }}
       summaryItems={[
-        { label: "Total Retailers", value: total.toLocaleString() },
-        { label: "Zero C2S", value: zero.toLocaleString(), tone: "amber" },
-        { label: "Showing", value: rows.length.toLocaleString() },
+        { label: "Total Retailers", value: total.toLocaleString("en-US") },
+        { label: "Zero C2S", value: zero.toLocaleString("en-US"), tone: "amber" },
+        { label: "Showing", value: rows.length.toLocaleString("en-US") },
         { label: "Total C2S", value: money(totalC2s) },
       ]}
       emptyTitle="No retailers match this view"

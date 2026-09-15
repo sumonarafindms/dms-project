@@ -61,7 +61,9 @@ export function validatePin(value: string, { allowEmpty = false } = {}): string 
    * simply tries 123456 on every account they can name.
    */
   if (/^(\d)\1*$/.test(pin)) return "PIN cannot be the same digit repeated.";
-  const ascending = Array.from({ length: 10 }, (_, i) => String(i)).join("").repeat(2);
+  const ascending = Array.from({ length: 10 }, (_, i) => String(i))
+    .join("")
+    .repeat(2);
   const descending = [...ascending].reverse().join("");
   if (ascending.includes(pin) || descending.includes(pin)) return "PIN cannot be a run of consecutive digits.";
   return null;

@@ -326,11 +326,19 @@ describe("the credential hash stays inside the auth module", () => {
       }
     };
     for (const d of ["app", "lib"]) walk(path.join(ROOT, d));
-    // lib/auth.ts hashes and verifies; the two auth routes set one.
+    /*
+     * lib/auth.ts hashes and verifies; the auth routes set one. The list is an
+     * allow-list rather than a ban, so a NEW file touching the hash fails here
+     * and has to be argued for — which is what happened when
+     * /api/auth/change-credential was added: it reads the hash for one purpose,
+     * verifying the caller's current credential before replacing it, and it
+     * reads it with its own query rather than expecting it on the session user.
+     */
     expect(offenders.sort()).toEqual(
       [
         "app/api/admin/employees/[role]/route.ts",
         "app/api/admin/users/route.ts",
+        "app/api/auth/change-credential/route.ts",
         "app/api/auth/login/route.ts",
         "app/api/auth/setup/route.ts",
         "lib/auth.ts",

@@ -64,10 +64,10 @@ export default async function Page({
       <PageHeader title="Supervisors" subtitle="Only the supervisors assigned to your Manager account." />
       <SummaryStrip
         items={[
-          { label: "Assigned Teams", value: sups.length.toLocaleString() },
-          { label: "Active RSOs", value: rows.length.toLocaleString() },
-          { label: "Retailers", value: rows.reduce((a, r) => a + r.retailerCount, 0).toLocaleString() },
-          { label: "Showing", value: teams.length.toLocaleString() },
+          { label: "Assigned Teams", value: sups.length.toLocaleString("en-US") },
+          { label: "Active RSOs", value: rows.length.toLocaleString("en-US") },
+          { label: "Retailers", value: rows.reduce((a, r) => a + r.retailerCount, 0).toLocaleString("en-US") },
+          { label: "Showing", value: teams.length.toLocaleString("en-US") },
         ]}
       />
       <EntityGrid
@@ -76,7 +76,7 @@ export default async function Page({
           href: `/manager/supervisors/${x.id}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`,
           eyebrow: "Supervisor",
           name: x.name,
-          code: `${x.rso} RSOs · ${x.ret.toLocaleString()} retailers`,
+          code: `${x.rso} RSOs · ${x.ret.toLocaleString("en-US")} retailers`,
           percent: pct(x.a, x.t),
           metrics: [
             { label: "GA", achieved: x.ga, target: x.gaT },

@@ -112,7 +112,10 @@ const round = (n: number) => Math.round(n);
  * only for matching — nothing displayed or exported is rewritten. U+09E6…U+09EF
  * are the Bengali digits ০–৯ in order, so subtracting the base gives the value.
  */
-export const foldDigits = (s: string) => s.replace(/[\u09e6-\u09ef]/g, (d) => String(d.charCodeAt(0) - 0x09e6));
+/* Moved to lib/format.ts so a client component can use it without pulling this
+   module's database imports. Re-exported so every existing import still works. */
+export { foldDigits } from "./format";
+import { foldDigits } from "./format";
 
 export function searchReport<B extends Built<unknown>>(
   built: B,
@@ -505,7 +508,7 @@ export async function buildPerformance(range: ReportRange, kind: PerformanceKind
       id: r.id,
       name: r.name,
       code: r.code,
-      sub: kind === "supervisor" ? `${r.retailerCount.toLocaleString()} retailers` : r.supervisor,
+      sub: kind === "supervisor" ? `${r.retailerCount.toLocaleString("en-US")} retailers` : r.supervisor,
       achieved: r.ga,
       target: r.gaTarget,
       c2c: r.c2c,
@@ -598,7 +601,7 @@ export async function buildValue(
       id: r.id,
       name: r.name,
       code: r.code,
-      sub: group === "supervisor" ? `${r.retailerCount.toLocaleString()} retailers` : r.supervisor,
+      sub: group === "supervisor" ? `${r.retailerCount.toLocaleString("en-US")} retailers` : r.supervisor,
       value: metric === "c2c" ? r.c2c : r.c2s,
       target: metric === "c2c" ? r.c2cTarget : 0,
       identity: personIdentity(r, group === "supervisor" ? "supervisor" : "rso"),
@@ -877,7 +880,7 @@ export async function buildCustom(
       id: r.id,
       name: r.name,
       code: r.code,
-      sub: level === "supervisor" ? `${r.retailerCount.toLocaleString()} retailers` : r.supervisor,
+      sub: level === "supervisor" ? `${r.retailerCount.toLocaleString("en-US")} retailers` : r.supervisor,
       identity: personIdentity(r, level === "supervisor" ? "supervisor" : "rso"),
       ga: r.ga,
       gaTarget: r.gaTarget,

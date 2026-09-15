@@ -96,10 +96,10 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
 
       <SummaryStrip
         items={[
-          { label: "My RSOs", value: rows.length.toLocaleString() },
-          { label: "Retailers", value: retailers.toLocaleString() },
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "brand" },
-          { label: "Latest C2C", value: `৳${Math.round(daily.c2cTotal).toLocaleString()}` },
+          { label: "My RSOs", value: rows.length.toLocaleString("en-US") },
+          { label: "Retailers", value: retailers.toLocaleString("en-US") },
+          { label: "Latest GA", value: daily.gaTotal.toLocaleString("en-US"), tone: "brand" },
+          { label: "Latest C2C", value: `৳${Math.round(daily.c2cTotal).toLocaleString("en-US")}` },
         ]}
       />
 
@@ -223,7 +223,7 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
           href="/supervisor/retailers"
           icon={<Icon name="shop" />}
           title="Retailers"
-          sub={`${retailers.toLocaleString()} assigned outlets`}
+          sub={`${retailers.toLocaleString("en-US")} assigned outlets`}
         />
         <Tile
           admin

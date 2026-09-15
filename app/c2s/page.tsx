@@ -17,6 +17,7 @@ import {
 import { Btn } from "../components/Kit";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { apiFetch, apiUpload } from "@/lib/api-client";
+import { fmtDate, fmtDateTime } from "../../lib/format";
 
 type Row = {
   employeeId: string;
@@ -207,11 +208,11 @@ export default function C2sPage() {
           <OpsMetric label="C2S Sales" value={money(totals.amount)} note="Retail sales amount" />
           <OpsMetric
             label="Monthly Transactions"
-            value={totals.trx.toLocaleString()}
+            value={totals.trx.toLocaleString("en-US")}
             note="Exact TRANSACTION_COUNT from source"
           />
-          <OpsMetric label="LSO Target" value={totals.lsoT.toLocaleString()} note="Monthly target" />
-          <OpsMetric label="LSO Achieved" value={totals.lsoA.toLocaleString()} note="Completed outlets" />
+          <OpsMetric label="LSO Target" value={totals.lsoT.toLocaleString("en-US")} note="Monthly target" />
+          <OpsMetric label="LSO Achieved" value={totals.lsoA.toLocaleString("en-US")} note="Completed outlets" />
           <OpsMetric
             label="LSO %"
             value={totals.lsoT ? `${((totals.lsoA / totals.lsoT) * 100).toFixed(1)}%` : "0%"}
@@ -273,7 +274,7 @@ export default function C2sPage() {
 
       <section>
         <OpsSectionTitle
-          title={`Date-wise C2S · ${new Date(date + "T00:00:00").toLocaleDateString()}`}
+          title={`Date-wise C2S · ${fmtDate(`${date}T00:00:00Z`)}`}
           subtitle="Retailers with customer sales on the selected day."
           right={
             <label className="kit-field kit-inline-date">
@@ -293,7 +294,7 @@ export default function C2sPage() {
           <OpsMetric label="Selected Day Sales" value={money(dayTotal)} note="Customer sales amount" />
           <OpsMetric
             label="Retailers Selling"
-            value={dailyRows.length.toLocaleString()}
+            value={dailyRows.length.toLocaleString("en-US")}
             note="Active selling outlets"
           />
         </div>
@@ -360,10 +361,10 @@ export default function C2sPage() {
               {history.map((h) => (
                 <tr key={h.id}>
                   <td>
-                    <b>{h.businessDate ? new Date(h.businessDate).toLocaleDateString() : "-"}</b>
+                    <b>{fmtDate(h.businessDate, "-")}</b>
                   </td>
                   <td>{h.fileName}</td>
-                  <td>{new Date(h.uploadedAt).toLocaleString()}</td>
+                  <td>{fmtDateTime(h.uploadedAt)}</td>
                   <td>
                     <strong className="kit-num">
                       {h.successRows}/{h.totalRows}

@@ -241,13 +241,13 @@ export function diagnoseRetailerMapping(params: {
 
   if (!employeeCount)
     return (
-      `No RSO exists yet, so none of these ${successRows.toLocaleString()} retailers could be assigned to one. ` +
+      `No RSO exists yet, so none of these ${successRows.toLocaleString("en-US")} retailers could be assigned to one. ` +
       "Upload the RSO master first, then this file again."
     );
 
   if (!mappedRows)
     return (
-      `None of these ${successRows.toLocaleString()} retailers matched an RSO. ` +
+      `None of these ${successRows.toLocaleString("en-US")} retailers matched an RSO. ` +
       "I_TOP_UP_SR_NUMBER must hold the RSO's mobile number, not the retailer's — check that column." +
       `${example} Until it matches, every report that groups by RSO will be empty.`
     );
@@ -256,7 +256,7 @@ export function diagnoseRetailerMapping(params: {
   // saying anything is set where it stops looking like ordinary attrition.
   if (mappedRows * 2 < successRows)
     return (
-      `Only ${mappedRows.toLocaleString()} of ${successRows.toLocaleString()} retailers matched an RSO. ` +
+      `Only ${mappedRows.toLocaleString("en-US")} of ${successRows.toLocaleString("en-US")} retailers matched an RSO. ` +
       `Check I_TOP_UP_SR_NUMBER against your RSO master.${example}`
     );
 

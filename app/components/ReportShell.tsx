@@ -208,7 +208,7 @@ export function ReportSearch({ matched, total, noun }: { matched: number; total:
       />
       {searching && (
         <p className="kit-hint is-xs no-print kit-mb-12">
-          Showing {matched.toLocaleString()} of {total.toLocaleString()} {noun}
+          Showing {matched.toLocaleString("en-US")} of {total.toLocaleString("en-US")} {noun}
           {total === 1 ? "" : "s"}. <b>Export Excel still downloads the full report</b> — clear the search first if you
           want only these rows.
         </p>

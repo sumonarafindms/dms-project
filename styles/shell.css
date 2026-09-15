@@ -156,6 +156,8 @@
     flex: 1;
   }
 
+  /* Now a <button> that opens the account sheet, so it has to shed the
+     browser's own button styling and take the row's alignment. */
   .sidebar-profile {
     display: flex;
     align-items: center;
@@ -165,6 +167,30 @@
     border-radius: var(--radius-control);
     background: rgb(0 0 0 / 0.22);
     border: 1px solid rgb(255 255 255 / 0.12);
+  }
+  .sidebar-profile-btn {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.14s var(--ease-premium);
+  }
+  .sidebar-profile-btn > span:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+  }
+  .sidebar-profile-btn .profile-name,
+  .sidebar-profile-btn .profile-role {
+    display: block;
+  }
+  .sidebar-profile-btn:hover {
+    background: rgb(0 0 0 / 0.34);
+  }
+  .sidebar-profile-btn > svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: var(--text-muted-dark);
   }
   .avatar {
     display: grid;

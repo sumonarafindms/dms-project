@@ -25,10 +25,10 @@ export default async function Page() {
 
       <SummaryStrip
         items={[
-          { label: "Login Users", value: users.length.toLocaleString() },
-          { label: "Role Default", value: defaults.toLocaleString() },
-          { label: "Customized", value: custom.toLocaleString(), tone: "brand" },
-          { label: "Roles", value: new Set(users.map((x) => x.role)).size.toLocaleString() },
+          { label: "Login Users", value: users.length.toLocaleString("en-US") },
+          { label: "Role Default", value: defaults.toLocaleString("en-US") },
+          { label: "Customized", value: custom.toLocaleString("en-US"), tone: "brand" },
+          { label: "Roles", value: new Set(users.map((x) => x.role)).size.toLocaleString("en-US") },
         ]}
       />
 

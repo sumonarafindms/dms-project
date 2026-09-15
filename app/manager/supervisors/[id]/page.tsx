@@ -62,18 +62,18 @@ export default async function Page({
       </Link>
       <PageHeader
         title={sup.name}
-        subtitle={`${all.length} RSOs · ${retailers.toLocaleString()} retailers in this assigned team`}
+        subtitle={`${all.length} RSOs · ${retailers.toLocaleString("en-US")} retailers in this assigned team`}
       />
       <SummaryStrip
         items={[
-          { label: "RSOs", value: all.length.toLocaleString() },
-          { label: "Retailers", value: retailers.toLocaleString() },
+          { label: "RSOs", value: all.length.toLocaleString("en-US") },
+          { label: "Retailers", value: retailers.toLocaleString("en-US") },
           {
             label: "Recharge Progress",
             value: `${pct(team.totalRechargeAchieved, team.totalRechargeTarget)}%`,
             tone: "brand",
           },
-          { label: "Showing", value: rows.length.toLocaleString() },
+          { label: "Showing", value: rows.length.toLocaleString("en-US") },
         ]}
       />
       <SectionHead title="Team execution" sub="Every metric is the sum of this team's RSO targets." />
@@ -111,7 +111,7 @@ export default async function Page({
           href: `/manager/rsos/${r.employeeId}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`,
           eyebrow: "RSO",
           name: r.name,
-          code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount.toLocaleString()} retailers`,
+          code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount.toLocaleString("en-US")} retailers`,
           percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
           metrics: [
             { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },

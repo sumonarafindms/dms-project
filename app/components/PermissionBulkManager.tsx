@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { Btn, Card, Check, Field, SectionHead } from "./Kit";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
+import { Picker } from "./Picker";
 
 type U = { id: string; name: string; role: string; mobile: string; custom: number };
 
@@ -126,14 +127,14 @@ export default function PermissionBulkManager({ users }: { users: U[] }) {
           </div>
           <div>
             <Field label="Copy from user" hint="copies their effective setup">
-              <select className="kit-select" value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
-                <option value="">Choose source user</option>
-                {users.map((u) => (
-                  <option value={u.id} key={u.id}>
-                    {u.name} · {u.role}
-                  </option>
-                ))}
-              </select>
+              {/* A picker, not a menu: this is every login in the system. */}
+              <Picker
+                name="sourceId"
+                placeholder="Choose source user — type to search"
+                options={users.map((u) => ({ id: u.id, label: u.name, meta: u.role }))}
+                value={sourceId}
+                onChange={setSourceId}
+              />
             </Field>
             <div className="kit-form-actions">
               <Btn variant="secondary" size="sm" type="button" disabled={busy} onClick={copy}>

@@ -53,10 +53,15 @@ export default async function Performance({
     { key: "name", label: PERFORMANCE_KINDS[kind].replace(" Performance", "") },
     { key: "code", label: "Code" },
     { key: "sub", label: kind === "supervisor" ? "Coverage" : kind === "bp" ? "RSO" : "Supervisor / RSO" },
-    { key: "achieved", label: "GA", align: "right", render: (r) => r.achieved.toLocaleString() },
+    { key: "achieved", label: "GA", align: "right", render: (r) => r.achieved.toLocaleString("en-US") },
     ...(hasTargets
       ? ([
-          { key: "target", label: "Target", align: "right", render: (r: PerformanceRow) => r.target.toLocaleString() },
+          {
+            key: "target",
+            label: "Target",
+            align: "right",
+            render: (r: PerformanceRow) => r.target.toLocaleString("en-US"),
+          },
           {
             key: "pct",
             label: "Achievement %",
@@ -101,16 +106,16 @@ export default async function Performance({
         hrefFor: (p) => reportPageHref(`/it/reports/performance/${kind}`, { from: range.from, to: range.to }, p),
       }}
       summaryItems={[
-        { label: "Total GA", value: totalAchieved.toLocaleString(), tone: "brand" },
+        { label: "Total GA", value: totalAchieved.toLocaleString("en-US"), tone: "brand" },
         ...(hasTargets
           ? [
-              { label: "Total Target", value: totalTarget.toLocaleString() },
+              { label: "Total Target", value: totalTarget.toLocaleString("en-US") },
               { label: "Achievement", value: totalTarget ? `${targetPercent(totalAchieved, totalTarget)}%` : "—" },
-              { label: "Behind Target", value: behind.toLocaleString(), tone: "amber" as const },
+              { label: "Behind Target", value: behind.toLocaleString("en-US"), tone: "amber" as const },
             ]
           : [
-              { label: "Retailers", value: rows.length.toLocaleString() },
-              { label: "Zero GA", value: behind.toLocaleString(), tone: "amber" as const },
+              { label: "Retailers", value: rows.length.toLocaleString("en-US") },
+              { label: "Zero GA", value: behind.toLocaleString("en-US"), tone: "amber" as const },
             ]),
       ]}
       emptyTitle={`No ${kind} data for this period`}

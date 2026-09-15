@@ -18,6 +18,7 @@ import {
 } from "../components/OperationsPremiumUI";
 import { Btn } from "../components/Kit";
 import { apiFetch, apiUpload } from "@/lib/api-client";
+import { fmtDate, fmtDateTime } from "../../lib/format";
 
 type EmployeeRow = {
   employeeId: string;
@@ -78,9 +79,9 @@ function yesterday() {
 
 function prettyDate(value?: string | null) {
   if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString();
+  // `value` back rather than "—" when it is not a date: an unparseable string
+  // from the API is worth showing so somebody can see what arrived.
+  return Number.isNaN(new Date(value).getTime()) ? value : fmtDate(value, "-");
 }
 
 export default function GaPage() {
@@ -275,14 +276,14 @@ export default function GaPage() {
       <div className="kit-metrics-grid">
         <OpsMetric
           label="Total GA"
-          value={dayTotals.total.toLocaleString()}
-          note={`${dayTotals.ga150.toLocaleString()} + ${dayTotals.ga300.toLocaleString()} · standard GA only`}
+          value={dayTotals.total.toLocaleString("en-US")}
+          note={`${dayTotals.ga150.toLocaleString("en-US")} + ${dayTotals.ga300.toLocaleString("en-US")} · standard GA only`}
         />
-        <OpsMetric label="150" value={dayTotals.ga150.toLocaleString()} note="MMSTC · selling price 170" />
-        <OpsMetric label="300" value={dayTotals.ga300.toLocaleString()} note="MMST / MMSTs" />
+        <OpsMetric label="150" value={dayTotals.ga150.toLocaleString("en-US")} note="MMSTC · selling price 170" />
+        <OpsMetric label="300" value={dayTotals.ga300.toLocaleString("en-US")} note="MMST / MMSTs" />
         <OpsMetric
           label="Active Retailers"
-          value={activeGaRetailers.toLocaleString()}
+          value={activeGaRetailers.toLocaleString("en-US")}
           note="Retailers with standard GA"
         />
       </div>
@@ -347,10 +348,10 @@ export default function GaPage() {
         subtitle="Standard GA only. SIMWAP / EV-SWAP are excluded from every employee and target total."
       />
       <div className="kit-metrics-grid">
-        <OpsMetric label="GA Target" value={totals.target.toLocaleString()} note="Monthly target" />
-        <OpsMetric label="GA Achieved" value={totals.achieved.toLocaleString()} note="Completed GA" />
-        <OpsMetric label="150" value={totals.ga150.toLocaleString()} note="Price = 170" />
-        <OpsMetric label="300" value={totals.ga300.toLocaleString()} note="MMST / MMSTs" />
+        <OpsMetric label="GA Target" value={totals.target.toLocaleString("en-US")} note="Monthly target" />
+        <OpsMetric label="GA Achieved" value={totals.achieved.toLocaleString("en-US")} note="Completed GA" />
+        <OpsMetric label="150" value={totals.ga150.toLocaleString("en-US")} note="Price = 170" />
+        <OpsMetric label="300" value={totals.ga300.toLocaleString("en-US")} note="MMST / MMSTs" />
         <OpsMetric
           label="GA %"
           value={totals.target ? `${((totals.achieved / totals.target) * 100).toFixed(1)}%` : "0%"}
@@ -358,7 +359,7 @@ export default function GaPage() {
         />
         <OpsMetric
           label="SSO"
-          value={`${totals.ssoA.toLocaleString()} / ${totals.ssoT.toLocaleString()}`}
+          value={`${totals.ssoA.toLocaleString("en-US")} / ${totals.ssoT.toLocaleString("en-US")}`}
           note="Achieved / target"
         />
       </div>
@@ -446,7 +447,7 @@ export default function GaPage() {
                     <b>{prettyDate(h.businessDate)}</b>
                   </td>
                   <td>{h.fileName}</td>
-                  <td>{new Date(h.uploadedAt).toLocaleString()}</td>
+                  <td>{fmtDateTime(h.uploadedAt)}</td>
                   <td className="is-right">
                     <strong>
                       {h.successRows}/{h.totalRows}

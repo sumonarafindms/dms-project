@@ -55,9 +55,9 @@ export default async function OpeningBalance({
         hrefFor: (p) => reportPageHref("/it/reports/ob", { from: range.from, to: range.to }, p),
       }}
       summaryItems={[
-        { label: "Retailers", value: total.toLocaleString() },
-        { label: "With Balance", value: withBalance.toLocaleString(), tone: "brand" },
-        { label: "Not In Snapshot", value: (total - withBalance).toLocaleString(), tone: "amber" },
+        { label: "Retailers", value: total.toLocaleString("en-US") },
+        { label: "With Balance", value: withBalance.toLocaleString("en-US"), tone: "brand" },
+        { label: "Not In Snapshot", value: (total - withBalance).toLocaleString("en-US"), tone: "amber" },
         { label: "Total Balance", value: money(totalBalance) },
       ]}
       emptyTitle="No retailers found"

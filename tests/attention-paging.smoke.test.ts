@@ -79,7 +79,13 @@ describe("every attention centre is paged", () => {
      * `list.rows.length` is at most one page of them. The second would turn a
      * summary into a description of the scroll position.
      */
-    expect(VIEW).toMatch(/value: list\.scopeTotal\.toLocaleString\(\)/);
+    /*
+     * Matched without the formatting call's arguments. The first version of
+     * this line spelled `.toLocaleString()` out in full and broke in v169, when
+     * every bare locale call in the app had "en-US" pinned to it — the property
+     * it guards (which number is shown) had not changed at all.
+     */
+    expect(VIEW).toMatch(/value: list\.scopeTotal\b/);
     expect(VIEW).not.toMatch(/value: list\.rows\.length/);
   });
 

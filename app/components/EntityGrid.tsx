@@ -119,7 +119,7 @@ export function EntityGrid({
         resultNoun={noun}
       />
       <p className="kit-list-caption">
-        {shown.length.toLocaleString()} {shown.length === 1 ? noun : `${noun}s`} · sorted by{" "}
+        {shown.length.toLocaleString("en-US")} {shown.length === 1 ? noun : `${noun}s`} · sorted by{" "}
         {activeSort(sorts, sort).label}
       </p>
       {shown.length ? (

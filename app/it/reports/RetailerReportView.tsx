@@ -19,7 +19,7 @@ import { ReportTable } from "../../components/ReportTable";
 import type { Column, ReportPaging } from "../../components/ReportTable";
 import { Icon } from "../../components/icons";
 
-export const money = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+export const money = (n: number) => `৳${Math.round(n).toLocaleString("en-US")}`;
 
 export function RetailerReportView({
   title,

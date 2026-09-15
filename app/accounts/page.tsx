@@ -76,8 +76,8 @@ export default async function Accounts() {
             value: `${feeds.length - behind}/${feeds.length}`,
             tone: behind ? "amber" : "brand",
           },
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString() },
-          { label: "Active Retailers", value: retailers.toLocaleString() },
+          { label: "Latest GA", value: daily.gaTotal.toLocaleString("en-US") },
+          { label: "Active Retailers", value: retailers.toLocaleString("en-US") },
           { label: "RSO · BP", value: `${rsos} · ${bps}` },
         ]}
       />
@@ -147,7 +147,7 @@ export default async function Accounts() {
           href="/accounts/retailers"
           icon={<Icon name="search" />}
           title="Retailer Search"
-          sub={`${retailers.toLocaleString()} active outlets`}
+          sub={`${retailers.toLocaleString("en-US")} active outlets`}
         />
         <Tile
           admin

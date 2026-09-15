@@ -201,5 +201,5 @@ export function riskTone(status: RiskStatus): "good" | "mid" | "low" | "neutral"
  */
 export function perDayLabel(value: number | null) {
   if (value === null || !Number.isFinite(value)) return "—";
-  return Math.ceil(value).toLocaleString();
+  return Math.ceil(value).toLocaleString("en-US");
 }

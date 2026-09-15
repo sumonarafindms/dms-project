@@ -104,10 +104,14 @@ export default async function Page({
       <PageHeader title="Supervisor Performance" subtitle="Team-level target, achievement, RSO and BP overview." />
       <SummaryStrip
         items={[
-          { label: "Supervisors", value: data.length.toLocaleString() },
-          { label: "Total Target", value: `৳${Math.round(totalT).toLocaleString()}` },
-          { label: "Achieved", value: `৳${Math.round(totalA).toLocaleString()}`, tone: "brand" },
-          { label: "Remaining", value: `৳${Math.max(0, Math.round(totalT - totalA)).toLocaleString()}`, tone: "amber" },
+          { label: "Supervisors", value: data.length.toLocaleString("en-US") },
+          { label: "Total Target", value: `৳${Math.round(totalT).toLocaleString("en-US")}` },
+          { label: "Achieved", value: `৳${Math.round(totalA).toLocaleString("en-US")}`, tone: "brand" },
+          {
+            label: "Remaining",
+            value: `৳${Math.max(0, Math.round(totalT - totalA)).toLocaleString("en-US")}`,
+            tone: "amber",
+          },
         ]}
       />
       <SectionHead
@@ -130,7 +134,7 @@ export default async function Page({
           href: `/admin/performance/supervisors/${x.id}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`,
           eyebrow: "Supervisor",
           name: x.name,
-          code: `${x.rsos} RSOs · ${x.bps.size} BPs · ${x.retailers.toLocaleString()} retailers`,
+          code: `${x.rsos} RSOs · ${x.bps.size} BPs · ${x.retailers.toLocaleString("en-US")} retailers`,
           percent: pct(x.achieved, x.target),
           metrics: [
             { label: "GA", achieved: x.gaA, target: x.gaT },

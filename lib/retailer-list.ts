@@ -164,7 +164,7 @@ export function pageLabel(p: RetailerListPage, noun = "retailer") {
   if (!p.total) return `No ${noun}s`;
   const first = (p.page - 1) * p.pageSize + 1;
   const last = Math.min(p.page * p.pageSize, p.total);
-  return `${first.toLocaleString()}–${last.toLocaleString()} of ${p.total.toLocaleString()} ${noun}${
+  return `${first.toLocaleString("en-US")}–${last.toLocaleString("en-US")} of ${p.total.toLocaleString("en-US")} ${noun}${
     p.total === 1 ? "" : "s"
   }`;
 }

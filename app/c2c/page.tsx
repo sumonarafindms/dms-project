@@ -18,6 +18,7 @@ import {
 import { Btn } from "../components/Kit";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { apiFetch, apiUpload } from "@/lib/api-client";
+import { fmtDate, fmtDateTime } from "../../lib/format";
 
 type Row = {
   employeeId: string;
@@ -226,7 +227,7 @@ export default function C2cPage() {
           <OpsMetric label="Total Recharge" value={money(totals.trA)} note="C2C + SC" />
           <OpsMetric
             label="Monthly Transactions"
-            value={totals.trx.toLocaleString()}
+            value={totals.trx.toLocaleString("en-US")}
             note="Exact TRANSACTION_COUNT from source"
           />
         </div>
@@ -295,7 +296,7 @@ export default function C2cPage() {
 
       <section>
         <OpsSectionTitle
-          title={`Date-wise C2C · ${new Date(date + "T00:00:00").toLocaleDateString()}`}
+          title={`Date-wise C2C · ${fmtDate(`${date}T00:00:00Z`)}`}
           subtitle="Retailers that received balance on the selected day."
           right={
             <label className="kit-field kit-inline-date">
@@ -315,7 +316,7 @@ export default function C2cPage() {
           <OpsMetric label="Selected Day Amount" value={money(dayTotal)} note="Total C2C distributed" />
           <OpsMetric
             label="Retailers Receiving Balance"
-            value={dailyRows.length.toLocaleString()}
+            value={dailyRows.length.toLocaleString("en-US")}
             note="Active recipients"
           />
         </div>
@@ -382,10 +383,10 @@ export default function C2cPage() {
               {history.map((h) => (
                 <tr key={h.id}>
                   <td>
-                    <b>{h.businessDate ? new Date(h.businessDate).toLocaleDateString() : "-"}</b>
+                    <b>{fmtDate(h.businessDate, "-")}</b>
                   </td>
                   <td>{h.fileName}</td>
-                  <td>{new Date(h.uploadedAt).toLocaleString()}</td>
+                  <td>{fmtDateTime(h.uploadedAt)}</td>
                   <td>
                     <strong className="kit-num">
                       {h.successRows}/{h.totalRows}

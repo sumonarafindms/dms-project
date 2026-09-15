@@ -28,6 +28,8 @@ import {
   SummaryStrip,
 } from "../../components/Kit";
 import { apiSend } from "@/lib/api-client";
+import { Picker } from "../../components/Picker";
+import { fmtDateTime } from "../../../lib/format";
 
 type Opt = { id: string; name: string; meta?: string };
 type U = {
@@ -164,15 +166,18 @@ export default function UserManager({
     if (!spec) return null;
     return (
       <Field label={spec.label} wide>
-        <select className="kit-select" name={spec.name} required defaultValue={current ?? ""} key={`${spec.name}-${r}`}>
-          <option value="">{spec.placeholder}</option>
-          {spec.options.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.name}
-              {x.meta ? ` · ${x.meta}` : ""}
-            </option>
-          ))}
-        </select>
+        {/* A picker, not a menu: these are the same hundreds-long lists of RSOs,
+            supervisors and BP retailers that the Add BP form had to be scrolled
+            through. `key` remounts it when the role changes so the previous
+            role's selection cannot survive into a field it does not belong to. */}
+        <Picker
+          key={`${spec.name}-${r}`}
+          name={spec.name}
+          required
+          placeholder={`${spec.placeholder} — type to search`}
+          options={spec.options.map((x) => ({ id: x.id, label: x.name, meta: x.meta }))}
+          defaultValue={current ?? ""}
+        />
       </Field>
     );
   };
@@ -186,10 +191,10 @@ export default function UserManager({
 
       <SummaryStrip
         items={[
-          { label: "Total Accounts", value: users.length.toLocaleString() },
-          { label: "Active", value: activeCount.toLocaleString(), tone: "brand" },
-          { label: "Disabled", value: (users.length - activeCount).toLocaleString(), tone: "amber" },
-          { label: "Locked out", value: lockedCount.toLocaleString(), tone: lockedCount ? "amber" : undefined },
+          { label: "Total Accounts", value: users.length.toLocaleString("en-US") },
+          { label: "Active", value: activeCount.toLocaleString("en-US"), tone: "brand" },
+          { label: "Disabled", value: (users.length - activeCount).toLocaleString("en-US"), tone: "amber" },
+          { label: "Locked out", value: lockedCount.toLocaleString("en-US"), tone: lockedCount ? "amber" : undefined },
         ]}
       />
 
@@ -270,7 +275,7 @@ export default function UserManager({
                 sub={`${u.role} · ${u.mobileNumber || "Admin login"}`}
                 detail={
                   u.lockedAt
-                    ? `Locked after ${u.failedLoginCount} failed sign-ins · ${new Date(u.lockedAt).toLocaleString()}`
+                    ? `Locked after ${u.failedLoginCount} failed sign-ins · ${fmtDateTime(u.lockedAt)}`
                     : u.link || "System account"
                 }
                 after={

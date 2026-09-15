@@ -64,9 +64,9 @@ export default async function LsoPending({
         hrefFor: (p) => reportPageHref("/it/reports/lso", { from: range.from, to: range.to }, p),
       }}
       summaryItems={[
-        { label: "Total Retailers", value: total.toLocaleString() },
-        { label: "LSO Complete", value: complete.toLocaleString(), tone: "brand" },
-        { label: "LSO Pending", value: rows.length.toLocaleString(), tone: "amber" },
+        { label: "Total Retailers", value: total.toLocaleString("en-US") },
+        { label: "LSO Complete", value: complete.toLocaleString("en-US"), tone: "brand" },
+        { label: "LSO Pending", value: rows.length.toLocaleString("en-US"), tone: "amber" },
         { label: "Completion", value: total ? `${Math.round((complete / total) * 100)}%` : "—" },
       ]}
       emptyTitle="All LSO complete"

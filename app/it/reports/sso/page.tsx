@@ -55,9 +55,9 @@ export default async function SsoPending({
         hrefFor: (p) => reportPageHref("/it/reports/sso", { from: range.from, to: range.to }, p),
       }}
       summaryItems={[
-        { label: "SIM Seller Outlets", value: sellers.toLocaleString() },
-        { label: "SSO Complete", value: complete.toLocaleString(), tone: "brand" },
-        { label: "SSO Pending", value: rows.length.toLocaleString(), tone: "amber" },
+        { label: "SIM Seller Outlets", value: sellers.toLocaleString("en-US") },
+        { label: "SSO Complete", value: complete.toLocaleString("en-US"), tone: "brand" },
+        { label: "SSO Pending", value: rows.length.toLocaleString("en-US"), tone: "amber" },
         { label: "Completion", value: sellers ? `${Math.round((complete / sellers) * 100)}%` : "—" },
       ]}
       emptyTitle="All SSO complete"

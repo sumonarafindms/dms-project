@@ -15,6 +15,7 @@ import {
   withSimSwap,
   withStandardGa,
 } from "@/lib/business-rules";
+import { currentGa170Tariff } from "@/lib/ga-tariff";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,9 @@ export async function GET(req: NextRequest) {
     const dailyStart = requestedDate ? dateOnly(requestedDate) : null;
     const dailyEnd = dailyStart ? new Date(dailyStart.getTime() + 24 * 60 * 60 * 1000) : null;
 
+    // The 170/300 split needs the current tariff; Total GA and the swap count do
+    // not. See lib/ga-tariff.ts for why it is read rather than declared.
+    const tariff = await currentGa170Tariff();
     const [
       employees,
       retailers,
@@ -77,12 +81,12 @@ export async function GET(req: NextRequest) {
       }),
       prisma.gaActivation.groupBy({
         by: ["retailerId"],
-        where: withGa170({ activationDate: { gte: fromDate, lt: rangeEnd } }),
+        where: withGa170(tariff, { activationDate: { gte: fromDate, lt: rangeEnd } }),
         _count: { _all: true },
       }),
       prisma.gaActivation.groupBy({
         by: ["retailerId"],
-        where: withGa300({ activationDate: { gte: fromDate, lt: rangeEnd } }),
+        where: withGa300(tariff, { activationDate: { gte: fromDate, lt: rangeEnd } }),
         _count: { _all: true },
       }),
       prisma.gaActivation.groupBy({

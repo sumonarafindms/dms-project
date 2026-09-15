@@ -85,10 +85,10 @@ export default async function Page() {
 
       <SummaryStrip
         items={[
-          { label: "Field Force", value: (supervisors + rsos).toLocaleString() },
-          { label: "Active BPs", value: bps.toLocaleString() },
-          { label: "Login Accounts", value: logins.toLocaleString(), tone: "brand" },
-          { label: "IT Users", value: itUsers.toLocaleString() },
+          { label: "Field Force", value: (supervisors + rsos).toLocaleString("en-US") },
+          { label: "Active BPs", value: bps.toLocaleString("en-US") },
+          { label: "Login Accounts", value: logins.toLocaleString("en-US"), tone: "brand" },
+          { label: "IT Users", value: itUsers.toLocaleString("en-US") },
         ]}
       />
 
@@ -102,7 +102,7 @@ export default async function Page() {
               icon={<Icon name={r.icon} />}
               title={r.label}
               sub={r.sub}
-              value={r.count.toLocaleString()}
+              value={r.count.toLocaleString("en-US")}
             />
           ))}
         </div>

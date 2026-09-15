@@ -95,9 +95,9 @@ export default function Page() {
 
       <SummaryStrip
         items={[
-          { label: "Total Retailers", value: summary.retailers.toLocaleString() },
-          { label: "Mapped", value: summary.mappedRetailers.toLocaleString(), tone: "brand" },
-          { label: "Unassigned", value: summary.unassignedRetailers.toLocaleString(), tone: "amber" },
+          { label: "Total Retailers", value: summary.retailers.toLocaleString("en-US") },
+          { label: "Mapped", value: summary.mappedRetailers.toLocaleString("en-US"), tone: "brand" },
+          { label: "Unassigned", value: summary.unassignedRetailers.toLocaleString("en-US"), tone: "amber" },
         ]}
       />
 
@@ -189,7 +189,7 @@ function Result({ label, value, warn }: { label: string; value?: number; warn?: 
   return (
     <div className={warn && n > 0 ? "is-warn" : undefined}>
       <span>{label}</span>
-      <strong>{n.toLocaleString()}</strong>
+      <strong>{n.toLocaleString("en-US")}</strong>
     </div>
   );
 }

@@ -121,10 +121,10 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
 
       <SummaryStrip
         items={[
-          { label: "Assigned Teams", value: supervisors.length.toLocaleString() },
-          { label: "RSOs", value: rows.length.toLocaleString() },
-          { label: "Retailers", value: retailers.toLocaleString() },
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString(), tone: "brand" },
+          { label: "Assigned Teams", value: supervisors.length.toLocaleString("en-US") },
+          { label: "RSOs", value: rows.length.toLocaleString("en-US") },
+          { label: "Retailers", value: retailers.toLocaleString("en-US") },
+          { label: "Latest GA", value: daily.gaTotal.toLocaleString("en-US"), tone: "brand" },
         ]}
       />
 
@@ -200,7 +200,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
                 href={`/manager/supervisors/${x.id}?month=${monthKey}`}
                 eyebrow="Supervisor"
                 name={x.name}
-                code={`${x.rsos} RSOs · ${x.retailers.toLocaleString()} retailers`}
+                code={`${x.rsos} RSOs · ${x.retailers.toLocaleString("en-US")} retailers`}
                 percent={progress}
                 metrics={[
                   { label: "GA", achieved: x.ga, target: x.gaTarget },

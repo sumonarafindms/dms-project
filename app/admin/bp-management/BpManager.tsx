@@ -18,6 +18,7 @@ import { Btn, Card, EmptyState, Field, NumberInput, Row, SectionHead, Table } fr
 import type { Column } from "../../components/Kit";
 import { dhakaTodayYmd } from "../../../lib/business-time";
 import { apiSend } from "@/lib/api-client";
+import { Picker } from "../../components/Picker";
 
 type Emp = { id: string; name: string; rsoMsisdn: string; supervisor: string };
 type Retailer = {
@@ -43,9 +44,6 @@ type Current = {
 };
 type Hist = { id: string; employee: string; code: string; name: string; startDate: string; endDate: string };
 
-/** The picker never renders more than this many options at once. */
-const MAX_OPTIONS = 80;
-
 export default function BpManager({
   employees,
   retailers,
@@ -59,7 +57,6 @@ export default function BpManager({
 }) {
   const router = useRouter();
   const [employeeId, setEmployeeId] = useState("");
-  const [q, setQ] = useState("");
   const [retailerId, setRetailerId] = useState("");
   const [message, setMessage] = useState("");
   const [ok, setOk] = useState(false);
@@ -67,15 +64,11 @@ export default function BpManager({
   const today = dhakaTodayYmd();
 
   const selectedEmployee = employees.find((e) => e.id === employeeId);
-  const matches = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return retailers.filter(
-      (r) =>
-        (!employeeId || r.employeeId === employeeId) &&
-        (!s || `${r.code} ${r.name} ${r.employee}`.toLowerCase().includes(s)),
-    );
-  }, [q, employeeId, retailers]);
-  const options = matches.slice(0, MAX_OPTIONS);
+  /* Only this RSO's codes. The searching itself is the picker's job now. */
+  const mine = useMemo(
+    () => retailers.filter((r) => !employeeId || r.employeeId === employeeId),
+    [employeeId, retailers],
+  );
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -101,7 +94,6 @@ export default function BpManager({
         : `BP assigned to ${d.code}. This RSO's other BP assignments are unchanged.`,
     );
     setRetailerId("");
-    setQ("");
     router.refresh();
   }
 
@@ -145,24 +137,17 @@ export default function BpManager({
         <Card className="kit-mb-20" padded="lg">
           <div className="kit-form-grid">
             <Field label="RSO / Employee">
-              <select
-                className="kit-select"
+              <Picker
                 name="employeeId"
                 required
+                placeholder="Search RSO by name, wallet or supervisor"
+                options={employees.map((e) => ({ id: e.id, label: e.name, meta: `${e.rsoMsisdn} · ${e.supervisor}` }))}
                 value={employeeId}
-                onChange={(e) => {
-                  setEmployeeId(e.target.value);
+                onChange={(id) => {
+                  setEmployeeId(id);
                   setRetailerId("");
-                  setQ("");
                 }}
-              >
-                <option value="">Select RSO</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name} · {e.rsoMsisdn} · {e.supervisor}
-                  </option>
-                ))}
-              </select>
+              />
             </Field>
             <Field label="Effective from">
               <input className="kit-input" type="date" name="startDate" defaultValue={today} required />
@@ -170,43 +155,24 @@ export default function BpManager({
             <Field label="BP GA target">
               <NumberInput min="0" name="gaTarget" defaultValue="0" />
             </Field>
-            {/* Search and select are two controls, so they are two fields: a
-                <label> points at its first control only, and the old single
-                label left the select itself unnamed for a screen reader. */}
-            <Field label="Find retailer">
-              <input
-                className="kit-input"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
+            {/* One control, not two. This screen used to carry a "Find
+                retailer" text box beside the select because a native menu of
+                this RSO's codes could not be searched; the picker does both,
+                so the pair is gone and the same component now serves every
+                long list in the app. */}
+            <Field label="Retailer code" hint={employeeId ? `${mine.length} under this RSO` : undefined}>
+              <Picker
+                name="retailerId"
+                required
                 disabled={!employeeId}
                 placeholder={
                   selectedEmployee ? `Search ${selectedEmployee.name}'s retailer code or name` : "Select an RSO first"
                 }
-              />
-            </Field>
-            <Field
-              label="Retailer code"
-              hint={
-                matches.length > MAX_OPTIONS
-                  ? `first ${MAX_OPTIONS} of ${matches.length} — narrow the search`
-                  : undefined
-              }
-            >
-              <select
-                className="kit-select"
-                name="retailerId"
-                required
+                emptyText="No retailer under this RSO matches"
+                options={mine.map((r) => ({ id: r.id, label: r.code, meta: r.name || "Unnamed retailer" }))}
                 value={retailerId}
-                onChange={(e) => setRetailerId(e.target.value)}
-                disabled={!employeeId}
-              >
-                <option value="">Select retailer</option>
-                {options.map((r) => (
-                  <option value={r.id} key={r.id}>
-                    {r.code} · {r.name || "Unnamed retailer"}
-                  </option>
-                ))}
-              </select>
+                onChange={setRetailerId}
+              />
             </Field>
           </div>
           <SaveNotice message={message} ok={ok} />
@@ -230,7 +196,7 @@ export default function BpManager({
                 title={`${x.code} · ${x.name || "Unnamed retailer"}`}
                 sub={`${x.employee} · ${x.supervisor} · Since ${x.startDate}`}
                 detail={x.login ? `Login: ${x.login}${x.mobile ? ` · ${x.mobile}` : ""}` : "No BP login"}
-                value={x.gaTarget ? x.gaTarget.toLocaleString() : "—"}
+                value={x.gaTarget ? x.gaTarget.toLocaleString("en-US") : "—"}
                 valueSub="GA target"
                 after={
                   <div className="kit-row-actions">

@@ -153,10 +153,10 @@ export function RoleAttentionView({
       <PageHeader title={title} subtitle={subtitle} />
       <SummaryStrip
         items={[
-          { label: "High Priority", value: high.toLocaleString(), tone: "amber" },
-          { label: "SSO Pending", value: sso.toLocaleString() },
-          { label: "LSO Pending", value: lso.toLocaleString() },
-          { label: "Flagged", value: list.scopeTotal.toLocaleString() },
+          { label: "High Priority", value: high.toLocaleString("en-US"), tone: "amber" },
+          { label: "SSO Pending", value: sso.toLocaleString("en-US") },
+          { label: "LSO Pending", value: lso.toLocaleString("en-US") },
+          { label: "Flagged", value: list.scopeTotal.toLocaleString("en-US") },
         ]}
       />
 

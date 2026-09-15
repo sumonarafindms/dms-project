@@ -604,3 +604,36 @@
 - PWA theme colour follows the topbar again, now that the topbar is the brand; icon regenerated.
 - Fixed white text on `--grad-brand`: the sidebar's brand letter, the auth logo tile and every avatar's initials sat on a gradient whose amber end takes white at 1.95:1. New `--text-on-brand`, which clears AA at both ends of the ramp, plus a guard — axe cannot measure contrast against a gradient, so this class of bug needs a source check rather than a browser sweep.
 - `premium.css` was re-declaring the sidebar ground and silently winning over `shell.css`; both now name one token.
+
+## v169 - GA import writes in batches, and one locale for every figure
+- The GA importer issued one statement per activation row inside a single transaction: 9,000 rows measured 8,974 ms against a local Postgres, and every one of those is a network round trip on the hosted database, under a 60-second route cap. Now `1 + ceil(rows / 1000)` statements — 9,000 rows in 1,414 ms.
+- A corrected row is rewritten rather than updated, carrying its original `id` and `createdAt`, so the batching changes nothing a reader can see. All deletes run before any insert, because a rewritten row re-uses its own unique `SIM_NO`.
+- Split the decision out as a pure `planGaWrite()`, matching `planMonthReplacement()`, so new/correction/duplicate/unchanged are tested by reading the plan.
+- The v163 batching guard listed three importers by name and GA was not among them — the exact "forgot the third importer" mistake its own comment warned about. The list is now read from disk, with exemptions that must be named and justified in code.
+- No schema, route, auth, permission or business-rule change: the rows written are the same rows.
+- Pinned the display locale on all 242 number call sites and routed the 13 date/time ones through a new `lib/format.ts`. A bare `toLocaleString()` uses the runtime's locale, so a Bengali browser rendered ২,১৯০ where the server sent 2,190 — a React hydration mismatch on every load for roughly nine in ten of this app's users, confirmed on `/it/reports/sso` at 3 failures out of 3 under `bn-BD` and 0 out of 30 under `en-US`.
+- Dates also pin the time zone: `toLocaleString("en-US")` on a Date still reads the runtime's zone, which is UTC on the server and Dhaka in the browser.
+
+## v170 - A select you can type into
+- Add BP's RSO and Retailer Code dropdowns had no search: hundreds of RSOs and ~2,190 retailers had to be scrolled on a phone. Both are now searchable pickers.
+- The search lives in the control, not the screen: a new `app/components/Picker.tsx` replaces every long `<select>` in the app — Add BP, the RSO supervisor field, BP Management (whose separate "Find retailer" box is gone, one control now instead of two), the Authorized Users link fields and the permissions "copy from user" menu.
+- Matches on name, code, wallet and supervisor, takes the words in any order, and folds Bengali digits so `০১৯৩৫৫৯৯৬২০` finds the wallet stored as `01935599620`.
+- RSO options now show the wallet number as well as the supervisor.
+- A `<select>` may no longer render a list built from data — guarded, with a per-file allow-list for the short fixed enumerations.
+- Keyboard and screen-reader support: arrow keys, Enter, Escape, `role="combobox"`/`listbox`, and a hidden input so every form still submits exactly the field it did before.
+
+## v171 - Change your own PIN, from the profile icon
+- There was no way to change your own PIN, on any role. Someone who thought their PIN had been read over their shoulder had to find an administrator. On a phone there was no way to sign out either: the sidebar carrying that button is `display: none` below 900px, and the top-bar avatar linked to the page the person was already on.
+- The avatar now opens an account sheet — who you are, **Change PIN**, **Sign out** — and the same sheet opens from the desktop sidebar's profile block. One component, so every role gets it and the two cannot drift.
+- `POST /api/auth/change-credential`: any signed-in role, current credential required, the same PIN rules the rest of the app applies, rate limited before any work, audited without ever recording a credential. Every other session is revoked and this device is re-issued one, so changing a PIN because somebody else may know it actually ends their session.
+- A wrong current PIN does **not** count toward the five-strike lock — that lock has no timer and needs an administrator, and the caller already holds a valid session.
+- The "current PIN" box carries no format rules, deliberately: v155's rule is that existing credentials keep working, so constraining it to six digits would stop anyone with a legacy PIN from ever changing it. Found exactly that way in the browser.
+- Fixed a stacking bug the new sheet exposed: a dialog rendered inside the sticky mobile top bar was scoped to that header's stacking context and painted *under* the bottom navigation, so its buttons could be seen and not tapped. The account dialog portals to `<body>`.
+
+## v172 - GA product codes are worked out, not looked up
+- The owner's real September file (2,527 rows) had 579 rows the app classified as "unknown" and silently dropped from every total: `SIMSWAP` (568), `ESIMSWAP` (2), `MMSTSC` (8) and `MMST1911` (1). `SIMSWAP` differs from the listed `SIMWAP` by one letter, so the SIM SWAP figure on screen read 9 instead of 579.
+- A product code is now classified by what it says, not by a list: a code containing SWAP (or ending in the carrier's older WAP) is a replacement, and in an Activation Details Report everything else is a normal SIM. `UNKNOWN` is unreachable for any row that has a code.
+- The 170/300 tariff is learned from the data — whatever `MMSTC` rows cost is the 170 tier — so moving a price needs no code change. A code the app already knows is still never re-decided by its price (v157).
+- Total GA needs no price at all, so `withStandardGa` stays synchronous in all thirty of its call sites; only the tier breakdown takes a tariff, on four screens.
+- Every import now reports the shape of the file it read — tier counts, the tariff it learned, and every unfamiliar code with its row count — so a new code announces itself instead of vanishing.
+- For the owner's file: **1,948 normal SIM** (1,433 at the 170 tier, 515 at the 300 tier) and **579 swaps**, with nothing left over. Previously 1,939 and 9.

@@ -31,20 +31,20 @@ export default async function Page({
       />
       <SummaryStrip
         items={[
-          { label: "Retailers", value: filtered.length.toLocaleString() },
+          { label: "Retailers", value: filtered.length.toLocaleString("en-US") },
           {
             label: "Needs Attention",
-            value: filtered.filter((x) => x.priority > 0).length.toLocaleString(),
+            value: filtered.filter((x) => x.priority > 0).length.toLocaleString("en-US"),
             tone: "amber",
           },
           {
             label: "SSO Ready",
-            value: filtered.filter((x) => x.ssoComplete).length.toLocaleString(),
+            value: filtered.filter((x) => x.ssoComplete).length.toLocaleString("en-US"),
             tone: "brand",
           },
           {
             label: "LSO Ready",
-            value: filtered.filter((x) => x.lsoComplete).length.toLocaleString(),
+            value: filtered.filter((x) => x.lsoComplete).length.toLocaleString("en-US"),
             tone: "brand",
           },
         ]}

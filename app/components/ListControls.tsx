@@ -88,7 +88,7 @@ export function ListControls({
         <Icon name="filter" />
         {resultCount === undefined
           ? "Instant filter"
-          : `${resultCount.toLocaleString()} ${resultCount === 1 ? resultNoun : `${resultNoun}s`}`}
+          : `${resultCount.toLocaleString("en-US")} ${resultCount === 1 ? resultNoun : `${resultNoun}s`}`}
       </span>
     </div>
   );

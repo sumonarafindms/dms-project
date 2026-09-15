@@ -16,6 +16,7 @@ import { monthBounds } from "../../../lib/month";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { parseYmd, monthStartsInRange } from "../../../lib/date-range";
 import { classifyGaActivation, withGa170, withGa300, withSimSwap, withStandardGa } from "../../../lib/business-rules";
+import { currentGa170Tariff } from "../../../lib/ga-tariff";
 import { targetPercent } from "../../../lib/achievement";
 import { SimActivationList } from "../../components/SimActivationList";
 import { Card, EmptyState, MetricBar, PageHeader, SummaryStrip } from "../../components/Kit";
@@ -82,6 +83,7 @@ export default async function Page({
   // the BP types, and tells them when the 300-row window is the limit.
   const where = rangeWhere;
 
+  const tariff = await currentGa170Tariff();
   const [rows, total, ga150, ga300, simSwap] = await Promise.all([
     prisma.gaActivation.findMany({
       where,
@@ -90,8 +92,8 @@ export default async function Page({
       select: { simNo: true, sellingPrice: true, productCode: true, activationDate: true, activationTime: true },
     }),
     prisma.gaActivation.count({ where: withStandardGa(rangeWhere) }),
-    prisma.gaActivation.count({ where: withGa170(rangeWhere) }),
-    prisma.gaActivation.count({ where: withGa300(rangeWhere) }),
+    prisma.gaActivation.count({ where: withGa170(tariff, rangeWhere) }),
+    prisma.gaActivation.count({ where: withGa300(tariff, rangeWhere) }),
     prisma.gaActivation.count({ where: withSimSwap(rangeWhere) }),
   ]);
 
@@ -110,12 +112,12 @@ export default async function Page({
 
       <SummaryStrip
         items={[
-          { label: "Total GA", value: total.toLocaleString(), tone: "brand" },
-          { label: "170 GA", value: ga150.toLocaleString() },
-          { label: "300 GA", value: ga300.toLocaleString() },
+          { label: "Total GA", value: total.toLocaleString("en-US"), tone: "brand" },
+          { label: "170 GA", value: ga150.toLocaleString("en-US") },
+          { label: "300 GA", value: ga300.toLocaleString("en-US") },
           // Shown, but deliberately outside the GA total — a swap replaces a
           // SIM, it does not add a subscriber.
-          { label: "SIM Swap", value: simSwap.toLocaleString(), tone: "amber" },
+          { label: "SIM Swap", value: simSwap.toLocaleString("en-US"), tone: "amber" },
         ]}
       />
 
@@ -123,7 +125,7 @@ export default async function Page({
         <Card className="kit-mb-16" padded>
           <MetricBar label="Target progress" achieved={total} target={target} />
           <p className="kit-hint kit-mt-8">
-            {Math.max(0, target - total).toLocaleString()} remaining · {targetPercent(total, target)}% achieved
+            {Math.max(0, target - total).toLocaleString("en-US")} remaining · {targetPercent(total, target)}% achieved
           </p>
         </Card>
       )}

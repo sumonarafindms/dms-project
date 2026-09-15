@@ -256,7 +256,7 @@ export default function TargetsPage() {
         : "warn"
     : null;
 
-  const figure = (n: number) => <strong>{Number(n).toLocaleString()}</strong>;
+  const figure = (n: number) => <strong>{Number(n).toLocaleString("en-US")}</strong>;
 
   /**
    * A number field inside the dialog.
@@ -288,12 +288,12 @@ export default function TargetsPage() {
 
       <SummaryStrip
         items={[
-          { label: "GA", value: totals.ga.toLocaleString() },
-          { label: "C2C", value: totals.c2c.toLocaleString() },
-          { label: "SC", value: totals.sc.toLocaleString() },
-          { label: "Recharge", value: totals.recharge.toLocaleString(), tone: "brand" },
-          { label: "SSO", value: totals.sso.toLocaleString() },
-          { label: "LSO", value: totals.lso.toLocaleString() },
+          { label: "GA", value: totals.ga.toLocaleString("en-US") },
+          { label: "C2C", value: totals.c2c.toLocaleString("en-US") },
+          { label: "SC", value: totals.sc.toLocaleString("en-US") },
+          { label: "Recharge", value: totals.recharge.toLocaleString("en-US"), tone: "brand" },
+          { label: "SSO", value: totals.sso.toLocaleString("en-US") },
+          { label: "LSO", value: totals.lso.toLocaleString("en-US") },
         ]}
       />
 
@@ -340,15 +340,15 @@ export default function TargetsPage() {
                 <div className="kit-result-grid kit-mt-12">
                   <div>
                     <span>Total rows</span>
-                    <strong>{Number(uploadResult.totalRows || 0).toLocaleString()}</strong>
+                    <strong>{Number(uploadResult.totalRows || 0).toLocaleString("en-US")}</strong>
                   </div>
                   <div>
                     <span>Updated</span>
-                    <strong>{Number(uploadResult.updated || 0).toLocaleString()}</strong>
+                    <strong>{Number(uploadResult.updated || 0).toLocaleString("en-US")}</strong>
                   </div>
                   <div className={uploadResult.failed ? "is-warn" : undefined}>
                     <span>Failed</span>
-                    <strong>{Number(uploadResult.failed || 0).toLocaleString()}</strong>
+                    <strong>{Number(uploadResult.failed || 0).toLocaleString("en-US")}</strong>
                   </div>
                 </div>
                 {uploadResult.errors?.length ? (

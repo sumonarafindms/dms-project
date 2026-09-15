@@ -44,12 +44,12 @@ export default async function Page() {
 
       <SummaryStrip
         items={[
-          { label: "Active RSOs", value: rsos.length.toLocaleString() },
-          { label: "BP Assignments", value: bps.length.toLocaleString() },
-          { label: "Supervisors", value: supervisors.toLocaleString() },
+          { label: "Active RSOs", value: rsos.length.toLocaleString("en-US") },
+          { label: "BP Assignments", value: bps.length.toLocaleString("en-US") },
+          { label: "Supervisors", value: supervisors.toLocaleString("en-US") },
           {
             label: "Owned Retailers",
-            value: rsos.reduce((n, x) => n + x._count.retailers, 0).toLocaleString(),
+            value: rsos.reduce((n, x) => n + x._count.retailers, 0).toLocaleString("en-US"),
             tone: "brand",
           },
         ]}

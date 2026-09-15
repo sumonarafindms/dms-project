@@ -58,7 +58,7 @@ export default async function LsoWorklist({
     const amountGap = lsoAmountRemaining(r.c2s);
     const trxGap = lsoTransactionsRemaining(r.c2sTransactions);
     const parts: string[] = [];
-    if (amountGap > 0) parts.push(`৳${Math.ceil(amountGap).toLocaleString()}`);
+    if (amountGap > 0) parts.push(`৳${Math.ceil(amountGap).toLocaleString("en-US")}`);
     if (trxGap > 0) parts.push(`${trxGap} trx`);
     return {
       id: r.id,

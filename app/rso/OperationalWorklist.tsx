@@ -128,9 +128,9 @@ export function OperationalWorklist({
 
       <SummaryStrip
         items={[
-          { label: "Total Retailers", value: total.toLocaleString() },
-          { label: `${title} Complete`, value: complete.toLocaleString(), tone: "brand" },
-          { label: `${title} Pending`, value: (total - complete).toLocaleString(), tone: "amber" },
+          { label: "Total Retailers", value: total.toLocaleString("en-US") },
+          { label: `${title} Complete`, value: complete.toLocaleString("en-US"), tone: "brand" },
+          { label: `${title} Pending`, value: (total - complete).toLocaleString("en-US"), tone: "amber" },
           { label: "Completion", value: total ? `${Math.round((complete / total) * 100)}%` : "—" },
         ]}
       />

@@ -19,7 +19,7 @@ import { Badge, Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } f
     number or string, so one coercion covers all three. */
 type Numeric = number | string | { toString(): string };
 const num = (v: Numeric | null | undefined) => Number(v?.toString() ?? 0);
-const money = (n: Numeric) => `৳${Math.round(num(n)).toLocaleString()}`;
+const money = (n: Numeric) => `৳${Math.round(num(n)).toLocaleString("en-US")}`;
 
 type GaRow = {
   simNo: string;

@@ -93,7 +93,7 @@ export default async function Page({
           // Before v136 this was only half true: `rows` still had the BP SIMs
           // inside "RSO GA", so a BP was counted here twice. It is not now.
           { label: "BP GA", value: `${bpGaA} / ${bpGaT}` },
-          { label: "BPs", value: bpStats.length.toLocaleString() },
+          { label: "BPs", value: bpStats.length.toLocaleString("en-US") },
         ]}
       />
       <SectionHead title="Team execution" sub="Every metric is the sum of this team's RSO targets." />
@@ -114,7 +114,7 @@ export default async function Page({
           href: `/admin/rsos/${r.employeeId}?${range}`,
           eyebrow: "RSO",
           name: r.name,
-          code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount.toLocaleString()} retailers`,
+          code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount.toLocaleString("en-US")} retailers`,
           percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
           metrics: [
             { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },

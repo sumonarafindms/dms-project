@@ -38,10 +38,10 @@ export default async function Page({
       />
       <SummaryStrip
         items={[
-          { label: "RSOs", value: rows.length.toLocaleString() },
-          { label: "Retailers", value: company.retailerCount.toLocaleString() },
-          { label: "Achieved", value: `৳${Math.round(a).toLocaleString()}`, tone: "brand" },
-          { label: "Remaining", value: `৳${Math.max(0, Math.round(t - a)).toLocaleString()}`, tone: "amber" },
+          { label: "RSOs", value: rows.length.toLocaleString("en-US") },
+          { label: "Retailers", value: company.retailerCount.toLocaleString("en-US") },
+          { label: "Achieved", value: `৳${Math.round(a).toLocaleString("en-US")}`, tone: "brand" },
+          { label: "Remaining", value: `৳${Math.max(0, Math.round(t - a)).toLocaleString("en-US")}`, tone: "amber" },
         ]}
       />
       <EntityGrid

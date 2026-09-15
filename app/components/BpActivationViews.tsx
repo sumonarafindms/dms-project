@@ -117,12 +117,12 @@ export async function BpActivationDetailView({
 
       <SummaryStrip
         items={[
-          { label: "Total GA", value: d.total.toLocaleString(), tone: "brand" },
-          { label: "150", value: d.total150.toLocaleString() },
-          { label: "300", value: d.total300.toLocaleString() },
-          { label: "SIM SWAP", value: d.simSwap.toLocaleString(), tone: "amber" },
+          { label: "Total GA", value: d.total.toLocaleString("en-US"), tone: "brand" },
+          { label: "150", value: d.total150.toLocaleString("en-US") },
+          { label: "300", value: d.total300.toLocaleString("en-US") },
+          { label: "SIM SWAP", value: d.simSwap.toLocaleString("en-US"), tone: "amber" },
           { label: "GA Target", value: d.assignment.gaTarget || "—" },
-          { label: "Days with GA", value: d.daily.length.toLocaleString() },
+          { label: "Days with GA", value: d.daily.length.toLocaleString("en-US") },
         ]}
       />
 

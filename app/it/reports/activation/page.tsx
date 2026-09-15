@@ -48,8 +48,8 @@ export default async function ActivationReport({
     { key: "name", label: ACTIVATION_GROUPS.find((g) => g.key === group)!.label.replace("By ", "") },
     { key: "code", label: "Code" },
     { key: "sub", label: ACTIVATION_SUB_LABEL[group] },
-    { key: "activation", label: "Activation", align: "right", render: (r) => r.activation.toLocaleString() },
-    { key: "target", label: "Target", align: "right", render: (r) => r.target.toLocaleString() },
+    { key: "activation", label: "Activation", align: "right", render: (r) => r.activation.toLocaleString("en-US") },
+    { key: "target", label: "Target", align: "right", render: (r) => r.target.toLocaleString("en-US") },
     {
       key: "pct",
       label: "Achievement %",
@@ -88,13 +88,13 @@ export default async function ActivationReport({
       <ReportSearch matched={matched} total={unfiltered} noun={group === "bp" ? "BP" : group} />
       <SummaryStrip
         items={[
-          { label: "Total Activation", value: totalActivation.toLocaleString(), tone: "brand" },
-          { label: "Total Target", value: totalTarget.toLocaleString() },
+          { label: "Total Activation", value: totalActivation.toLocaleString("en-US"), tone: "brand" },
+          { label: "Total Target", value: totalTarget.toLocaleString("en-US") },
           {
             label: "Achievement",
             value: totalTarget ? `${targetPercent(totalActivation, totalTarget)}%` : "—",
           },
-          { label: "Rows", value: ordered.length.toLocaleString() },
+          { label: "Rows", value: ordered.length.toLocaleString("en-US") },
         ]}
       />
       <ReportTable

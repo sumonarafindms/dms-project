@@ -34,11 +34,11 @@ export default async function Page({
       </div>
       <SummaryStrip
         items={[
-          { label: "GA Target", value: a.gaTarget.toLocaleString() },
-          { label: "GA Achieved", value: d.total.toLocaleString(), tone: "brand" },
-          { label: "GA Remaining", value: Math.max(0, a.gaTarget - d.total).toLocaleString(), tone: "amber" },
+          { label: "GA Target", value: a.gaTarget.toLocaleString("en-US") },
+          { label: "GA Achieved", value: d.total.toLocaleString("en-US"), tone: "brand" },
+          { label: "GA Remaining", value: Math.max(0, a.gaTarget - d.total).toLocaleString("en-US"), tone: "amber" },
           // Shown, never added: a replacement SIM is not a new activation.
-          { label: "SIM Swap", value: d.simSwap.toLocaleString() },
+          { label: "SIM Swap", value: d.simSwap.toLocaleString("en-US") },
         ]}
       />
       <Card className="kit-mb-20" padded>

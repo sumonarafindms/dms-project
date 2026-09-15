@@ -54,10 +54,28 @@ describe("GA product classification", () => {
     }
   });
 
-  it("never counts an unknown product code as standard GA", () => {
-    expect(classifyGaActivation(row("MMXYZ", 300))).toBe("UNKNOWN");
-    expect(isStandardGaActivation(row("MMXYZ", 300))).toBe(false);
+  it("counts a product code nobody recognises as a normal SIM", () => {
+    /*
+     * This assertion is the reverse of what it said until v172, and the reversal
+     * is the point.
+     *
+     * It used to require `UNKNOWN`, and "unknown" meant excluded from every
+     * total in silence. Then the owner's real September file arrived with four
+     * codes this project had never seen — SIMSWAP (568 rows), ESIMSWAP (2),
+     * MMSTSC (8), MMST1911 (1) — and 579 of its 2,527 rows fell into that
+     * bucket. Nothing on any screen said so.
+     *
+     * The file is an Activation Details Report: every row in it is an
+     * activation, and the only distinction the business draws is new versus
+     * replacement. So a code that does not say SWAP is a normal SIM, whatever
+     * else it says. There is no third thing for it to be.
+     */
+    expect(classifyGaActivation(row("MMXYZ", 300))).toBe("GA_300");
+    expect(isStandardGaActivation(row("MMXYZ", 300))).toBe(true);
     expect(isSimSwapActivation(row("MMXYZ", 300))).toBe(false);
+    // And at the 170 tariff it lands in the other tier, by price — the only
+    // evidence an unfamiliar row carries about which SIM it is.
+    expect(classifyGaActivation(row("MMXYZ", 170))).toBe("GA_170");
   });
 
   it("classifies legacy rows without a product code by selling price", () => {
@@ -78,7 +96,7 @@ describe("Total GA", () => {
     expect(countStandardGa(rows)).toBe(172);
   });
 
-  it("excludes swaps and unknown codes from Total GA but reports them separately", () => {
+  it("excludes swaps from Total GA but reports them separately", () => {
     const rows = [
       ...Array.from({ length: 149 }, () => row("MMSTC", 170)),
       ...Array.from({ length: 20 }, () => row("MMST", 300)),
@@ -88,12 +106,16 @@ describe("Total GA", () => {
       row("MMXYZ", 300),
     ];
     const breakdown = summarizeGaActivations(rows);
-    expect(breakdown.total).toBe(172);
+    // 172 + the unfamiliar code, which is an activation like any other.
+    expect(breakdown.total).toBe(173);
     expect(breakdown.ga170).toBe(149);
-    expect(breakdown.ga300).toBe(23);
+    expect(breakdown.ga300).toBe(24);
     expect(breakdown.ga170 + breakdown.ga300).toBe(breakdown.total);
     expect(breakdown.simSwap).toBe(15);
-    expect(breakdown.unknown).toBe(1);
+    // Nothing is left over. Every row in an activation report is one of the two
+    // things, and a row that is neither used to be a row nobody could see.
+    expect(breakdown.unknown).toBe(0);
+    expect(breakdown.total + breakdown.simSwap + breakdown.unknown).toBe(rows.length);
   });
 
   it("keeps a swap-only retailer at zero Total GA", () => {

@@ -47,10 +47,10 @@ export default async function Page({
 
       <SummaryStrip
         items={[
-          { label: "Retailers in scope", value: all.length.toLocaleString() },
-          { label: "Needs review", value: flagged.toLocaleString(), tone: "amber" },
-          { label: "High priority", value: high.toLocaleString() },
-          { label: "Clear", value: (all.length - flagged).toLocaleString(), tone: "brand" },
+          { label: "Retailers in scope", value: all.length.toLocaleString("en-US") },
+          { label: "Needs review", value: flagged.toLocaleString("en-US"), tone: "amber" },
+          { label: "High priority", value: high.toLocaleString("en-US") },
+          { label: "Clear", value: (all.length - flagged).toLocaleString("en-US"), tone: "brand" },
         ]}
       />
 

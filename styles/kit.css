@@ -3777,3 +3777,103 @@
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Picker — the select you can type into (app/components/Picker.tsx)
+ *
+ * Styled to look like `.kit-select` so a form that mixes the two does not
+ * look like it was assembled from two kits. The caret is drawn here rather
+ * than inherited, because the control is an <input> and only a <select> gets
+ * one for free.
+ * ------------------------------------------------------------------ */
+.kit-picker {
+  position: relative;
+  width: 100%;
+}
+
+.kit-picker-input {
+  width: 100%;
+  padding-right: 2rem;
+}
+
+.kit-picker-caret {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: -0.35rem;
+  border-right: 2px solid var(--color-neutral-500);
+  border-bottom: 2px solid var(--color-neutral-500);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.kit-picker-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  /* Ten rows before it scrolls. Taller than that and the list covers the
+     field it belongs to on a phone. */
+  max-height: 17rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #fff;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-elevated);
+}
+
+.kit-picker-option {
+  display: block;
+  /* 44px, the touch target this app holds every row to. */
+  min-height: 2.75rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.kit-picker-option > strong {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-neutral-800);
+}
+.kit-picker-option > small {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.kit-picker-option.is-active {
+  background: var(--color-brand-50);
+}
+.kit-picker-option.is-chosen > strong {
+  color: var(--text-brand);
+}
+
+.kit-picker-empty,
+.kit-picker-more {
+  display: block;
+  padding: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.kit-picker-more {
+  border-top: 1px solid var(--color-neutral-100);
+}
+
+/* A .kit-row that is a <button>. The kit's rows are links or divs; the account
+   sheet needs two of them to be actions, and a bare <button> brings its own
+   browser chrome to undo. */
+.kit-row-btn {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}

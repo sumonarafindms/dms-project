@@ -14,7 +14,14 @@ export default async function Page() {
   return (
     <AdminEmployeeForm
       role="bps"
-      employees={employees.map((x) => ({ id: x.id, name: x.name, meta: x.supervisor?.name || x.rsoMsisdn }))}
+      /* Wallet AND supervisor, not one or the other: the picker searches the
+         meta line, and the wallet number is how an operator tells two RSOs with
+         similar names apart. */
+      employees={employees.map((x) => ({
+        id: x.id,
+        name: x.name,
+        meta: [x.rsoMsisdn, x.supervisor?.name].filter(Boolean).join(" · "),
+      }))}
       retailers={retailers.map((x) => ({
         id: x.id,
         name: x.retailerCode,

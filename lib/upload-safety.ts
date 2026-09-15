@@ -124,11 +124,7 @@ export function validateUploadContent(name: string, bytes: Uint8Array) {
 export function looksLikeHtml(bytes: Uint8Array) {
   // UTF-16 puts a NUL between every character, so the NULs are stripped before
   // looking — otherwise a UTF-16 HTML file would slip past.
-  const head = Buffer.from(bytes.subarray(0, 1024))
-    .toString("latin1")
-    .replace(/\0/g, "")
-    .trimStart()
-    .toLowerCase();
+  const head = Buffer.from(bytes.subarray(0, 1024)).toString("latin1").replace(/\0/g, "").trimStart().toLowerCase();
   return head.startsWith("<!doctype html") || head.startsWith("<html") || /^<\?xml[^>]*>\s*<html/.test(head);
 }
 
@@ -162,7 +158,7 @@ export function looksLikeTextExport(bytes: Uint8Array) {
 export function assertRowLimit(rowCount: number, what = "sheet") {
   if (rowCount > MAX_SHEET_ROWS)
     throw new Error(
-      `This ${what} has ${rowCount.toLocaleString()} rows, above the ${MAX_SHEET_ROWS.toLocaleString()} row limit. Split the file and import it in parts.`,
+      `This ${what} has ${rowCount.toLocaleString("en-US")} rows, above the ${MAX_SHEET_ROWS.toLocaleString("en-US")} row limit. Split the file and import it in parts.`,
     );
 }
 

@@ -159,7 +159,7 @@ export function EmployeeDetailView({
           // include deactivated outlets, so the header and the list disagreed.
           {
             label: p.totalRetailerCount > p.retailerCount ? "Active retailers" : "Retailers",
-            value: p.retailerCount.toLocaleString(),
+            value: p.retailerCount.toLocaleString("en-US"),
           },
           {
             label: `SSO · ${pct(p.ssoAchieved, p.ssoTarget)}%`,
@@ -220,7 +220,7 @@ export function EmployeeDetailView({
                 detail={
                   <>
                     <span className={r.lso ? "is-ok" : "is-warn"}>{r.lso ? "LSO complete" : "LSO pending"}</span>
-                    {` · ৳${Math.round(r.c2cAmount).toLocaleString()} C2C`}
+                    {` · ৳${Math.round(r.c2cAmount).toLocaleString("en-US")} C2C`}
                   </>
                 }
                 value={r.ga}

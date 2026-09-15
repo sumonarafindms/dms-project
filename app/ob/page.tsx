@@ -13,6 +13,7 @@ import {
 } from "../components/OperationsPremiumUI";
 import { Btn } from "../components/Kit";
 import { apiFetch, apiUpload } from "@/lib/api-client";
+import { fmtDate, fmtTime } from "../../lib/format";
 
 type Row = {
   retailerCode: string;
@@ -162,12 +163,12 @@ export default function ObPage() {
         />
         <div className="kit-metrics-grid">
           <OpsMetric label="Snapshot Date" value={snapshotDate || "No data"} note="Latest report date" />
-          <OpsMetric label="Retailers" value={pageMeta.total.toLocaleString()} note="Mapped outlets" />
+          <OpsMetric label="Retailers" value={pageMeta.total.toLocaleString("en-US")} note="Mapped outlets" />
           <OpsMetric label="Total Opening Balance" value={money(total)} note="Current total balance" />
           <OpsMetric
             label="Last Import"
-            value={batch ? new Date(batch.uploadedAt).toLocaleDateString() : "-"}
-            note={batch ? new Date(batch.uploadedAt).toLocaleTimeString() : "No import yet"}
+            value={fmtDate(batch?.uploadedAt, "-")}
+            note={batch ? fmtTime(batch.uploadedAt) : "No import yet"}
           />
         </div>
       </section>

@@ -4,6 +4,7 @@ import { monthBounds } from "./month";
 import { normalizeMonth } from "./drilldown";
 import { monthStartsInRange, parseYmd } from "./date-range";
 import { withGa170, withSimSwap, withStandardGa } from "./business-rules";
+import { currentGa170Tariff } from "./ga-tariff";
 import { assignmentGaTarget, assignmentWindow } from "./bp-period";
 // Re-exported so the BP screens keep their existing import path; the rule
 // itself now lives in bp-period.ts, shared with lib/performance.ts.
@@ -217,6 +218,9 @@ export async function bpAssignmentDetail(
   // variants (EV_SWAP / EVSWAP / SIM-WAP) cannot leak into the GA count.
   const where = withStandardGa(commonWhere);
   const swapWhere = withSimSwap(commonWhere);
+  // The 170/300 split is the one figure that needs the current tariff; Total GA
+  // and the swap count do not. See lib/ga-tariff.ts.
+  const tariff = await currentGa170Tariff();
   const [rows, total, simSwap, total150] = await Promise.all([
     prisma.gaActivation.findMany({
       where,
@@ -226,7 +230,7 @@ export async function bpAssignmentDetail(
     }),
     prisma.gaActivation.count({ where }),
     prisma.gaActivation.count({ where: swapWhere }),
-    prisma.gaActivation.count({ where: withGa170(commonWhere) }),
+    prisma.gaActivation.count({ where: withGa170(tariff, commonWhere) }),
   ]);
   const total300 = total - total150;
   const dailyRaw = await prisma.gaActivation.groupBy({

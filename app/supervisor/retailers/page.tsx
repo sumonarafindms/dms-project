@@ -33,10 +33,10 @@ export default async function Page({
       <PageHeader title="My Retailers" subtitle="Every active retailer under your RSO team." />
       <SummaryStrip
         items={[
-          { label: "Retailers", value: rows.length.toLocaleString() },
-          { label: "SIM Sellers", value: sim.toLocaleString() },
-          { label: "Flagged", value: flagged.toLocaleString(), tone: flagged ? "amber" : "brand" },
-          { label: "On Track", value: (rows.length - flagged).toLocaleString(), tone: "brand" },
+          { label: "Retailers", value: rows.length.toLocaleString("en-US") },
+          { label: "SIM Sellers", value: sim.toLocaleString("en-US") },
+          { label: "Flagged", value: flagged.toLocaleString("en-US"), tone: flagged ? "amber" : "brand" },
+          { label: "On Track", value: (rows.length - flagged).toLocaleString("en-US"), tone: "brand" },
         ]}
       />
       <SectionHead title="Search & review" sub="GA, C2S, SSO and LSO status for the selected dates." />

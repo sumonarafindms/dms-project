@@ -203,7 +203,7 @@ export function AttentionSummary({ rows }: { rows: RetailerOpportunity[] }) {
     <div className="kit-card-grid is-quad kit-mb-20">
       {items.map((x) => (
         <Card padded key={x.label}>
-          <Row icon={<Icon name={x.icon} />} title={x.label} sub={x.sub} value={x.value.toLocaleString()} />
+          <Row icon={<Icon name={x.icon} />} title={x.label} sub={x.sub} value={x.value.toLocaleString("en-US")} />
         </Card>
       ))}
     </div>

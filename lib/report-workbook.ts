@@ -81,7 +81,7 @@ export const EXCEL_DEFAULT_WIDTH = 9;
 function widthFor(heading: string, values: (string | number)[]) {
   let widest = heading.length;
   for (const v of values) {
-    const n = typeof v === "number" ? v.toLocaleString().length : String(v ?? "").length;
+    const n = typeof v === "number" ? v.toLocaleString("en-US").length : String(v ?? "").length;
     if (n > widest) widest = n;
   }
   // +2 for the cell padding and the autofilter arrow that sits in the header.

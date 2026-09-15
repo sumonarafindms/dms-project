@@ -167,7 +167,7 @@ export default function MasterDataPage() {
     void refresh(page);
   }, [page, refresh]);
 
-  const dash = (n: number) => (loading ? "…" : n.toLocaleString());
+  const dash = (n: number) => (loading ? "…" : n.toLocaleString("en-US"));
   const pager = summary.pagination;
 
   return (
@@ -219,7 +219,7 @@ export default function MasterDataPage() {
               key: "retailerCount",
               label: "Retailers",
               align: "right",
-              render: (r) => <strong>{r.retailerCount.toLocaleString()}</strong>,
+              render: (r) => <strong>{r.retailerCount.toLocaleString("en-US")}</strong>,
             },
           ]}
           rows={summary.employeeRows}

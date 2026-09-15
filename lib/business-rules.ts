@@ -20,11 +20,18 @@
  */
 
 import { Prisma } from "@prisma/client";
-import { isGa170Product, isGa300Product, isSimSwapProduct, normalizeGaProductCode } from "./ga-product";
+import {
+  isGa170Product,
+  isGa300Product,
+  isNormalSimProduct,
+  isSimSwapProduct,
+  normalizeGaProductCode,
+} from "./ga-product";
 
 export {
   isGa170Product,
   isGa300Product,
+  isNormalSimProduct,
   isSimSwapProduct,
   isStandardGaProduct,
   normalizeGaProductCode,
@@ -135,20 +142,64 @@ export function classifyLegacyGaByPrice(sellingPrice: Prisma.Decimal | number | 
  * GA classification (in memory)
  * ------------------------------------------------------------------ */
 
-export function classifyGaActivation(row: GaClassifiable): GaCategory {
-  const code = normalizeGaProductCode(row.productCode);
-  if (code) {
-    if (isGa170Product(code)) return "GA_170";
-    if (isGa300Product(code)) return "GA_300";
-    if (isSimSwapProduct(code)) return "SIM_SWAP";
-    return "UNKNOWN";
+/**
+ * The prices the 170-tier SIM is currently sold at.
+ *
+ * Learned, not declared. `MMSTC` is the one code we know belongs to that tier,
+ * so whatever MMSTC rows cost IS the 170 tariff — if the carrier moves it from
+ * 170 to 180 tomorrow, this moves with it and nothing needs editing. The
+ * constant is only the answer when there is nothing to learn from (an empty
+ * database, or a set of rows with no MMSTC in it).
+ *
+ * This is the one place price is allowed to decide anything about a row that
+ * has a product code, and it decides the smallest possible thing: which of the
+ * two normal-SIM tiers an UNFAMILIAR code belongs to. A code we know is never
+ * re-decided by its price — that is v157's rule and it still holds.
+ */
+export function ga170Tariff(rows: readonly GaClassifiable[]): Set<number> {
+  const prices = new Set<number>();
+  for (const row of rows) {
+    if (!isGa170Product(row.productCode)) continue;
+    const price = toNumber(row.sellingPrice);
+    if (price !== null) prices.add(price);
   }
-  return classifyLegacyGaByPrice(row.sellingPrice);
+  return prices.size ? prices : new Set([LEGACY_GA_170_PRICE]);
+}
+
+/**
+ * Classify one activation.
+ *
+ * `tariff` is the set of 170-tier prices, from `ga170Tariff`. Omit it and the
+ * legacy constant is used — right for a single row in isolation, but callers
+ * with a whole file or a whole query should learn it and pass it, which is what
+ * `summarizeGaActivations` does for you.
+ */
+export function classifyGaActivation(row: GaClassifiable, tariff?: ReadonlySet<number>): GaCategory {
+  const code = normalizeGaProductCode(row.productCode);
+  if (!code) return classifyLegacyGaByPrice(row.sellingPrice);
+
+  // Replacement first: a code that says SWAP is a swap whatever else it says.
+  if (isSimSwapProduct(code)) return "SIM_SWAP";
+
+  // The two codes we know, decided by the code alone — never by the price.
+  if (isGa170Product(code)) return "GA_170";
+  if (isGa300Product(code)) return "GA_300";
+
+  /*
+   * Anything else in an activation report is an activation. The only open
+   * question is which tier, and the price is the only evidence the row carries.
+   * `UNKNOWN` is deliberately unreachable here: a code nobody recognises used
+   * to be dropped from every total in silence, which is how 579 rows of the
+   * owner's September file went missing.
+   */
+  const price = toNumber(row.sellingPrice);
+  const prices = tariff ?? new Set([LEGACY_GA_170_PRICE]);
+  return price !== null && prices.has(price) ? "GA_170" : "GA_300";
 }
 
 /** Counts toward Total GA, GA achievement, SSO and dashboard GA. */
-export function isStandardGaActivation(row: GaClassifiable) {
-  const category = classifyGaActivation(row);
+export function isStandardGaActivation(row: GaClassifiable, tariff?: ReadonlySet<number>) {
+  const category = classifyGaActivation(row, tariff);
   return category === "GA_170" || category === "GA_300";
 }
 
@@ -171,8 +222,8 @@ export function emptyGaBreakdown(): GaBreakdown {
 }
 
 /** Adds `count` activations of one classified row into a running breakdown. */
-export function addGaActivation(target: GaBreakdown, row: GaClassifiable, count = 1) {
-  switch (classifyGaActivation(row)) {
+export function addGaActivation(target: GaBreakdown, row: GaClassifiable, count = 1, tariff?: ReadonlySet<number>) {
+  switch (classifyGaActivation(row, tariff)) {
     case "GA_170":
       target.ga170 += count;
       target.total += count;
@@ -191,8 +242,11 @@ export function addGaActivation(target: GaBreakdown, row: GaClassifiable, count 
 }
 
 export function summarizeGaActivations(rows: readonly GaClassifiable[]): GaBreakdown {
+  // The tariff is learned from the same rows being counted, so a set of rows is
+  // self-describing: nobody has to tell it what 170 costs this month.
+  const tariff = ga170Tariff(rows);
   const breakdown = emptyGaBreakdown();
-  for (const row of rows) addGaActivation(breakdown, row);
+  for (const row of rows) addGaActivation(breakdown, row, 1, tariff);
   return breakdown;
 }
 
@@ -205,26 +259,43 @@ export function countStandardGa(rows: readonly GaClassifiable[]) {
  * GA classification (Prisma filters)
  * ------------------------------------------------------------------ */
 
-const standardGaFilter: Prisma.GaActivationWhereInput = {
+/*
+ * The same rules, in SQL.
+ *
+ * They are written as SHAPE tests rather than code lists for exactly the reason
+ * the in-memory classifier is: a list cannot match a spelling nobody has seen.
+ * `SIMSWAP` was invisible to the old `in: ["SIMWAP","EV-SWAP"]` filter, so 568
+ * replacement rows were counted as neither GA nor swap on every screen in the
+ * app.
+ *
+ * Prisma's `contains`/`endsWith` are case-sensitive on Postgres, so each test
+ * is repeated for the spellings the importer can store. The importer
+ * uppercases PRODUCT_CODE, which makes the upper-case forms the ones that
+ * actually match; the rest are belt and braces for rows written by anything
+ * else.
+ */
+const SWAP_LIKE: Prisma.GaActivationWhereInput = {
   OR: [
-    { productCode: { in: STANDARD_GA_MATCH_CODES } },
-    { productCode: null, sellingPrice: { in: [LEGACY_GA_170_PRICE, LEGACY_GA_300_PRICE] } },
+    { productCode: { contains: "SWAP" } },
+    { productCode: { contains: "swap" } },
+    { productCode: { contains: "Swap" } },
+    { productCode: { endsWith: "WAP" } },
+    { productCode: { endsWith: "wap" } },
+    { productCode: { endsWith: "Wap" } },
   ],
 };
 
-const ga170Filter: Prisma.GaActivationWhereInput = {
-  OR: [{ productCode: { in: GA_170_MATCH_CODES } }, { productCode: null, sellingPrice: LEGACY_GA_170_PRICE }],
+/** Has a product code, and that code does not say SWAP. */
+const NORMAL_SIM_CODE: Prisma.GaActivationWhereInput = {
+  AND: [{ productCode: { not: null } }, { NOT: SWAP_LIKE }],
 };
 
-const ga300Filter: Prisma.GaActivationWhereInput = {
-  OR: [{ productCode: { in: GA_300_MATCH_CODES } }, { productCode: null, sellingPrice: LEGACY_GA_300_PRICE }],
+const standardGaFilter: Prisma.GaActivationWhereInput = {
+  OR: [NORMAL_SIM_CODE, { productCode: null, sellingPrice: { in: [LEGACY_GA_170_PRICE, LEGACY_GA_300_PRICE] } }],
 };
 
 const simSwapFilter: Prisma.GaActivationWhereInput = {
-  OR: [
-    { productCode: { in: SIM_SWAP_MATCH_CODES } },
-    { productCode: null, sellingPrice: { in: [LEGACY_SIMWAP_PRICE, LEGACY_EV_SWAP_PRICE] } },
-  ],
+  OR: [SWAP_LIKE, { productCode: null, sellingPrice: { in: [LEGACY_SIMWAP_PRICE, LEGACY_EV_SWAP_PRICE] } }],
 };
 
 /**
@@ -237,16 +308,56 @@ export function withStandardGa(where: Prisma.GaActivationWhereInput = {}): Prism
   return { AND: [where, standardGaFilter] };
 }
 
-export function withGa170(where: Prisma.GaActivationWhereInput = {}): Prisma.GaActivationWhereInput {
-  return { AND: [where, ga170Filter] };
-}
-
-export function withGa300(where: Prisma.GaActivationWhereInput = {}): Prisma.GaActivationWhereInput {
-  return { AND: [where, ga300Filter] };
-}
-
 export function withSimSwap(where: Prisma.GaActivationWhereInput = {}): Prisma.GaActivationWhereInput {
   return { AND: [where, simSwapFilter] };
+}
+
+/**
+ * The 170 / 300 split, which is the one thing SQL cannot decide on its own.
+ *
+ * Total GA needs no tariff — it is every activation that is not a swap — so
+ * `withStandardGa` stays a plain synchronous filter used in thirty places. Only
+ * the breakdown has to know what 170 costs this month, and rather than be told,
+ * it asks the data: `ga170Tariff` reads the distinct prices of the rows whose
+ * code IS the known 170 code.
+ *
+ * That is why these two are async and the others are not. The lookup is one
+ * indexed `groupBy` over a handful of rows and it is used on four screens.
+ */
+export type GaTierFilters = { ga170: Prisma.GaActivationWhereInput; ga300: Prisma.GaActivationWhereInput };
+
+/** `withStandardGa`'s two halves. Await the tariff, then compose as usual. */
+export function withGa170(tariff: ReadonlySet<number>, where: Prisma.GaActivationWhereInput = {}) {
+  return { AND: [where, gaTierFilters(tariff).ga170] };
+}
+
+export function withGa300(tariff: ReadonlySet<number>, where: Prisma.GaActivationWhereInput = {}) {
+  return { AND: [where, gaTierFilters(tariff).ga300] };
+}
+
+export function gaTierFilters(tariff: ReadonlySet<number>): GaTierFilters {
+  const prices = [...tariff];
+  const known170: Prisma.GaActivationWhereInput = { productCode: { in: GA_170_MATCH_CODES } };
+  const known300: Prisma.GaActivationWhereInput = { productCode: { in: GA_300_MATCH_CODES } };
+  const unfamiliar: Prisma.GaActivationWhereInput = {
+    AND: [NORMAL_SIM_CODE, { NOT: { productCode: { in: [...GA_170_MATCH_CODES, ...GA_300_MATCH_CODES] } } }],
+  };
+  return {
+    ga170: {
+      OR: [
+        known170,
+        { AND: [unfamiliar, { sellingPrice: { in: prices } }] },
+        { productCode: null, sellingPrice: LEGACY_GA_170_PRICE },
+      ],
+    },
+    ga300: {
+      OR: [
+        known300,
+        { AND: [unfamiliar, { NOT: { sellingPrice: { in: prices } } }] },
+        { productCode: null, sellingPrice: LEGACY_GA_300_PRICE },
+      ],
+    },
+  };
 }
 
 /** Minimum select needed to classify an activation. Use in every GA query. */

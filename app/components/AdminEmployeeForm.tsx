@@ -17,6 +17,7 @@ import { Btn, Card, Check, Field, LinkBtn, NumberInput, PageHeader } from "./Kit
 import { Icon } from "./icons";
 import { PIN_LENGTH } from "../../lib/credential-policy";
 import { apiSend } from "@/lib/api-client";
+import { Picker } from "./Picker";
 
 type Option = { id: string; name: string; meta?: string; employeeId?: string };
 type Initial = {
@@ -49,6 +50,8 @@ export default function AdminEmployeeForm({
   const router = useRouter(),
     edit = Boolean(initial.id);
   const [employeeId, setEmployeeId] = useState(initial.employeeId || "");
+  const [retailerId, setRetailerId] = useState(initial.retailerId || "");
+  const [supervisorId, setSupervisorId] = useState(initial.supervisorId || "");
   const [active, setActive] = useState(initial.active !== false);
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
@@ -121,14 +124,13 @@ export default function AdminEmployeeForm({
                   <input className="kit-input" name="employeeCode" defaultValue={initial.employeeCode || ""} />
                 </Field>
                 <Field label="Supervisor">
-                  <select className="kit-select" name="supervisorId" defaultValue={initial.supervisorId || ""}>
-                    <option value="">Unassigned</option>
-                    {supervisors.map((x) => (
-                      <option value={x.id} key={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Picker
+                    name="supervisorId"
+                    placeholder="Unassigned — type to search"
+                    options={supervisors.map((x) => ({ id: x.id, label: x.name, meta: x.meta }))}
+                    value={supervisorId}
+                    onChange={setSupervisorId}
+                  />
                 </Field>
               </>
             )}
@@ -137,32 +139,34 @@ export default function AdminEmployeeForm({
                 {!edit ? (
                   <>
                     <Field label="RSO">
-                      <select
-                        className="kit-select"
+                      <Picker
                         name="employeeId"
                         required
+                        placeholder="Search RSO by name, wallet or supervisor"
+                        options={employees.map((x) => ({ id: x.id, label: x.name, meta: x.meta }))}
                         value={employeeId}
-                        onChange={(e) => setEmployeeId(e.target.value)}
-                      >
-                        <option value="">Select RSO</option>
-                        {employees.map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.name}
-                            {x.meta ? ` · ${x.meta}` : ""}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(id) => {
+                          setEmployeeId(id);
+                          // The retailer list is the chosen RSO's, so a retailer
+                          // picked under the previous one has to go with it.
+                          setRetailerId("");
+                        }}
+                      />
                     </Field>
-                    <Field label="Retailer Code">
-                      <select className="kit-select" name="retailerId" required defaultValue={initial.retailerId || ""}>
-                        <option value="">Select retailer</option>
-                        {availableRetailers.map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.name}
-                            {x.meta ? ` · ${x.meta}` : ""}
-                          </option>
-                        ))}
-                      </select>
+                    <Field
+                      label="Retailer Code"
+                      hint={employeeId ? `${availableRetailers.length} under this RSO` : undefined}
+                    >
+                      <Picker
+                        name="retailerId"
+                        required
+                        disabled={!employeeId}
+                        placeholder={employeeId ? "Search retailer code or name" : "Select an RSO first"}
+                        emptyText="No retailer under this RSO matches"
+                        options={availableRetailers.map((x) => ({ id: x.id, label: x.name, meta: x.meta }))}
+                        value={retailerId}
+                        onChange={setRetailerId}
+                      />
                     </Field>
                     <Field label="Effective From">
                       <input

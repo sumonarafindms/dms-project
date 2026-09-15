@@ -27,10 +27,10 @@ export default async function Page({
       <PageHeader title="My Retailers" subtitle="GA, C2S, SSO and LSO status across your own outlet base." />
       <SummaryStrip
         items={[
-          { label: "Assigned", value: rows.length.toLocaleString() },
-          { label: "SIM Sellers", value: sim.toLocaleString() },
-          { label: "Need Focus", value: flagged.toLocaleString(), tone: flagged ? "amber" : "brand" },
-          { label: "On Track", value: (rows.length - flagged).toLocaleString(), tone: "brand" },
+          { label: "Assigned", value: rows.length.toLocaleString("en-US") },
+          { label: "SIM Sellers", value: sim.toLocaleString("en-US") },
+          { label: "Need Focus", value: flagged.toLocaleString("en-US"), tone: flagged ? "amber" : "brand" },
+          { label: "On Track", value: (rows.length - flagged).toLocaleString("en-US"), tone: "brand" },
         ]}
       />
       <SectionHead title="Search & review" sub="Open any retailer for full sales and activity detail." />

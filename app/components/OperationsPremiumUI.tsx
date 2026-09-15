@@ -16,6 +16,7 @@ import { TableScrollHint } from "./TableScrollHint";
 import { Icon } from "./icons";
 import { Badge, Card, EmptyState as KitEmptyState, LinkBtn, PageHeader, SectionHead } from "./Kit";
 import type { BadgeTone } from "./Kit";
+import { fmtDate, fmtDateTime } from "../../lib/format";
 
 export function OpsHeader({
   title,
@@ -288,9 +289,7 @@ export function OpsFreshness({
       <div className="kit-feed-head">
         <div className="kit-min0">
           <span className="kit-label">Latest {label} data</span>
-          <strong className="kit-figure">
-            {businessDate ? new Date(businessDate).toLocaleDateString() : "No import yet"}
-          </strong>
+          <strong className="kit-figure">{fmtDate(businessDate, "No import yet")}</strong>
           {range ? <span className="kit-figure-sub">{range}</span> : null}
         </div>
         <Badge tone={businessDate ? "complete" : "pending"}>{businessDate ? "Imported" : "No data"}</Badge>
@@ -299,7 +298,7 @@ export function OpsFreshness({
         {fileName || "Upload a source file"}
       </p>
       <p className="kit-figure-sub">
-        {uploadedAt ? `Imported ${new Date(uploadedAt).toLocaleString()}` : "No import history available"}
+        {uploadedAt ? `Imported ${fmtDateTime(uploadedAt)}` : "No import history available"}
       </p>
     </Card>
   );

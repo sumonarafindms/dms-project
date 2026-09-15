@@ -85,8 +85,8 @@ export async function ValueReport({
               { label: "Total Target", value: money(totalTarget) },
               { label: "Achievement", value: totalTarget ? `${targetPercent(total, totalTarget)}%` : "—" },
             ]
-          : [{ label: "Rows With Value", value: rows.filter((r) => r.value > 0).length.toLocaleString() }]),
-        { label: "Rows", value: rows.length.toLocaleString() },
+          : [{ label: "Rows With Value", value: rows.filter((r) => r.value > 0).length.toLocaleString("en-US") }]),
+        { label: "Rows", value: rows.length.toLocaleString("en-US") },
       ]}
       emptyTitle={`No ${label} for this period`}
       emptyHint={`Check Data Readiness — the ${label} feed may not be imported for these dates.`}

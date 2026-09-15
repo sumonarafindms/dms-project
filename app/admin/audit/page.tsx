@@ -92,10 +92,10 @@ export default async function Page({
 
       <SummaryStrip
         items={[
-          { label: "Total Events", value: total.toLocaleString() },
-          { label: "Today", value: today.toLocaleString(), tone: "brand" },
-          { label: "Logins Today", value: logins.toLocaleString() },
-          { label: "Shown", value: rows.length.toLocaleString() },
+          { label: "Total Events", value: total.toLocaleString("en-US") },
+          { label: "Today", value: today.toLocaleString("en-US"), tone: "brand" },
+          { label: "Logins Today", value: logins.toLocaleString("en-US") },
+          { label: "Shown", value: rows.length.toLocaleString("en-US") },
         ]}
       />
 
@@ -103,7 +103,7 @@ export default async function Page({
         <div className="kit-note is-info kit-mb-20" role="note">
           <Icon name="info" />
           <span>
-            {assignmentEvents.toLocaleString()} assignment change
+            {assignmentEvents.toLocaleString("en-US")} assignment change
             {assignmentEvents === 1 ? "" : "s"} recorded (retailer &rarr; RSO, RSO &rarr; supervisor, supervisor &rarr;
             manager). Kept out of this list so one master upload cannot bury everything else.{" "}
             <Link href={`/admin/audit?module=${ASSIGNMENT_MODULE}`}>View assignment history</Link>

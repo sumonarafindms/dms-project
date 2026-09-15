@@ -935,7 +935,7 @@ export function Pager({
             ← Previous
           </LinkBtn>
           <span className="kit-pager-position">
-            Page {page.toLocaleString()} of {pageCount.toLocaleString()}
+            Page {page.toLocaleString("en-US")} of {pageCount.toLocaleString("en-US")}
           </span>
           <LinkBtn variant="ghost" size="sm" disabled={last} href={last ? "#" : hrefFor(page + 1)} rel="next">
             Next →
