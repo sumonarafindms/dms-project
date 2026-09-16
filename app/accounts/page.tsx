@@ -17,6 +17,8 @@
 import { requirePagePermission } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { latestDailySnapshot } from "../../lib/intelligence";
+import { dailyFeedItems } from "../../lib/feed-day";
+import { fmtNumber } from "../../lib/format";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { Badge, Card, PageHeader, SectionHead, SummaryStrip, Tile } from "../components/Kit";
 import { Icon } from "../components/icons";
@@ -76,8 +78,8 @@ export default async function Accounts() {
             value: `${feeds.length - behind}/${feeds.length}`,
             tone: behind ? "amber" : "brand",
           },
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString("en-US") },
-          { label: "Active Retailers", value: retailers.toLocaleString("en-US") },
+          ...dailyFeedItems(daily, ["ga"]),
+          { label: "Active Retailers", value: fmtNumber(retailers) },
           { label: "RSO · BP", value: `${rsos} · ${bps}` },
         ]}
       />
@@ -147,7 +149,7 @@ export default async function Accounts() {
           href="/accounts/retailers"
           icon={<Icon name="search" />}
           title="Retailer Search"
-          sub={`${retailers.toLocaleString("en-US")} active outlets`}
+          sub={`${fmtNumber(retailers)} active outlets`}
         />
         <Tile
           admin

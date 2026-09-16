@@ -90,11 +90,33 @@ describe("every attention centre is paged", () => {
   });
 
   it("keeps the three pages thin", () => {
-    // They exist to decide scope and wording. When they grow back past that,
-    // the copies start drifting again — which is how this bug lasted.
+    /*
+     * They exist to decide scope and wording. When they grow back past that,
+     * the copies start drifting again — which is how this bug lasted.
+     *
+     * Raised from 60 in v175, which added each page's empty-scope wording —
+     * three or four lines of prose per page saying what it means for THAT role
+     * to have nothing in scope. That is the wording these pages are for. The
+     * cap is a smoke alarm, not the real guard; the one below is.
+     */
     for (const p of ATTENTION_PAGES) {
       const lines = read(p).split("\n").length;
-      expect(lines, `${p} is ${lines} lines — has page logic crept back in?`).toBeLessThan(60);
+      expect(lines, `${p} is ${lines} lines — has page logic crept back in?`).toBeLessThan(80);
+    }
+  });
+
+  it("none of the three renders the shared page itself", () => {
+    /*
+     * The property the line cap is a proxy for, stated directly: a route may
+     * decide scope and wording, and must not grow its own copy of the view.
+     * A page that starts rendering its own strip or list is how three screens
+     * became three screens that disagree — measured, not estimated by length.
+     */
+    for (const p of ATTENTION_PAGES) {
+      const src = read(p);
+      for (const owned of ["SummaryStrip", "RoleAttentionList", "DateRangeForm", "ServerSearchBar", "Pager"]) {
+        expect(src, `${p} renders <${owned}> itself — that belongs to RoleAttentionView`).not.toContain(`<${owned}`);
+      }
     }
   });
 });

@@ -18,6 +18,8 @@ import { requirePagePermission } from "../../lib/auth";
 import { employeePerformance } from "../../lib/performance";
 import { prisma } from "../../lib/prisma";
 import { latestDailySnapshot } from "../../lib/intelligence";
+import { dailyFeedItems, dailyFeedNote } from "../../lib/feed-day";
+import { fmtNumber } from "../../lib/format";
 import { dhakaMonth } from "../../lib/business-time";
 import { pacing } from "../../lib/pacing";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
@@ -25,6 +27,7 @@ import {
   Card,
   ComparisonSection,
   EmptyState,
+  PageNotice,
   KpiCard,
   PageHeader,
   Row,
@@ -32,6 +35,7 @@ import {
   StatPill,
   StatusTile,
   SummaryStrip,
+  FeedNote,
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
@@ -42,14 +46,7 @@ export const dynamic = "force-dynamic";
 export default async function RSO({ searchParams }: { searchParams: Promise<{ compare?: string }> }) {
   const u = await requirePagePermission(["RSO"], "dashboard");
   if (!u.employeeId)
-    return (
-      <main className="page">
-        <PageHeader title="Account not mapped" subtitle="Ask Admin to link this login to an RSO employee record." />
-        <Card>
-          <EmptyState title="Account not mapped" icon={<Icon name="alert" />} />
-        </Card>
-      </main>
-    );
+    return <PageNotice title="Account not mapped" subtitle="Ask Admin to link this login to an RSO employee record." />;
 
   const monthKey = dhakaMonth();
   const month = `${monthKey}-01`;
@@ -62,7 +59,37 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
     prisma.bpAssignment.count({ where: { employeeId: u.employeeId, active: true } }),
   ]);
   const r = perf[0];
-  if (!r) return null;
+  /*
+   * `employeePerformance` only returns ACTIVE employees, so a deactivated —
+   * or deleted — record lands here. This used to `return null`, which renders
+   * a completely blank page: no heading, no message, and on a phone no way
+   * back, because the shell's chrome is part of the page that did not render.
+   * The RSO saw a white screen and had nothing to tell anyone except "it
+   * stopped working".
+   *
+   * The reason is looked up rather than guessed, because "your record was
+   * switched off" and "your login points at a record that is not there" send
+   * the person to different people.
+   */
+  if (!r) {
+    const record = await prisma.employee.findUnique({
+      where: { id: u.employeeId },
+      select: { active: true },
+    });
+    return record ? (
+      <PageNotice
+        title="Your employee record is inactive"
+        subtitle="Ask Admin to reactivate it."
+        hint="Targets, retailers and daily figures stay exactly as they are — they reappear as soon as the record is switched back on."
+      />
+    ) : (
+      <PageNotice
+        title="Employee record not found"
+        subtitle="This login points at an RSO record that no longer exists."
+        hint="Ask Admin to link it to a current RSO employee record."
+      />
+    );
+  }
 
   // "day" unless asked otherwise. An unknown value falls back rather than
   // throwing, because this arrives from the URL.
@@ -90,12 +117,12 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
 
       <SummaryStrip
         items={[
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString("en-US"), tone: "brand" },
-          { label: "Latest C2C", value: `৳${Math.round(daily.c2cTotal).toLocaleString("en-US")}` },
-          { label: "My Retailers", value: r.retailerCount.toLocaleString("en-US") },
-          { label: "Need Focus", value: focus.length.toLocaleString("en-US"), tone: focus.length ? "amber" : "brand" },
+          ...dailyFeedItems(daily),
+          { label: "My Retailers", value: fmtNumber(r.retailerCount) },
+          { label: "Need Focus", value: fmtNumber(focus.length), tone: focus.length ? "amber" : "brand" },
         ]}
       />
+      <FeedNote note={dailyFeedNote(daily)} />
 
       <SectionHead
         title="Target vs Achievement"

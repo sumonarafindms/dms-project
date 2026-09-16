@@ -21,3 +21,8 @@ next-env.d.ts.bak
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# The vendored SheetJS tarball is a DEPENDENCY, not a build artifact: package.json
+# installs xlsx from it by file path, so a build without it fails at npm ci.
+# Listed here only to say, loudly, that it must not be added to the ignores above.
+!vendor/

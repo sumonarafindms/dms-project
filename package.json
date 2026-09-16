@@ -30,7 +30,7 @@
     "next": "^15.5.24",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -47,5 +47,11 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "postcss": "^8.5.28",
+    "uuid": "^11.1.1",
+    "deepmerge-ts": "^8.0.2",
+    "js-yaml": "^4.3.2"
   }
 }

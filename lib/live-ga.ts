@@ -3,6 +3,7 @@ import { ImportType } from "@prisma/client";
 import { withStandardGa } from "./business-rules";
 import { standardGaByAssignment } from "./bp-activations";
 import { managerScope } from "./manager-scope";
+import { businessDayBounds, dhakaTodayYmd } from "./business-time";
 
 /**
  * One day's GA, for whoever is looking at it.
@@ -40,28 +41,25 @@ import { managerScope } from "./manager-scope";
  * rather than inventing a second answer.
  */
 
-const DHAKA_OFFSET_MS = 6 * 60 * 60 * 1000;
+/**
+ * The activation date a GA row carries for a given Dhaka day.
+ *
+ * The rule — and the reason it must not be offset twice — now lives in
+ * `lib/business-time.ts`, because GA is not the only feed that stores a date
+ * rather than an instant. This name is kept so its callers did not have to
+ * change.
+ */
+export const gaDayBounds = businessDayBounds;
 
-/** The activation date a GA row carries for a given Dhaka day. */
-export function gaDayBounds(ymd: string) {
-  /*
-   * `GaActivation.activationDate` is stored by the importer as UTC midnight of
-   * the date printed in the file (`dateOnlyUtc`), NOT as an instant. So a day
-   * is an exact range over that midnight, and must not be shifted by the Dhaka
-   * offset a second time — doing that would return the previous day's rows all
-   * morning, which is precisely the kind of error nobody notices until month
-   * end.
-   */
-  const start = new Date(`${ymd}T00:00:00.000Z`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return { start, end };
-}
-
-/** Today in Dhaka, as the app's other screens compute it. */
-export function dhakaToday(now = new Date()) {
-  const d = new Date(now.getTime() + DHAKA_OFFSET_MS);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-}
+/**
+ * Today in Dhaka.
+ *
+ * A second copy of `dhakaTodayYmd` lived here, with its own `DHAKA_OFFSET_MS`.
+ * Two implementations of "what day is it" is one more than a business can have:
+ * they agreed, but nothing made them, and the fixed +6 offset is the single
+ * assumption the whole app's day boundaries rest on. The name stays.
+ */
+export const dhakaToday = dhakaTodayYmd;
 
 export type LiveViewer = {
   role: string;

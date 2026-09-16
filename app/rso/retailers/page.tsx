@@ -3,7 +3,7 @@ import { normalizeMonth } from "../../../lib/drilldown";
 import { retailerOpportunities } from "../../../lib/retailer-opportunities";
 import { retailerListPage, sortOptionsFor } from "../../../lib/retailer-list";
 import { RetailerSearchView } from "../../components/RetailerOpportunityViews";
-import { Card, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
+import { Card, PageHeader, PageNotice, SectionHead, SummaryStrip } from "../../components/Kit";
 
 export default async function Page({
   searchParams,
@@ -13,7 +13,17 @@ export default async function Page({
   const u = await requirePagePermission(["RSO"], "retailers"),
     s = await searchParams,
     month = normalizeMonth(s.from?.slice(0, 7) || s.month);
-  const rows = u.employeeId ? await retailerOpportunities(month, [u.employeeId], s.from, s.to) : [],
+  // Same reasoning as /rso/attention: a summary strip full of zeros is not an
+  // answer to "where are my retailers".
+  if (!u.employeeId)
+    return (
+      <PageNotice
+        title="Account not mapped"
+        subtitle="Ask Admin to link this login to an RSO employee record."
+        hint="Until then this page has no outlet base to search."
+      />
+    );
+  const rows = await retailerOpportunities(month, [u.employeeId], s.from, s.to),
     sim = rows.filter((x) => x.simSeller).length,
     flagged = rows.filter((x) => x.priority > 0).length;
   const listPage = retailerListPage(rows, {
@@ -24,7 +34,10 @@ export default async function Page({
 
   return (
     <main className="page">
-      <PageHeader title="My Retailers" subtitle="GA, C2S, SSO and LSO status across your own outlet base." />
+      <PageHeader
+        title="My Retailers"
+        subtitle={`${month} · GA, C2S, SSO and LSO status across your own outlet base.`}
+      />
       <SummaryStrip
         items={[
           { label: "Assigned", value: rows.length.toLocaleString("en-US") },

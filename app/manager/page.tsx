@@ -17,6 +17,8 @@ import { employeePerformance } from "../../lib/performance";
 import { prisma } from "../../lib/prisma";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
 import { latestDailySnapshot, monthPace } from "../../lib/intelligence";
+import { dailyFeedItems, dailyFeedNote } from "../../lib/feed-day";
+import { fmtNumber } from "../../lib/format";
 import { managerScope } from "../../lib/manager-scope";
 import { dhakaMonth } from "../../lib/business-time";
 import { pacing } from "../../lib/pacing";
@@ -33,6 +35,7 @@ import {
   StatusTile,
   SummaryStrip,
   Tile,
+  FeedNote,
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
@@ -121,12 +124,13 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
 
       <SummaryStrip
         items={[
-          { label: "Assigned Teams", value: supervisors.length.toLocaleString("en-US") },
-          { label: "RSOs", value: rows.length.toLocaleString("en-US") },
-          { label: "Retailers", value: retailers.toLocaleString("en-US") },
-          { label: "Latest GA", value: daily.gaTotal.toLocaleString("en-US"), tone: "brand" },
+          { label: "Assigned Teams", value: fmtNumber(supervisors.length) },
+          { label: "RSOs", value: fmtNumber(rows.length) },
+          { label: "Retailers", value: fmtNumber(retailers) },
+          ...dailyFeedItems(daily, ["ga"]),
         ]}
       />
+      <FeedNote note={dailyFeedNote(daily, ["ga"])} />
 
       <SectionHead
         title="Target progress"
@@ -200,7 +204,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
                 href={`/manager/supervisors/${x.id}?month=${monthKey}`}
                 eyebrow="Supervisor"
                 name={x.name}
-                code={`${x.rsos} RSOs · ${x.retailers.toLocaleString("en-US")} retailers`}
+                code={`${x.rsos} RSOs · ${fmtNumber(x.retailers)} retailers`}
                 percent={progress}
                 metrics={[
                   { label: "GA", achieved: x.ga, target: x.gaTarget },

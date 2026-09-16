@@ -24,6 +24,7 @@
  * rows, not the admin card grid.
  */
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Badge, Card, EmptyState, PageHeader, Pager, Row, SectionHead, SummaryStrip } from "./Kit";
 import { DateRangeForm } from "./ListControls";
@@ -41,10 +42,13 @@ export function RoleAttentionList({
   rows,
   base,
   query = "",
+  empty,
 }: {
   rows: RetailerOpportunity[];
   base: string;
   query?: string;
+  /** What an empty list means here — decided by the caller, which knows. */
+  empty: { title: string; hint: ReactNode; positive?: boolean };
 }) {
   /*
    * No `limit` prop. It existed for a "top N" preview that no page ever
@@ -52,13 +56,26 @@ export function RoleAttentionList({
    * (v144) nothing could want one — the caller passes the page it means to
    * show. A capping option nobody passes is a way to hide rows by accident.
    */
+  /*
+   * An empty list had exactly one meaning here, and it was the wrong one three
+   * times out of four: a green tick reading "No attention items — current
+   * retailer execution rules are complete for this scope."
+   *
+   * It fired for an RSO whose login is not linked to an employee record, for a
+   * supervisor with no team, for a manager with no assigned supervisors, and
+   * for a search that matched nothing. In every one of those the app knew
+   * nothing at all about the retailers, and said everything was fine.
+   *
+   * So the caller decides, because the caller is the only thing that knows
+   * which of the four this is.
+   */
   if (!rows.length)
     return (
       <EmptyState
-        positive
-        title="No attention items"
-        hint="Current retailer execution rules are complete for this scope."
-        icon={<Icon name="check" />}
+        positive={empty.positive}
+        title={empty.title}
+        hint={empty.hint}
+        icon={<Icon name={empty.positive ? "check" : "alert"} />}
       />
     );
 
@@ -103,6 +120,7 @@ export function RoleAttentionView({
   title,
   subtitle,
   sectionSub,
+  emptyScope,
 }: {
   /** Every retailer in this role's scope — flagged and clear. */
   all: RetailerOpportunity[];
@@ -117,6 +135,8 @@ export function RoleAttentionView({
   title: string;
   subtitle: string;
   sectionSub: string;
+  /** What it means for this role to have no retailers in scope at all. */
+  emptyScope: { title: string; hint: string };
 }) {
   /*
    * The summary counts the whole scope; the list shows one page of it.
@@ -148,6 +168,24 @@ export function RoleAttentionView({
     return `?${params.toString()}`;
   };
 
+  const empty: { title: string; hint: ReactNode; positive?: boolean } = !all.length
+    ? emptyScope
+    : list.q
+      ? {
+          title: `Nothing matches “${list.q}”`,
+          hint: (
+            <>
+              No flagged retailer in this scope matches that search. <Link href={`?${query}`}>Clear the search</Link> to
+              see them all.
+            </>
+          ),
+        }
+      : {
+          title: "No attention items",
+          hint: `All ${all.length.toLocaleString("en-US")} retailers in this scope meet the current execution rules.`,
+          positive: true,
+        };
+
   return (
     <main className="page">
       <PageHeader title={title} subtitle={subtitle} />
@@ -171,16 +209,9 @@ export function RoleAttentionView({
 
       <SectionHead title="Retailers needing action" sub={sectionSub} />
       <Card padded>
-        <RoleAttentionList rows={list.rows} base={base} query={`?${query}`} />
+        <RoleAttentionList rows={list.rows} base={base} query={`?${query}`} empty={empty} />
       </Card>
       <Pager page={list.page} pageCount={list.pageCount} label={pageLabel(list)} hrefFor={pageHref} />
-
-      {list.q && list.total === 0 ? (
-        <p className="kit-hint is-xs kit-mt-8">
-          Nothing matches “{list.q}” among the flagged retailers. <Link href={`?${query}`}>Clear the search</Link> to
-          see them all.
-        </p>
-      ) : null}
     </main>
   );
 }

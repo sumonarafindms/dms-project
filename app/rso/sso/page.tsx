@@ -13,8 +13,7 @@ import { SSO_MIN_MONTHLY_STANDARD_GA } from "../../../lib/business-rules";
 import { prisma } from "../../../lib/prisma";
 import { OperationalWorklist, resolveSort } from "../OperationalWorklist";
 import type { WorklistRow } from "../OperationalWorklist";
-import { Card, EmptyState, PageHeader } from "../../components/Kit";
-import { Icon } from "../../components/icons";
+import { PageNotice } from "../../components/Kit";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +27,7 @@ export default async function SsoWorklist({
   const month = normalizeMonth(s.month || dhakaMonth());
 
   if (!u.employeeId)
-    return (
-      <main className="page">
-        <PageHeader title="Account not mapped" subtitle="Ask Admin to link this login to an RSO employee record." />
-        <Card>
-          <EmptyState title="Account not mapped" icon={<Icon name="alert" />} />
-        </Card>
-      </main>
-    );
+    return <PageNotice title="Account not mapped" subtitle="Ask Admin to link this login to an RSO employee record." />;
 
   const [retailers, assignments] = await Promise.all([
     retailerOpportunities(month, [u.employeeId]),
@@ -71,6 +63,10 @@ export default async function SsoWorklist({
       sort={resolveSort(s.sort)}
       basePath="/rso/sso"
       statusFilter={s.status === "pending" || s.status === "complete" ? s.status : "all"}
+      emptyScope={{
+        title: "No SIM-seller retailers",
+        hint: "SSO is measured on outlets marked as SIM sellers, and none of yours is. Ask your supervisor if that looks wrong.",
+      }}
     />
   );
 }

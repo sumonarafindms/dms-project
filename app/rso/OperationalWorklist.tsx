@@ -15,6 +15,7 @@
  * 7 transactions" stay defined in one place.
  */
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Badge, Card, EmptyState, PageHeader, ProgressLine, SummaryStrip } from "../components/Kit";
 import { Icon } from "../components/icons";
@@ -84,6 +85,7 @@ export function OperationalWorklist({
   sort,
   basePath,
   statusFilter,
+  emptyScope,
 }: {
   title: string;
   requirement: string;
@@ -94,6 +96,8 @@ export function OperationalWorklist({
   sort: WorklistSort;
   basePath: string;
   statusFilter: "all" | "pending" | "complete";
+  /** What it means for this particular worklist to have nothing in it at all. */
+  emptyScope: { title: string; hint: string };
 }) {
   const total = rows.length;
   const complete = rows.filter((r) => r.complete).length;
@@ -119,12 +123,60 @@ export function OperationalWorklist({
   const done = visible.filter((r) => r.complete).sort(sortFn);
   const grouped = sort === "pending";
 
+  /**
+   * A filtered-out group is hidden, not reported as empty.
+   *
+   * The "Pending first" layout draws both groups with an empty-state under each
+   * one. Under the **Complete** filter `pending` is empty by construction, so
+   * the Pending group rendered a green tick reading "No pending SSO retailers —
+   * every outlet has met the requirement this month" directly above a list of
+   * the three that had, while seven pending ones sat one tap away. The
+   * Completed group said the mirror image under the Pending filter.
+   *
+   * Neither empty-state was wrong about its own array. Both were describing an
+   * array the reader had just asked to exclude.
+   */
+  const showPending = statusFilter !== "complete";
+  const showDone = statusFilter !== "pending";
+
+  /**
+   * What an empty list actually means, which is three different things.
+   *
+   * This used to be one branch reading **"All SSO complete — no SSO work is
+   * outstanding"**, in green, with a tick. It fired for all three:
+   *
+   *   - Tap the **Complete** chip when nothing has been completed yet and the
+   *     screen congratulated the RSO on finishing work none of which was done.
+   *     The exact inversion of the truth.
+   *   - An RSO with no SIM-seller retailers at all got the same tick, so a
+   *     mapping problem looked like an achievement.
+   *   - And, correctly, the case where every retailer really is done.
+   *
+   * Only the third is good news, so only the third is `positive`. The other
+   * two are statements of fact with no tick on them.
+   */
+  const emptyMessage: { title: string; hint: string; positive?: boolean; icon: ReactNode } =
+    total === 0
+      ? { ...emptyScope, icon: <Icon name="alert" /> }
+      : statusFilter === "complete"
+        ? {
+            title: `No ${title} complete yet`,
+            hint: `None of these ${total} retailers has met the requirement this month. Switch to Pending to see what is outstanding.`,
+            icon: <Icon name="alert" />,
+          }
+        : {
+            title: `All ${title} complete`,
+            hint: `Every one of these ${total} retailers has met the requirement this month.`,
+            positive: true,
+            icon: <Icon name="check" />,
+          };
+
   const link = (params: Record<string, string>) =>
     `${basePath}?${new URLSearchParams({ month, ...params }).toString()}`;
 
   return (
     <main className="page">
-      <PageHeader title={title} subtitle={`${requirement} · ${total} retailers`} />
+      <PageHeader title={title} subtitle={`${month} · ${requirement} · ${total} retailers`} />
 
       <SummaryStrip
         items={[
@@ -163,50 +215,53 @@ export function OperationalWorklist({
 
       {visible.length === 0 ? (
         <Card>
-          <EmptyState
-            positive
-            title={`All ${title} complete`}
-            hint={`No ${title} work is outstanding for the retailers matching this filter.`}
-            icon={<Icon name="check" />}
-          />
+          <EmptyState {...emptyMessage} />
         </Card>
       ) : grouped ? (
         <>
-          <div className="kit-group-head">
-            <span className="kit-group-dot" aria-hidden="true" />
-            <h3>Pending ({pending.length})</h3>
-          </div>
-          {pending.length ? (
-            <div className="kit-card-grid kit-mb-24">
-              {pending.map((r) => (
-                <WorklistCard key={r.id} row={r} progressLabel={progressLabel} required={required} month={month} />
-              ))}
-            </div>
-          ) : (
-            <Card className="kit-mb-24">
-              <EmptyState
-                positive
-                title={`No pending ${title} retailers`}
-                hint="Every outlet has met the requirement this month."
-                icon={<Icon name="check" />}
-              />
-            </Card>
+          {showPending && (
+            <>
+              <div className="kit-group-head">
+                <span className="kit-group-dot" aria-hidden="true" />
+                <h3>Pending ({pending.length})</h3>
+              </div>
+              {pending.length ? (
+                <div className="kit-card-grid kit-mb-24">
+                  {pending.map((r) => (
+                    <WorklistCard key={r.id} row={r} progressLabel={progressLabel} required={required} month={month} />
+                  ))}
+                </div>
+              ) : (
+                <Card className="kit-mb-24">
+                  <EmptyState
+                    positive
+                    title={`No pending ${title} retailers`}
+                    hint="Every outlet has met the requirement this month."
+                    icon={<Icon name="check" />}
+                  />
+                </Card>
+              )}
+            </>
           )}
 
-          <div className="kit-group-head">
-            <span className="kit-group-dot is-done" aria-hidden="true" />
-            <h3>Completed ({done.length})</h3>
-          </div>
-          {done.length ? (
-            <div className="kit-card-grid">
-              {done.map((r) => (
-                <WorklistCard key={r.id} row={r} progressLabel={progressLabel} required={required} month={month} />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <EmptyState title="No completed retailers yet" icon={<Icon name="shop" />} />
-            </Card>
+          {showDone && (
+            <>
+              <div className="kit-group-head">
+                <span className="kit-group-dot is-done" aria-hidden="true" />
+                <h3>Completed ({done.length})</h3>
+              </div>
+              {done.length ? (
+                <div className="kit-card-grid">
+                  {done.map((r) => (
+                    <WorklistCard key={r.id} row={r} progressLabel={progressLabel} required={required} month={month} />
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <EmptyState title="No completed retailers yet" icon={<Icon name="shop" />} />
+                </Card>
+              )}
+            </>
           )}
         </>
       ) : (

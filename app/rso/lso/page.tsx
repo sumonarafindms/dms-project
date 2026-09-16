@@ -19,8 +19,7 @@ import {
 import { prisma } from "../../../lib/prisma";
 import { OperationalWorklist, resolveSort } from "../OperationalWorklist";
 import type { WorklistRow } from "../OperationalWorklist";
-import { Card, EmptyState, PageHeader } from "../../components/Kit";
-import { Icon } from "../../components/icons";
+import { PageNotice } from "../../components/Kit";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +33,7 @@ export default async function LsoWorklist({
   const month = normalizeMonth(s.month || dhakaMonth());
 
   if (!u.employeeId)
-    return (
-      <main className="page">
-        <PageHeader title="Account not mapped" subtitle="Ask Admin to link this login to an RSO employee record." />
-        <Card>
-          <EmptyState title="Account not mapped" icon={<Icon name="alert" />} />
-        </Card>
-      </main>
-    );
+    return <PageNotice title="Account not mapped" subtitle="Ask Admin to link this login to an RSO employee record." />;
 
   const [retailers, assignments] = await Promise.all([
     retailerOpportunities(month, [u.employeeId]),
@@ -82,6 +74,10 @@ export default async function LsoWorklist({
       sort={resolveSort(s.sort)}
       basePath="/rso/lso"
       statusFilter={s.status === "pending" || s.status === "complete" ? s.status : "all"}
+      emptyScope={{
+        title: "No retailers assigned",
+        hint: "LSO is measured across your own outlet base, and nothing is assigned to you. Ask Admin to check your retailer mapping.",
+      }}
     />
   );
 }

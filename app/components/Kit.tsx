@@ -14,6 +14,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Icon } from "./icons";
 import { TARGET_BAND_LABEL, targetBand, targetPercent } from "../../lib/achievement";
 import type { TargetBand } from "../../lib/achievement";
 import { perDayLabel, riskTone } from "../../lib/pacing";
@@ -357,6 +358,22 @@ export function SummaryStrip({ items }: { items: { label: string; value: ReactNo
   );
 }
 
+/**
+ * The one line that says a daily figure is not from today.
+ *
+ * Renders nothing when every feed is current, so a caller can drop it in
+ * unconditionally and a clean day stays quiet. `role="status"` rather than
+ * `alert`: stale data is worth reading, not worth interrupting.
+ */
+export function FeedNote({ note }: { note: string | null }) {
+  if (!note) return null;
+  return (
+    <p className="kit-note is-warn kit-mb-16" role="status">
+      {note}
+    </p>
+  );
+}
+
 export function EmptyState({
   title,
   hint,
@@ -364,7 +381,8 @@ export function EmptyState({
   icon,
 }: {
   title: string;
-  hint?: string;
+  /** ReactNode, not string: an empty state often has to offer a way out of it. */
+  hint?: ReactNode;
   positive?: boolean;
   icon?: ReactNode;
 }) {
@@ -376,6 +394,36 @@ export function EmptyState({
       <strong>{title}</strong>
       {hint && <p>{hint}</p>}
     </div>
+  );
+}
+
+/**
+ * A whole page that exists only to explain why there is nothing to show.
+ *
+ * Four screens hand-rolled this and a fifth — the RSO home — forgot to, and
+ * returned `null` instead: an inactive employee record produced a completely
+ * blank page, no heading, no message, no way out, on the role most of this
+ * app's users hold. A shared component is how "say something" stops depending
+ * on each page remembering to.
+ *
+ * `role="alert"` is deliberately absent. This is the whole page; there is
+ * nothing for it to interrupt.
+ */
+export function PageNotice({ title, subtitle, hint }: { title: string; subtitle: string; hint?: string }) {
+  /*
+   * Three lines, each said once: the heading names the problem, the optional
+   * detail explains it, and the card carries the one thing the reader can do.
+   * The hand-rolled version this replaces put the title in the heading AND in
+   * the card, so the screen repeated itself and the action was the only part
+   * that was not emphasised.
+   */
+  return (
+    <main className="page">
+      <PageHeader title={title} subtitle={hint} />
+      <Card>
+        <EmptyState title={subtitle} icon={<Icon name="alert" />} />
+      </Card>
+    </main>
   );
 }
 
@@ -736,6 +784,20 @@ export function KpiCard({
    */
   pace?: Pacing;
 }) {
+  /*
+   * A missing target is not a target of zero.
+   *
+   * `targetPercent(a, 0)` is 0 by design — there is no honest percentage of
+   * nothing — and this card used to print that 0 into a ring, a bar and a
+   * "0 of 0 · Remaining 0". An RSO whose month had no target uploaded read
+   * five tiles telling them they were at zero percent, in the band colour the
+   * app uses for failing, and nothing anywhere said a target was missing.
+   * `PaceFoot` already declines to guess for this case; the ring did not.
+   *
+   * So when there is no target there is no ring and no bar: the achievement is
+   * shown, because it is real, and the gap is named instead of drawn.
+   */
+  const hasTarget = target > 0;
   const p = targetPercent(achieved, target);
   return (
     <Card padded>
@@ -747,22 +809,36 @@ export function KpiCard({
             {fmt(Math.round(achieved))}
           </strong>
           <span>
-            of {unit}
-            {fmt(Math.round(target))}
+            {hasTarget ? (
+              <>
+                of {unit}
+                {fmt(Math.round(target))}
+              </>
+            ) : (
+              "No target set"
+            )}
           </span>
         </div>
-        <Ring value={p} size={40} stroke={4} />
+        {hasTarget && <Ring value={p} size={40} stroke={4} />}
       </div>
-      <div className="kit-mt-10">
-        <Bar value={p} thin />
-      </div>
-      <p className="kit-kpi-foot">
-        Remaining:{" "}
-        <b>
-          {unit}
-          {fmt(Math.max(0, Math.round(target - achieved)))}
-        </b>
-      </p>
+      {hasTarget ? (
+        <>
+          <div className="kit-mt-10">
+            <Bar value={p} thin />
+          </div>
+          <p className="kit-kpi-foot">
+            Remaining:{" "}
+            <b>
+              {unit}
+              {fmt(Math.max(0, Math.round(target - achieved)))}
+            </b>
+          </p>
+        </>
+      ) : (
+        // Short on purpose: five of these stack on one phone screen, and the
+        // card above already says "No target set".
+        <p className="kit-kpi-foot">Ask Admin to upload this month&apos;s target.</p>
+      )}
       {pace && <PaceFoot pace={pace} unit={unit} />}
     </Card>
   );

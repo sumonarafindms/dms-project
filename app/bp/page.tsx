@@ -15,26 +15,29 @@
 import { requirePagePermission } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { monthBounds } from "../../lib/month";
-import { dhakaMonth, dhakaTodayYmd } from "../../lib/business-time";
 import { classifyGaActivation, gaCategoryLabel, withStandardGa } from "../../lib/business-rules";
 import { targetPercent } from "../../lib/achievement";
 import { pacing } from "../../lib/pacing";
-import { Btn, Card, EmptyState, HeroRing, PaceFoot, PageHeader, Row, SectionHead, StatPill } from "../components/Kit";
+import {
+  Btn,
+  Card,
+  EmptyState,
+  FeedNote,
+  HeroRing,
+  PaceFoot,
+  PageHeader,
+  PageNotice as Notice,
+  Row,
+  SectionHead,
+  StatPill,
+} from "../components/Kit";
 import { Icon } from "../components/icons";
+import { latestGaDay } from "../../lib/intelligence";
+import { businessDayBounds, dhakaMonth, dhakaYesterdayYmd } from "../../lib/business-time";
+import { feedDay, feedDayLabel, stalenessNote } from "../../lib/feed-day";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
-
-function Notice({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <main className="page">
-      <PageHeader title={title} subtitle={subtitle} />
-      <Card>
-        <EmptyState title={title} hint={subtitle} icon={<Icon name="alert" />} />
-      </Card>
-    </main>
-  );
-}
 
 export default async function BP() {
   const u = await requirePagePermission(["BP"], "dashboard");
@@ -45,10 +48,19 @@ export default async function BP() {
 
   const monthText = `${dhakaMonth()}-01`;
   const { start, end } = monthBounds(monthText);
-  const dayStart = new Date(`${dhakaTodayYmd()}T00:00:00.000Z`);
-  const dayEnd = new Date(dayStart.getTime() + 86400000);
 
-  const [retailer, assignment] = await Promise.all([
+  /*
+   * The daily tile is anchored on the newest day the GA FEED has, not on
+   * today.
+   *
+   * It used to count today in Dhaka, and `lib/readiness-data.ts` already
+   * states why that could not work: GA, C2C, C2S and OB are uploaded for the
+   * PREVIOUS day, so today is never expected to have data. The card therefore
+   * read "Today's Activation: 0" for most of every working day, and a BP had
+   * no way to tell that apart from having genuinely sold nothing. It is the
+   * same defect as the role homes' "Latest GA", arriving from the other side.
+   */
+  const [retailer, assignment, gaDayYmd] = await Promise.all([
     prisma.retailer.findUnique({
       where: { id: u.bpRetailerId },
       select: {
@@ -61,6 +73,7 @@ export default async function BP() {
       where: { retailerId: u.bpRetailerId, active: true },
       include: { monthlyTargets: { where: { month: start }, take: 1 } },
     }),
+    latestGaDay(),
   ]);
 
   if (!retailer) return <Notice title="Retailer not found" subtitle="The BP retailer mapping needs to be updated." />;
@@ -73,16 +86,20 @@ export default async function BP() {
   const effectiveStart = assignment.startDate > start ? assignment.startDate : start;
   const assignmentEnd = assignment.endDate ? new Date(assignment.endDate.getTime() + 86400000) : end;
   const effectiveEnd = assignmentEnd < end ? assignmentEnd : end;
-  const todayStart = dayStart > effectiveStart ? dayStart : effectiveStart;
-  const todayEnd = dayEnd < effectiveEnd ? dayEnd : effectiveEnd;
+  // The feed's day, clipped to the assignment the same way the month is: a BP
+  // is not credited with activations from before they held the code.
+  const gaDayBounds = gaDayYmd ? businessDayBounds(gaDayYmd) : null;
+  const dayStart = gaDayBounds && gaDayBounds.start > effectiveStart ? gaDayBounds.start : effectiveStart;
+  const dayEnd = gaDayBounds && gaDayBounds.end < effectiveEnd ? gaDayBounds.end : effectiveEnd;
+  const dayInWindow = Boolean(gaDayBounds) && dayStart < dayEnd;
 
-  const [monthlyGa, todayGa, recent] = await Promise.all([
+  const [monthlyGa, dayGa, recent] = await Promise.all([
     prisma.gaActivation.count({
       where: withStandardGa({ retailerId: u.bpRetailerId, activationDate: { gte: effectiveStart, lt: effectiveEnd } }),
     }),
-    todayStart < todayEnd
+    dayInWindow
       ? prisma.gaActivation.count({
-          where: withStandardGa({ retailerId: u.bpRetailerId, activationDate: { gte: todayStart, lt: todayEnd } }),
+          where: withStandardGa({ retailerId: u.bpRetailerId, activationDate: { gte: dayStart, lt: dayEnd } }),
         })
       : Promise.resolve(0),
     prisma.gaActivation.findMany({
@@ -98,6 +115,7 @@ export default async function BP() {
   // A BP's whole question is "how many more today", so the pacing line matters
   // more here than anywhere else in the app.
   const pace = pacing(target, monthlyGa, monthText);
+  const gaDay = feedDay(gaDayYmd, dayGa, dhakaYesterdayYmd());
 
   return (
     <main className="page">
@@ -122,16 +140,17 @@ export default async function BP() {
         </Card>
       )}
 
-      <div className="kit-pair kit-my-16">
+      <div className="kit-pair kit-mt-16 kit-mb-8">
         <Card padded>
-          <strong>{todayGa}</strong>
-          <span>Today&apos;s Activation</span>
+          <strong>{gaDay.value}</strong>
+          <span>{feedDayLabel("Activations", gaDay)}</span>
         </Card>
         <Card padded>
           <strong>{monthlyGa}</strong>
           <span>This Month Activation</span>
         </Card>
       </div>
+      <FeedNote note={stalenessNote([{ label: "GA", day: gaDay }])} />
 
       <SectionHead title="My team" sub="Who to contact about this BP code." />
       {/* StatPill is a slate-50 tile, which is nearly the page background —

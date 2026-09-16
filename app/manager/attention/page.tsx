@@ -35,6 +35,18 @@ export default async function Page({
       title="Attention Center"
       subtitle="Execution gaps inside your assigned Supervisor and RSO teams only."
       sectionSub="SSO needs 2+ GA for SIM sellers; LSO needs ৳500+ C2S and 7+ transactions in one month."
+      emptyScope={
+        scope.employeeIds.length
+          ? {
+              title: "No retailers in your teams",
+              hint: "The RSOs under your supervisors have no retailers mapped for this period, so there is nothing to compare against the rules.",
+            }
+          : {
+              // Same reasoning as /rso/attention: an empty scope is not an all-clear.
+              title: "No teams assigned",
+              hint: "No supervisor is assigned to you, so this page has nothing in scope. Ask Admin to assign your teams.",
+            }
+      }
     />
   );
 }
