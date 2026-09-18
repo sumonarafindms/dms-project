@@ -56,7 +56,7 @@ Get-ChildItem -Path $HOME -Filter "DMS-Project*.zip" -Recurse -ErrorAction Silen
   Select-Object FullName, LastWriteTime, Length | Sort-Object LastWriteTime -Descending
 ```
 
-**Why `styles` is deleted first:** unzipping only *adds and overwrites* — it
+**Why `styles` is deleted first:** unzipping only _adds and overwrites_ — it
 never deletes. The redesign removed 27 old CSS files; without this they stay on
 disk and get committed. The zip contains the complete new `styles\`, so it is
 restored immediately. The guard above makes the delete safe.
@@ -74,7 +74,24 @@ update.
 npm install
 ```
 
-Required whenever `package.json` changed. Safe to run every time.
+**Never skip this.** It is one line and it is not optional, because skipping it
+does not produce an error — it produces a _wrong pass_.
+
+A version that changes `package.json` leaves your `node_modules` holding the old
+packages. Everything still runs; `npm run build` still says "Compiled
+successfully"; and what you push is built against dependencies the project no
+longer asks for. v174 moved `xlsx` to a patched copy vendored in the repo, so a
+run without this step compiles happily against the **vulnerable** one.
+
+This has already cost a pre-deploy check once, so `npm test` now says so in
+plain words when it happens:
+
+```
+node_modules is STALE — package.json asks for file:vendor/xlsx-0.20.3.tgz
+and that file is there, but the loaded copy is 0.18.5. Run `npm install`.
+```
+
+If you see that, the fix is this step. Nothing is wrong with the code.
 
 ---
 
@@ -89,23 +106,34 @@ npm test
 npm run build
 ```
 
-| Command        | Expected                                               |
-| -------------- | ------------------------------------------------------ |
-| `lint`         | `0 errors` (73 warnings is normal — pre-existing debt) |
+| Command        | Expected                                                |
+| -------------- | ------------------------------------------------------- |
+| `lint`         | `0 errors` (warnings are pre-existing debt, not a stop) |
 | `format:check` | `All matched files use Prettier code style!`            |
-| `test`         | `47 passed`                                             |
+| `test`         | `0 failed` — every test file passes                     |
 | `build`        | `✓ Compiled successfully`                               |
 
-**Reading failures:** an error naming a *missing file* (`Can't resolve
+**Read `0 failed`, not a total.** This table used to name an exact count and it
+was wrong for fifty versions — it still said `47 passed` when the suite had
+grown past eight hundred. A number that has to be edited by hand every release
+is a number that will be stale, and a stale expectation trains you to ignore the
+one line that matters. The delivery note for each version says how many tests it
+added; the only thing to check here is that none failed.
+
+The suite is slower on Windows than the figures in any release note: NTFS and a
+virus scanner make every module read cost something, so `collect` can take a
+minute where it takes seconds elsewhere. That is normal and not a failure.
+
+**Reading failures:** an error naming a _missing file_ (`Can't resolve
 '../styles/tokens.css'`, `No files matching the pattern`) almost always means
 Step 2 didn't complete — re-run it before debugging anything else. Errors about
-*code* are real; send me the output.
+_code_ are real; send me the output.
 
 ---
 
 ## Step 5 — look at the actual UI
 
-Automated checks cannot tell you whether a page *looks* right.
+Automated checks cannot tell you whether a page _looks_ right.
 
 ```powershell
 npm run dev

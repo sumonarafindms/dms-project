@@ -39,6 +39,7 @@
  */
 
 import { fmtMoney, fmtNumber } from "./format";
+import { gaTierLine, type GaTiers } from "./ga-category";
 
 /** How a feed's newest day relates to the newest day data is due. */
 export type FeedFreshness =
@@ -54,6 +55,8 @@ export type FeedDay = {
   freshness: FeedFreshness;
   /** Whole days between `date` and the last due day. 0 unless `behind`. */
   daysBehind: number;
+  /** For GA: the 170/300 split of `value`. Absent for a feed that has no tiers. */
+  tiers?: GaTiers | null;
 };
 
 /** Whole days from one `YYYY-MM-DD` to another. Negative when `to` is earlier. */
@@ -68,11 +71,11 @@ export function daysBetweenYmd(from: string, to: string): number {
  * legitimately be uploaded the same day it covers, and flagging that would be
  * noise.
  */
-export function feedDay(date: string | null, value: number, lastDue: string): FeedDay {
-  if (!date) return { date: null, value: 0, freshness: "none", daysBehind: 0 };
+export function feedDay(date: string | null, value: number, lastDue: string, tiers?: GaTiers | null): FeedDay {
+  if (!date) return { date: null, value: 0, freshness: "none", daysBehind: 0, tiers: null };
   const behind = daysBetweenYmd(date, lastDue);
-  if (behind <= 0) return { date, value, freshness: "current", daysBehind: 0 };
-  return { date, value, freshness: "behind", daysBehind: behind };
+  if (behind <= 0) return { date, value, freshness: "current", daysBehind: 0, tiers };
+  return { date, value, freshness: "behind", daysBehind: behind, tiers };
 }
 
 export type DailyFeedKey = "ga" | "c2c";
@@ -144,6 +147,8 @@ export function dailyFeedItems(snapshot: DailySnapshot, feeds: DailyFeedKey[] = 
     label: feedDayLabel(FEED_NAME[key], snapshot[key]),
     value: key === "c2c" ? fmtMoney(snapshot[key].value) : fmtNumber(snapshot[key].value),
     tone: feedDayTone(snapshot[key]),
+    // The day's own 170/300 split, under the day's own figure.
+    note: gaTierLine(snapshot[key].tiers),
   }));
 }
 

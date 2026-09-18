@@ -49,11 +49,16 @@ export default async function LsoPending({
     },
   ];
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <RetailerReportView
       title="LSO Pending"
       subtitle={`Complete at ৳${LSO_MIN_MONTHLY_AMOUNT} and ${LSO_MIN_MONTHLY_TRANSACTIONS} transactions in one month • Closest to complete first`}
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("lso", range)}

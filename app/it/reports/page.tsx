@@ -58,13 +58,17 @@ export default async function ReportsHome({ searchParams }: { searchParams: Prom
   const warning = readinessWarning(readiness.feeds);
   const q = rangeQuery(range);
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <main className="page">
       <PageHeader
         title="Reporting Center"
         subtitle="Operational reports, performance summaries and daily business insights"
       />
-      <ReportDateBar range={range} />
+      <ReportDateBar range={range} nowIso={nowIso} />
 
       <SectionHead
         title="Data readiness"

@@ -53,6 +53,10 @@ export default async function ReadinessPage({
   const covered = report.feeds.reduce((a, f) => a + f.covered, 0);
   const problems = report.feeds.flatMap((f) => f.problems.map((d) => ({ ...d, label: f.label })));
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <main className="page">
       <PageHeader
@@ -64,7 +68,7 @@ export default async function ReadinessPage({
           </LinkBtn>
         }
       />
-      <ReportDateBar range={range} />
+      <ReportDateBar range={range} nowIso={nowIso} />
 
       <SummaryStrip
         items={[

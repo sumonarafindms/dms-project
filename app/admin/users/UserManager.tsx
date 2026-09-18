@@ -207,7 +207,7 @@ export default function UserManager({
 
       <SectionHead title="Create authorized account" sub="Mobile + PIN access linked to the correct DMS role." />
       <Card className="kit-mb-20" padded="lg">
-        <form onSubmit={create}>
+        <form method="post" onSubmit={create}>
           <div className="kit-form-grid">
             <Field label="Role">
               <select className="kit-select" value={role} onChange={(e) => setRole(e.target.value)}>
@@ -336,7 +336,7 @@ export default function UserManager({
             </>
           }
         >
-          <form id="edit-login-form" onSubmit={saveEdit}>
+          <form method="post" id="edit-login-form" onSubmit={saveEdit}>
             <div className="kit-form-grid">
               <Field label="Display name">
                 <input className="kit-input" name="displayName" defaultValue={editing.displayName} required />

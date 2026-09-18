@@ -18,6 +18,8 @@ import { Icon } from "./icons";
 import { TARGET_BAND_LABEL, targetBand, targetPercent } from "../../lib/achievement";
 import type { TargetBand } from "../../lib/achievement";
 import { perDayLabel, riskTone } from "../../lib/pacing";
+import { gaTierLine } from "../../lib/ga-category";
+import type { GaTiers } from "../../lib/ga-category";
 import { COMPARISON_KINDS, COMPARISON_KIND_LABEL, changeLabel, changeTone } from "../../lib/comparison";
 import type { ComparisonKind } from "../../lib/comparison";
 import type { MetricComparison } from "../../lib/comparison-data";
@@ -82,11 +84,14 @@ export function MetricBar({
   achieved,
   target,
   unit = "",
+  tiers,
 }: {
   label: string;
   achieved: number;
   target: number;
   unit?: string;
+  /** For a GA bar: the 170/300 split of `achieved`. */
+  tiers?: GaTiers | null;
 }) {
   const p = targetPercent(achieved, target);
   const band = targetBand(p);
@@ -113,6 +118,7 @@ export function MetricBar({
         </span>
       </div>
       <Bar value={p} />
+      <TierLine tiers={tiers} />
     </div>
   );
 }
@@ -345,13 +351,20 @@ export function Card({
   );
 }
 
-export function SummaryStrip({ items }: { items: { label: string; value: ReactNode; tone?: "brand" | "amber" }[] }) {
+export function SummaryStrip({
+  items,
+}: {
+  items: { label: string; value: ReactNode; tone?: "brand" | "amber"; note?: ReactNode }[];
+}) {
   return (
     <div className="kit-summary-strip">
       {items.map((it) => (
         <div className="kit-card" key={it.label}>
           <span className="kit-label">{it.label}</span>
           <strong className={it.tone ? `tone-${it.tone}` : undefined}>{it.value}</strong>
+          {/* `note` carries the 170/300 split under a GA tile. Same class as
+              everywhere else the split appears, so it reads the same size. */}
+          {it.note ? <p className="kit-tier-line">{it.note}</p> : null}
         </div>
       ))}
     </div>
@@ -365,6 +378,25 @@ export function SummaryStrip({ items }: { items: { label: string; value: ReactNo
  * unconditionally and a clean day stays quiet. `role="status"` rather than
  * `alert`: stale data is worth reading, not worth interrupting.
  */
+/**
+ * The 170 / 300 split under a GA figure.
+ *
+ * The owner's request: *"ga ar jai block gula thakbe oi gula niche show hobe
+ * 170 takar sim koita and 300 takar sim koita — only normal sim"*, so that an
+ * RSO or BP can see which SIM is moving and a supervisor can read the market.
+ *
+ * One component rather than a line of JSX repeated on nine screens, for the
+ * reason "Latest GA" ended up on three screens in v175 with no way to change
+ * it once. It renders nothing when there is nothing to split, so a caller can
+ * drop it in unconditionally and a month with no sales stays quiet instead of
+ * printing "GA 170 0 · GA 300 0".
+ */
+export function TierLine({ tiers }: { tiers: GaTiers | null | undefined }) {
+  const line = gaTierLine(tiers);
+  if (!line) return null;
+  return <p className="kit-tier-line">{line}</p>;
+}
+
 export function FeedNote({ note }: { note: string | null }) {
   if (!note) return null;
   return (
@@ -482,7 +514,7 @@ export function HeroRing({
 }: {
   label: string;
   percent: number;
-  figures: { label: string; value: ReactNode; tone?: "brand" | "amber" }[];
+  figures: { label: string; value: ReactNode; tone?: "brand" | "amber"; tiers?: GaTiers | null }[];
 }) {
   return (
     <Card className="kit-hero-ring">
@@ -494,6 +526,7 @@ export function HeroRing({
           <div key={f.label}>
             <strong className={f.tone ? `tone-${f.tone}` : undefined}>{f.value}</strong>
             <span>{f.label}</span>
+            <TierLine tiers={f.tiers} />
           </div>
         ))}
       </div>
@@ -541,6 +574,7 @@ export function Row({
   detail,
   value,
   valueSub,
+  tiers,
   after,
   href,
 }: {
@@ -551,6 +585,14 @@ export function Row({
   detail?: ReactNode;
   value?: ReactNode;
   valueSub?: ReactNode;
+  /**
+   * A GA row's 170/300 split.
+   *
+   * It goes in the MAIN column, not beside the figure: the value column is a
+   * couple of characters wide on a phone, and "GA 170 5 · GA 300 2" wrapped
+   * there would push the row's own name to an ellipsis.
+   */
+  tiers?: GaTiers | null;
   after?: ReactNode;
   href?: string;
 }) {
@@ -566,6 +608,7 @@ export function Row({
         <strong>{title}</strong>
         {sub && <span>{sub}</span>}
         {detail && <small>{detail}</small>}
+        <TierLine tiers={tiers} />
       </div>
       {(value !== undefined || valueSub) && (
         <div className="kit-row-value">
@@ -769,11 +812,14 @@ export function KpiCard({
   target,
   unit = "",
   pace,
+  tiers,
 }: {
   label: string;
   achieved: number;
   target: number;
   unit?: string;
+  /** For a GA card: the 170/300 split of `achieved`. */
+  tiers?: GaTiers | null;
   /**
    * Optional pacing, computed by the CALLER rather than here.
    *
@@ -821,6 +867,7 @@ export function KpiCard({
         </div>
         {hasTarget && <Ring value={p} size={40} stroke={4} />}
       </div>
+      <TierLine tiers={tiers} />
       {hasTarget ? (
         <>
           <div className="kit-mt-10">
@@ -1115,7 +1162,7 @@ export function EntityCard({
   name: string;
   code: string;
   percent: number;
-  metrics: { label: string; achieved: number; target: number; unit?: string }[];
+  metrics: { label: string; achieved: number; target: number; unit?: string; tiers?: GaTiers | null }[];
   footer?: ReactNode;
 }) {
   return (
@@ -1132,7 +1179,14 @@ export function EntityCard({
       {metrics.length > 0 && (
         <div className="kit-entity-metrics">
           {metrics.map((m) => (
-            <MetricBar key={m.label} label={m.label} achieved={m.achieved} target={m.target} unit={m.unit} />
+            <MetricBar
+              key={m.label}
+              label={m.label}
+              achieved={m.achieved}
+              target={m.target}
+              unit={m.unit}
+              tiers={m.tiers}
+            />
           ))}
         </div>
       )}

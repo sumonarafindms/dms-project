@@ -120,6 +120,10 @@ const configs: Record<string, RoleConfig> = {
       { href: "/manager/attention", label: "Attention", icon: "target", module: "attention" },
       { href: "/manager/supervisors", label: "Supervisors", icon: "users", module: "employees" },
       { href: "/manager/rsos", label: "RSOs", icon: "chart", module: "performance" },
+      // The manager has held `retailers: view` since the permissions were
+      // written; the entry was simply never added, so the module was
+      // unreachable except by typing the URL.
+      { href: "/manager/retailers", label: "Retailers", icon: "shop", module: "retailers" },
       { href: "/manager/bp-activations", label: "BP Activations", icon: "sim", module: "bp" },
     ],
     bottom: [],

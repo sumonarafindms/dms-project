@@ -117,7 +117,18 @@ for (const role of ROLES) {
 
     test(`${role.key} can load all ${routes.length} of its routes`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== WIDTH_PROJECT, `breadth sweep runs at ${WIDTH_PROJECT} only`);
-      test.setTimeout(180_000);
+      /*
+       * The budget scales with the work, because one number cannot fit both.
+       *
+       * A flat 180s fitted BP's three routes with hours to spare and did not
+       * fit ADMIN's or IT's fifty-three: at production volume those sweeps
+       * take about three minutes, and both failed on the timeout alone with
+       * no route having failed. That is the same mistake v179 found one level
+       * down in this very file — a fixed 400ms sleep that was a bet on how
+       * fast the machine and the data were — so the budget is now stated as
+       * what it actually is: a base, plus an allowance per route.
+       */
+      test.setTimeout(60_000 + routes.length * 6_000);
 
       /*
        * Collect Content-Security-Policy violations from every page this sweep
@@ -162,7 +173,33 @@ for (const role of ROLES) {
           }
           if (!resolved.has(route)) {
             await page.goto(parent.from).catch(() => null);
-            await page.waitForTimeout(400);
+            /*
+             * WAIT FOR THE LINK, never for a fixed number of milliseconds.
+             *
+             * This slept 400ms and then looked. At the seeded volume the list
+             * was always up by then; against a production-sized database
+             * (2,190 retailers) `/admin/retailers` takes about 2.2 seconds, so
+             * the sweep looked at an empty page and reported
+             * "no link found — page NOT covered (empty list?)" for three roles
+             * at once. The parenthesis was the tell: the check was guessing,
+             * and it guessed at the application.
+             *
+             * A fixed sleep is a bet on how fast the machine and the data are.
+             * This waits for the thing it is about to read, and still fails —
+             * correctly — if the list really is empty.
+             */
+            await page
+              .waitForFunction(
+                (pattern: string) => {
+                  const re = new RegExp(pattern);
+                  return Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]")).some((a) =>
+                    re.test(a.getAttribute("href") || ""),
+                  );
+                },
+                parent.match.source,
+                { timeout: 15_000 },
+              )
+              .catch(() => null);
             const href = await page.evaluate((pattern: string) => {
               const re = new RegExp(pattern);
               for (const a of Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))) {
@@ -177,7 +214,9 @@ for (const role of ROLES) {
           if (!found) {
             // No row to click through to. Reported, not silently passed: an
             // empty parent means this detail page went unchecked.
-            failures.push(`${route}: no link found on ${parent.from} — page NOT covered (empty list?)`);
+            failures.push(
+              `${route}: no link matching ${parent.match.source} on ${parent.from} after 15s — page NOT covered`,
+            );
             continue;
           }
           url = found;

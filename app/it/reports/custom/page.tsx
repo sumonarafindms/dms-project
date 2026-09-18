@@ -74,11 +74,16 @@ export default async function CustomReport({
   const levelParam = level === "supervisor" ? undefined : level;
   const fieldsParam = active.join(",");
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <GroupedReportView
       title="Custom Report"
       subtitle={`${CUSTOM_LEVELS.find((l) => l.key === level)!.label} level`}
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("custom", range, {

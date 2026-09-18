@@ -1,5 +1,7 @@
 "use client";
 
+import type { GaTiers } from "../../lib/ga-category";
+
 /**
  * RSO detail — migrated to the role-UI kit.
  *
@@ -31,6 +33,8 @@ type Perf = {
   lsoTarget: number;
   gaAchieved: number;
   gaTarget: number;
+  ga170: number;
+  ga300: number;
   c2cAchieved: number;
   c2cTarget: number;
   totalRechargeAchieved: number;
@@ -47,6 +51,7 @@ type RetailerRow = {
   /** False for a deactivated outlet that still traded inside the period. */
   active?: boolean;
   ga: number;
+  gaTiers: GaTiers;
   lso: boolean;
   c2cAmount: number;
 };
@@ -172,7 +177,13 @@ export function EmployeeDetailView({
 
       <SectionHead title="Target progress" sub="For the selected date range." />
       <div className="kit-kpi-grid kit-mb-20">
-        <KpiCard label="GA" achieved={p.gaAchieved} target={p.gaTarget} pace={paceFor(p.gaTarget, p.gaAchieved)} />
+        <KpiCard
+          label="GA"
+          achieved={p.gaAchieved}
+          target={p.gaTarget}
+          pace={paceFor(p.gaTarget, p.gaAchieved)}
+          tiers={{ total: p.gaAchieved, ga170: p.ga170, ga300: p.ga300 }}
+        />
         <KpiCard
           label="C2C"
           achieved={Math.round(p.c2cAchieved)}
@@ -225,6 +236,7 @@ export function EmployeeDetailView({
                 }
                 value={r.ga}
                 valueSub="GA"
+                tiers={r.gaTiers}
               />
             ))}
           </div>

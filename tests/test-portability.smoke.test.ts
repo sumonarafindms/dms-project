@@ -81,6 +81,37 @@ describe("the guards run on every platform", () => {
     expect(r(path.join(__dirname, "..", "lib", "report-builders.ts"))).toBe("lib/report-builders.ts");
   });
 
+  it("has no test transforming a .tsx module inside a test body", () => {
+    /*
+     * The second Windows-only failure, and the same shape as the first.
+     *
+     * A `.tsx` module has to be transformed by Vite before it can be imported.
+     * At the top of a file that cost belongs to `collect`, which has no
+     * per-test stopwatch. Inside a test body it belongs to the test, and on the
+     * owner's Windows machine — `transform 19.7s` against 1.5s here — nine
+     * assertions against a pure function took 5.14 seconds and blew the 5s
+     * default. The code was correct, the test was correct, and the only thing
+     * wrong was where the import was written.
+     *
+     * `testTimeout` in vitest.config.ts is now 30s, so this would no longer
+     * fail. That is not a reason to allow it: a test whose duration is
+     * dominated by a first-time transform is measuring the disk.
+     */
+    const offenders = testFiles()
+      .filter((f) => f.name !== "test-portability.smoke.test.ts")
+      .filter(
+        (f) =>
+          /await\s+import\s*\(\s*["'][^"']*\.tsx?["']\s*\)/.test(codeOf(f.src)) ||
+          /await\s+import\s*\(\s*["']\.\.\/app\/[^"']*["']\s*\)/.test(codeOf(f.src)),
+      )
+      .map((f) => f.name);
+    expect(
+      offenders,
+      `these tests pay a Vite transform inside a test body and will be slow or flaky on Windows:\n  ${offenders.join("\n  ")}\n` +
+        `Import the module at the top of the file instead.`,
+    ).toEqual([]);
+  });
+
   it("compares paths only against forward-slash literals", () => {
     /*
      * A test could normalise correctly and still be wrong the other way round,

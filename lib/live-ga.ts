@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import { ImportType } from "@prisma/client";
-import { withStandardGa } from "./business-rules";
+import { classifyGaActivation, withStandardGa } from "./business-rules";
+import { addTier, addTiers, noTiers, type GaTiers } from "./ga-category";
+import { currentGa170Tariff } from "./ga-tariff";
 import { standardGaByAssignment } from "./bp-activations";
 import { managerScope } from "./manager-scope";
 import { businessDayBounds, dhakaTodayYmd } from "./business-time";
@@ -78,7 +80,8 @@ export type LiveRow = {
   name: string;
   /** A code, a mobile number — whatever identifies this row to a human. */
   meta: string | null;
-  count: number;
+  /** The day's standard GA, with its 170/300 split. */
+  count: GaTiers;
   /** Set when this row can be opened to see the level below it. */
   href?: string;
 };
@@ -94,7 +97,8 @@ export type LiveSection = {
 export type LiveGa = {
   date: string;
   /** What this viewer's own total is — the headline number. */
-  total: number;
+  /** The day's standard GA for this scope, with its 170/300 split. */
+  total: GaTiers;
   /** "Supervisors", "RSOs", "Retailers" … whatever the headline counts over. */
   scope: string;
   sections: LiveSection[];
@@ -129,12 +133,23 @@ export async function lastGaUpload() {
  */
 async function gaByRetailer(ymd: string, retailerWhere: Record<string, unknown> = {}) {
   const { start, end } = gaDayBounds(ymd);
-  const groups = await prisma.gaActivation.groupBy({
-    by: ["retailerId"],
-    where: withStandardGa({ activationDate: { gte: start, lt: end }, retailer: retailerWhere }),
-    _count: { _all: true },
-  });
-  return new Map(groups.map((g) => [g.retailerId, g._count._all]));
+  // `productCode` and `sellingPrice` join the keys so the tier split rides back
+  // with the totals rather than costing a second pass over the same day.
+  const [groups, tariff] = await Promise.all([
+    prisma.gaActivation.groupBy({
+      by: ["retailerId", "productCode", "sellingPrice"],
+      where: withStandardGa({ activationDate: { gte: start, lt: end }, retailer: retailerWhere }),
+      _count: { _all: true },
+    }),
+    currentGa170Tariff(),
+  ]);
+  const out = new Map<string, GaTiers>();
+  for (const g of groups) {
+    const tiers = out.get(g.retailerId) ?? noTiers();
+    addTier(tiers, classifyGaActivation(g, tariff), g._count._all);
+    out.set(g.retailerId, tiers);
+  }
+  return out;
 }
 
 /** The BP assignments in scope, with each one's count for the day. */
@@ -158,17 +173,25 @@ async function bpRows(ymd: string, where: Record<string, unknown>): Promise<Live
       id: a.id,
       name: a.retailer.retailerName || a.retailer.retailerCode,
       meta: `${a.retailer.retailerCode}${a.employee?.name ? ` · ${a.employee.name}` : ""}`,
-      count: counts.get(a.id) ?? 0,
+      count: counts.get(a.id) ?? noTiers(),
     }))
-    .sort((x, y) => y.count - x.count || x.name.localeCompare(y.name));
+    .sort((x, y) => y.count.total - x.count.total || x.name.localeCompare(y.name));
 }
 
 /**
  * Sums a per-retailer map over a set of retailers grouped by some owner.
  * Retailers with no activation today simply are not in the map.
  */
-function totalFor(counts: Map<string, number>, retailerIds: string[]) {
-  return retailerIds.reduce((n, id) => n + (counts.get(id) ?? 0), 0);
+/** Adds up a list of rows' tiers — the headline over a section. */
+function sumRows(rows: { count: GaTiers }[]): GaTiers {
+  return rows.reduce<GaTiers>((acc, r) => addTiers(acc, r.count), noTiers());
+}
+
+function totalFor(counts: Map<string, GaTiers>, retailerIds: string[]): GaTiers {
+  return retailerIds.reduce<GaTiers>((acc, id) => {
+    const t = counts.get(id);
+    return t ? addTiers(acc, t) : acc;
+  }, noTiers());
 }
 
 export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFocus?: string | null): Promise<LiveGa> {
@@ -177,15 +200,15 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
 
   /* ---------------------------------------------------------------- BP */
   if (viewer.role === "BP") {
-    if (!viewer.bpRetailerId) return { ...base, total: 0, scope: "Your activations", sections: [] };
+    if (!viewer.bpRetailerId) return { ...base, total: noTiers(), scope: "Your activations", sections: [] };
     const rows = await bpRows(ymd, { retailerId: viewer.bpRetailerId });
-    return { ...base, total: rows.reduce((n, r) => n + r.count, 0), scope: "Your activations", sections: [] };
+    return { ...base, total: sumRows(rows), scope: "Your activations", sections: [] };
   }
 
   /* --------------------------------------------------------------- RSO */
   if (viewer.role === "RSO") {
     const employeeId = viewer.employeeId;
-    if (!employeeId) return { ...base, total: 0, scope: "Your activations", sections: [] };
+    if (!employeeId) return { ...base, total: noTiers(), scope: "Your activations", sections: [] };
 
     const retailers = await prisma.retailer.findMany({
       where: { employeeId, active: true },
@@ -199,14 +222,14 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
      * list is the day's work, not the territory.
      */
     const active = retailers
-      .filter((r) => (counts.get(r.id) ?? 0) > 0)
+      .filter((r) => (counts.get(r.id)?.total ?? 0) > 0)
       .map((r) => ({
         id: r.id,
         name: r.retailerName || r.retailerCode,
         meta: [r.retailerCode, r.iTopUpNumber].filter(Boolean).join(" · "),
-        count: counts.get(r.id) ?? 0,
+        count: counts.get(r.id) ?? noTiers(),
       }))
-      .sort((x, y) => y.count - x.count || x.name.localeCompare(y.name));
+      .sort((x, y) => y.count.total - x.count.total || x.name.localeCompare(y.name));
 
     const bps = await bpRows(ymd, { employeeId });
     return {
@@ -226,7 +249,7 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
   /* -------------------------------------------------- SUPERVISOR level */
   if (viewer.role === "SUPERVISOR") {
     const supervisorId = viewer.supervisorId;
-    if (!supervisorId) return { ...base, total: 0, scope: "Your team", sections: [] };
+    if (!supervisorId) return { ...base, total: noTiers(), scope: "Your team", sections: [] };
     return teamView(ymd, { supervisorId, active: true }, { employee: { supervisorId } }, base, "Your team");
   }
 
@@ -280,14 +303,17 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
       id: s.id,
       name: s.name,
       meta: `${s.employees.length} RSO${s.employees.length === 1 ? "" : "s"}`,
-      count: s.employees.reduce((n, e) => n + totalFor(counts, byEmployee.get(e.id) ?? []), 0),
+      count: s.employees.reduce<GaTiers>(
+        (acc, e) => addTiers(acc, totalFor(counts, byEmployee.get(e.id) ?? [])),
+        noTiers(),
+      ),
       href: `/live-ga?supervisor=${encodeURIComponent(s.name)}`,
     }))
-    .sort((x, y) => y.count - x.count || x.name.localeCompare(y.name));
+    .sort((x, y) => y.count.total - x.count.total || x.name.localeCompare(y.name));
 
   return {
     ...base,
-    total: rows.reduce((n, r) => n + r.count, 0),
+    total: sumRows(rows),
     scope: "Everyone",
     sections: [{ key: "supervisors", title: "Supervisors", empty: "No supervisor is active.", rows }],
   };
@@ -329,7 +355,7 @@ async function teamView(
       meta: [e.employeeCode, e.rsoMsisdn].filter(Boolean).join(" · ") || null,
       count: totalFor(counts, byEmployee.get(e.id) ?? []),
     }))
-    .sort((x, y) => y.count - x.count || x.name.localeCompare(y.name));
+    .sort((x, y) => y.count.total - x.count.total || x.name.localeCompare(y.name));
 
   const bps = await bpRows(ymd, bpWhere);
 
@@ -341,7 +367,7 @@ async function teamView(
    */
   return {
     ...base,
-    total: rsoRows.reduce((n, r) => n + r.count, 0),
+    total: sumRows(rsoRows),
     scope,
     sections: [
       { key: "rsos", title: "RSOs", empty: "No RSO is active in this team.", rows: rsoRows },

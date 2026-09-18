@@ -129,7 +129,7 @@ function ChangeCredential({ role, onDone }: { role: string; onDone: () => void }
   );
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="kit-form-grid">
         {field(`Current ${rules.noun}`, current, setCurrent, "current-password", false)}
         {field(`New ${rules.noun}`, next, setNext, "new-password")}

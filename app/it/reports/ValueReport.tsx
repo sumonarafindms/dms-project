@@ -22,12 +22,15 @@ export type { ValueGroup };
 export async function ValueReport({
   metric,
   range,
+  nowIso,
   group,
   page,
   q,
 }: {
   metric: "c2c" | "c2s";
   range: ReportRange;
+  /** The server's clock — see ReportDateBar's note on nowIso. */
+  nowIso: string;
   group: ValueGroup;
   page?: string;
   q?: string;
@@ -68,6 +71,7 @@ export async function ValueReport({
       title={`${label} Report`}
       subtitle={hasTarget ? "Value against target" : "Retail sales value"}
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref(metric, range, groupParam ? { group: groupParam } : {})}

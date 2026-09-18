@@ -58,6 +58,10 @@ export default async function ActivationReport({
     },
   ];
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <main className="page">
       <Link href={`/it/reports?${rangeQuery(range)}`} className="kit-detail-back no-print">
@@ -73,7 +77,7 @@ export default async function ActivationReport({
           />
         }
       />
-      <ReportDateBar range={range} />
+      <ReportDateBar range={range} nowIso={nowIso} />
       <div className="kit-report-presets no-print kit-mb-12">
         {ACTIVATION_GROUPS.map((g) => (
           <Link

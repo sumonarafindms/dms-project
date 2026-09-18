@@ -145,7 +145,9 @@ for (const role of ROLES) {
             );
           })
           .join("\n");
-        throw new Error(`${role.key}: ${byRule.size} blocking accessibility rule(s) across ${scanned} routes\n${report}`);
+        throw new Error(
+          `${role.key}: ${byRule.size} blocking accessibility rule(s) across ${scanned} routes\n${report}`,
+        );
       }
 
       // A sweep that scanned nothing is not a passing sweep.

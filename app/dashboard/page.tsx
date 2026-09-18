@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../components/icons";
+import { fmtNumber } from "../../lib/format";
 import { dhakaMonth } from "../../lib/business-time";
 import { ACHIEVEMENT_ON_TRACK_PERCENT, ACHIEVEMENT_WATCH_PERCENT } from "../../lib/achievement";
 import { pacing } from "../../lib/pacing";
@@ -47,6 +48,8 @@ type ApiRow = {
   retailerCount: number;
   gaTarget: number;
   gaAchieved: number;
+  ga170: number;
+  ga300: number;
   ssoTarget: number;
   ssoAchieved: number;
   c2cTarget: number;
@@ -61,7 +64,16 @@ type ApiRow = {
   bp: BpPortion;
 };
 
-const fmt = (n: number) => new Intl.NumberFormat("en-BD", { maximumFractionDigits: 0 }).format(n);
+/*
+ * `fmtNumber`, not a local `Intl.NumberFormat("en-BD", …)`.
+ *
+ * This page had its own formatter pinned to a different locale from the rest of
+ * the app, so the same figure was grouped `1,23,456` here and `123,456`
+ * everywhere else. v169 pinned every figure in the product to one locale for
+ * exactly this reason; the guard it added looks for a bare `toLocaleString()`
+ * and an explicit `Intl.NumberFormat` slipped under it.
+ */
+const fmt = (n: number) => fmtNumber(Math.round(n));
 const pct = (a: number, t: number) => (t ? Math.round((a / t) * 100) : 0);
 
 export default function Dashboard() {

@@ -54,15 +54,19 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
 
   const monthKey = dhakaMonth();
   const month = `${monthKey}-01`;
-  const [rows, attentionRows, daily] = await Promise.all([
+  /*
+   * The comparison joins the batch below rather than following it — it needs
+   * only the URL, never the batch's results. See lib/performance.ts: locally a
+   * second wait is invisible, and in production it is a network round trip.
+   */
+  const sp = await searchParams;
+  const compareKind = parseComparisonKind(sp.compare);
+  const [rows, attentionRows, daily, comparison] = await Promise.all([
     employeePerformance(month, ids),
     retailerOpportunities(monthKey, ids),
     latestDailySnapshot(ids),
+    performanceComparison(compareKind, ids),
   ]);
-
-  const sp = await searchParams;
-  const compareKind = parseComparisonKind(sp.compare);
-  const comparison = await performanceComparison(compareKind, ids);
 
   const attention = attentionRows.filter((x) => x.priority > 0).length;
   const retailers = rows.reduce((a, r) => a + r.retailerCount, 0);
@@ -116,6 +120,7 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
           achieved={team.gaAchieved}
           target={team.gaTarget}
           pace={paceFor("gaTarget", "gaAchieved")}
+          tiers={{ total: team.gaAchieved, ga170: team.ga170, ga300: team.ga300 }}
         />
         <KpiCard
           label="SSO"
@@ -173,7 +178,12 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
                 code={`${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount} retailers`}
                 percent={pct(r.totalRechargeAchieved, r.totalRechargeTarget)}
                 metrics={[
-                  { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
+                  {
+                    label: "GA",
+                    achieved: r.gaAchieved,
+                    target: r.gaTarget,
+                    tiers: { total: r.gaAchieved, ga170: r.ga170, ga300: r.ga300 },
+                  },
                   { label: "Recharge", achieved: r.totalRechargeAchieved, target: r.totalRechargeTarget, unit: "৳" },
                 ]}
               />
@@ -198,7 +208,12 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
               code={`${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount} retailers`}
               percent={pct(r.totalRechargeAchieved, r.totalRechargeTarget)}
               metrics={[
-                { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
+                {
+                  label: "GA",
+                  achieved: r.gaAchieved,
+                  target: r.gaTarget,
+                  tiers: { total: r.gaAchieved, ga170: r.ga170, ga300: r.ga300 },
+                },
                 { label: "LSO", achieved: r.lsoAchieved, target: r.lsoTarget },
               ]}
             />

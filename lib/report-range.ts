@@ -80,9 +80,16 @@ function previousMonthRange(ymd: string): ReportRange {
   return { from, to: `${from.slice(0, 8)}${String(lastDay).padStart(2, "0")}` };
 }
 
-export function rangePresets(): { label: string; range: ReportRange }[] {
-  const today = dhakaTodayYmd();
-  const yesterday = dhakaYesterdayYmd();
+/**
+ * `now` is a parameter, not a clock read, because the only caller is a CLIENT
+ * component: it renders once on the server for the initial HTML and again in
+ * the browser on hydration. Reading the clock here meant reading two of them,
+ * and across a Dhaka midnight the two renders disagree about every preset —
+ * the hydration mismatch `EmployeeDetailView` already carries a note about.
+ */
+export function rangePresets(now?: Date): { label: string; range: ReportRange }[] {
+  const today = dhakaTodayYmd(now);
+  const yesterday = dhakaYesterdayYmd(now);
   return [
     { label: "Yesterday", range: { from: yesterday, to: yesterday } },
     { label: "Today", range: { from: today, to: today } },

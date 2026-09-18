@@ -14,7 +14,9 @@ import { monthBounds } from "./month";
  */
 import { dhakaTodayYmd, dhakaYesterdayYmd, businessDayBounds } from "./business-time";
 import { feedDay } from "./feed-day";
-import { withStandardGa } from "./business-rules";
+import { classifyGaActivation, withStandardGa } from "./business-rules";
+import { addTier, noTiers, type GaTiers } from "./ga-category";
+import { currentGa170Tariff } from "./ga-tariff";
 
 export function monthPace(month: string, now = new Date()) {
   const { start, end } = monthBounds(month);
@@ -83,17 +85,31 @@ export async function latestDailySnapshot(employeeIds?: string[], now = new Date
   ]);
   const c2cYmd = ymd(latestC2c?.date);
 
-  const [gaCount, c2cSum] = await Promise.all([
+  /*
+   * The GA day is GROUPED rather than counted, so the tile's 170/300 split
+   * comes back from the query that was already being run. `productCode` and
+   * `sellingPrice` are the only extra keys; the result is a handful of rows.
+   */
+  const [gaGroups, c2cSum, tariff] = await Promise.all([
     gaYmd
-      ? prisma.gaActivation.count({ where: { AND: [gaScope, { activationDate: dayRange(gaYmd) }] } })
-      : Promise.resolve(0),
+      ? prisma.gaActivation.groupBy({
+          by: ["productCode", "sellingPrice"],
+          where: { AND: [gaScope, { activationDate: dayRange(gaYmd) }] },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
     c2cYmd
       ? prisma.c2cRecord.aggregate({ _sum: { amount: true }, where: { ...c2cScope, date: dayRange(c2cYmd) } })
       : Promise.resolve(null),
+    currentGa170Tariff(),
   ]);
+  const gaTiers = gaGroups.reduce<GaTiers>(
+    (acc, g) => addTier(acc, classifyGaActivation(g, tariff), g._count._all),
+    noTiers(),
+  );
 
   return {
-    ga: feedDay(gaYmd, gaCount, lastDue),
+    ga: feedDay(gaYmd, gaTiers.total, lastDue, gaTiers),
     c2c: feedDay(c2cYmd, Number(c2cSum?._sum.amount ?? 0), lastDue),
   };
 }

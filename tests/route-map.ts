@@ -92,6 +92,7 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/manager/attention": ["MANAGER"],
   "/manager/bp-activations": ["MANAGER"],
   "/manager/bp-activations/[id]": ["MANAGER"],
+  "/manager/retailers": ["MANAGER"],
   "/manager/retailers/[id]": ["MANAGER"],
   "/manager/rsos": ["MANAGER"],
   "/manager/rsos/[id]": ["MANAGER"],

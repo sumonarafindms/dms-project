@@ -3,7 +3,8 @@ import { prisma } from "./prisma";
 import { monthBounds } from "./month";
 import { normalizeMonth } from "./drilldown";
 import { monthStartsInRange, parseYmd } from "./date-range";
-import { withGa170, withSimSwap, withStandardGa } from "./business-rules";
+import { classifyGaActivation, withGa170, withSimSwap, withStandardGa } from "./business-rules";
+import { addTier, noTiers, type GaCategory, type GaTiers } from "./ga-category";
 import { currentGa170Tariff } from "./ga-tariff";
 import { assignmentGaTarget, assignmentWindow } from "./bp-period";
 // Re-exported so the BP screens keep their existing import path; the rule
@@ -26,7 +27,8 @@ export type BpAssignmentListRow = {
   gaTarget: number;
   startDate: Date;
   endDate: Date | null;
-  monthGa: number;
+  /** The month's standard GA for this assignment, and its 170/300 split. */
+  monthGa: GaTiers;
   retailer: {
     retailerCode: string;
     retailerName: string | null;
@@ -63,37 +65,42 @@ export async function standardGaByAssignment(
   assignments: { id: string; retailerId: string; startDate: Date; endDate: Date | null }[],
   rangeStart: Date,
   rangeEnd: Date,
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+): Promise<Map<string, GaTiers>> {
+  const out = new Map<string, GaTiers>();
   if (!assignments.length) return out;
 
-  const groups = await prisma.gaActivation.groupBy({
-    by: ["retailerId", "activationDate"],
-    where: withStandardGa({
-      retailerId: { in: [...new Set(assignments.map((a) => a.retailerId))] },
-      activationDate: { gte: rangeStart, lt: rangeEnd },
+  /*
+   * `productCode` and `sellingPrice` are grouping keys so the 170/300 split
+   * comes back with the total instead of costing two more round trips. The
+   * query is the same one; the result set gains a row only where an outlet
+   * sold both tiers on the same day.
+   */
+  const [groups, tariff] = await Promise.all([
+    prisma.gaActivation.groupBy({
+      by: ["retailerId", "activationDate", "productCode", "sellingPrice"],
+      where: withStandardGa({
+        retailerId: { in: [...new Set(assignments.map((a) => a.retailerId))] },
+        activationDate: { gte: rangeStart, lt: rangeEnd },
+      }),
+      _count: { _all: true },
     }),
-    _count: { _all: true },
-  });
+    currentGa170Tariff(),
+  ]);
 
-  const byRetailer = new Map<string, { day: number; count: number }[]>();
+  const byRetailer = new Map<string, { day: number; category: GaCategory; count: number }[]>();
   for (const g of groups) {
     const list = byRetailer.get(g.retailerId) ?? [];
-    list.push({ day: g.activationDate.getTime(), count: g._count._all });
+    list.push({ day: g.activationDate.getTime(), category: classifyGaActivation(g, tariff), count: g._count._all });
     byRetailer.set(g.retailerId, list);
   }
 
   for (const a of assignments) {
     const { effectiveStart, effectiveEnd } = assignmentWindow(a, rangeStart, rangeEnd);
-    out.set(
-      a.id,
-      effectiveStart < effectiveEnd
-        ? (byRetailer.get(a.retailerId) ?? []).reduce(
-            (n, d) => (d.day >= effectiveStart.getTime() && d.day < effectiveEnd.getTime() ? n + d.count : n),
-            0,
-          )
-        : 0,
-    );
+    const tiers = noTiers();
+    if (effectiveStart < effectiveEnd)
+      for (const d of byRetailer.get(a.retailerId) ?? [])
+        if (d.day >= effectiveStart.getTime() && d.day < effectiveEnd.getTime()) addTier(tiers, d.category, d.count);
+    out.set(a.id, tiers);
   }
   return out;
 }
@@ -143,7 +150,7 @@ export async function listBpAssignments(
 
   const withCounts: BpAssignmentListRow[] = assignments.map((a) => {
     const { effectiveStart, effectiveEnd } = assignmentWindow(a, rangeStart, rangeEnd);
-    const monthGa = gaByAssignment.get(a.id) ?? 0;
+    const monthGa = gaByAssignment.get(a.id) ?? noTiers();
     const gaTarget = assignmentGaTarget(a, monthStartsInRange(effectiveStart, effectiveEnd));
     return {
       id: a.id,

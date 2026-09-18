@@ -51,6 +51,7 @@ export function GroupedReportView<T extends { id?: string }>({
   title,
   subtitle,
   range,
+  nowIso,
   rows,
   columns,
   exportHref,
@@ -64,6 +65,8 @@ export function GroupedReportView<T extends { id?: string }>({
   title: string;
   subtitle: string;
   range: ReportRange;
+  /** The server's clock, handed to ReportDateBar — see its note on nowIso. */
+  nowIso: string;
   /** Every row in the report. `paging` decides how many are rendered. */
   rows: T[];
   columns: Column<T>[];
@@ -88,7 +91,7 @@ export function GroupedReportView<T extends { id?: string }>({
         subtitle={`Report Period: ${rangeLabel(range)} • ${subtitle}`}
         action={<ReportActionBar exportHref={exportHref} rowCount={rows.length} />}
       />
-      <ReportDateBar range={range} />
+      <ReportDateBar range={range} nowIso={nowIso} />
       {children}
       <SummaryStrip items={summaryItems} />
       {search && <ReportSearch matched={search.matched} total={search.total} noun={search.noun} />}

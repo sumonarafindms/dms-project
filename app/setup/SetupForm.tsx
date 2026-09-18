@@ -19,7 +19,7 @@ export default function SetupForm() {
     r.refresh();
   }
   return (
-    <form className="auth-v54-card" onSubmit={submit}>
+    <form method="post" className="auth-v54-card" onSubmit={submit}>
       <div className="auth-v54-mobile-brand always">
         <div className="auth-v54-logo">D</div>
         <div>

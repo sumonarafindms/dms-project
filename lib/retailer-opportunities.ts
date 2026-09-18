@@ -3,6 +3,7 @@ import { monthBounds } from "./month";
 import { monthStartsInRange, monthStartUtc, parseYmd } from "./date-range";
 import { normalizeMonth } from "./drilldown";
 import {
+  classifyGaActivation,
   isLsoComplete,
   isSimSellerRetailer,
   isSsoComplete,
@@ -11,6 +12,8 @@ import {
   lsoTransactionsRemaining,
   ssoGaRemaining,
 } from "./business-rules";
+import { addTier, noTiers, type GaTiers } from "./ga-category";
+import { currentGa170Tariff } from "./ga-tariff";
 
 export type RetailerOpportunity = {
   id: string;
@@ -27,6 +30,8 @@ export type RetailerOpportunity = {
   employeeMsisdn: string;
   supervisor: string;
   ga: number;
+  /** The 170/300 split of `ga`. Adds up to it exactly. */
+  gaTiers: GaTiers;
   c2c: number;
   c2s: number;
   c2sTransactions: number;
@@ -109,14 +114,24 @@ export async function retailerOpportunities(
   ]);
 
   const gaByMonth = new Map<string, number>(),
-    gaTotal = new Map<string, number>();
+    gaTotal = new Map<string, GaTiers>();
+  /*
+   * The tier split costs nothing here: this groupBy has ALWAYS carried
+   * `productCode` and `sellingPrice` — it needs them to decide what is a
+   * standard GA at all — and only the boolean was being read. Classifying
+   * instead of testing turns the same rows into the 170/300 breakdown that
+   * every attention row, retailer card and "visit first" row now shows.
+   */
+  const tariff = await currentGa170Tariff();
   for (const x of ga) {
     if (!isStandardGaActivation(x)) continue;
     const count = x._count._all,
       mk = x.activationDate.toISOString().slice(0, 7),
       key = `${x.retailerId}|${mk}`;
     gaByMonth.set(key, (gaByMonth.get(key) || 0) + count);
-    gaTotal.set(x.retailerId, (gaTotal.get(x.retailerId) || 0) + count);
+    const tiers = gaTotal.get(x.retailerId) ?? noTiers();
+    addTier(tiers, classifyGaActivation(x, tariff), count);
+    gaTotal.set(x.retailerId, tiers);
   }
   const c2cMap = new Map(c2c.map((x) => [x.retailerId, Number(x._sum.amount || 0)]));
   const c2sMap = new Map(c2s.map((x) => [x.retailerId, Number(x._sum.amount || 0)]));
@@ -130,7 +145,8 @@ export async function retailerOpportunities(
   const monthKeys = months.map((x) => x.toISOString().slice(0, 7));
 
   return retailers.map((r) => {
-    const gaCount = gaTotal.get(r.id) || 0,
+    const gaTiers = gaTotal.get(r.id) ?? noTiers(),
+      gaCount = gaTiers.total,
       c2cAmount = c2cMap.get(r.id) || 0,
       c2sAmount = c2sMap.get(r.id) || 0,
       monthly = monthlyByRetailer.get(r.id) || [];
@@ -178,6 +194,7 @@ export async function retailerOpportunities(
       employeeMsisdn: r.employee?.rsoMsisdn || "—",
       supervisor: r.employee?.supervisor?.name || "Unassigned",
       ga: gaCount,
+      gaTiers,
       c2c: c2cAmount,
       c2s: c2sAmount,
       c2sTransactions,

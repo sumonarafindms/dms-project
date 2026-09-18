@@ -125,9 +125,7 @@ export async function expectContentFillsViewport(page: Page, where: string) {
   ).toBeGreaterThan(m.viewport * 0.6);
 
   if (m.page)
-    expect(m.page.w, `${where}: main.page is only ${m.page.w}px of ${m.viewport}px`).toBeGreaterThan(
-      m.viewport * 0.6,
-    );
+    expect(m.page.w, `${where}: main.page is only ${m.page.w}px of ${m.viewport}px`).toBeGreaterThan(m.viewport * 0.6);
 
   // A sticky bar, not a column. Stretched to the document height is the exact
   // symptom of the nav being a row flex item.

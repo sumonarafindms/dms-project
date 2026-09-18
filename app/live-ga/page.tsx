@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "../../lib/auth";
 import { buildLiveGa, dhakaToday, type LiveRow, type LiveSection } from "../../lib/live-ga";
-import { Avatar, Card, fmt } from "../components/Kit";
+import { Avatar, Card, TierLine, fmt } from "../components/Kit";
+import { addTiers, noTiers, type GaTiers } from "../../lib/ga-category";
 import { Icon } from "../components/icons";
 
 /**
@@ -35,7 +36,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 function Rows({ rows }: { rows: LiveRow[] }) {
-  const best = rows.reduce((n, r) => Math.max(n, r.count), 0);
+  const best = rows.reduce((n, r) => Math.max(n, r.count.total), 0);
   return (
     <ul className="live-list">
       {rows.map((r) => {
@@ -45,16 +46,20 @@ function Rows({ rows }: { rows: LiveRow[] }) {
             <span className="live-row-body">
               <span className="live-row-head">
                 <strong>{r.name}</strong>
-                <b className={`live-row-count${r.count ? "" : " is-zero"}`}>{fmt(r.count)}</b>
+                <b className={`live-row-count${r.count.total ? "" : " is-zero"}`}>{fmt(r.count.total)}</b>
               </span>
               {r.meta ? <small>{r.meta}</small> : null}
+              {/* The 170/300 split, on the row it belongs to — the owner's
+                  request is that it sit under every GA figure, and on this
+                  screen every row IS a GA figure. */}
+              <TierLine tiers={r.count} />
               {/*
                 Drawn only when somebody in the list actually did something —
                 a row of empty tracks under a list of zeros is decoration.
               */}
               {best > 0 ? (
                 <span className="live-row-bar" aria-hidden="true">
-                  <i style={{ width: `${Math.round((r.count / best) * 100)}%` }} />
+                  <i style={{ width: `${Math.round((r.count.total / best) * 100)}%` }} />
                 </span>
               ) : null}
             </span>
@@ -78,8 +83,8 @@ function Rows({ rows }: { rows: LiveRow[] }) {
 }
 
 function Section({ section }: { section: LiveSection }) {
-  const total = section.rows.reduce((n, r) => n + r.count, 0);
-  const active = section.rows.filter((r) => r.count > 0).length;
+  const total = section.rows.reduce<GaTiers>((acc, r) => addTiers(acc, r.count), noTiers());
+  const active = section.rows.filter((r) => r.count.total > 0).length;
   return (
     <section className="live-section">
       <header className="live-section-head">
@@ -88,7 +93,7 @@ function Section({ section }: { section: LiveSection }) {
           <span className="live-section-meta">
             {/* What the reader wants from a section header is how much of this
                 list is actually working today, not how long the list is. */}
-            <strong>{fmt(total)}</strong> GA · {active} of {section.rows.length} active
+            <strong>{fmt(total.total)}</strong> GA · {active} of {section.rows.length} active
           </span>
         ) : null}
       </header>
@@ -171,8 +176,9 @@ export default async function Page({
           </span>
         </div>
 
-        <p className="live-total">{fmt(live.total)}</p>
+        <p className="live-total">{fmt(live.total.total)}</p>
         <p className="live-total-label">GA today · {live.scope}</p>
+        <TierLine tiers={live.total} />
 
         {updated ? (
           <p className="live-updated">
@@ -186,7 +192,7 @@ export default async function Page({
           </p>
         )}
 
-        {live.total === 0 ? (
+        {live.total.total === 0 ? (
           <p className="live-note">
             {live.lastUpload
               ? "Nothing recorded for today yet. This fills in when the day's GA file is uploaded."

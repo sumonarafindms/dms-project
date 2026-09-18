@@ -1,6 +1,7 @@
 import { requireUser } from "../../../../lib/auth";
 import { listBpAssignments } from "../../../../lib/bp-activations";
 import { normalizeMonth } from "../../../../lib/drilldown";
+import { GA_CATEGORY_LABEL, addTiers, noTiers, type GaTiers } from "../../../../lib/ga-category";
 import { PageHeader, SummaryStrip } from "../../../components/Kit";
 import { EntityGrid } from "../../../components/EntityGrid";
 // A plain description, not comparators: functions cannot cross the
@@ -36,16 +37,19 @@ export default async function Page({
    * were given different targets by hand, the largest stands — the same rule
    * lib/bp-ledger.ts applies, and it never quietly lowers the goal.
    */
-  const byOutlet = new Map<string, { target: number; achieved: number }>();
+  const byOutlet = new Map<string, { target: number; achieved: GaTiers }>();
   for (const x of rows) {
     const prev = byOutlet.get(x.retailerId);
     byOutlet.set(x.retailerId, {
       target: Math.max(prev?.target ?? 0, x.gaTarget),
-      achieved: Math.max(prev?.achieved ?? 0, x.monthGa),
+      // The whole tier triple is carried, so the summary strip's split is
+      // de-duplicated by outlet exactly as its total already was.
+      achieved: (prev?.achieved.total ?? 0) >= x.monthGa.total ? (prev?.achieved ?? noTiers()) : x.monthGa,
     });
   }
   const totalT = [...byOutlet.values()].reduce((a, x) => a + x.target, 0),
-    totalA = [...byOutlet.values()].reduce((a, x) => a + x.achieved, 0);
+    totalTiers = [...byOutlet.values()].reduce<GaTiers>((a, x) => addTiers(a, x.achieved), noTiers()),
+    totalA = totalTiers.total;
   return (
     <main className="page">
       <PageHeader title="BP Performance" subtitle="BP assignments, RSO ownership and SIM activation performance." />
@@ -61,6 +65,8 @@ export default async function Page({
           },
           { label: "GA Target", value: totalT.toLocaleString("en-US") },
           { label: "GA Achieved", value: totalA.toLocaleString("en-US"), tone: "brand" },
+          { label: GA_CATEGORY_LABEL.GA_170, value: totalTiers.ga170.toLocaleString("en-US") },
+          { label: GA_CATEGORY_LABEL.GA_300, value: totalTiers.ga300.toLocaleString("en-US") },
           { label: "GA Remaining", value: Math.max(0, totalT - totalA).toLocaleString("en-US"), tone: "amber" },
         ]}
       />
@@ -71,12 +77,12 @@ export default async function Page({
           eyebrow: "BP",
           name: b.retailer.retailerName || b.retailer.retailerCode,
           code: `${b.retailer.retailerCode} · RSO ${b.employee.name}`,
-          percent: b.gaTarget ? Math.round((b.monthGa / b.gaTarget) * 100) : 0,
-          metrics: [{ label: "SIM Sales", achieved: b.monthGa, target: b.gaTarget }],
+          percent: b.gaTarget ? Math.round((b.monthGa.total / b.gaTarget) * 100) : 0,
+          metrics: [{ label: "SIM Sales", achieved: b.monthGa.total, target: b.gaTarget, tiers: b.monthGa }],
           search: `${b.retailer.retailerCode} ${b.retailer.retailerName || ""} ${b.employee.name}`.toLowerCase(),
           sortKeys: {
-            pct: b.gaTarget ? Math.round((b.monthGa / b.gaTarget) * 100) : 0,
-            ga: b.monthGa,
+            pct: b.gaTarget ? Math.round((b.monthGa.total / b.gaTarget) * 100) : 0,
+            ga: b.monthGa.total,
             target: b.gaTarget,
           },
         }))}

@@ -1,5 +1,7 @@
 "use client";
 
+import type { GaTiers } from "../../lib/ga-category";
+
 /**
  * A searchable, sortable grid of EntityCards.
  *
@@ -27,7 +29,7 @@ export type EntityRow = {
   name: string;
   code: string;
   percent: number;
-  metrics: { label: string; achieved: number; target: number; unit?: string }[];
+  metrics: { label: string; achieved: number; target: number; unit?: string; tiers?: GaTiers | null }[];
   search: string;
   sortKeys: Record<string, number>;
 };

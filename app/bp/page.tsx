@@ -16,6 +16,9 @@ import { requirePagePermission } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { monthBounds } from "../../lib/month";
 import { classifyGaActivation, gaCategoryLabel, withStandardGa } from "../../lib/business-rules";
+import { addTier, noTiers, type GaTiers } from "../../lib/ga-category";
+import { currentGa170Tariff } from "../../lib/ga-tariff";
+import type { Prisma } from "@prisma/client";
 import { targetPercent } from "../../lib/achievement";
 import { pacing } from "../../lib/pacing";
 import {
@@ -27,6 +30,7 @@ import {
   PaceFoot,
   PageHeader,
   PageNotice as Notice,
+  TierLine,
   Row,
   SectionHead,
   StatPill,
@@ -93,15 +97,27 @@ export default async function BP() {
   const dayEnd = gaDayBounds && gaDayBounds.end < effectiveEnd ? gaDayBounds.end : effectiveEnd;
   const dayInWindow = Boolean(gaDayBounds) && dayStart < dayEnd;
 
-  const [monthlyGa, dayGa, recent] = await Promise.all([
-    prisma.gaActivation.count({
+  /*
+   * The month and the day are GROUPED rather than counted, so each comes back
+   * with its 170/300 split in the query that was already being run.
+   *
+   * The owner's request is that every GA block says how many 170 SIMs and how
+   * many 300 — this is the BP's whole screen, so it is the one that matters
+   * most. A BP knowing which pack is moving is the point of the feature.
+   */
+  const [monthGroups, dayGroups, recent] = await Promise.all([
+    prisma.gaActivation.groupBy({
+      by: ["productCode", "sellingPrice"],
       where: withStandardGa({ retailerId: u.bpRetailerId, activationDate: { gte: effectiveStart, lt: effectiveEnd } }),
+      _count: { _all: true },
     }),
     dayInWindow
-      ? prisma.gaActivation.count({
+      ? prisma.gaActivation.groupBy({
+          by: ["productCode", "sellingPrice"],
           where: withStandardGa({ retailerId: u.bpRetailerId, activationDate: { gte: dayStart, lt: dayEnd } }),
+          _count: { _all: true },
         })
-      : Promise.resolve(0),
+      : Promise.resolve([]),
     prisma.gaActivation.findMany({
       where: { retailerId: u.bpRetailerId, activationDate: { gte: effectiveStart, lt: effectiveEnd } },
       orderBy: [{ activationDate: "desc" }, { activationTime: "desc" }],
@@ -109,6 +125,15 @@ export default async function BP() {
       select: { simNo: true, sellingPrice: true, productCode: true, activationDate: true, activationTime: true },
     }),
   ]);
+
+  const tariff = await currentGa170Tariff();
+  const tally = (
+    groups: { productCode: string | null; sellingPrice: Prisma.Decimal | null; _count: { _all: number } }[],
+  ) => groups.reduce<GaTiers>((acc, g) => addTier(acc, classifyGaActivation(g, tariff), g._count._all), noTiers());
+  const monthTiers = tally(monthGroups);
+  const dayTiers = tally(dayGroups);
+  const monthlyGa = monthTiers.total;
+  const dayGa = dayTiers.total;
 
   const target = assignment.monthlyTargets[0]?.gaTarget ?? assignment.gaTarget ?? 0;
   const remaining = Math.max(0, target - monthlyGa);
@@ -129,7 +154,7 @@ export default async function BP() {
         percent={targetPercent(monthlyGa, target)}
         figures={[
           { label: "Target", value: target || "—" },
-          { label: "Activated", value: monthlyGa, tone: "brand" },
+          { label: "Activated", value: monthlyGa, tone: "brand", tiers: monthTiers },
           { label: "Remaining", value: target ? remaining : "—", tone: "amber" },
         ]}
       />
@@ -144,10 +169,12 @@ export default async function BP() {
         <Card padded>
           <strong>{gaDay.value}</strong>
           <span>{feedDayLabel("Activations", gaDay)}</span>
+          <TierLine tiers={dayTiers} />
         </Card>
         <Card padded>
           <strong>{monthlyGa}</strong>
           <span>This Month Activation</span>
+          <TierLine tiers={monthTiers} />
         </Card>
       </div>
       <FeedNote note={stalenessNote([{ label: "GA", day: gaDay }])} />

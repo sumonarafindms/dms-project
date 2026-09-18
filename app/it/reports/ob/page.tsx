@@ -40,11 +40,16 @@ export default async function OpeningBalance({
     },
   ];
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <RetailerReportView
       title="Opening Balance Report"
       subtitle="Latest snapshot, highest balance first"
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("ob", range)}

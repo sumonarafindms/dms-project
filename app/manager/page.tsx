@@ -18,6 +18,7 @@ import { prisma } from "../../lib/prisma";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
 import { latestDailySnapshot, monthPace } from "../../lib/intelligence";
 import { dailyFeedItems, dailyFeedNote } from "../../lib/feed-day";
+import { noTiers, type GaTiers } from "../../lib/ga-category";
 import { fmtNumber } from "../../lib/format";
 import { managerScope } from "../../lib/manager-scope";
 import { dhakaMonth } from "../../lib/business-time";
@@ -50,7 +51,14 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
   const monthKey = dhakaMonth();
   const month = `${monthKey}-01`;
 
-  const [rows, attentionRows, supervisors, daily] = await Promise.all([
+  /*
+   * The comparison joins the batch below rather than following it — it needs
+   * only the URL, never the batch's results. See lib/performance.ts: locally a
+   * second wait is invisible, and in production it is a network round trip.
+   */
+  const sp = await searchParams;
+  const compareKind = parseComparisonKind(sp.compare);
+  const [rows, attentionRows, supervisors, daily, comparison] = await Promise.all([
     employeePerformance(month, scope.employeeIds),
     retailerOpportunities(monthKey, scope.employeeIds),
     prisma.supervisor.findMany({
@@ -59,13 +67,11 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
       orderBy: { name: "asc" },
     }),
     latestDailySnapshot(scope.employeeIds),
+    performanceComparison(compareKind, scope.employeeIds),
   ]);
 
   const attention = attentionRows.filter((x) => x.priority > 0).length;
   const retailers = rows.reduce((a, r) => a + r.retailerCount, 0);
-  const sp = await searchParams;
-  const compareKind = parseComparisonKind(sp.compare);
-  const comparison = await performanceComparison(compareKind, scope.employeeIds);
 
   const expected = monthPace(month);
   // teamTotals, not a plain sum: each RSO row now excludes its BPs, and a
@@ -90,10 +96,21 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
       target: number;
       ga: number;
       gaTarget: number;
+      tiers: GaTiers;
     }
   >();
   for (const s of supervisors)
-    supBy.set(s.name, { id: s.id, name: s.name, rsos: 0, retailers: 0, achieved: 0, target: 0, ga: 0, gaTarget: 0 });
+    supBy.set(s.name, {
+      id: s.id,
+      name: s.name,
+      rsos: 0,
+      retailers: 0,
+      achieved: 0,
+      target: 0,
+      ga: 0,
+      gaTarget: 0,
+      tiers: noTiers(),
+    });
   /*
    * groupTotals, not a reduce over withBp(). A supervisor's team may hold one
    * Business Partner through two of its RSOs, and `withBp()` deliberately
@@ -111,6 +128,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
     x.target = t.totalRechargeTarget;
     x.ga = t.gaAchieved;
     x.gaTarget = t.gaTarget;
+    x.tiers = { total: t.gaAchieved, ga170: t.ga170, ga300: t.ga300 };
   }
   const supRows = [...supBy.values()].sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
 
@@ -142,6 +160,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
           achieved={team.gaAchieved}
           target={team.gaTarget}
           pace={paceFor("gaTarget", "gaAchieved")}
+          tiers={{ total: team.gaAchieved, ga170: team.ga170, ga300: team.ga300 }}
         />
         <KpiCard
           label="LSO"
@@ -207,7 +226,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
                 code={`${x.rsos} RSOs · ${fmtNumber(x.retailers)} retailers`}
                 percent={progress}
                 metrics={[
-                  { label: "GA", achieved: x.ga, target: x.gaTarget },
+                  { label: "GA", achieved: x.ga, target: x.gaTarget, tiers: x.tiers },
                   { label: "Recharge", achieved: x.achieved, target: x.target, unit: "৳" },
                 ]}
                 footer={
@@ -247,7 +266,12 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
             code={`${r.employeeCode || r.rsoMsisdn} · ${r.supervisor}`}
             percent={pct(r.totalRechargeAchieved, r.totalRechargeTarget)}
             metrics={[
-              { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
+              {
+                label: "GA",
+                achieved: r.gaAchieved,
+                target: r.gaTarget,
+                tiers: { total: r.gaAchieved, ga170: r.ga170, ga300: r.ga300 },
+              },
               { label: "LSO", achieved: r.lsoAchieved, target: r.lsoTarget },
             ]}
           />

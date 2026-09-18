@@ -145,6 +145,10 @@ export default async function DailySummary({
   const levelParam = level === "supervisor" ? undefined : level;
   const pageParams = { from: range.from, to: range.to, level: levelParam, supervisor };
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <main className="page">
       <Link href={`/it/reports?${rangeQuery(range)}`} className="kit-detail-back no-print">
@@ -164,7 +168,7 @@ export default async function DailySummary({
           />
         }
       />
-      <ReportDateBar range={range} />
+      <ReportDateBar range={range} nowIso={nowIso} />
 
       <div className="kit-report-presets no-print kit-mb-12">
         {DAILY_LEVELS.map((l) => (

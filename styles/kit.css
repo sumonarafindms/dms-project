@@ -1453,6 +1453,24 @@
     color: var(--color-neutral-600);
   }
 
+  /* The 170 / 300 split under a GA figure.
+     One class for every GA block in the app — a KPI card, a team metric bar, an
+     entity card, the BP's hero ring — so the same sentence reads the same size
+     and weight wherever the owner asked for it, and a new GA block gets it
+     right by using the class rather than by remembering the rule. */
+  .kit-tier-line {
+    margin-top: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+  }
+  /* Inside a hero ring's figure stack the line is centred with its figure. */
+  .kit-hero-figures .kit-tier-line {
+    margin-top: 0.125rem;
+    text-align: center;
+  }
+
   /* Clickable status tile — the demo's "SSO Pending / LSO Pending" row.
      Deep-links into the matching worklist, already filtered. */
   .kit-status-tiles {
@@ -3195,14 +3213,23 @@
     font-size: 0.6875rem;
     font-weight: 700;
   }
+  /* The TEXT steps, not the band fills.
+     `--band-achieved` is `--color-success-600` — 3.77:1 on white, and this is
+     11px bold, which is not large text. `--band-near` is 3.69:1. Both were
+     under AA for the life of this app and axe never said so, because the
+     browser sweep only ever saw a target that had not been hit: the seeded
+     data never reached "Achieved", so the failing state was never rendered
+     while anything was measuring it.
+     Same defect as v166's six rules — a fill step asked for as text — and the
+     bands are fills by definition: they colour rings, bars and dots. */
   .kit-pace.tone-good .kit-pace-status {
-    color: var(--band-achieved);
+    color: var(--text-success);
   }
   .kit-pace.tone-mid .kit-pace-status {
-    color: var(--band-near);
+    color: var(--text-warning);
   }
   .kit-pace.tone-low .kit-pace-status {
-    color: var(--band-behind);
+    color: var(--text-danger);
   }
   .kit-pace.tone-neutral .kit-pace-status {
     color: var(--color-neutral-500);

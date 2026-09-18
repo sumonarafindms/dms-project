@@ -234,7 +234,7 @@ export default function GaPage() {
         </>
       }
     >
-      <form onSubmit={upload} className="kit-upload-form">
+      <form method="post" onSubmit={upload} className="kit-upload-form">
         <label className="kit-file-field">
           <span>ActivationDetailsReport.xlsx</span>
           <small>Excel · max 20 MB</small>

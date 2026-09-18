@@ -35,6 +35,8 @@ const assignment = (over: Partial<Parameters<typeof bpLedger>[0][number]> = {}) 
 const rowFor = (bp: RollupRow["bp"]): RollupRow => ({
   gaTarget: 0,
   gaAchieved: 0,
+  ga170: 0,
+  ga300: 0,
   ssoTarget: 0,
   ssoAchieved: 0,
   c2cTarget: 0,

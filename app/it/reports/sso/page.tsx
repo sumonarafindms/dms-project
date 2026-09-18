@@ -40,11 +40,16 @@ export default async function SsoPending({
     },
   ];
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <RetailerReportView
       title="SSO Pending"
       subtitle={`Complete at ${SSO_MIN_MONTHLY_STANDARD_GA} standard GA in one month • Closest to complete first`}
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("sso", range)}

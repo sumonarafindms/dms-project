@@ -19,6 +19,7 @@ import { employeePerformance } from "../../lib/performance";
 import { prisma } from "../../lib/prisma";
 import { latestDailySnapshot } from "../../lib/intelligence";
 import { dailyFeedItems, dailyFeedNote } from "../../lib/feed-day";
+import { bpShareNote } from "../../lib/bp-rollup";
 import { fmtNumber } from "../../lib/format";
 import { dhakaMonth } from "../../lib/business-time";
 import { pacing } from "../../lib/pacing";
@@ -50,13 +51,27 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
 
   const monthKey = dhakaMonth();
   const month = `${monthKey}-01`;
-  const [perf, daily, retailers, bpCount] = await Promise.all([
+  /*
+   * The comparison joins this batch instead of following it.
+   *
+   * It used to be awaited after the four above had returned, so the page waited
+   * for two rounds of database work where one would do. Nothing it needs comes
+   * from them — only `compareKind`, which is read from the URL, and
+   * `searchParams` is a promise that resolves without touching the database.
+   *
+   * Locally this is invisible; in production the database is remote and every
+   * wait is a network round trip. See lib/performance.ts.
+   */
+  const sp = await searchParams;
+  const compareKind = parseComparisonKind(sp.compare);
+  const [perf, daily, retailers, bpCount, comparison] = await Promise.all([
     employeePerformance(month, [u.employeeId]),
     latestDailySnapshot([u.employeeId]),
     retailerOpportunities(monthKey, [u.employeeId]),
     // count, not findFirst: an RSO may hold several BPs, and the tile below
     // reports how many. `findFirst` made three of them read as one.
     prisma.bpAssignment.count({ where: { employeeId: u.employeeId, active: true } }),
+    performanceComparison(compareKind, [u.employeeId]),
   ]);
   const r = perf[0];
   /*
@@ -90,12 +105,6 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
       />
     );
   }
-
-  // "day" unless asked otherwise. An unknown value falls back rather than
-  // throwing, because this arrives from the URL.
-  const sp = await searchParams;
-  const compareKind = parseComparisonKind(sp.compare);
-  const comparison = await performanceComparison(compareKind, [u.employeeId]);
 
   // The clock is read ONCE here, on the server, and the same instant is used
   // for every card — otherwise five cards could straddle a Dhaka midnight and
@@ -132,8 +141,18 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
             : "Your monthly targets at a glance."
         }
       />
+      {/* Which accounting these cards use, said once, where they are read.
+          See bpShareNote — without it the GA card reads 470 on a page whose
+          own pills describe a territory credited with 485. */}
+      <FeedNote note={bpShareNote(r.bp)} />
       <div className="kit-kpi-grid kit-mb-20">
-        <KpiCard label="GA" achieved={r.gaAchieved} target={r.gaTarget} pace={paceFor(r.gaTarget, r.gaAchieved)} />
+        <KpiCard
+          label="GA"
+          achieved={r.gaAchieved}
+          target={r.gaTarget}
+          pace={paceFor(r.gaTarget, r.gaAchieved)}
+          tiers={{ total: r.gaAchieved, ga170: r.ga170, ga300: r.ga300 }}
+        />
         <KpiCard label="SSO" achieved={r.ssoAchieved} target={r.ssoTarget} pace={paceFor(r.ssoTarget, r.ssoAchieved)} />
         <KpiCard label="LSO" achieved={r.lsoAchieved} target={r.lsoTarget} pace={paceFor(r.lsoTarget, r.lsoAchieved)} />
         <KpiCard
@@ -158,7 +177,10 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
         control={{ mode: "link", hrefFor: (k) => `/rso?compare=${k}` }}
       />
 
-      <SectionHead title="Quick status" sub="Tap a count to open the work behind it." />
+      <SectionHead
+        title="Quick status"
+        sub="Tap a count to open the work behind it. These count OUTLETS in your base — including any you also hold as a BP — so they can differ from the target cards above, which count only your own share."
+      />
       <div className="kit-status-tiles kit-mb-20">
         <StatusTile href={`/rso/sso?month=${monthKey}&status=pending`} count={ssoPending} label="SSO Pending" />
         <StatusTile href={`/rso/lso?month=${monthKey}&status=pending`} count={lsoPending} label="LSO Pending" />
@@ -170,13 +192,15 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
         />
       </div>
 
-      <SectionHead title="Team snapshot" />
+      {/* "Team snapshot" was borrowed from the supervisor's page. An RSO has
+          no team; they have an outlet base, and that is what these count. */}
+      <SectionHead title="Your outlet base" />
       <Card className="kit-mb-20" padded>
         <div className="kit-pill-grid">
           <StatPill value={r.retailerCount} label="Retailers" />
           <StatPill value={sellers.length} label="SIM Sellers" />
-          <StatPill value={sellers.length - ssoPending} label="SSO Complete" />
-          <StatPill value={retailers.length - lsoPending} label="LSO Complete" />
+          <StatPill value={sellers.length - ssoPending} label="Outlets at SSO" />
+          <StatPill value={retailers.length - lsoPending} label="Outlets at LSO" />
         </div>
       </Card>
 
@@ -199,6 +223,7 @@ export default async function RSO({ searchParams }: { searchParams: Promise<{ co
                 // meaningless for a retailer whose problem is LSO.
                 value={x.ga}
                 valueSub={x.reasons[0] ?? "Follow up"}
+                tiers={x.gaTiers}
               />
             ))}
           </div>

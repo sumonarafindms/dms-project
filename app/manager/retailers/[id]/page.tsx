@@ -21,7 +21,14 @@ export default async function Page({
     <RetailerDetailView
       d={d}
       month={month}
-      backHref={`/manager/rsos/${d.retailer.employeeId}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`}
+      /*
+       * Back to the LIST, like the RSO's and the supervisor's.
+       *
+       * This pointed at `/manager/rsos/{employeeId}` because `/manager/retailers`
+       * did not exist. The effect on a phone was that working down the attention
+       * queue threw the reader onto some RSO's performance page after every tap.
+       */
+      backHref={`/manager/retailers?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`}
     />
   );
 }

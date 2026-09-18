@@ -35,7 +35,7 @@ import Link from "next/link";
 import { DateRangeForm } from "./ListControls";
 import { ServerSearchBar, ServerSelect } from "./ServerSearchBar";
 import { Icon } from "./icons";
-import { Badge, Card, EmptyState, Pager, Row, SectionHead } from "./Kit";
+import { Badge, Card, EmptyState, Pager, Row, SectionHead, TierLine } from "./Kit";
 import type { RetailerOpportunity } from "../../lib/retailer-opportunities";
 import type { RetailerListPage } from "../../lib/retailer-list";
 import { pageLabel } from "../../lib/retailer-list";
@@ -128,6 +128,9 @@ export function RetailerSearchView({
                 <div>
                   <span>GA</span>
                   <strong>{r.ga}</strong>
+                  {/* The tier split rides with the outlet's GA, which is the
+                      figure an RSO is deciding a visit on. */}
+                  <TierLine tiers={r.gaTiers} />
                 </div>
                 <div>
                   <span>C2S</span>

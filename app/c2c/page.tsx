@@ -199,7 +199,7 @@ export default function C2cPage() {
             </>
           }
         >
-          <form onSubmit={upload} className="kit-upload-form">
+          <form method="post" onSubmit={upload} className="kit-upload-form">
             <label className="kit-file-field">
               <span>ITop_Up_StockLifting file</span>
               <small>Excel / TXT · max 20 MB</small>

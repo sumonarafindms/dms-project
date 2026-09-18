@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { dhakaToday, gaDayBounds } from "../lib/live-ga";
+import { initialsOf } from "../app/components/Kit";
 
 /**
  * Today's GA, and the ways a "live" screen can quietly lie.
@@ -139,7 +140,19 @@ describe("the rules the screen must keep", () => {
     const src = codeOf(read("lib", "live-ga.ts"));
     expect(src).toMatch(/groupBy\(/);
     expect(src, "Live GA counts with a query per row").not.toMatch(/gaActivation\.count\(/);
-    expect(src).not.toMatch(/Promise\.all\(/);
+    /*
+     * The danger is a fan-out — one query per row — not concurrency. This used
+     * to ban `Promise.all(` outright, which is too blunt: v177 pairs the day's
+     * single `groupBy` with the cached tariff lookup, two fixed queries that do
+     * not grow with the list, and the blanket ban failed on it.
+     *
+     * What actually reintroduces the defect is awaiting a MAPPED array, so
+     * that is what is banned now. The two assertions above still hold the
+     * main line.
+     */
+    expect(src, "Live GA awaits a mapped array — that is one query per row").not.toMatch(
+      /Promise\.all\(\s*[\w.]*\.map\(/,
+    );
   });
 });
 
@@ -163,9 +176,12 @@ describe("who sees what", () => {
      * no RSO", and `{}` means everyone — both are wrong, and the second is a
      * leak.
      */
-    expect(lib).toMatch(/if \(!employeeId\) return \{ \.\.\.base, total: 0/);
-    expect(lib).toMatch(/if \(!viewer\.bpRetailerId\) return \{ \.\.\.base, total: 0/);
-    expect(lib).toMatch(/if \(!supervisorId\) return \{ \.\.\.base, total: 0/);
+    // `total` is a zeroed tier triple since v177, not a bare 0 — the property
+    // guarded is the early return, not how "nothing" is spelled.
+    const nothing = String.raw`return \{ \.\.\.base, total: (0|noTiers\(\))`;
+    expect(lib).toMatch(new RegExp(String.raw`if \(!employeeId\) ` + nothing));
+    expect(lib).toMatch(new RegExp(String.raw`if \(!viewer\.bpRetailerId\) ` + nothing));
+    expect(lib).toMatch(new RegExp(String.raw`if \(!supervisorId\) ` + nothing));
   });
 
   it("does not add BP totals on top of RSO totals", () => {
@@ -175,9 +191,11 @@ describe("who sees what", () => {
      * a breakdown inside the number, not an addition to it — and a double
      * count is the kind of error that only surfaces when a target looks met.
      */
-    expect(lib).toMatch(/total: rsoRows\.reduce/);
+    // The headline is built from the RSO rows ALONE. `sumRows` replaced the
+    // inline reduce in v177; either spelling is fine, taking `bps` in is not.
+    expect(lib).toMatch(/total: (sumRows\(rsoRows\)|rsoRows\.reduce)/);
     expect(lib, "the team headline adds the BP rows to the RSO rows").not.toMatch(
-      /total:\s*rsoRows\.reduce[\s\S]{0,120}\+\s*bps\./,
+      /total:\s*(sumRows\(rsoRows[\s\S]{0,60}bps|rsoRows\.reduce[\s\S]{0,120}\+\s*bps\.)/,
     );
   });
 });
@@ -274,13 +292,12 @@ describe("small wording and initials details", () => {
     expect(read("app", "live-ga", "page.tsx")).toMatch(/GA today · \{live\.scope\}/);
   });
 
-  it("builds initials from words, not from the first two characters", async () => {
+  it("builds initials from words, not from the first two characters", () => {
     /*
      * `name.slice(0, 2)` gave "Md Mashiujjaman shuvo" and "MD SHAHIN RAHMAN
      * KHAN" the same "MD" — two supervisors, one avatar — and turned
      * "R.R Enterprise- BP 01" into "R.", a full stop in a circle.
      */
-    const { initialsOf } = await import("../app/components/Kit");
     expect(initialsOf("Md Mashiujjaman shuvo")).toBe("MM");
     expect(initialsOf("MD SHAHIN RAHMAN KHAN")).toBe("MS");
     /*

@@ -7,6 +7,7 @@ import { standardGaByAssignment } from "../../../lib/bp-activations";
 import { Badge, Card, EmptyState, MetricBar, PageHeader, Row, SectionHead } from "../../components/Kit";
 import { Icon } from "../../components/icons";
 import { targetPercent } from "../../../lib/achievement";
+import { addTiers, noTiers } from "../../../lib/ga-category";
 
 /**
  * My BPs — every Business Partner this RSO holds.
@@ -66,9 +67,9 @@ export default async function Page() {
   const totals = active.reduce(
     (a, x) => {
       const target = x.monthlyTargets[0]?.gaTarget ?? x.gaTarget;
-      return { target: a.target + target, achieved: a.achieved + (gaByAssignment.get(x.id) ?? 0) };
+      return { target: a.target + target, achieved: addTiers(a.achieved, gaByAssignment.get(x.id) ?? noTiers()) };
     },
-    { target: 0, achieved: 0 },
+    { target: 0, achieved: noTiers() },
   );
 
   const historySection = (
@@ -114,7 +115,7 @@ export default async function Page() {
     <main className="page">
       <PageHeader
         title={active.length === 1 ? "My BP" : `My BPs (${active.length})`}
-        subtitle={`${dhakaMonth()} · GA ${totals.achieved} of ${totals.target || "no"} target${
+        subtitle={`${dhakaMonth()} · GA ${totals.achieved.total} of ${totals.target || "no"} target${
           totals.target === 1 ? "" : "s"
         } across ${active.length} assignment${active.length === 1 ? "" : "s"}`}
         action={<Badge tone="active">{active.length} active</Badge>}
@@ -123,7 +124,7 @@ export default async function Page() {
       <div className="kit-stack-12">
         {active.map((a) => {
           const target = a.monthlyTargets[0]?.gaTarget ?? a.gaTarget;
-          const ga = gaByAssignment.get(a.id) ?? 0;
+          const ga = gaByAssignment.get(a.id) ?? noTiers();
           const login = a.retailer.bpUser?.active && a.retailer.bpUser.role === "BP" ? a.retailer.bpUser : null;
           return (
             /*
@@ -153,13 +154,13 @@ export default async function Page() {
                     {a.retailer.retailerCode} · since {a.startDate.toISOString().slice(0, 10)}
                   </span>
                 </div>
-                <Badge tone={targetPercent(ga, target) >= 100 ? "achieved" : "active"}>
-                  {target ? `${targetPercent(ga, target)}%` : "No target"}
+                <Badge tone={targetPercent(ga.total, target) >= 100 ? "achieved" : "active"}>
+                  {target ? `${targetPercent(ga.total, target)}%` : "No target"}
                 </Badge>
               </div>
 
               <div className="kit-mt-8">
-                <MetricBar label="Monthly GA" achieved={ga} target={target} />
+                <MetricBar label="Monthly GA" achieved={ga.total} target={target} tiers={ga} />
               </div>
 
               <p className="kit-hint is-xs kit-mt-6">

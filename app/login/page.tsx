@@ -80,7 +80,25 @@ export default function Login() {
         </div>
       </section>
       <section className="auth-v54-panel">
-        <form className="auth-v54-card" onSubmit={submit}>
+        {/*
+          `method="post"` is not decoration, and it is not about this handler.
+
+          A <form> with no method is a GET, and that default applies for as
+          long as the page is HTML the browser has not yet handed to React.
+          Submitting in that window put the typed values in the query string:
+
+            /login?identifier=01700000001&credential=<the PIN>
+
+          which is the browser's address bar, its history, the server's access
+          log and the Referer of the next request. Measured against a real
+          build: the window is up to ~0.5s on fast 3G and ~3.5s on slow 3G —
+          seconds, on the networks this app is used on, with the button
+          visible and enabled the whole time. A POST puts the fields in a body
+          that nothing keeps, and Next renders this page again with a clean
+          URL. `onSubmit` still prevents it once React is here; this is what
+          happens before that.
+        */}
+        <form method="post" className="auth-v54-card" onSubmit={submit}>
           <div className="auth-v54-mobile-brand">
             <div className="auth-v54-logo">D</div>
             <div>

@@ -133,7 +133,7 @@ export default function BpManager({
         title="Assign / change BP"
         sub="Choose the RSO first, then one of that RSO's retailer codes. A new assignment automatically closes the previous active BP for that RSO."
       />
-      <form onSubmit={submit}>
+      <form method="post" onSubmit={submit}>
         <Card className="kit-mb-20" padded="lg">
           <div className="kit-form-grid">
             <Field label="RSO / Employee">

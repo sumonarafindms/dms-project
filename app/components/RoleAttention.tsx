@@ -93,6 +93,7 @@ export function RoleAttentionList({
           detail={r.reasons.slice(0, 2).join(" · ")}
           value={r.ga}
           valueSub={`GA · ${r.c2sTransactions} trx`}
+          tiers={r.gaTiers}
           after={
             <div className="kit-row-actions">
               <Badge tone={priorityTone(r.priority)}>P{r.priority}</Badge>

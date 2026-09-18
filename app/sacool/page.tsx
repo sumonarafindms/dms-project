@@ -89,7 +89,12 @@ export default function AdminAccess() {
       </section>
 
       <section className="auth-v54-panel">
-        <form className="auth-v54-card" onSubmit={submit}>
+        {/*
+          `method="post"` for the reason spelled out on /login: before React
+          takes the page over, a form with no method is a GET, and this one
+          carries an administrator password.
+        */}
+        <form method="post" className="auth-v54-card" onSubmit={submit}>
           <div className="auth-v54-mobile-brand">
             <div className="auth-v54-logo">D</div>
             <div>

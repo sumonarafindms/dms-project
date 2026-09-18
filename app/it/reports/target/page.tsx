@@ -63,11 +63,16 @@ export default async function TargetReport({
 
   const groupParam = group === "supervisor" ? undefined : group;
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <GroupedReportView
       title="Target vs Achievement"
       subtitle="GA, SSO, LSO and C2C against monthly targets"
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("target", range, groupParam ? { group: groupParam } : {})}

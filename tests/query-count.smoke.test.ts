@@ -32,6 +32,7 @@ vi.mock("../lib/prisma", () => {
 });
 
 const { listBpAssignments } = await import("../lib/bp-activations");
+const { forgetGaTariff } = await import("../lib/ga-tariff");
 const { employeeDetail } = await import("../lib/employee-detail");
 
 const assignments = (n: number) =>
@@ -66,6 +67,18 @@ beforeEach(() => {
 describe("listBpAssignments", () => {
   const run = async (n: number) => {
     stub["bpAssignment.findMany"] = assignments(n);
+    /*
+     * The tariff cache is dropped before each run, deliberately.
+     *
+     * v177 made `standardGaByAssignment` also read the learned 170 tariff,
+     * which `lib/ga-tariff.ts` caches for 60 seconds. Without this the first
+     * run paid for that lookup and the second did not, so the two runs
+     * differed by one — and the test would have been reporting a cache hit as
+     * a query-count difference. What this file measures is whether the work
+     * grows with the number of assignments; a warm cache has nothing to say
+     * about that.
+     */
+    forgetGaTariff();
     calls.length = 0;
     await listBpAssignments({ role: "ADMIN" } as never, "2026-08");
     return calls.length;
@@ -77,10 +90,25 @@ describe("listBpAssignments", () => {
     expect(many).toBe(one);
   });
 
-  it("groups GA in a single query instead of counting per assignment", async () => {
+  it("groups GA in a fixed number of queries instead of counting per assignment", async () => {
+    /*
+     * Two `groupBy`s now, not one: the day's activations, and the learned 170
+     * tariff (v172) that decides the tier split. Neither depends on how many
+     * assignments are in the list, which is the property — so it is asserted
+     * that way, by running the same thing at two sizes, rather than by
+     * hardcoding a number that has to be edited whenever a fixed lookup is
+     * added.
+     */
     await run(50);
+    const fifty = calls.filter((c) => c === "gaActivation.groupBy").length;
     expect(calls.filter((c) => c === "gaActivation.count")).toHaveLength(0);
-    expect(calls.filter((c) => c === "gaActivation.groupBy")).toHaveLength(1);
+
+    await run(1);
+    const one = calls.filter((c) => c === "gaActivation.groupBy").length;
+    expect(calls.filter((c) => c === "gaActivation.count")).toHaveLength(0);
+
+    expect(fifty, "GA grouping grows with the number of assignments").toBe(one);
+    expect(fifty).toBeLessThanOrEqual(2);
   });
 });
 

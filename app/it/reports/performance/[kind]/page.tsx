@@ -91,11 +91,16 @@ export default async function Performance({
     ? rows.filter((r) => r.target > 0 && targetPercent(r.achieved, r.target) < 80).length
     : rows.filter((r) => r.achieved === 0).length;
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <GroupedReportView
       title={PERFORMANCE_KINDS[kind]}
       subtitle={hasTargets ? "Ranked by achievement" : "Ranked by GA volume"}
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("performance", range, { kind })}

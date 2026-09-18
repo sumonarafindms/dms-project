@@ -37,9 +37,31 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"))
 
 describe("SheetJS is the patched build", () => {
   it("is 0.20.2 or newer, which is where both advisories are fixed", () => {
+    /*
+     * When this fails there are two very different reasons, and they call for
+     * opposite actions — so the message works out which one it is rather than
+     * leaving the reader to guess.
+     *
+     * It fired for real on the owner's Windows machine during a pre-deploy
+     * check. `package.json` was correct and the tarball was present; what was
+     * stale was `node_modules`, because `npm install` had not been run after a
+     * version that changed a dependency spec. The old message said only
+     * "SheetJS 0.18.5 still carries the ReDoS", which is true and tells you
+     * nothing about what to do. A guard that cannot say what went wrong costs
+     * someone an hour at the worst possible moment.
+     */
+    const spec = String(pkg.dependencies.xlsx ?? "");
+    const tarball = spec.replace(/^file:/, "");
+    const specIsVendored = spec.startsWith("file:vendor/");
+    const tarballPresent = specIsVendored && fs.existsSync(path.join(ROOT, tarball));
+    const stale = specIsVendored && tarballPresent;
+
+    const why = stale
+      ? `node_modules is STALE — package.json asks for ${spec} and that file is there, but the loaded copy is ${XLSX.version}. Run \`npm install\`.`
+      : `SheetJS ${XLSX.version} carries both advisories, and package.json asks for "${spec}". It must be the vendored tarball.`;
+
     const [major, minor, patch] = XLSX.version.split(".").map(Number);
-    expect(XLSX.version, `SheetJS ${XLSX.version} still carries the ReDoS`).not.toBe("0.18.5");
-    expect(major * 10000 + minor * 100 + patch).toBeGreaterThanOrEqual(2002);
+    expect(major * 10000 + minor * 100 + patch, why).toBeGreaterThanOrEqual(2002);
   });
 
   it("is installed from the vendored tarball, not the abandoned registry copy", () => {

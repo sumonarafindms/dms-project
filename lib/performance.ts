@@ -61,6 +61,8 @@ const NO_BP: BpPortion = {
   count: 0,
   gaTarget: 0,
   gaAchieved: 0,
+  ga170: 0,
+  ga300: 0,
   ssoAchieved: 0,
   c2cAchieved: 0,
   lsoAchieved: 0,
@@ -72,6 +74,8 @@ const NO_BP: BpPortion = {
 const NO_BP_RETAILER: BpRetailerFigures = {
   gaTarget: 0,
   gaAchieved: 0,
+  ga170: 0,
+  ga300: 0,
   ssoAchieved: 0,
   c2cAchieved: 0,
   lsoAchieved: 0,
@@ -92,16 +96,45 @@ export async function employeePerformance(month: string, employeeIds?: string[],
   const fullMonthKeys = new Set(fullyCoveredMonths(rangeStart, rangeEnd).map((x) => x.toISOString().slice(0, 7)));
   const employeeWhere: any = { active: true };
   if (employeeIds) employeeWhere.id = { in: employeeIds };
+  /** An assignment that overlaps the reported range at all. */
+  const assignmentWindowWhere = {
+    startDate: { lt: rangeEnd },
+    OR: [{ endDate: null }, { endDate: { gte: rangeStart } }],
+  };
 
-  const employees = await prisma.employee.findMany({
-    where: employeeWhere,
-    include: {
-      supervisor: true,
-      _count: { select: { retailers: { where: { active: true } } } },
-      targets: { where: { month: { gte: firstMonth, lt: afterLast } } },
-      manualMetrics: { where: { month: { gte: firstMonth, lt: afterLast } } },
-    },
-  });
+  /*
+   * The retailers are fetched ALONGSIDE the employees, not after them.
+   *
+   * The retailer query used to filter on `employeeId: { in: eids }` — the ids
+   * the employee query had just returned — so it could not start until that
+   * round trip came back. Expressed as a relation filter it needs no ids at
+   * all: "owned by an employee matching this scope" is the same set as "owned
+   * by one of the employees that scope returned", and the two queries then run
+   * together.
+   *
+   * `employeeWhere` is the single definition of the scope, used by both, so
+   * they cannot drift apart.
+   */
+  const [employees, retailerRefs] = await Promise.all([
+    prisma.employee.findMany({
+      where: employeeWhere,
+      include: {
+        supervisor: true,
+        _count: { select: { retailers: { where: { active: true } } } },
+        targets: { where: { month: { gte: firstMonth, lt: afterLast } } },
+        manualMetrics: { where: { month: { gte: firstMonth, lt: afterLast } } },
+      },
+    }),
+    prisma.retailer.findMany({
+      where: {
+        OR: [
+          { employee: employeeWhere },
+          { bpAssignments: { some: { employee: employeeWhere, ...assignmentWindowWhere } } },
+        ],
+      },
+      select: { id: true, employeeId: true, simSeller: true },
+    }),
+  ]);
   if (!employees.length) return [];
 
   const eids = employees.map((e) => e.id);
@@ -120,21 +153,6 @@ export async function employeePerformance(month: string, employeeIds?: string[],
    * by ownership alone left every other holder looking at a BP with no
    * figures: the assignment showed, the count showed, and the GA was zero.
    */
-  const scopeAssignments = await prisma.bpAssignment.findMany({
-    where: {
-      employeeId: { in: eids },
-      startDate: { lt: rangeEnd },
-      OR: [{ endDate: null }, { endDate: { gte: rangeStart } }],
-    },
-    select: { retailerId: true },
-  });
-  const bpScopeIds = [...new Set(scopeAssignments.map((a) => a.retailerId))];
-  const retailerRefs = await prisma.retailer.findMany({
-    where: bpScopeIds.length
-      ? { OR: [{ employeeId: { in: eids } }, { id: { in: bpScopeIds } }] }
-      : { employeeId: { in: eids } },
-    select: { id: true, employeeId: true, simSeller: true },
-  });
   const totalByEmployee = new Map<string, number>();
   for (const r of retailerRefs) {
     if (!r.employeeId) continue;
@@ -152,35 +170,6 @@ export async function employeePerformance(month: string, employeeIds?: string[],
    * everything below asks "was this day inside a BP window" rather than "is
    * this retailer a BP now".
    */
-  const bpAssignments = retailerIds.length
-    ? await prisma.bpAssignment.findMany({
-        where: {
-          retailerId: { in: retailerIds },
-          startDate: { lt: rangeEnd },
-          OR: [{ endDate: null }, { endDate: { gte: rangeStart } }],
-        },
-        select: {
-          retailerId: true,
-          employeeId: true,
-          startDate: true,
-          endDate: true,
-          gaTarget: true,
-          monthlyTargets: { select: { month: true, gaTarget: true } },
-        },
-      })
-    : [];
-
-  /*
-   * One ledger answers both BP questions for this window: which days belong to
-   * a BP at all, and which RSOs to credit for them. The rule lives in
-   * lib/bp-ledger.ts because /api/dashboard/summary needs exactly the same
-   * answers — two copies is how the dashboard and the RSO page start
-   * disagreeing about one RSO.
-   */
-  const inScope = (id: string) => employeeIdSet.has(id);
-  const ledger = bpLedger(bpAssignments, rangeStart, rangeEnd, inScope);
-  const ownerOf = (retailerId: string) => retailerMap.get(retailerId)?.employeeId ?? null;
-
   if (!retailerIds.length) {
     return employees.map((e) => {
       const targets = e.targets.reduce(
@@ -230,7 +219,26 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     });
   }
 
-  const [gaGroups, c2cGroups, c2sGroups, c2sMonthly] = await Promise.all([
+  /*
+   * The BP assignments join the parallel batch rather than preceding it.
+   *
+   * They used to be awaited on their own, and nothing below the fetch needed
+   * them until the ledger was built — so the four aggregate queries sat waiting
+   * on a round trip they did not depend on. All five want only `retailerIds`,
+   * which is already in hand, so all five go together.
+   */
+  const [bpAssignments, gaGroups, c2cGroups, c2sGroups, c2sMonthly] = await Promise.all([
+    prisma.bpAssignment.findMany({
+      where: { retailerId: { in: retailerIds }, ...assignmentWindowWhere },
+      select: {
+        retailerId: true,
+        employeeId: true,
+        startDate: true,
+        endDate: true,
+        gaTarget: true,
+        monthlyTargets: { select: { month: true, gaTarget: true } },
+      },
+    }),
     prisma.gaActivation.groupBy({
       by: ["retailerId", "sellingPrice", "productCode", "activationDate"],
       where: { retailerId: { in: retailerIds }, activationDate: { gte: rangeStart, lt: rangeEnd } },
@@ -255,6 +263,17 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     }),
   ]);
 
+  /*
+   * One ledger answers both BP questions for this window: which days belong to
+   * a BP at all, and which RSOs to credit for them. The rule lives in
+   * lib/bp-ledger.ts because /api/dashboard/summary needs exactly the same
+   * answers — two copies is how the dashboard and the RSO page start
+   * disagreeing about one RSO.
+   */
+  const inScope = (id: string) => employeeIdSet.has(id);
+  const ledger = bpLedger(bpAssignments, rangeStart, rangeEnd, inScope);
+  const ownerOf = (retailerId: string) => retailerMap.get(retailerId)?.employeeId ?? null;
+
   const gaBy = new Map<string, { t: number; a170: number; a300: number }>(),
     retailerGaMonth = new Map<string, { eid: string; count: number; simSeller: string | null }>(),
     // Keyed by retailer-month, and it carries the retailer and a day inside
@@ -276,8 +295,23 @@ export async function employeePerformance(month: string, employeeIds?: string[],
       // The BP sold this, not the RSO. It still belongs to the territory, so
       // it is kept here rather than dropped — teamTotals() adds it back, once
       // per outlet however many RSOs hold it.
+      /*
+       * The TIER goes through with the count, not just the count.
+       *
+       * This used to credit `gaAchieved` alone and drop `category` on the
+       * floor. Nothing was wrong with the total — but the moment a screen
+       * shows the 170/300 split beside it, an RSO holding a BP would read
+       * "GA 41 · GA 170 12 · GA 300 9": three numbers, each correct, that do
+       * not add up. Two of them would be describing only the RSO's own
+       * outlets while the third described the territory.
+       *
+       * `ga170 + ga300 === gaAchieved` is asserted at every level in
+       * tests/ga-tier-rollup.smoke.test.ts.
+       */
       ledger.credit(x.retailerId, x.activationDate.getTime(), eid, (f) => {
         f.gaAchieved += count;
+        if (category === "GA_170") f.ga170 += count;
+        else f.ga300 += count;
       });
       const bpKey = `${x.retailerId}|${x.activationDate.toISOString().slice(0, 7)}`,
         br = bpGaMonth.get(bpKey) || {

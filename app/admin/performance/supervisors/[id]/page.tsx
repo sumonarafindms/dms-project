@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import { EntityGrid } from "../../../../components/EntityGrid";
 import Link from "next/link";
 import { Card, EmptyState, KpiCard, PageHeader, Row, SectionHead, SummaryStrip } from "../../../../components/Kit";
+import { addTiers, noTiers, type GaTiers } from "../../../../../lib/ga-category";
 import { Icon } from "../../../../components/icons";
 import { pacingForView } from "../../../../../lib/pacing";
 
@@ -60,7 +61,7 @@ export default async function Page({
   const bpStats = bps.map((b) => {
     const { effectiveStart: es, effectiveEnd: ee } = assignmentWindow(b, rs, re);
     const target = es < ee ? assignmentGaTarget(b, monthStartsInRange(es, ee)) : 0;
-    return { ...b, target, achieved: gaByAssignment.get(b.id) ?? 0 };
+    return { ...b, target, achieved: gaByAssignment.get(b.id) ?? noTiers() };
   });
   const range = `month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`;
   // Recharge is the TEAM's, so it includes the BPs' C2C. GA is shown split, so
@@ -70,9 +71,14 @@ export default async function Page({
   const rechargeTarget = team.totalRechargeTarget,
     rechargeAchieved = team.totalRechargeAchieved,
     rsoGaT = rows.reduce((a, x) => a + x.gaTarget, 0),
-    rsoGaA = rows.reduce((a, x) => a + x.gaAchieved, 0),
+    rsoTiers = rows.reduce<GaTiers>(
+      (a, x) => addTiers(a, { total: x.gaAchieved, ga170: x.ga170, ga300: x.ga300 }),
+      noTiers(),
+    ),
+    rsoGaA = rsoTiers.total,
     bpGaT = bpStats.reduce((a, x) => a + x.target, 0),
-    bpGaA = bpStats.reduce((a, x) => a + x.achieved, 0);
+    bpTiers = bpStats.reduce<GaTiers>((a, x) => addTiers(a, x.achieved), noTiers()),
+    bpGaA = bpTiers.total;
   // pacingForView, not pacing: this page accepts from/to, so the figures may
   // describe a narrowed window rather than the month. It returns null there
   // and the pacing line is simply not shown.
@@ -98,8 +104,8 @@ export default async function Page({
       />
       <SectionHead title="Team execution" sub="Every metric is the sum of this team's RSO targets." />
       <div className="kit-kpi-grid kit-mb-20">
-        <KpiCard label="RSO GA" achieved={rsoGaA} target={rsoGaT} pace={paceFor(rsoGaT, rsoGaA)} />
-        <KpiCard label="BP GA" achieved={bpGaA} target={bpGaT} pace={paceFor(bpGaT, bpGaA)} />
+        <KpiCard label="RSO GA" achieved={rsoGaA} target={rsoGaT} pace={paceFor(rsoGaT, rsoGaA)} tiers={rsoTiers} />
+        <KpiCard label="BP GA" achieved={bpGaA} target={bpGaT} pace={paceFor(bpGaT, bpGaA)} tiers={bpTiers} />
         <KpiCard
           label="Recharge"
           achieved={rechargeAchieved}

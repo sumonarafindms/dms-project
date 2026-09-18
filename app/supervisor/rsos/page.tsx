@@ -61,7 +61,12 @@ export default async function Page({
           code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount} retailers`,
           percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
           metrics: [
-            { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
+            {
+              label: "GA",
+              achieved: r.gaAchieved,
+              target: r.gaTarget,
+              tiers: { total: r.gaAchieved, ga170: r.ga170, ga300: r.ga300 },
+            },
             { label: "LSO", achieved: r.lsoAchieved, target: r.lsoTarget },
             { label: "Recharge", achieved: r.totalRechargeAchieved, target: r.totalRechargeTarget, unit: "৳" },
           ],

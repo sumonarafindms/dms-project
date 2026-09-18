@@ -25,6 +25,7 @@ export function RetailerReportView({
   title,
   subtitle,
   range,
+  nowIso,
   rows,
   columns,
   exportHref,
@@ -38,6 +39,8 @@ export function RetailerReportView({
   title: string;
   subtitle: string;
   range: ReportRange;
+  /** The server's clock, handed to ReportDateBar — see its note on nowIso. */
+  nowIso: string;
   /** Every row in the report. `paging` decides how many are rendered. */
   rows: RetailerReportRow[];
   columns: Column<RetailerReportRow>[];
@@ -62,7 +65,7 @@ export function RetailerReportView({
         subtitle={`Report Period: ${rangeLabel(range)} • ${subtitle}`}
         action={<ReportActionBar exportHref={exportHref} rowCount={rows.length} />}
       />
-      <ReportDateBar range={range} />
+      <ReportDateBar range={range} nowIso={nowIso} />
       {children}
       <SummaryStrip items={summaryItems} />
       {search && <ReportSearch matched={search.matched} total={search.total} noun={search.noun} />}

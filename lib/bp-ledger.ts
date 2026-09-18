@@ -47,6 +47,8 @@ type Window = { from: number; to: number; employeeId: string };
 const emptyFigures = (): BpRetailerFigures => ({
   gaTarget: 0,
   gaAchieved: 0,
+  ga170: 0,
+  ga300: 0,
   ssoAchieved: 0,
   c2cAchieved: 0,
   lsoAchieved: 0,
@@ -207,6 +209,8 @@ export function bpLedger(
     for (const retailerId of Object.keys(mine)) byRetailer[retailerId] = outletFor(retailerId);
     const agg = Object.values(mine).reduce((a, f) => {
       a.gaAchieved += f.gaAchieved;
+      a.ga170 += f.ga170;
+      a.ga300 += f.ga300;
       a.ssoAchieved += f.ssoAchieved;
       a.c2cAchieved += f.c2cAchieved;
       a.lsoAchieved += f.lsoAchieved;
@@ -218,6 +222,8 @@ export function bpLedger(
       count: countByEmployee.get(employeeId) ?? 0,
       gaTarget: targetByEmployee.get(employeeId) ?? 0,
       gaAchieved: agg.gaAchieved,
+      ga170: agg.ga170,
+      ga300: agg.ga300,
       ssoAchieved: agg.ssoAchieved,
       c2cAchieved: agg.c2cAchieved,
       lsoAchieved: agg.lsoAchieved,

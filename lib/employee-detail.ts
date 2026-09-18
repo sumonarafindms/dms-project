@@ -142,6 +142,10 @@ export async function employeeDetail(employeeId: string, month: string, fromInpu
           ...r,
           // Total GA excludes SIMWAP / EV-SWAP; swaps are reported on their own.
           ga: breakdown.total,
+          // The 170/300 split was already computed here — `addGaActivation`
+          // fills the whole breakdown — and only the total and the swap count
+          // survived the return. It costs nothing to keep.
+          gaTiers: { total: breakdown.total, ga170: breakdown.ga170, ga300: breakdown.ga300 },
           simSwap: breakdown.simSwap,
           c2sAmount: c2s.get(r.id) ?? 0,
           c2sTrx: monthly.reduce((a, x) => a + x.transactionCount, 0),

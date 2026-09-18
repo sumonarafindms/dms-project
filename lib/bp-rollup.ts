@@ -40,6 +40,18 @@ export type BpPortion = {
   count: number;
   gaTarget: number;
   gaAchieved: number;
+  /**
+   * The same GA, split by tariff tier. `ga170 + ga300 === gaAchieved`, always.
+   *
+   * Carried here rather than recomputed on a screen because a total and its
+   * parts must come from one pass over one set of rows. The BP's GA used to
+   * reach this type with its category already discarded, so a page showing
+   * "GA 41 · 170: 12 · 300: 9" would have been stating two true numbers that
+   * did not add up to the third — which reads as a broken app even though
+   * every figure was right on its own.
+   */
+  ga170: number;
+  ga300: number;
   ssoAchieved: number;
   c2cAchieved: number;
   lsoAchieved: number;
@@ -67,6 +79,8 @@ export type BpPortion = {
 export type BpRetailerFigures = {
   gaTarget: number;
   gaAchieved: number;
+  ga170: number;
+  ga300: number;
   ssoAchieved: number;
   c2cAchieved: number;
   lsoAchieved: number;
@@ -86,6 +100,8 @@ export type BpRetailerFigures = {
 export type RollupRow = {
   gaTarget: number;
   gaAchieved: number;
+  ga170: number;
+  ga300: number;
   ssoTarget: number;
   ssoAchieved: number;
   c2cTarget: number;
@@ -106,6 +122,9 @@ export type RollupRow = {
 export type RollupTotals = {
   gaTarget: number;
   gaAchieved: number;
+  /** The GA above, split by tier. Adds up to `gaAchieved` at every level. */
+  ga170: number;
+  ga300: number;
   ssoTarget: number;
   ssoAchieved: number;
   c2cTarget: number;
@@ -130,6 +149,8 @@ export type RollupTotals = {
 const EMPTY: RollupTotals = {
   gaTarget: 0,
   gaAchieved: 0,
+  ga170: 0,
+  ga300: 0,
   ssoTarget: 0,
   ssoAchieved: 0,
   c2cTarget: 0,
@@ -157,6 +178,8 @@ export function withBp(row: RollupRow): RollupTotals {
   return {
     gaTarget: row.gaTarget + bp.gaTarget,
     gaAchieved: row.gaAchieved + bp.gaAchieved,
+    ga170: row.ga170 + bp.ga170,
+    ga300: row.ga300 + bp.ga300,
     ssoTarget: row.ssoTarget,
     ssoAchieved: row.ssoAchieved + bp.ssoAchieved,
     c2cTarget: row.c2cTarget,
@@ -210,19 +233,33 @@ export function teamTotals(rows: RollupRow[]): RollupTotals {
     (a, f) => ({
       gaTarget: a.gaTarget + f.gaTarget,
       gaAchieved: a.gaAchieved + f.gaAchieved,
+      ga170: a.ga170 + f.ga170,
+      ga300: a.ga300 + f.ga300,
       ssoAchieved: a.ssoAchieved + f.ssoAchieved,
       c2cAchieved: a.c2cAchieved + f.c2cAchieved,
       lsoAchieved: a.lsoAchieved + f.lsoAchieved,
       c2sAmount: a.c2sAmount + f.c2sAmount,
       c2sTransactions: a.c2sTransactions + f.c2sTransactions,
     }),
-    { gaTarget: 0, gaAchieved: 0, ssoAchieved: 0, c2cAchieved: 0, lsoAchieved: 0, c2sAmount: 0, c2sTransactions: 0 },
+    {
+      gaTarget: 0,
+      gaAchieved: 0,
+      ga170: 0,
+      ga300: 0,
+      ssoAchieved: 0,
+      c2cAchieved: 0,
+      lsoAchieved: 0,
+      c2sAmount: 0,
+      c2sTransactions: 0,
+    },
   );
 
   const own = rows.reduce<RollupTotals>(
     (acc, row) => ({
       gaTarget: acc.gaTarget + row.gaTarget,
       gaAchieved: acc.gaAchieved + row.gaAchieved,
+      ga170: acc.ga170 + row.ga170,
+      ga300: acc.ga300 + row.ga300,
       ssoTarget: acc.ssoTarget + row.ssoTarget,
       ssoAchieved: acc.ssoAchieved + row.ssoAchieved,
       c2cTarget: acc.c2cTarget + row.c2cTarget,
@@ -244,6 +281,8 @@ export function teamTotals(rows: RollupRow[]): RollupTotals {
   return {
     gaTarget: own.gaTarget + bp.gaTarget,
     gaAchieved: own.gaAchieved + bp.gaAchieved,
+    ga170: own.ga170 + bp.ga170,
+    ga300: own.ga300 + bp.ga300,
     ssoTarget: own.ssoTarget,
     ssoAchieved: own.ssoAchieved + bp.ssoAchieved,
     c2cTarget: own.c2cTarget,
@@ -324,3 +363,36 @@ export function groupSizes<T, K>(rows: T[], key: (row: T) => K | null | undefine
 
 /** True when any BP sits inside this set — worth a footnote on a team screen. */
 export const hasBp = (rows: RollupRow[]) => rows.some((r) => r.bp.count > 0);
+
+/**
+ * One sentence reconciling an RSO's own figures with the BP share held aside.
+ *
+ * ## The contradiction this exists to end
+ *
+ * The RSO home shows two accountings of the same words, side by side, and said
+ * which was which nowhere. Measured on real data for one RSO:
+ *
+ *     KPI card   "SSO"            48     ← employeePerformance: the RSO's OWN
+ *                                          credit, with BP-held days routed to
+ *                                          the BP side
+ *     StatPill   "SSO Complete"   49     ← retailerOpportunities: every outlet
+ *                                          they own, which does not know a BP
+ *                                          from any other retailer
+ *
+ * Both are true. Neither is labelled. The same RSO's GA card reads 470 while
+ * the territory credits them 485, and nothing on the page lets a reader get
+ * from one number to the other.
+ *
+ * The split itself is deliberate and stays: v139 established that RSO and BP
+ * targets are set independently, which is why `withBp()` carries the note that
+ * a screen about the RSO themselves uses the row as it comes. What was missing
+ * was the sentence that makes the two figures add up in the reader's head.
+ *
+ * Returns null when there is no BP share, so a caller can drop it in
+ * unconditionally and an RSO without BPs sees nothing extra.
+ */
+export function bpShareNote(bp: BpPortion): string | null {
+  if (!bp.count || bp.gaAchieved <= 0) return null;
+  const partners = `${bp.count} BP${bp.count === 1 ? "" : "s"}`;
+  return `These are your own outlets. Your ${partners} added ${bp.gaAchieved.toLocaleString("en-US")} GA this month and are counted separately, against their own target, on My BPs.`;
+}

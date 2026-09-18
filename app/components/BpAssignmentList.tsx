@@ -1,5 +1,7 @@
 "use client";
 
+import type { GaTiers } from "../../lib/ga-category";
+
 /**
  * The BP assignment list, with instant search and sort.
  *
@@ -24,7 +26,7 @@ export type BpListRow = {
   id: string;
   active: boolean;
   gaTarget: number;
-  monthGa: number;
+  monthGa: GaTiers;
   startDate: string;
   endDate: string | null;
   retailerCode: string;
@@ -34,7 +36,7 @@ export type BpListRow = {
 };
 
 const label = (b: BpListRow) => b.retailerName || b.retailerCode;
-const pctOf = (b: BpListRow) => (b.gaTarget > 0 ? Math.round((b.monthGa / b.gaTarget) * 100) : 0);
+const pctOf = (b: BpListRow) => (b.gaTarget > 0 ? Math.round((b.monthGa.total / b.gaTarget) * 100) : 0);
 
 /**
  * The sort orders for this list, over the serialised row it receives.
@@ -49,8 +51,8 @@ const SORTS: SortSpec<BpListRow>[] = [
     label: "Active first, then newest",
     compare: (a, b) => Number(b.active) - Number(a.active) || b.startDate.localeCompare(a.startDate),
   },
-  { value: "ga-desc", label: "SIM sales — high to low", compare: byNumberDesc((b) => b.monthGa, label) },
-  { value: "ga-asc", label: "SIM sales — low to high", compare: byNumberAsc((b) => b.monthGa, label) },
+  { value: "ga-desc", label: "SIM sales — high to low", compare: byNumberDesc((b) => b.monthGa.total, label) },
+  { value: "ga-asc", label: "SIM sales — low to high", compare: byNumberAsc((b) => b.monthGa.total, label) },
   { value: "pct-desc", label: "GA target % — high to low", compare: byNumberDesc(pctOf, label) },
   { value: "pct-asc", label: "GA target % — low to high", compare: byNumberAsc(pctOf, label) },
   { value: "target-desc", label: "GA target — high to low", compare: byNumberDesc((b) => b.gaTarget, label) },
@@ -132,8 +134,9 @@ export function BpAssignmentList({
                     <Badge tone={a.active ? "active" : "neutral"}>{a.active ? "Active" : "History"}</Badge>
                   </div>
                 }
-                value={a.monthGa}
+                value={a.monthGa.total}
                 valueSub="GA"
+                tiers={a.monthGa}
               />
             ))}
           </div>

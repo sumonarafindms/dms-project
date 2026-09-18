@@ -35,3 +35,60 @@ export const GA_CATEGORY_LABEL: Record<GaCategory, string> = {
 export function gaCategoryLabel(category: GaCategory) {
   return GA_CATEGORY_LABEL[category];
 }
+
+/**
+ * A standard-GA count and its two tiers, kept together.
+ *
+ * ## Why `total` is not a separate number
+ *
+ * The owner asked for the 170/300 split under every GA figure, so that an RSO
+ * can see which SIM is moving. The moment a screen shows a total and its parts,
+ * the reader adds them up — and if they do not agree the app looks broken even
+ * when all three numbers are individually right.
+ *
+ * That was a live risk: an RSO who holds a Business Partner has the BP's GA
+ * added into their total by `lib/bp-ledger.ts`, and the ledger used to carry
+ * the count with the category thrown away. The total would have been the
+ * territory's and the two tiers only the RSO's own outlets.
+ *
+ * So the invariant is structural rather than remembered: `addTier` is the ONLY
+ * way to put a number in, and it moves `total` and one tier together or does
+ * nothing at all. A swap or an unclassified row cannot reach `total`, because
+ * there is no branch that would let it.
+ */
+export type GaTiers = { total: number; ga170: number; ga300: number };
+
+export const noTiers = (): GaTiers => ({ total: 0, ga170: 0, ga300: 0 });
+
+/** Add `count` rows of one category. Anything that is not a tier is ignored. */
+export function addTier(into: GaTiers, category: GaCategory, count = 1): GaTiers {
+  if (category === "GA_170") {
+    into.ga170 += count;
+    into.total += count;
+  } else if (category === "GA_300") {
+    into.ga300 += count;
+    into.total += count;
+  }
+  return into;
+}
+
+/** Merge one set of tiers into another, keeping the invariant. */
+export function addTiers(into: GaTiers, from: GaTiers): GaTiers {
+  into.ga170 += from.ga170;
+  into.ga300 += from.ga300;
+  into.total += from.total;
+  return into;
+}
+
+/**
+ * "GA 170 12 · GA 300 9" — the sub-line under a GA figure.
+ *
+ * One spelling, built from the labels above, so the split reads the same on the
+ * RSO's home, the BP's ring, a team card and an attention row. Returns null
+ * when there is nothing to split, so a caller can drop it in unconditionally
+ * and an empty month stays quiet instead of printing "GA 170 0 · GA 300 0".
+ */
+export function gaTierLine(tiers: GaTiers | null | undefined): string | null {
+  if (!tiers || tiers.total <= 0) return null;
+  return `${GA_CATEGORY_LABEL.GA_170} ${tiers.ga170} · ${GA_CATEGORY_LABEL.GA_300} ${tiers.ga300}`;
+}

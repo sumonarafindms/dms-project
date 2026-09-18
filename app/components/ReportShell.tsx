@@ -34,7 +34,28 @@ import type { ReportRange } from "../../lib/report-range";
 /* ------------------------------------------------------------------ *
  * Date bar
  * ------------------------------------------------------------------ */
-export function ReportDateBar({ range }: { range: ReportRange }) {
+export function ReportDateBar({
+  range,
+  nowIso,
+}: {
+  range: ReportRange;
+  /**
+   * The server's clock, as an ISO string. REQUIRED, deliberately.
+   *
+   * This is a client component: it renders on the server for the initial HTML
+   * and again in the browser on hydration. `rangePresets()` used to read the
+   * clock here, so the two renders read two different clocks — and across a
+   * Dhaka midnight they disagree about every preset's dates and about which
+   * preset is highlighted. That is a hydration mismatch, and React responds by
+   * throwing the server's HTML away and re-rendering the tree.
+   *
+   * `EmployeeDetailView` carries the same note and takes the same prop; this
+   * component was missed. It is required rather than optional so the compiler
+   * names every caller — an optional prop with a clock fallback leaves the bug
+   * wherever somebody forgets, which is exactly how it survived here.
+   */
+  nowIso: string;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -52,7 +73,7 @@ export function ReportDateBar({ range }: { range: ReportRange }) {
   const setFrom = (v: string) => v && apply({ from: v, to: v > range.to ? v : range.to });
   const setTo = (v: string) => v && apply({ from: v < range.from ? v : range.from, to: v });
 
-  const presets = rangePresets();
+  const presets = rangePresets(new Date(nowIso));
   const active = presets.find((p) => p.range.from === range.from && p.range.to === range.to);
   const days = rangeDayCount(range);
 

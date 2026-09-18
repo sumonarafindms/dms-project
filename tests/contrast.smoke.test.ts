@@ -268,6 +268,86 @@ describe("the brand's fill steps are never used as text", () => {
   });
 });
 
+describe("a status colour that has never been on screen is still checked", () => {
+  /*
+   * How `.kit-pace-status` stayed under AA for the life of the app.
+   *
+   * It asked for `var(--band-achieved)` — an ALIAS for `--color-success-600`,
+   * 3.77:1 on white at 11px bold. `--band-near` was 3.69:1 on the next line.
+   * Two things hid it:
+   *
+   *   - The v166 sweep matches token NAMES (`--color-brand-500` and its
+   *     siblings). An alias spells nothing it looks for.
+   *   - axe measures what is actually rendered, and the seeded data never
+   *     reached a target, so "Achieved" and "At risk" were never on a page
+   *     while anything was measuring. The browser sweep was green across
+   *     seven roles and every route because the failing state did not exist.
+   *
+   * The first version of this guard swept every `color:` in every stylesheet,
+   * resolved it and measured it against white. It produced nine hits, of which
+   * two were real: the rest were decorative icons (1.4.11 wants 3:1, not 4.5),
+   * a 20px bold figure that is large text by definition, and four rules on the
+   * dark sidebar where `--text-muted-dark` measures 8.41:1 and is correct.
+   * Wrong instrument — the same mistake v166 made with sRGB distance, and axe
+   * already does that job properly for anything that renders.
+   *
+   * What axe cannot do is look at a state nobody has produced yet. So this
+   * checks the pacing statuses by ENUMERATING them, not by waiting for one.
+   */
+  const styleFiles = fs
+    .readdirSync(path.join(ROOT, "styles"))
+    .filter((f) => f.endsWith(".css"))
+    .map((f) => ({ file: f, src: fs.readFileSync(path.join(ROOT, "styles", f), "utf8") }));
+
+  const KIT = fs.readFileSync(path.join(ROOT, "styles", "kit.css"), "utf8");
+
+  it("every pacing status clears AA, including the ones today's data never shows", () => {
+    /*
+     * `riskTone` maps four statuses onto four tones. Each tone's colour is read
+     * out of the stylesheet and measured, so a status that no seeded row can
+     * currently produce is held to the same standard as the one on screen.
+     */
+    const tones = ["good", "mid", "low", "neutral"];
+    const failures: string[] = [];
+    for (const tone of tones) {
+      const rule = KIT.match(new RegExp(`\\.kit-pace\\.tone-${tone} \\.kit-pace-status \\{([^}]*)\\}`));
+      expect(rule, `no .kit-pace.tone-${tone} rule — has the tone list changed?`).toBeTruthy();
+      const token = rule![1].match(/color:\s*(var\(--[\w-]+\))/)?.[1];
+      expect(token, `tone-${tone} sets no colour`).toBeTruthy();
+      const hex = resolve(token!);
+      const ratio = contrast("#ffffff", hex);
+      if (ratio < AA_BODY) failures.push(`tone-${tone}: ${token} = ${hex} (${ratio.toFixed(2)}:1)`);
+    }
+    expect(
+      failures,
+      `the pacing line is 11px — not large text — so these need a --text-* step:\n  ${failures.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("resolves an alias all the way down before judging it", () => {
+    // The instrument, proved against a value known to be a fill step. Without
+    // this the sweep above could pass by resolving everything to the same
+    // unreadable string and comparing it with itself.
+    expect(resolve("var(--band-achieved)")).toBe(resolve("var(--color-success-600)"));
+    expect(contrast("#ffffff", resolve("var(--band-achieved)"))).toBeLessThan(AA_BODY);
+    expect(contrast("#ffffff", resolve("var(--text-success)"))).toBeGreaterThanOrEqual(AA_BODY);
+  });
+
+  it("the band tokens are fills, and say so by never being text", () => {
+    /*
+     * The rule stated directly, which is what actually caught this. A `--band-*`
+     * colours a ring, a bar or a dot; each has a `--text-*` counterpart one
+     * token away. `--band-behind` is 4.70:1 and would survive a measurement —
+     * it is banned anyway, because "this one happens to clear AA" is how the
+     * other two came to be written.
+     */
+    for (const { file, src } of styleFiles)
+      expect(src, `${file} uses a band fill as text — use --text-success / --text-warning / --text-danger`).not.toMatch(
+        /(^|[^-])color:\s*var\(--band-/m,
+      );
+  });
+});
+
 describe("nothing white is written on the bright gradient", () => {
   /*
    * The failure axe structurally cannot see.

@@ -1,6 +1,7 @@
 import { requirePagePermission } from "../../../lib/auth";
 import { employeePerformance } from "../../../lib/performance";
 import { groupSizes, groupTotals } from "../../../lib/bp-rollup";
+import { noTiers, type GaTiers } from "../../../lib/ga-category";
 import { targetPercent as pct } from "../../../lib/achievement";
 import { prisma } from "../../../lib/prisma";
 import { normalizeMonth } from "../../../lib/drilldown";
@@ -36,7 +37,10 @@ export default async function Page({
   ]);
   // Keyed by supervisor id, not name: two supervisors sharing a name used to
   // share one row's totals here.
-  const by = new Map<string, { rso: number; ret: number; a: number; t: number; ga: number; gaT: number }>();
+  const by = new Map<
+    string,
+    { rso: number; ret: number; a: number; t: number; ga: number; gaT: number; tiers: GaTiers }
+  >();
   /*
    * groupTotals, not a reduce over withBp(): a supervisor's team can hold one
    * Business Partner through two RSOs, and `withBp()` gives each of them the
@@ -53,11 +57,12 @@ export default async function Page({
       t: t.totalRechargeTarget,
       ga: t.gaAchieved,
       gaT: t.gaTarget,
+      tiers: { total: t.gaAchieved, ga170: t.ga170, ga300: t.ga300 },
     });
   const teams = sups.map((sup) => ({
     id: sup.id,
     name: sup.name,
-    ...(by.get(sup.id) || { rso: 0, ret: 0, a: 0, t: 0, ga: 0, gaT: 0 }),
+    ...(by.get(sup.id) || { rso: 0, ret: 0, a: 0, t: 0, ga: 0, gaT: 0, tiers: noTiers() }),
   }));
   return (
     <main className="page">
@@ -79,7 +84,7 @@ export default async function Page({
           code: `${x.rso} RSOs · ${x.ret.toLocaleString("en-US")} retailers`,
           percent: pct(x.a, x.t),
           metrics: [
-            { label: "GA", achieved: x.ga, target: x.gaT },
+            { label: "GA", achieved: x.ga, target: x.gaT, tiers: x.tiers },
             { label: "Recharge", achieved: x.a, target: x.t, unit: "৳" },
           ],
           search: x.name.toLowerCase(),

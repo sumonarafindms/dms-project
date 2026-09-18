@@ -46,11 +46,16 @@ export default async function LowC2s({
   // show or download a different report than the one being viewed.
   const viewParam = view === "all" ? undefined : view;
 
+  // One instant for both renders — see ReportDateBar's nowIso.
+
+  const nowIso = new Date().toISOString();
+
   return (
     <RetailerReportView
       title="Low C2S Retailers"
       subtitle="Lowest C2S first"
       range={range}
+      nowIso={nowIso}
       rows={rows}
       columns={columns}
       exportHref={reportExportHref("low-c2s", range, viewParam ? { view: viewParam } : {})}

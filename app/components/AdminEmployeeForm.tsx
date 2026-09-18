@@ -101,7 +101,7 @@ export default function AdminEmployeeForm({
         }
       />
 
-      <form onSubmit={submit}>
+      <form method="post" onSubmit={submit}>
         <Card className="kit-mb-20" padded="lg">
           <div className="kit-form-grid">
             {role !== "bps" && (

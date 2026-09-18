@@ -57,6 +57,11 @@ const bp = (over: Partial<BpPortion> = {}, retailerId = `bp-retailer-${++bpSeq}`
   const figures = {
     gaTarget: over.gaTarget ?? 0,
     gaAchieved: over.gaAchieved ?? 0,
+    // Default the split to the whole of the GA sitting at the 170 tier, so a
+    // fixture that only says `gaAchieved` still satisfies ga170 + ga300 = total
+    // and cannot accidentally assert a broken invariant.
+    ga170: over.ga170 ?? over.gaAchieved ?? 0,
+    ga300: over.ga300 ?? 0,
     ssoAchieved: over.ssoAchieved ?? 0,
     c2cAchieved: over.c2cAchieved ?? 0,
     lsoAchieved: over.lsoAchieved ?? 0,
@@ -74,6 +79,8 @@ const bp = (over: Partial<BpPortion> = {}, retailerId = `bp-retailer-${++bpSeq}`
 const row = (over: Partial<RollupRow> = {}): RollupRow => ({
   gaTarget: 0,
   gaAchieved: 0,
+  ga170: 0,
+  ga300: 0,
   ssoTarget: 0,
   ssoAchieved: 0,
   c2cTarget: 0,

@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
-import { isSsoComplete, lsoCompleteMonthlySummaryWhere, withStandardGa } from "@/lib/business-rules";
+import {
+  classifyGaActivation,
+  isSsoComplete,
+  lsoCompleteMonthlySummaryWhere,
+  withStandardGa,
+} from "@/lib/business-rules";
+import { addTier, noTiers, type GaTiers } from "@/lib/ga-category";
+import { currentGa170Tariff } from "@/lib/ga-tariff";
 import { apiError } from "@/lib/http-errors";
 import { dhakaMonth } from "@/lib/business-time";
 import { bpLedger } from "@/lib/bp-ledger";
@@ -60,8 +67,14 @@ export async function GET(req: NextRequest) {
       // Grouped by DAY as well as retailer: a BP assignment starts and ends on
       // a date, so without the day there is no way to give the 11th to the RSO
       // and the 13th to the BP.
+      /*
+       * `productCode` and `sellingPrice` join the grouping keys so the 170/300
+       * split can be decided here rather than with two more round trips. It is
+       * the same query — the result set gains a row only where one retailer
+       * sold both tiers on one day.
+       */
       prisma.gaActivation.groupBy({
-        by: ["retailerId", "activationDate"],
+        by: ["retailerId", "activationDate", "productCode", "sellingPrice"],
         where: withStandardGa({ activationDate: { gte: start, lt: end } }),
         _count: { _all: true },
       }),
@@ -114,33 +127,45 @@ export async function GET(req: NextRequest) {
      */
     const ledger = bpLedger(bpAssignments, start, end, () => true);
 
-    const gaByEmployee = new Map<string, number>();
+    const gaByEmployee = new Map<string, GaTiers>();
     const ssoByEmployee = new Map<string, number>();
+    /*
+     * `/dashboard` and `employeePerformance` are required to agree (see the
+     * note below), so the tier split has to be computed the same way on both
+     * sides: from the learned tariff, never from a hardcoded price.
+     */
+    const tariff = await currentGa170Tariff();
     // SSO counts retailer-MONTHS that reached the threshold, and the window
     // here is exactly one month — so the per-retailer totals are accumulated
     // first, split RSO-side from BP-side, and only then tested.
-    const perRetailer = new Map<string, { rso: number; bp: number }>();
+    const perRetailer = new Map<string, { rso: GaTiers; bp: GaTiers }>();
     for (const group of gaGroups) {
-      const bucket = perRetailer.get(group.retailerId) ?? { rso: 0, bp: 0 };
-      if (ledger.ownsDay(group.retailerId, group.activationDate.getTime())) bucket.bp += group._count._all;
-      else bucket.rso += group._count._all;
+      const bucket = perRetailer.get(group.retailerId) ?? { rso: noTiers(), bp: noTiers() };
+      const side = ledger.ownsDay(group.retailerId, group.activationDate.getTime()) ? bucket.bp : bucket.rso;
+      addTier(side, classifyGaActivation(group, tariff), group._count._all);
       perRetailer.set(group.retailerId, bucket);
     }
     for (const [retailerId, counts] of perRetailer) {
       const retailer = retailerMap.get(retailerId);
       const employeeId = retailer?.employeeId;
       if (!employeeId) continue;
-      if (counts.rso > 0) {
-        gaByEmployee.set(employeeId, (gaByEmployee.get(employeeId) || 0) + counts.rso);
-        if (isSsoComplete(retailer.simSeller, counts.rso))
+      if (counts.rso.total > 0) {
+        const mine = gaByEmployee.get(employeeId) ?? noTiers();
+        mine.total += counts.rso.total;
+        mine.ga170 += counts.rso.ga170;
+        mine.ga300 += counts.rso.ga300;
+        gaByEmployee.set(employeeId, mine);
+        if (isSsoComplete(retailer.simSeller, counts.rso.total))
           ssoByEmployee.set(employeeId, (ssoByEmployee.get(employeeId) || 0) + 1);
       }
-      if (counts.bp > 0) {
+      if (counts.bp.total > 0) {
         // The window here is exactly one month, so any day inside it picks the
         // same holders; `start` is the cheapest one to hand.
-        const sso = isSsoComplete(retailer.simSeller, counts.bp);
+        const sso = isSsoComplete(retailer.simSeller, counts.bp.total);
         ledger.credit(retailerId, start.getTime(), employeeId, (f) => {
-          f.gaAchieved += counts.bp;
+          f.gaAchieved += counts.bp.total;
+          f.ga170 += counts.bp.ga170;
+          f.ga300 += counts.bp.ga300;
           if (sso) f.ssoAchieved += 1;
         });
       }
@@ -174,6 +199,7 @@ export async function GET(req: NextRequest) {
         manual = employee.manualMetrics[0];
       const scAchieved = Number(manual?.scAchieved || 0);
       const c2cAchieved = c2cByEmployee.get(employee.id) || 0;
+      const ga = gaByEmployee.get(employee.id) ?? noTiers();
       const bp: BpPortion = ledger.portionFor(employee.id);
       return {
         employeeId: employee.id,
@@ -185,7 +211,9 @@ export async function GET(req: NextRequest) {
         // subtracting the BP's here would remove the same SIMs twice — see the
         // note in lib/performance.ts.
         gaTarget: target?.gaTarget || 0,
-        gaAchieved: gaByEmployee.get(employee.id) || 0,
+        gaAchieved: ga.total,
+        ga170: ga.ga170,
+        ga300: ga.ga300,
         ssoTarget: target?.ssoTarget || 0,
         ssoAchieved: ssoByEmployee.get(employee.id) || 0,
         c2cTarget: Number(target?.c2cTarget || 0),
