@@ -7,6 +7,7 @@
  * otherwise — the same precedence the import and performance code uses.
  */
 
+import { bpDisplayName } from "../../../lib/bp-name";
 import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "../../components/Kit";
@@ -62,8 +63,8 @@ export default async function Page() {
             {bps.map((x) => (
               <Row
                 key={x.id}
-                avatar={x.retailer.retailerName || x.retailer.retailerCode}
-                title={x.retailer.retailerName || x.retailer.retailerCode}
+                avatar={bpDisplayName(x.retailer)}
+                title={bpDisplayName(x.retailer)}
                 sub={x.retailer.retailerCode}
                 detail={`RSO ${x.employee.name} · since ${x.startDate.toISOString().slice(0, 10)}`}
                 value={x.monthlyTargets[0]?.gaTarget ?? x.gaTarget}

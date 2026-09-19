@@ -1,6 +1,7 @@
 "use client";
 
 import type { GaTiers } from "../../lib/ga-category";
+import { bpDisplayName } from "../../lib/bp-name";
 
 /**
  * The BP assignment list, with instant search and sort.
@@ -31,11 +32,14 @@ export type BpListRow = {
   endDate: string | null;
   retailerCode: string;
   retailerName: string;
+  /** The BP's own display name, if one was given. See lib/bp-name.ts. */
+  bpName?: string | null;
   rsoName: string;
   supervisorName: string;
 };
 
-const label = (b: BpListRow) => b.retailerName || b.retailerCode;
+// One rule for what a BP is called, shared with every other screen.
+const label = (b: BpListRow) => bpDisplayName(b);
 const pctOf = (b: BpListRow) => (b.gaTarget > 0 ? Math.round((b.monthGa.total / b.gaTarget) * 100) : 0);
 
 /**
@@ -67,7 +71,8 @@ const SORTS: SortSpec<BpListRow>[] = [
   { value: "start-asc", label: "Assigned — oldest first", compare: (a, b) => a.startDate.localeCompare(b.startDate) },
 ];
 
-const haystack = (b: BpListRow) => `${b.retailerCode} ${b.retailerName} ${b.rsoName} ${b.supervisorName}`.toLowerCase();
+const haystack = (b: BpListRow) =>
+  `${b.retailerCode} ${b.retailerName} ${b.bpName || ""} ${b.rsoName} ${b.supervisorName}`.toLowerCase();
 
 export function BpAssignmentList({
   rows,
@@ -122,8 +127,8 @@ export function BpAssignmentList({
               <Row
                 key={a.id}
                 href={`${basePath}/${a.id}?${range}`}
-                avatar={a.retailerName || a.retailerCode}
-                title={a.retailerName || a.retailerCode}
+                avatar={label(a)}
+                title={label(a)}
                 sub={`${a.retailerCode} · RSO ${a.rsoName}${a.supervisorName ? ` · ${a.supervisorName}` : ""}`}
                 detail={`${a.startDate} → ${a.endDate || "current"}`}
                 // Wrapped in .kit-row-actions so the mobile rule moves it to

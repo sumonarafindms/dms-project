@@ -5,6 +5,7 @@
  * them as pending would put work on an RSO's list that does not exist.
  */
 
+import { bpDisplayName } from "../../../lib/bp-name";
 import { requirePagePermission } from "../../../lib/auth";
 import { retailerOpportunities } from "../../../lib/retailer-opportunities";
 import { normalizeMonth } from "../../../lib/drilldown";
@@ -33,12 +34,10 @@ export default async function SsoWorklist({
     retailerOpportunities(month, [u.employeeId]),
     prisma.bpAssignment.findMany({
       where: { employeeId: u.employeeId, active: true },
-      select: { retailerId: true, retailer: { select: { retailerName: true, retailerCode: true } } },
+      select: { retailerId: true, retailer: { select: { retailerName: true, retailerCode: true, bpName: true } } },
     }),
   ]);
-  const bpByRetailer = new Map(
-    assignments.map((a) => [a.retailerId, a.retailer.retailerName || a.retailer.retailerCode]),
-  );
+  const bpByRetailer = new Map(assignments.map((a) => [a.retailerId, bpDisplayName(a.retailer)]));
 
   const rows: WorklistRow[] = retailers
     .filter((r) => r.simSeller)

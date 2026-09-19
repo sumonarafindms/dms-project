@@ -16,6 +16,7 @@ model Supervisor {
   updatedAt DateTime   @updatedAt
   user      User?
   managerAssignments ManagerSupervisor[]
+  targets   SupervisorMonthlyTarget[]
 }
 
 model ManagerSupervisor {
@@ -53,6 +54,20 @@ model Retailer {
   id               String      @id @default(cuid())
   retailerCode     String      @unique
   retailerName     String?
+  /**
+   * What this outlet is called when it acts as a Business Partner.
+   *
+   * `retailerName` cannot carry it: that column is owned by the master import
+   * and is re-asserted from the vendor's file on every upload, so a name typed
+   * here would be overwritten by the next master file. Before v181 the BP
+   * display name was written only to the BP login's `User.displayName`, which
+   * meant a BP with no mobile number and PIN had nowhere to keep one and the
+   * typed name was dropped in silence.
+   *
+   * Null means "no BP name given" — every reader falls back to `retailerName`
+   * and then to `retailerCode`, through `bpDisplayName()` in lib/bp-name.ts.
+   */
+  bpName           String?
   simSeller        String?
   iTopUpSeller     String?
   tranMobileNo     String?
@@ -78,6 +93,38 @@ model Retailer {
 
   @@index([employeeId])
   @@index([iTopUpSrNumber])
+}
+
+/**
+ * A supervisor's own monthly target.
+ *
+ * Until v181 a supervisor had no target of their own: every supervisor figure
+ * in the app was the SUM of their RSOs' targets, plus their BPs' GA target on
+ * the dashboard path. Two code comments used to state that as a rule. The
+ * owner's ruling is that it produced a number too high to manage against — a
+ * supervisor is not simply the addition of the people under them — so a
+ * supervisor now carries a target that is set directly and stands on its own.
+ *
+ * The columns mirror MonthlyTarget exactly, and deliberately: every screen that
+ * shows a supervisor a GA, SSO, LSO, C2C, SC or Recharge target must still find
+ * one, or a card that used to carry a figure would quietly go blank.
+ */
+model SupervisorMonthlyTarget {
+  id                  String     @id @default(cuid())
+  supervisorId        String
+  supervisor          Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+  month               DateTime
+  gaTarget            Int        @default(0)
+  c2cTarget           Decimal    @default(0) @db.Decimal(18,2)
+  scTarget            Decimal    @default(0) @db.Decimal(18,2)
+  totalRechargeTarget Decimal    @default(0) @db.Decimal(18,2)
+  ssoTarget           Int        @default(0)
+  lsoTarget           Int        @default(0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([supervisorId, month])
+  @@index([month])
 }
 
 model MonthlyTarget {

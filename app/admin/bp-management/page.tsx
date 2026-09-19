@@ -1,3 +1,4 @@
+import { bpDisplayName } from "../../../lib/bp-name";
 import { requireUser } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { PageHeader } from "../../components/Kit";
@@ -38,6 +39,7 @@ export default async function BpManagement() {
             id: true,
             retailerCode: true,
             retailerName: true,
+            bpName: true,
             bpUser: { select: { displayName: true, mobileNumber: true, active: true, role: true } },
           },
         },
@@ -49,7 +51,7 @@ export default async function BpManagement() {
       take: 30,
       include: {
         employee: { select: { name: true } },
-        retailer: { select: { retailerCode: true, retailerName: true } },
+        retailer: { select: { retailerCode: true, retailerName: true, bpName: true } },
       },
     }),
   ]);
@@ -82,7 +84,7 @@ export default async function BpManagement() {
           supervisor: a.employee.supervisor?.name || "Unassigned",
           retailerId: a.retailerId,
           code: a.retailer.retailerCode,
-          name: a.retailer.retailerName || "",
+          name: bpDisplayName(a.retailer),
           startDate: a.startDate.toISOString().slice(0, 10),
           gaTarget: a.gaTarget,
           login: a.retailer.bpUser?.active && a.retailer.bpUser.role === "BP" ? a.retailer.bpUser.displayName : "",
@@ -93,7 +95,7 @@ export default async function BpManagement() {
           id: a.id,
           employee: a.employee.name,
           code: a.retailer.retailerCode,
-          name: a.retailer.retailerName || "",
+          name: bpDisplayName(a.retailer),
           startDate: a.startDate.toISOString().slice(0, 10),
           endDate: a.endDate?.toISOString().slice(0, 10) || "",
         }))}

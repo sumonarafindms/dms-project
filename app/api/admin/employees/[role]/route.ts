@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bpDisplayName, bpNameToStore } from "@/lib/bp-name";
 import { prisma } from "../../../../../lib/prisma";
 import { getCurrentUser, hashCredential } from "../../../../../lib/auth";
 import { recordAssignmentChanges } from "../../../../../lib/assignment-history";
@@ -166,10 +167,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
         const assignment = await tx.bpAssignment.create({
           data: { employeeId, retailerId, startDate, gaTarget, active: true },
         });
+        /*
+         * The BP display name goes on the RETAILER, not only on the login.
+         *
+         * It used to be written solely to `User.displayName`, which exists
+         * only when a mobile number and PIN are supplied — so a BP without a
+         * phone had the name typed into this form dropped in silence. It also
+         * meant the name could not be read by any screen that was not looking
+         * at the login, which is why every list went on showing the master
+         * file's name. See lib/bp-name.ts.
+         */
+        if (name) await tx.retailer.update({ where: { id: retailerId }, data: { bpName: name } });
         if (mobile)
           await tx.user.create({
             data: {
-              displayName: name || retailer.retailerName || retailer.retailerCode,
+              // The login's own label is kept in step with the BP's name, so
+              // the BP's home greeting and every list agree.
+              displayName: bpDisplayName({ ...retailer, bpName: name }),
               mobileNumber: mobile,
               credentialHash: await hashCredential(pin),
               role: "BP",
@@ -363,10 +377,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
         active = b.active !== false,
         mobile = clean(b.mobile),
         pin = clean(b.pin),
-        name = clean(b.name) || a.retailer.retailerName || a.retailer.retailerCode;
+        /*
+         * Blank means blank.
+         *
+         * This used to fall back to `retailerName` when the field was empty,
+         * which made the BP name impossible to CLEAR once set — an operator
+         * who wanted the master file's name back had no way to ask for it.
+         * `bpNameToStore` returns null instead, and the fallback then happens
+         * at read time where it belongs (lib/bp-name.ts).
+         */
+        bpName = bpNameToStore(b.name),
+        name = bpDisplayName({ ...a.retailer, bpName });
       await prisma.$transaction(async (tx) => {
         const endDate = !active && a.active ? new Date(`${dhakaTodayYmd()}T00:00:00.000Z`) : undefined;
         await tx.bpAssignment.update({ where: { id }, data: { gaTarget, active, ...(endDate ? { endDate } : {}) } });
+        await tx.retailer.update({ where: { id: a.retailerId }, data: { bpName } });
         if (a.retailer.bpUser) {
           const udata: any = { displayName: name, active };
           if (mobile) udata.mobileNumber = mobile;

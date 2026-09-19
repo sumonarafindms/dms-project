@@ -155,6 +155,12 @@ export default function BpManager({
             <Field label="BP GA target">
               <NumberInput min="0" name="gaTarget" defaultValue="0" />
             </Field>
+            {/* The name this outlet is shown under wherever it appears as a
+                BP. Optional: left blank, every screen falls back to the
+                master file's retailer name. See lib/bp-name.ts. */}
+            <Field label="BP display name" hint="Optional — defaults to the retailer name">
+              <input className="kit-input" name="bpName" placeholder="What to call this BP" />
+            </Field>
             {/* One control, not two. This screen used to carry a "Find
                 retailer" text box beside the select because a native menu of
                 this RSO's codes could not be searched; the picker does both,

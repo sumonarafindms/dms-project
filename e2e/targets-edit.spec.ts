@@ -150,10 +150,20 @@ test.describe("Monthly target control, phone cards", () => {
     await dialog.getByRole("button", { name: /update target/i }).click();
     await expect(dialog).toBeHidden();
 
+    /*
+     * Matched on the FORMATTED figure.
+     *
+     * The card prints `toLocaleString("en-US")`, so a value of 1,203 renders
+     * with a comma and `^1203$` misses it. This passed for as long as the
+     * first card's target happened to be under a thousand — it failed the
+     * first time a real four-figure target sat there, which is a test of the
+     * data rather than of the page.
+     */
+    const shown = Number(next).toLocaleString("en-US");
     await expect(
       card
         .locator("strong")
-        .filter({ hasText: new RegExp(`^${next}$`) })
+        .filter({ hasText: new RegExp(`^${shown.replace(/,/g, ",")}$`) })
         .first(),
     ).toBeVisible();
   });

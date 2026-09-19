@@ -1,3 +1,4 @@
+import { bpDisplayName } from "./bp-name";
 import { prisma } from "./prisma";
 import { ImportType } from "@prisma/client";
 import { classifyGaActivation, withStandardGa } from "./business-rules";
@@ -162,7 +163,7 @@ async function bpRows(ymd: string, where: Record<string, unknown>): Promise<Live
       retailerId: true,
       startDate: true,
       endDate: true,
-      retailer: { select: { retailerCode: true, retailerName: true } },
+      retailer: { select: { retailerCode: true, retailerName: true, bpName: true } },
       employee: { select: { name: true } },
     },
   });
@@ -171,7 +172,7 @@ async function bpRows(ymd: string, where: Record<string, unknown>): Promise<Live
   return assignments
     .map((a) => ({
       id: a.id,
-      name: a.retailer.retailerName || a.retailer.retailerCode,
+      name: bpDisplayName(a.retailer),
       meta: `${a.retailer.retailerCode}${a.employee?.name ? ` · ${a.employee.name}` : ""}`,
       count: counts.get(a.id) ?? noTiers(),
     }))

@@ -32,6 +32,8 @@ export type BpAssignmentListRow = {
   retailer: {
     retailerCode: string;
     retailerName: string | null;
+    /** The BP's own display name, if one was given. See lib/bp-name.ts. */
+    bpName: string | null;
   };
   employee: {
     name: string;
@@ -139,7 +141,7 @@ export async function listBpAssignments(
       AND: [{ startDate: { lt: rangeEnd } }, { OR: [{ endDate: null }, { endDate: { gte: rangeStart } }] }],
     },
     include: {
-      retailer: { select: { retailerCode: true, retailerName: true } },
+      retailer: { select: { retailerCode: true, retailerName: true, bpName: true } },
       employee: { select: { name: true, employeeCode: true, supervisor: { select: { name: true } } } },
       monthlyTargets: true,
     },
@@ -195,7 +197,9 @@ export async function bpAssignmentDetail(
   const assignment = await prisma.bpAssignment.findFirst({
     where: { id, ...assignmentAccessWhere(user) },
     include: {
-      retailer: { select: { id: true, retailerCode: true, retailerName: true, category: true, route: true } },
+      retailer: {
+        select: { id: true, retailerCode: true, retailerName: true, bpName: true, category: true, route: true },
+      },
       employee: { select: { name: true, employeeCode: true, rsoMsisdn: true, supervisor: { select: { name: true } } } },
       monthlyTargets: true,
     },

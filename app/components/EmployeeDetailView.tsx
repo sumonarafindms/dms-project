@@ -48,6 +48,8 @@ type RetailerRow = {
   route?: string | null;
   isBp?: boolean;
   simSeller?: string | null;
+  /** SIM seller with at least two standard GA this month — lib/business-rules.ts. */
+  sso: boolean;
   /** False for a deactivated outlet that still traded inside the period. */
   active?: boolean;
   ga: number;
@@ -62,6 +64,19 @@ const SORTS: SortSpec<RetailerRow>[] = [
   { value: "ga-asc", label: "GA — low to high", compare: byNumberAsc((r) => r.ga, outlet) },
   { value: "c2c-desc", label: "C2C — high to low", compare: byNumberDesc((r) => r.c2cAmount, outlet) },
   { value: "c2c-asc", label: "C2C — low to high", compare: byNumberAsc((r) => r.c2cAmount, outlet) },
+  /*
+   * The two execution verdicts, both orderable.
+   *
+   * Only LSO was here, although every row already carried its SSO verdict and
+   * the list prints both — so an RSO could ask "which of my outlets still owe
+   * me an LSO" and had no way to ask the same question about SSO, which is the
+   * one with a two-SIM threshold they can actually close today.
+   */
+  {
+    value: "sso-pending",
+    label: "SSO pending first",
+    compare: (a, b) => Number(a.sso) - Number(b.sso) || byText(outlet(a), outlet(b)),
+  },
   {
     value: "lso-pending",
     label: "LSO pending first",
@@ -230,6 +245,19 @@ export function EmployeeDetailView({
                 sub={`${r.retailerCode}${r.active === false ? " · Inactive" : ""}${r.isBp ? " · BP" : ""}${(r.simSeller || "").toUpperCase() === "Y" ? " · SIM Seller" : ""}`}
                 detail={
                   <>
+                    {/* Both verdicts, because the list can now be ordered by
+                        either and a row ordered by something it does not show
+                        is a list nobody can read. SSO applies to SIM sellers
+                        only, so a non-seller says so rather than reading as a
+                        failure. */}
+                    <span className={r.sso ? "is-ok" : "is-warn"}>
+                      {(r.simSeller || "").toUpperCase() === "Y"
+                        ? r.sso
+                          ? "SSO complete"
+                          : "SSO pending"
+                        : "Not a SIM seller"}
+                    </span>
+                    {" · "}
                     <span className={r.lso ? "is-ok" : "is-warn"}>{r.lso ? "LSO complete" : "LSO pending"}</span>
                     {` · ৳${Math.round(r.c2cAmount).toLocaleString("en-US")} C2C`}
                   </>

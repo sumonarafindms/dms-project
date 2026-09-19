@@ -1,3 +1,4 @@
+import { bpDisplayName } from "../../../lib/bp-name";
 import { requireUser } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import UserManager from "./UserManager";
@@ -35,13 +36,13 @@ export default async function Users() {
         link:
           u.employee?.name ||
           u.supervisor?.name ||
-          (u.bpRetailer ? `${u.bpRetailer.retailerCode} · ${u.bpRetailer.retailerName || "BP"}` : ""),
+          (u.bpRetailer ? `${u.bpRetailer.retailerCode} · ${bpDisplayName(u.bpRetailer)}` : ""),
       }))}
       employees={employees.map((e) => ({ id: e.id, name: e.name, meta: e.rsoMsisdn }))}
       supervisors={supervisors.map((s) => ({ id: s.id, name: s.name }))}
       bps={bps.map((a) => ({
         id: a.retailerId,
-        name: `${a.retailer.retailerCode} · ${a.retailer.retailerName || "BP"}`,
+        name: `${a.retailer.retailerCode} · ${bpDisplayName(a.retailer)}`,
         meta: `Under ${a.employee.name}`,
       }))}
     />

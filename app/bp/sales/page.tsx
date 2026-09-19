@@ -10,6 +10,7 @@
  * more than 300 activations would see a total that shrank to fit the page.
  */
 
+import { bpDisplayName } from "../../../lib/bp-name";
 import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { monthBounds } from "../../../lib/month";
@@ -62,7 +63,7 @@ export default async function Page({
   const [retailer, a] = await Promise.all([
     prisma.retailer.findUnique({
       where: { id: u.bpRetailerId },
-      select: { retailerCode: true, retailerName: true },
+      select: { retailerCode: true, retailerName: true, bpName: true },
     }),
     prisma.bpAssignment.findFirst({
       where: { retailerId: u.bpRetailerId, active: true },
@@ -115,7 +116,7 @@ export default async function Page({
     <main className="page">
       <PageHeader
         title="Activation Details"
-        subtitle={`${retailer?.retailerCode || ""} · ${retailer?.retailerName || "Your BP retailer"}`}
+        subtitle={`${retailer?.retailerCode || ""} · ${retailer ? bpDisplayName(retailer) : "Your BP retailer"}`}
       />
 
       <SummaryStrip

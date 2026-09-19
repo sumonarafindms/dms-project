@@ -438,18 +438,39 @@ export async function employeePerformance(month: string, employeeIds?: string[],
       gaAchieved: g.t,
       ga170: g.a170,
       ga300: g.a300,
+      /*
+       * ## The BP's SSO, LSO and C2C belong to the RSO who holds it
+       *
+       * GA is split because a BP assignment carries its own GA target (v139),
+       * so crediting the RSO for a BP's SIMs would target the same SIMs twice.
+       * **No other metric has a BP target.** An RSO's SSO, LSO and C2C targets
+       * are set in /targets against their whole base — Business Partners
+       * included — so holding the BP's achievement aside measured them against
+       * a goal that still covered those outlets. `lib/bp-rollup.ts` said as
+       * much in passing: "an RSO with BPs will show a lower achievement
+       * percentage on those four until their targets are revised by hand."
+       *
+       * The owner's ruling is that the target is right and the achievement was
+       * wrong: an SSO completed at a BP outlet is the holder's SSO. So these
+       * three are folded in here, at the one place that builds the row, rather
+       * than added at each of the twenty screens that show them.
+       *
+       * `bp` still carries them. It is the record of WHERE the figure came
+       * from, and `teamTotals` needs it to count an outlet held by two RSOs on
+       * one team exactly once.
+       */
       ssoTarget: targets.sso,
-      ssoAchieved: sso.get(e.id) || 0,
+      ssoAchieved: (sso.get(e.id) || 0) + bp.ssoAchieved,
       c2cTarget: targets.c2c,
-      c2cAchieved: c,
+      c2cAchieved: c + bp.c2cAchieved,
       scTarget: targets.sc,
       scAchieved: sc,
       totalRechargeTarget: targets.recharge,
-      totalRechargeAchieved: c + sc,
+      totalRechargeAchieved: c + bp.c2cAchieved + sc,
       lsoTarget: targets.lso,
-      lsoAchieved: cs.lso,
-      c2sAmount: cs.amount,
-      c2sTransactions: cs.trx,
+      lsoAchieved: cs.lso + bp.lsoAchieved,
+      c2sAmount: cs.amount + bp.c2sAmount,
+      c2sTransactions: cs.trx + bp.c2sTransactions,
       bp,
     } satisfies EmployeePerformance;
   });

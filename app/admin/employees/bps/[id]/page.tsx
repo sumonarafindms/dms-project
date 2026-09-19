@@ -15,7 +15,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       role="bps"
       initial={{
         id: a.id,
-        name: a.retailer.bpUser?.displayName || a.retailer.retailerName || a.retailer.retailerCode,
+        /*
+         * The BP's own name, from the retailer row that now holds it.
+         *
+         * This was the ONE place in the app that read the name back, which is
+         * why it looked right here and nowhere else. It reads the same field
+         * every other screen reads now, and falls back the same way.
+         */
+        name: a.retailer.bpName || "",
         mobile: a.retailer.bpUser?.mobileNumber || "",
         active: a.active && Boolean(a.retailer.bpUser?.active ?? true),
         employeeId: a.employeeId,

@@ -1,3 +1,4 @@
+import { bpDisplayName } from "../../../../lib/bp-name";
 import { requireUser } from "../../../../lib/auth";
 import { listBpAssignments } from "../../../../lib/bp-activations";
 import { normalizeMonth } from "../../../../lib/drilldown";
@@ -75,11 +76,12 @@ export default async function Page({
           id: b.id,
           href: `/admin/performance/bps/${b.id}?month=${month}${s.from ? `&from=${s.from}` : ""}${s.to ? `&to=${s.to}` : ""}`,
           eyebrow: "BP",
-          name: b.retailer.retailerName || b.retailer.retailerCode,
+          name: bpDisplayName(b.retailer),
           code: `${b.retailer.retailerCode} · RSO ${b.employee.name}`,
           percent: b.gaTarget ? Math.round((b.monthGa.total / b.gaTarget) * 100) : 0,
           metrics: [{ label: "SIM Sales", achieved: b.monthGa.total, target: b.gaTarget, tiers: b.monthGa }],
-          search: `${b.retailer.retailerCode} ${b.retailer.retailerName || ""} ${b.employee.name}`.toLowerCase(),
+          search:
+            `${b.retailer.retailerCode} ${b.retailer.retailerName || ""} ${b.retailer.bpName || ""} ${b.employee.name}`.toLowerCase(),
           sortKeys: {
             pct: b.gaTarget ? Math.round((b.monthGa.total / b.gaTarget) * 100) : 0,
             ga: b.monthGa.total,

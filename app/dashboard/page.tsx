@@ -39,11 +39,19 @@ import {
   Tile,
 } from "../components/Kit";
 import { apiFetch } from "@/lib/api-client";
+import {
+  emptySupervisorTarget,
+  sumSupervisorTargets,
+  targetFor,
+  withSupervisorTarget,
+  type SupervisorTarget,
+} from "../../lib/supervisor-target";
 
 type ApiRow = {
   employeeId: string;
   employeeCode?: string | null;
   name: string;
+  supervisorId: string | null;
   supervisor: string;
   retailerCount: number;
   gaTarget: number;
@@ -83,6 +91,8 @@ export default function Dashboard() {
   // and stops the pacing figures shifting when the month picker re-renders.
   const [nowIso] = useState(() => new Date().toISOString());
   const [rows, setRows] = useState<ApiRow[]>([]);
+  /** The supervisors' own targets for the selected month, keyed by id. */
+  const [supTargets, setSupTargets] = useState<Map<string, SupervisorTarget>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -99,7 +109,10 @@ export default function Dashboard() {
     (async () => {
       setLoading(true);
       setError("");
-      const res = await apiFetch<{ rows?: ApiRow[] }>(`/api/dashboard/summary?month=${month}&_=${Date.now()}`, {
+      const res = await apiFetch<{
+        rows?: ApiRow[];
+        supervisorTargets?: (SupervisorTarget & { supervisorId: string })[];
+      }>(`/api/dashboard/summary?month=${month}&_=${Date.now()}`, {
         cache: "no-store",
         signal: controller.signal,
       });
@@ -109,6 +122,9 @@ export default function Dashboard() {
       // must not be painted over the dashboard as an error.
       if (!res.ok) return void (res.message && setError(res.message));
       setRows(res.data.rows || []);
+      setSupTargets(
+        new Map((res.data.supervisorTargets || []).map((t) => [t.supervisorId, { ...emptySupervisorTarget(), ...t }])),
+      );
     })();
     return () => {
       active = false;
@@ -146,7 +162,17 @@ export default function Dashboard() {
    * rows here would silently drop every BP's SIMs and recharge from the
    * company figure — see lib/bp-rollup.ts.
    */
-  const totals = useMemo(() => teamTotals(rows), [rows]);
+  /*
+   * The company target is the supervisors' own targets added up.
+   *
+   * v181: once a supervisor's target is a number somebody chose, the company's
+   * has to be the sum of those, or this page's headline row and the supervisor
+   * section below it would be built from two different things and never
+   * reconcile. The ACHIEVED side is unchanged — `teamTotals` over the rows,
+   * Business Partners included, shared outlets counted once.
+   */
+  const companyTarget = useMemo(() => sumSupervisorTargets(supTargets.values()), [supTargets]);
+  const totals = useMemo(() => withSupervisorTarget(teamTotals(rows), companyTarget), [rows, companyTarget]);
 
   // Composite score: recharge, GA and the SSO/LSO execution pair, weighted
   // equally. One number for "is this RSO keeping up overall".
@@ -174,20 +200,25 @@ export default function Dashboard() {
      * whole outlet by design — so summing them into a bucket counted its GA
      * and its target twice, on the company's own dashboard.
      */
-    const totals = groupTotals(rows, (r) => r.supervisor);
-    const sizes = groupSizes(rows, (r) => r.supervisor);
-    for (const [name, t] of totals)
-      map.set(name, {
-        name,
-        rsos: sizes.get(name) ?? 0,
+    // Grouped by id rather than by name: two supervisors sharing a name used
+    // to share one card here, and there is now a per-id target to attach.
+    const totals = groupTotals(rows, (r) => r.supervisorId);
+    const sizes = groupSizes(rows, (r) => r.supervisorId);
+    const nameOf = new Map(rows.map((r) => [r.supervisorId, r.supervisor]));
+    for (const [supervisorId, raw] of totals) {
+      const t = withSupervisorTarget(raw, targetFor(supTargets, supervisorId));
+      map.set(supervisorId ?? "", {
+        name: nameOf.get(supervisorId) || "Unassigned",
+        rsos: sizes.get(supervisorId) ?? 0,
         retailers: t.retailerCount,
         achieved: t.totalRechargeAchieved,
         target: t.totalRechargeTarget,
         ga: t.gaAchieved,
         gaTarget: t.gaTarget,
       });
+    }
     return [...map.values()].sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
-  }, [rows]);
+  }, [rows, supTargets]);
 
   const behind = scored.filter((r) => r.score < ACHIEVEMENT_WATCH_PERCENT).length;
   const onTrack = scored.filter((r) => r.score >= ACHIEVEMENT_ON_TRACK_PERCENT).length;

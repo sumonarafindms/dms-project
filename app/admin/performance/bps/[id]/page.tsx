@@ -1,3 +1,4 @@
+import { bpDisplayName } from "../../../../../lib/bp-name";
 import { requireUser } from "../../../../../lib/auth";
 import { bpAssignmentDetail } from "../../../../../lib/bp-activations";
 import { normalizeMonth } from "../../../../../lib/drilldown";
@@ -27,7 +28,7 @@ export default async function Page({
         <Icon name="arrow" /> BP Performance
       </Link>
       <PageHeader
-        title={a.retailer.retailerName || a.retailer.retailerCode}
+        title={bpDisplayName(a.retailer)}
         subtitle={`${a.retailer.retailerCode} · RSO ${a.employee.name} · ${a.employee.supervisor?.name || "No supervisor"}`}
       />
       <div className="no-print kit-mb-16">

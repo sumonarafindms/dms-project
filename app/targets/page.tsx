@@ -57,6 +57,7 @@ type TargetRow = {
   rsoMsisdn: string;
   name: string;
   supervisor: string;
+  supervisorId: string | null;
   retailerCount: number;
   gaTarget: number;
   c2cTarget: number;
@@ -72,20 +73,43 @@ type BpRow = {
   bpName: string;
   rsoName: string;
   rsoMsisdn: string;
+  supervisorId: string | null;
   gaTarget: number;
 };
-type TargetsPayload = { rows?: TargetRow[]; bpRows?: BpRow[] };
+/**
+ * A supervisor's own target.
+ *
+ * `set` is the difference between "nobody has set this" and "somebody set it to
+ * zero", and the two must not look alike: an unset supervisor shows no figures
+ * and the reference line below instead, so an operator can see there is work to
+ * do rather than a row of confident zeros.
+ */
+type SupRow = {
+  supervisorId: string;
+  name: string;
+  rsoCount: number;
+  set: boolean;
+  gaTarget: number;
+  c2cTarget: number;
+  scTarget: number;
+  totalRechargeTarget: number;
+  ssoTarget: number;
+  lsoTarget: number;
+};
+type TargetsPayload = { rows?: TargetRow[]; bpRows?: BpRow[]; supRows?: SupRow[] };
 type ImportResult = { totalRows?: number; updated?: number; failed?: number; errors?: string[] };
 
-const numericFields = [
-  "gaTarget",
-  "c2cTarget",
-  "scTarget",
-  "totalRechargeTarget",
-  "ssoTarget",
-  "lsoTarget",
-  "scAchieved",
-] as const;
+/**
+ * The six fields that are TARGETS, and which every entity with a target has.
+ *
+ * `scAchieved` below is not one of them: it is a manually entered achievement
+ * rather than a goal, and it belongs to an RSO alone. A supervisor's dialog
+ * offers these six and nothing else, and `numericFields` is derived from this
+ * list rather than written out again so the two cannot drift.
+ */
+const targetFields = ["gaTarget", "c2cTarget", "scTarget", "totalRechargeTarget", "ssoTarget", "lsoTarget"] as const;
+
+const numericFields = [...targetFields, "scAchieved"] as const;
 type NumericField = (typeof numericFields)[number];
 
 const FIELD_LABEL: Record<NumericField, string> = {
@@ -107,6 +131,7 @@ export default function TargetsPage() {
   const canUpdate = useCan("targets", "update");
   const [month, setMonth] = useState(currentMonth()),
     [rows, setRows] = useState<TargetRow[]>([]),
+    [supRows, setSupRows] = useState<SupRow[]>([]),
     [bpRows, setBpRows] = useState<BpRow[]>([]);
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false),
@@ -122,7 +147,9 @@ export default function TargetsPage() {
    * in place and "undoing" by reloading would throw away every other unsaved
    * change on the page.
    */
-  const [editing, setEditing] = useState<{ kind: "rso"; id: string } | { kind: "bp"; id: string } | null>(null);
+  const [editing, setEditing] = useState<
+    { kind: "rso"; id: string } | { kind: "sup"; id: string } | { kind: "bp"; id: string } | null
+  >(null);
   const [draft, setDraft] = useState<Record<string, number>>({});
 
   async function load() {
@@ -130,6 +157,7 @@ export default function TargetsPage() {
     const r = await apiFetch<TargetsPayload>(`/api/targets?month=${month}`, { cache: "no-store" });
     if (r.ok) {
       setRows(r.data.rows || []);
+      setSupRows(r.data.supRows || []);
       setBpRows(r.data.bpRows || []);
     } else setMessage(r.message);
     setLoading(false);
@@ -162,6 +190,12 @@ export default function TargetsPage() {
     setDraft(Object.fromEntries(numericFields.map((k) => [k, r[k]])));
     setEditing({ kind: "rso", id: r.employeeId });
   }
+  function openSup(r: SupRow) {
+    // The six target fields, without `scAchieved` — that is an RSO's manually
+    // entered achievement, not a target, and a supervisor has no equivalent.
+    setDraft(Object.fromEntries(targetFields.map((k) => [k, r[k]])));
+    setEditing({ kind: "sup", id: r.supervisorId });
+  }
   function openBp(r: BpRow) {
     setDraft({ gaTarget: r.gaTarget });
     setEditing({ kind: "bp", id: r.assignmentId });
@@ -178,6 +212,10 @@ export default function TargetsPage() {
     if (!editing) return;
     if (editing.kind === "rso")
       setRows((old) => old.map((r) => (r.employeeId === editing.id ? { ...r, ...draft } : r)));
+    else if (editing.kind === "sup")
+      // `set: true` the moment a person edits it: from here on the figures are
+      // a decision, even if the decision was to leave a metric at zero.
+      setSupRows((old) => old.map((r) => (r.supervisorId === editing.id ? { ...r, ...draft, set: true } : r)));
     else
       setBpRows((old) =>
         old.map((r) => (r.assignmentId === editing.id ? { ...r, gaTarget: draft.gaTarget ?? r.gaTarget } : r)),
@@ -188,7 +226,10 @@ export default function TargetsPage() {
   async function save() {
     setSaving(true);
     setMessage("");
-    const r = await apiSend("/api/targets", "POST", { month, rows, bpRows });
+    // One write for the whole month — RSO, supervisor and BP rows together.
+    // A save that wrote half of them would leave a month disagreeing with
+    // itself, and this page has always had exactly one save.
+    const r = await apiSend("/api/targets", "POST", { month, rows, supRows, bpRows });
     setSaving(false);
     setMessage(r.ok ? `Saved targets for ${month}.` : r.message);
     if (r.ok) await load();
@@ -228,6 +269,49 @@ export default function TargetsPage() {
    * dialog looks its record up by id. The fastest version of a lookup is the
    * one no longer performed.
    */
+
+  /**
+   * What a supervisor's target USED to come out as, kept only as a reference.
+   *
+   * Before v181 a supervisor had no target: their figure was their RSOs'
+   * targets added up, plus their BPs' GA target on the dashboard path. The
+   * owner's ruling is that this number is too high to manage against, so it no
+   * longer decides anything — but an operator opening this page for the first
+   * time needs to know what the old number was in order to choose a new one,
+   * and being shown it beside an empty field is better than being asked to
+   * remember it.
+   *
+   * It is computed here from `rows` and `bpRows`, which this page already has,
+   * rather than fetched: one arithmetic, in one place, on data already loaded.
+   * A BP held by two RSOs under the same supervisor is counted once — the same
+   * de-duplication `teamTotals()` does on the server, for the same reason.
+   */
+  const reference = useMemo(() => {
+    const out = new Map<string, { ga: number; c2c: number; sc: number; recharge: number; sso: number; lso: number }>();
+    const empty = () => ({ ga: 0, c2c: 0, sc: 0, recharge: 0, sso: 0, lso: 0 });
+    for (const r of rows) {
+      if (!r.supervisorId) continue;
+      const a = out.get(r.supervisorId) ?? empty();
+      a.ga += r.gaTarget;
+      a.c2c += r.c2cTarget;
+      a.sc += r.scTarget;
+      a.recharge += r.totalRechargeTarget;
+      a.sso += r.ssoTarget;
+      a.lso += r.lsoTarget;
+      out.set(r.supervisorId, a);
+    }
+    const countedBp = new Set<string>();
+    for (const b of bpRows) {
+      if (!b.supervisorId) continue;
+      const key = `${b.supervisorId}:${b.bpCode}`;
+      if (countedBp.has(key)) continue;
+      countedBp.add(key);
+      const a = out.get(b.supervisorId) ?? empty();
+      a.ga += b.gaTarget;
+      out.set(b.supervisorId, a);
+    }
+    return out;
+  }, [rows, bpRows]);
 
   const totals = useMemo(
     () =>
@@ -271,7 +355,15 @@ export default function TargetsPage() {
   );
 
   const editingRso = editing?.kind === "rso" ? rows.find((r) => r.employeeId === editing.id) : undefined;
+  const editingSup = editing?.kind === "sup" ? supRows.find((r) => r.supervisorId === editing.id) : undefined;
   const editingBp = editing?.kind === "bp" ? bpRows.find((r) => r.assignmentId === editing.id) : undefined;
+
+  /** "RSO + BP used to add up to 1,240 GA" — the line under an unset row. */
+  const referenceNote = (r: SupRow) => {
+    const ref = reference.get(r.supervisorId);
+    if (!ref) return "No RSO targets set under this supervisor yet.";
+    return `Their RSOs and BPs add up to ${ref.ga.toLocaleString("en-US")} GA · ${Math.round(ref.recharge).toLocaleString("en-US")} recharge — what this used to show.`;
+  };
 
   return (
     <main className="page">
@@ -364,6 +456,95 @@ export default function TargetsPage() {
           </Card>
         </>
       )}
+
+      <SectionHead
+        title="Supervisor targets"
+        sub={`${supRows.filter((r) => r.set).length} of ${supRows.length} supervisors have a target for ${month}.`}
+      />
+      <Card className="kit-mb-20" padded>
+        {loading ? (
+          <p className="kit-filter-note">Loading targets…</p>
+        ) : supRows.length ? (
+          <>
+            {/* Said once, at the top, rather than on every row: this is the
+                change of rule, and a supervisor's figures no longer follow
+                from anybody else's. */}
+            <p className="kit-hint is-xs kit-mb-10">
+              A supervisor&rsquo;s target is set here and stands on its own. It is no longer their RSOs&rsquo; and
+              BPs&rsquo; targets added up &mdash; that figure is shown beside each row for reference only.
+            </p>
+            <div className="kit-table-wrap" tabIndex={0} role="group" aria-label="Table, scrolls sideways">
+              <table className="kit-table">
+                <thead>
+                  <tr>
+                    <th>Supervisor</th>
+                    {targetFields.map((k) => (
+                      <th key={k} className="is-right">
+                        {FIELD_LABEL[k]}
+                      </th>
+                    ))}
+                    {canUpdate && <th className="is-right">Edit</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {supRows.map((r) => (
+                    <tr key={r.supervisorId}>
+                      <td>
+                        <strong>{r.name}</strong>
+                        <small>
+                          {r.rsoCount} {r.rsoCount === 1 ? "RSO" : "RSOs"}
+                          {r.set ? "" : ` · ${referenceNote(r)}`}
+                        </small>
+                      </td>
+                      {targetFields.map((k) => (
+                        <td key={k} className="is-right">
+                          {r.set ? figure(r[k]) : <span className="kit-filter-note">not set</span>}
+                        </td>
+                      ))}
+                      {canUpdate && (
+                        <td className="is-right">
+                          <Btn variant="secondary" size="sm" onClick={() => openSup(r)}>
+                            <Icon name="settings" /> Edit
+                          </Btn>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="kit-table-cards">
+              {supRows.map((r) => (
+                <div className="kit-card kit-card-p" key={r.supervisorId}>
+                  <strong>{r.name}</strong>
+                  <p className="kit-figure-sub">
+                    {r.rsoCount} {r.rsoCount === 1 ? "RSO" : "RSOs"}
+                    {r.set ? "" : ` · ${referenceNote(r)}`}
+                  </p>
+                  <div className="kit-form-grid kit-mt-10">
+                    {targetFields.map((k) => (
+                      <Field key={k} label={FIELD_LABEL[k]}>
+                        {r.set ? figure(r[k]) : <span className="kit-filter-note">not set</span>}
+                      </Field>
+                    ))}
+                  </div>
+                  {canUpdate && (
+                    <Btn variant="secondary" size="sm" block className="kit-mt-10" onClick={() => openSup(r)}>
+                      <Icon name="settings" /> Edit targets
+                    </Btn>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            title="No active supervisors"
+            hint="Add a supervisor under People before setting supervisor targets."
+            icon={<Icon name="target" />}
+          />
+        )}
+      </Card>
 
       <SectionHead title="Employee targets" sub={`${visible.length} of ${rows.length} RSOs shown.`} />
       <div className="kit-filter-bar no-print">
@@ -550,6 +731,28 @@ export default function TargetsPage() {
         </Modal>
       )}
 
+      {editingSup && (
+        <Modal
+          title={editingSup.name}
+          sub={`Supervisor · ${editingSup.rsoCount} ${editingSup.rsoCount === 1 ? "RSO" : "RSOs"} · ${month}`}
+          onClose={() => setEditing(null)}
+          footer={
+            <>
+              <Btn variant="ghost" onClick={() => setEditing(null)}>
+                Cancel
+              </Btn>
+              <Btn onClick={applyDraft}>Update targets</Btn>
+            </>
+          }
+        >
+          <p className="kit-hint is-xs kit-mb-10">{referenceNote(editingSup)}</p>
+          <div className="kit-form-grid">{targetFields.map((k) => draftField(k, FIELD_LABEL[k]))}</div>
+          <p className="kit-hint is-xs kit-mt-10">
+            Changes apply when you press <b>Save all changes</b> at the bottom of the page.
+          </p>
+        </Modal>
+      )}
+
       {editingBp && (
         <Modal
           title={editingBp.bpName || editingBp.bpCode}
@@ -574,7 +777,7 @@ export default function TargetsPage() {
       {canUpdate && (
         <div className="kit-save-bar no-print">
           <span>
-            {rows.length} RSO · {bpRows.length} BP records
+            {rows.length} RSO · {supRows.length} supervisor · {bpRows.length} BP records
           </span>
           <Btn disabled={saving || loading} onClick={save}>
             {saving ? "Saving…" : "Save all changes"}

@@ -43,12 +43,20 @@
 import {
   bpActivation,
   retailerReport,
+  companyTotals,
+  reportPerformanceRows,
   rollUpToSupervisor,
   rsoActivation,
   rsoSummary,
   supervisorSummary,
 } from "./report-data";
-import type { ActivationRow, RetailerReportRow, RsoSummaryRow, SupervisorSummaryRow } from "./report-data";
+import type {
+  ActivationRow,
+  CompanyTotals,
+  RetailerReportRow,
+  RsoSummaryRow,
+  SupervisorSummaryRow,
+} from "./report-data";
 import { isMonthToDate, monthToDate, resolveRange } from "./report-range";
 import type { ReportRange } from "./report-range";
 import { targetPercent } from "./achievement";
@@ -474,9 +482,18 @@ export type PerformanceRow = {
   identity: ExportRow;
 };
 
-export async function buildPerformance(range: ReportRange, kind: PerformanceKind): Promise<Built<PerformanceRow>> {
+export async function buildPerformance(
+  range: ReportRange,
+  kind: PerformanceKind,
+): Promise<Built<PerformanceRow> & { totals: CompanyTotals | null }> {
   type Pre = Omit<PerformanceRow, "rank">;
   let pre: Pre[];
+  /*
+   * Null for a BP or retailer grouping, on purpose: those rows ARE the things
+   * themselves, nothing is held aside and nothing is shared, so the sum of
+   * them IS the total and the page uses it.
+   */
+  let company: CompanyTotals | null = null;
   if (kind === "bp") {
     pre = (await bpActivation(range)).map((b) => ({
       id: b.id,
@@ -502,8 +519,9 @@ export async function buildPerformance(range: ReportRange, kind: PerformanceKind
       identity: retailerIdentity(r),
     }));
   } else {
-    const summary = await rsoSummary(range);
-    const source = kind === "supervisor" ? rollUpToSupervisor(summary) : summary;
+    const perf = await reportPerformanceRows(range);
+    company = await companyTotals(range, kind === "supervisor" ? "supervisor" : "rso", perf);
+    const source = kind === "supervisor" ? await rollUpToSupervisor(range, perf) : await rsoSummary(range, perf);
     pre = source.map((r) => ({
       id: r.id,
       name: r.name,
@@ -529,6 +547,7 @@ export async function buildPerformance(range: ReportRange, kind: PerformanceKind
 
   return {
     rows,
+    totals: company,
     exportRows: rows.map((r) => ({
       Rank: r.rank,
       ...r.identity,
@@ -584,6 +603,8 @@ export async function buildValue(
   const hasTarget = metric === "c2c";
 
   let pre: ValueRow[];
+  // Fetched once when the grouping needs it, and shared with the strip below.
+  let valuePerf: Awaited<ReturnType<typeof reportPerformanceRows>> | undefined;
   if (group === "retailer") {
     pre = (await retailerReport(range)).map((r) => ({
       id: r.id,
@@ -595,8 +616,9 @@ export async function buildValue(
       identity: retailerIdentity(r),
     }));
   } else {
-    const summary = await rsoSummary(range);
-    const source = group === "supervisor" ? rollUpToSupervisor(summary) : summary;
+    valuePerf = await reportPerformanceRows(range);
+    const source =
+      group === "supervisor" ? await rollUpToSupervisor(range, valuePerf) : await rsoSummary(range, valuePerf);
     pre = source.map((r: RsoSummaryRow) => ({
       id: r.id,
       name: r.name,
@@ -609,8 +631,15 @@ export async function buildValue(
   }
 
   const rows = [...pre].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
-  const total = rows.reduce((a, r) => a + r.value, 0);
-  const totalTarget = rows.reduce((a, r) => a + r.target, 0);
+  /*
+   * The strip is the company for a person grouping, and the sum of the rows
+   * for a retailer one. See `companyTotals` in lib/report-data.ts: an RSO row
+   * holds its BP share aside, and two teams each count a shared outlet once.
+   */
+  const person = group !== "retailer";
+  const company = person ? await companyTotals(range, group === "supervisor" ? "supervisor" : "rso", valuePerf) : null;
+  const total = company ? (metric === "c2c" ? company.c2c : company.c2s) : rows.reduce((a, r) => a + r.value, 0);
+  const totalTarget = company ? (metric === "c2c" ? company.c2cTarget : 0) : rows.reduce((a, r) => a + r.target, 0);
   const showTarget = hasTarget && group !== "retailer";
 
   return {
@@ -642,15 +671,29 @@ export type TargetGroup = (typeof TARGET_GROUPS)[number]["key"];
 export const targetGroup = (v?: string): TargetGroup =>
   (TARGET_GROUPS.find((g) => g.key === v)?.key ?? "supervisor") as TargetGroup;
 
-export async function buildTarget(range: ReportRange, group: TargetGroup): Promise<Built<RsoSummaryRow>> {
-  const summary = await rsoSummary(range);
-  const source = group === "supervisor" ? rollUpToSupervisor(summary) : summary;
+export async function buildTarget(
+  range: ReportRange,
+  group: TargetGroup,
+): Promise<Built<RsoSummaryRow> & { totals: CompanyTotals }> {
+  /*
+   * One fetch, two uses.
+   *
+   * The table and the company figure above it want the same performance rows,
+   * and `employeePerformance` company-wide costs about 0.9s at production
+   * volume — asking twice took this page to five seconds.
+   */
+  const perf = await reportPerformanceRows(range);
+  const [source, totals] = await Promise.all([
+    group === "supervisor" ? rollUpToSupervisor(range, perf) : rsoSummary(range, perf),
+    companyTotals(range, group === "supervisor" ? "supervisor" : "rso", perf),
+  ]);
   const rows = [...source].sort(
     (a, b) => targetPercent(b.ga, b.gaTarget) - targetPercent(a.ga, a.gaTarget) || a.name.localeCompare(b.name),
   );
 
   return {
     rows,
+    totals,
     /*
      * The sheet carries every column the screen shows.
      *
@@ -874,8 +917,7 @@ export async function buildCustom(
       ob: r.openingBalance,
     }));
   } else {
-    const summary = await rsoSummary(range);
-    const source = level === "supervisor" ? rollUpToSupervisor(summary) : summary;
+    const source = level === "supervisor" ? await rollUpToSupervisor(range) : await rsoSummary(range);
     pre = source.map((r) => ({
       id: r.id,
       name: r.name,

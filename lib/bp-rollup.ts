@@ -176,25 +176,33 @@ const EMPTY: RollupTotals = {
 export function withBp(row: RollupRow): RollupTotals {
   const bp = row.bp;
   return {
+    // GA is the one metric still held apart on the row, because a BP
+    // assignment carries its own GA target. Adding it here is what makes this
+    // a TERRITORY figure rather than the RSO's own.
     gaTarget: row.gaTarget + bp.gaTarget,
     gaAchieved: row.gaAchieved + bp.gaAchieved,
     ga170: row.ga170 + bp.ga170,
     ga300: row.ga300 + bp.ga300,
+    /*
+     * SSO, LSO, C2C and C2S are already in the row.
+     *
+     * v183: a BP has no target for any of them, and the RSO's target covers
+     * their whole base, so the holder is credited at source — see the note in
+     * lib/performance.ts. Adding `bp` again here would count the same outlet
+     * twice on every territory view.
+     */
     ssoTarget: row.ssoTarget,
-    ssoAchieved: row.ssoAchieved + bp.ssoAchieved,
+    ssoAchieved: row.ssoAchieved,
     c2cTarget: row.c2cTarget,
-    c2cAchieved: row.c2cAchieved + bp.c2cAchieved,
+    c2cAchieved: row.c2cAchieved,
     lsoTarget: row.lsoTarget,
-    lsoAchieved: row.lsoAchieved + bp.lsoAchieved,
+    lsoAchieved: row.lsoAchieved,
     scTarget: row.scTarget,
     scAchieved: row.scAchieved,
-    // Total recharge is C2C plus the manual SC figure, so the BP's C2C flows
-    // through here too. Recomputed rather than read from the row, which
-    // already had the BP share removed.
     totalRechargeTarget: row.totalRechargeTarget,
-    totalRechargeAchieved: row.c2cAchieved + bp.c2cAchieved + row.scAchieved,
-    c2sAmount: (row.c2sAmount ?? 0) + bp.c2sAmount,
-    c2sTransactions: (row.c2sTransactions ?? 0) + bp.c2sTransactions,
+    totalRechargeAchieved: row.totalRechargeAchieved,
+    c2sAmount: row.c2sAmount ?? 0,
+    c2sTransactions: row.c2sTransactions ?? 0,
     retailerCount: row.retailerCount,
     bpCount: bp.count,
   };
@@ -254,6 +262,19 @@ export function teamTotals(rows: RollupRow[]): RollupTotals {
     },
   );
 
+  /*
+   * The rows' OWN figures, with the BP share taken back out.
+   *
+   * Since v183 a row's SSO, LSO, C2C and C2S already include the outlets that
+   * RSO holds as a BP — the holder is credited at source, because no BP target
+   * exists for those metrics. That is right for one RSO and wrong for a team:
+   * two RSOs on the same team holding one outlet would each bring it, and the
+   * team would count it twice.
+   *
+   * So each row contributes only what is exclusively its own, and the deduped
+   * `bp` above is added back once. GA is untouched by this — it was never
+   * folded into the row.
+   */
   const own = rows.reduce<RollupTotals>(
     (acc, row) => ({
       gaTarget: acc.gaTarget + row.gaTarget,
@@ -261,17 +282,17 @@ export function teamTotals(rows: RollupRow[]): RollupTotals {
       ga170: acc.ga170 + row.ga170,
       ga300: acc.ga300 + row.ga300,
       ssoTarget: acc.ssoTarget + row.ssoTarget,
-      ssoAchieved: acc.ssoAchieved + row.ssoAchieved,
+      ssoAchieved: acc.ssoAchieved + row.ssoAchieved - row.bp.ssoAchieved,
       c2cTarget: acc.c2cTarget + row.c2cTarget,
-      c2cAchieved: acc.c2cAchieved + row.c2cAchieved,
+      c2cAchieved: acc.c2cAchieved + row.c2cAchieved - row.bp.c2cAchieved,
       lsoTarget: acc.lsoTarget + row.lsoTarget,
-      lsoAchieved: acc.lsoAchieved + row.lsoAchieved,
+      lsoAchieved: acc.lsoAchieved + row.lsoAchieved - row.bp.lsoAchieved,
       scTarget: acc.scTarget + row.scTarget,
       scAchieved: acc.scAchieved + row.scAchieved,
       totalRechargeTarget: acc.totalRechargeTarget + row.totalRechargeTarget,
       totalRechargeAchieved: acc.totalRechargeAchieved + row.totalRechargeAchieved,
-      c2sAmount: acc.c2sAmount + (row.c2sAmount ?? 0),
-      c2sTransactions: acc.c2sTransactions + (row.c2sTransactions ?? 0),
+      c2sAmount: acc.c2sAmount + (row.c2sAmount ?? 0) - row.bp.c2sAmount,
+      c2sTransactions: acc.c2sTransactions + (row.c2sTransactions ?? 0) - row.bp.c2sTransactions,
       retailerCount: acc.retailerCount + row.retailerCount,
       bpCount: 0,
     }),
@@ -291,8 +312,9 @@ export function teamTotals(rows: RollupRow[]): RollupTotals {
     lsoAchieved: own.lsoAchieved + bp.lsoAchieved,
     scTarget: own.scTarget,
     scAchieved: own.scAchieved,
-    // Same recomputation as withBp(): the rows already had the BP share taken
-    // out, so total recharge is rebuilt from C2C plus the manual SC figure.
+    // Rebuilt from C2C plus the manual SC figure. `own.c2cAchieved` is the
+    // exclusive part (the reduce above took each row's BP share back out) and
+    // `bp.c2cAchieved` is that share counted once, so this adds up exactly.
     totalRechargeTarget: own.totalRechargeTarget,
     totalRechargeAchieved: own.c2cAchieved + bp.c2cAchieved + own.scAchieved,
     c2sAmount: own.c2sAmount + bp.c2sAmount,

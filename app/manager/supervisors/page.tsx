@@ -6,6 +6,8 @@ import { targetPercent as pct } from "../../../lib/achievement";
 import { prisma } from "../../../lib/prisma";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { managerScope } from "../../../lib/manager-scope";
+import { targetFor, targetWindow, withSupervisorTarget } from "../../../lib/supervisor-target";
+import { supervisorTargets } from "../../../lib/supervisor-target-query";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
 import { EntityGrid } from "../../components/EntityGrid";
 
@@ -27,13 +29,15 @@ export default async function Page({
     s = await searchParams,
     scope = await managerScope(u.id),
     month = normalizeMonth(s.from?.slice(0, 7) || s.month);
-  const [rows, sups] = await Promise.all([
+  const win = targetWindow(`${month}-01`, s.from, s.to);
+  const [rows, sups, supTargets] = await Promise.all([
     employeePerformance(`${month}-01`, scope.employeeIds, s.from, s.to),
     prisma.supervisor.findMany({
       where: { active: true, id: { in: scope.supervisorIds } },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    supervisorTargets(win.start, win.endExclusive, scope.supervisorIds),
   ]);
   // Keyed by supervisor id, not name: two supervisors sharing a name used to
   // share one row's totals here.
@@ -49,7 +53,11 @@ export default async function Page({
    */
   const totals = groupTotals(rows, (r) => r.supervisorId);
   const sizes = groupSizes(rows, (r) => r.supervisorId);
-  for (const [supervisorId, t] of totals)
+  for (const [supervisorId, raw] of totals) {
+    // Achievement from the territory; target from the supervisor's own row.
+    // v181: a supervisor is no longer measured against their RSOs' targets
+    // added up. See lib/supervisor-target.ts.
+    const t = withSupervisorTarget(raw, targetFor(supTargets, supervisorId));
     by.set(supervisorId, {
       rso: sizes.get(supervisorId) ?? 0,
       ret: t.retailerCount,
@@ -59,6 +67,7 @@ export default async function Page({
       gaT: t.gaTarget,
       tiers: { total: t.gaAchieved, ga170: t.ga170, ga300: t.ga300 },
     });
+  }
   const teams = sups.map((sup) => ({
     id: sup.id,
     name: sup.name,

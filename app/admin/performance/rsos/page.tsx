@@ -60,6 +60,7 @@ export default async function Page({
               tiers: { total: r.gaAchieved, ga170: r.ga170, ga300: r.ga300 },
             },
             { label: "SSO", achieved: r.ssoAchieved, target: r.ssoTarget },
+            { label: "LSO", achieved: r.lsoAchieved, target: r.lsoTarget },
             { label: "Recharge", achieved: r.totalRechargeAchieved, target: r.totalRechargeTarget, unit: "৳" },
           ],
           search: `${r.name} ${r.employeeCode || ""} ${r.rsoMsisdn} ${r.supervisor}`.toLowerCase(),

@@ -12,6 +12,7 @@
  * separately on the sales page, never folded into the target.
  */
 
+import { bpDisplayName } from "../../lib/bp-name";
 import { requirePagePermission } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { monthBounds } from "../../lib/month";
@@ -70,6 +71,7 @@ export default async function BP() {
       select: {
         retailerCode: true,
         retailerName: true,
+        bpName: true,
         employee: { select: { name: true, rsoMsisdn: true, supervisor: { select: { name: true } } } },
       },
     }),
@@ -146,7 +148,7 @@ export default async function BP() {
     <main className="page">
       <PageHeader
         title={`Hello, ${u.displayName}`}
-        subtitle={`${retailer.retailerCode} · ${retailer.retailerName || "BP retailer"}`}
+        subtitle={`${retailer.retailerCode} · ${bpDisplayName(retailer)}`}
       />
 
       <HeroRing

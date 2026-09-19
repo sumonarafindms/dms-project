@@ -35,7 +35,8 @@ export default async function TargetReport({
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
   const group = targetGroup(sp.group);
-  const { rows, matched, unfiltered } = searchReport(await buildTarget(range, group), sp.q);
+  const built = await buildTarget(range, group);
+  const { rows, matched, unfiltered } = searchReport(built, sp.q);
 
   const columns: Column<RsoSummaryRow>[] = [
     { key: "name", label: group === "supervisor" ? "Supervisor" : "RSO" },
@@ -49,17 +50,15 @@ export default async function TargetReport({
     { key: "c2cPct", label: "C2C %", align: "right", render: (r) => pctCell(r.c2c, r.c2cTarget) },
   ];
 
-  const t = rows.reduce(
-    (a, r) => ({
-      ga: a.ga + r.ga,
-      gaTarget: a.gaTarget + r.gaTarget,
-      sso: a.sso + r.sso,
-      ssoTarget: a.ssoTarget + r.ssoTarget,
-      lso: a.lso + r.lso,
-      lsoTarget: a.lsoTarget + r.lsoTarget,
-    }),
-    { ga: 0, gaTarget: 0, sso: 0, ssoTarget: 0, lso: 0, lsoTarget: 0 },
-  );
+  /*
+   * The strip is the COMPANY, not the sum of the rows on screen.
+   *
+   * Adding the rows up was wrong in both directions: grouped by RSO it left
+   * out the whole Business Partner share (GA short by 120 on the September
+   * data), and grouped by supervisor it counted an outlet worked by two teams
+   * twice (GA 11 too high). See `companyTotals` in lib/report-data.ts.
+   */
+  const t = built.totals;
 
   const groupParam = group === "supervisor" ? undefined : group;
 

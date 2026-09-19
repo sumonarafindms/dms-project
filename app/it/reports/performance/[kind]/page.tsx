@@ -45,7 +45,8 @@ export default async function Performance({
   const kind = raw;
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const { rows, matched, unfiltered } = searchReport(await buildPerformance(range, kind), sp.q);
+  const built = await buildPerformance(range, kind);
+  const { rows, matched, unfiltered } = searchReport(built, sp.q);
 
   const hasTargets = kind !== "retailer";
   const columns: Column<PerformanceRow>[] = [
@@ -85,8 +86,18 @@ export default async function Performance({
         ] as Column<PerformanceRow>[])),
   ];
 
-  const totalAchieved = rows.reduce((a, r) => a + r.achieved, 0);
-  const totalTarget = rows.reduce((a, r) => a + r.target, 0);
+  /*
+   * For a PERSON grouping the strip is the company, not the sum of the rows.
+   *
+   * An RSO row is that RSO's own credit with the BP share held aside, so
+   * adding them drops it; a supervisor row counts a shared outlet once per
+   * team, so adding the teams counts it twice. `companyTotals` does neither.
+   * For `bp` and `retailer` the rows ARE the things themselves — nothing is
+   * held aside and nothing is shared — so the sum is the right total there.
+   */
+  const company = built.totals;
+  const totalAchieved = company ? company.ga : rows.reduce((a, r) => a + r.achieved, 0);
+  const totalTarget = company ? company.gaTarget : rows.reduce((a, r) => a + r.target, 0);
   const behind = hasTargets
     ? rows.filter((r) => r.target > 0 && targetPercent(r.achieved, r.target) < 80).length
     : rows.filter((r) => r.achieved === 0).length;

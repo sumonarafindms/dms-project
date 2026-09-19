@@ -42,6 +42,9 @@ import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
 import { groupSizes, groupTotals, teamTotals } from "../../lib/bp-rollup";
 import { parseComparisonKind } from "../../lib/comparison";
+import { monthBounds } from "../../lib/month";
+import { sumSupervisorTargets, targetFor, withSupervisorTarget } from "../../lib/supervisor-target";
+import { supervisorTargets } from "../../lib/supervisor-target-query";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +61,8 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
    */
   const sp = await searchParams;
   const compareKind = parseComparisonKind(sp.compare);
-  const [rows, attentionRows, supervisors, daily, comparison] = await Promise.all([
+  const bounds = monthBounds(month);
+  const [rows, attentionRows, supervisors, daily, comparison, supTargets] = await Promise.all([
     employeePerformance(month, scope.employeeIds),
     retailerOpportunities(monthKey, scope.employeeIds),
     prisma.supervisor.findMany({
@@ -68,23 +72,40 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
     }),
     latestDailySnapshot(scope.employeeIds),
     performanceComparison(compareKind, scope.employeeIds),
+    supervisorTargets(bounds.start, bounds.end, scope.supervisorIds),
   ]);
 
   const attention = attentionRows.filter((x) => x.priority > 0).length;
   const retailers = rows.reduce((a, r) => a + r.retailerCount, 0);
 
   const expected = monthPace(month);
-  // teamTotals, not a plain sum: each RSO row now excludes its BPs, and a
-  // manager answers for the whole territory. See lib/bp-rollup.ts.
-  const team = teamTotals(rows);
+  /*
+   * The manager's own figures: achievement from the territory, target from the
+   * supervisors under them.
+   *
+   * `teamTotals` for the achieved side, because each RSO row excludes its BPs
+   * and a manager answers for the whole territory (lib/bp-rollup.ts). The
+   * target side is the sum of the SUPERVISORS' own targets, not the RSOs' —
+   * v181's second ruling, and it is what keeps this page's headline row and
+   * the supervisor cards below it in agreement. Built from RSO targets, the
+   * two would have been different numbers wearing the same word.
+   */
+  const managerTarget = sumSupervisorTargets(supervisors.map((x) => targetFor(supTargets, x.id)));
+  const team = withSupervisorTarget(teamTotals(rows), managerTarget);
   // One clock read for the whole page — four cards each calling new Date()
   // could straddle a Dhaka midnight and disagree about the days left.
   const now = new Date();
   const paceFor = (targetKey: keyof typeof team, achievedKey: keyof typeof team) =>
     pacing(team[targetKey], team[achievedKey], monthKey, now);
 
-  // Roll RSO rows up to their supervisor. Supervisors hold no targets of their
-  // own, so a supervisor's target is the sum of their RSOs'.
+  /*
+   * Roll RSO rows up to their supervisor for the ACHIEVED side only.
+   *
+   * Until v181 the comment here read "Supervisors hold no targets of their
+   * own, so a supervisor's target is the sum of their RSOs'." That is no
+   * longer true: a supervisor's target is set on the Target page and stands on
+   * its own.
+   */
   const supBy = new Map<
     string,
     {
@@ -99,8 +120,10 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
       tiers: GaTiers;
     }
   >();
+  // Keyed by id, not name. Two supervisors who share a name used to share one
+  // card's totals here — the same defect `/manager/supervisors` already fixed.
   for (const s of supervisors)
-    supBy.set(s.name, {
+    supBy.set(s.id, {
       id: s.id,
       name: s.name,
       rsos: 0,
@@ -117,12 +140,13 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
    * gives each holder the whole outlet — so adding those together counted it
    * twice. The dedup lives in lib/bp-rollup.ts.
    */
-  const supTotals = groupTotals(rows, (r) => r.supervisor);
-  const supSizes = groupSizes(rows, (r) => r.supervisor);
-  for (const [name, t] of supTotals) {
-    const x = supBy.get(name);
+  const supTotals = groupTotals(rows, (r) => r.supervisorId);
+  const supSizes = groupSizes(rows, (r) => r.supervisorId);
+  for (const [supervisorId, raw] of supTotals) {
+    const x = supervisorId ? supBy.get(supervisorId) : undefined;
     if (!x) continue;
-    x.rsos = supSizes.get(name) ?? 0;
+    const t = withSupervisorTarget(raw, targetFor(supTargets, supervisorId));
+    x.rsos = supSizes.get(supervisorId) ?? 0;
     x.retailers = t.retailerCount;
     x.achieved = t.totalRechargeAchieved;
     x.target = t.totalRechargeTarget;

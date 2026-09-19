@@ -128,7 +128,16 @@ for (const role of ROLES) {
        * fast the machine and the data were — so the budget is now stated as
        * what it actually is: a base, plus an allowance per route.
        */
-      test.setTimeout(60_000 + routes.length * 6_000);
+      /*
+       * v182 raised the allowance from 6s to 12s a route. The 6s was set when
+       * a route load was about three seconds; this sweep does not just load
+       * each route, it then follows a detail link off it, and on a two-core
+       * machine running two workers the measured cost is 8–12s a route —
+       * ACCOUNTS' twelve took 102s of a 132s budget, and MANAGER's eleven ran
+       * past 126s with no route having failed. A budget that a healthy run
+       * only just fits is a budget that reports the machine, not the app.
+       */
+      test.setTimeout(60_000 + routes.length * 12_000);
 
       /*
        * Collect Content-Security-Policy violations from every page this sweep

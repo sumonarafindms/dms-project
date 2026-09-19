@@ -1,11 +1,13 @@
 import { requireUser } from "../../../../lib/auth";
 import { employeePerformance } from "../../../../lib/performance";
-import { groupSizes, groupTotals } from "../../../../lib/bp-rollup";
+import { groupSizes, groupTotals, teamTotals } from "../../../../lib/bp-rollup";
 import { targetPercent as pct } from "../../../../lib/achievement";
 import { prisma } from "../../../../lib/prisma";
 import { normalizeMonth } from "../../../../lib/drilldown";
 import { monthBounds } from "../../../../lib/month";
 import { parseYmd } from "../../../../lib/date-range";
+import { targetFor, withSupervisorTarget } from "../../../../lib/supervisor-target";
+import { supervisorTargets } from "../../../../lib/supervisor-target-query";
 import { Card, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
 import { ComparisonChart } from "../../../components/AnalyticsCharts";
 import { EntityGrid } from "../../../components/EntityGrid";
@@ -49,7 +51,10 @@ export default async function Page({
     include: { employee: { select: { supervisorId: true } } },
   });
   const map = new Map<string, SupervisorRow>();
-  const sups = await prisma.supervisor.findMany({ where: { active: true }, select: { id: true, name: true } });
+  const [sups, supTargets] = await Promise.all([
+    prisma.supervisor.findMany({ where: { active: true }, select: { id: true, name: true } }),
+    supervisorTargets(rs, re),
+  ]);
   for (const x of sups)
     map.set(x.id, {
       id: x.id,
@@ -78,9 +83,13 @@ export default async function Page({
    */
   const totals = groupTotals(rows, (r) => r.supervisorId);
   const sizes = groupSizes(rows, (r) => r.supervisorId);
-  for (const [supervisorId, t] of totals) {
+  for (const [supervisorId, raw] of totals) {
     const x = map.get(supervisorId);
     if (!x) continue;
+    // v181: achievement from the territory, target from the supervisor's own
+    // row. "Total Target" in the strip below is therefore the sum of the
+    // targets somebody chose, not of the RSOs' underneath them.
+    const t = withSupervisorTarget(raw, targetFor(supTargets, supervisorId));
     x.rsos = sizes.get(supervisorId) ?? 0;
     x.retailers = t.retailerCount;
     x.target = t.totalRechargeTarget;
@@ -97,11 +106,23 @@ export default async function Page({
     }
   }
   const data = [...map.values()];
+  /*
+   * The target adds up; the achievement does not.
+   *
+   * Each supervisor has exactly one target, so summing them is the company's
+   * target. But an outlet worked as a Business Partner by two RSOs on two
+   * different teams counts once in EACH team — correctly, because both teams
+   * work it — so adding the teams counts it twice. The company's achievement
+   * has to come from the underlying rows, which is what `teamTotals` is for.
+   */
   const totalT = data.reduce((a, x) => a + x.target, 0),
-    totalA = data.reduce((a, x) => a + x.achieved, 0);
+    totalA = teamTotals(rows).totalRechargeAchieved;
   return (
     <main className="page">
-      <PageHeader title="Supervisor Performance" subtitle="Team-level target, achievement, RSO and BP overview." />
+      <PageHeader
+        title="Supervisor Performance"
+        subtitle="Each supervisor's own target, against everything their team sold."
+      />
       <SummaryStrip
         items={[
           { label: "Supervisors", value: data.length.toLocaleString("en-US") },

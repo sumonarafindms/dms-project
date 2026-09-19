@@ -1,3 +1,4 @@
+import { bpDisplayName } from "../../../../lib/bp-name";
 import { requireUser } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { EmployeeList } from "../../../components/AdminEmployeesUI";
@@ -19,7 +20,7 @@ export default async function Page() {
         addHref="/admin/employees/bps/new"
         rows={rows.map((x) => ({
           id: x.id,
-          name: x.retailer.retailerName || x.retailer.retailerCode,
+          name: bpDisplayName(x.retailer),
           mobile: x.retailer.bpUser?.mobileNumber || "",
           role: "BP",
           active: x.active && Boolean(x.retailer.bpUser?.active ?? true),

@@ -13,6 +13,7 @@ import { currentGa170Tariff } from "@/lib/ga-tariff";
 import { apiError } from "@/lib/http-errors";
 import { dhakaMonth } from "@/lib/business-time";
 import { bpLedger } from "@/lib/bp-ledger";
+import { supervisorTargets } from "@/lib/supervisor-target-query";
 import type { BpPortion } from "@/lib/bp-rollup";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export async function GET(req: NextRequest) {
           employeeCode: true,
           name: true,
           rsoMsisdn: true,
+          supervisorId: true,
           supervisor: { select: { name: true } },
           _count: { select: { retailers: true } },
           targets: {
@@ -205,6 +207,7 @@ export async function GET(req: NextRequest) {
         employeeId: employee.id,
         employeeCode: employee.employeeCode,
         name: employee.name,
+        supervisorId: employee.supervisorId,
         supervisor: employee.supervisor?.name || "Unassigned",
         retailerCount: employee._count.retailers,
         // Exactly as entered. RSO and BP targets are set independently, so
@@ -214,22 +217,47 @@ export async function GET(req: NextRequest) {
         gaAchieved: ga.total,
         ga170: ga.ga170,
         ga300: ga.ga300,
+        /*
+         * Same fold as lib/performance.ts, and it has to be: this endpoint and
+         * that function are the app's two aggregation paths, and the older
+         * comments in both already say they must apply one rule or /dashboard
+         * and /admin/performance/rsos will disagree about the same RSO.
+         *
+         * A BP has no SSO, LSO or C2C target, and the RSO's target covers
+         * their whole base including the outlets they hold as a BP — so the
+         * holder is credited for them. GA stays apart, because a BP assignment
+         * does carry its own GA target.
+         */
         ssoTarget: target?.ssoTarget || 0,
-        ssoAchieved: ssoByEmployee.get(employee.id) || 0,
+        ssoAchieved: (ssoByEmployee.get(employee.id) || 0) + bp.ssoAchieved,
         c2cTarget: Number(target?.c2cTarget || 0),
-        c2cAchieved,
+        c2cAchieved: c2cAchieved + bp.c2cAchieved,
         scTarget: Number(target?.scTarget || 0),
         scAchieved,
         totalRechargeTarget: Number(target?.totalRechargeTarget || 0),
-        totalRechargeAchieved: c2cAchieved + scAchieved,
+        totalRechargeAchieved: c2cAchieved + bp.c2cAchieved + scAchieved,
         lsoTarget: target?.lsoTarget || 0,
-        lsoAchieved: lsoByEmployee.get(employee.id) || 0,
+        lsoAchieved: (lsoByEmployee.get(employee.id) || 0) + bp.lsoAchieved,
         bp,
       };
     });
 
+    /*
+     * The supervisors' own targets travel with the rows.
+     *
+     * The dashboard groups RSO rows into supervisor buckets in the browser, so
+     * it needs the stored targets there to apply them — v181: a supervisor is
+     * measured against a target somebody set, not against their RSOs' added
+     * up. Sent as plain data; the rule that turns it into a figure lives in
+     * lib/supervisor-target.ts, which the client imports.
+     */
+    const supTargets = await supervisorTargets(start, end);
     return NextResponse.json(
-      { month: start.toISOString().slice(0, 7), rows },
+      {
+        month: start.toISOString().slice(0, 7),
+        rows,
+        supervisorTargets: [...supTargets].map(([supervisorId, t]) => ({ supervisorId, ...t })),
+      },
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (error) {

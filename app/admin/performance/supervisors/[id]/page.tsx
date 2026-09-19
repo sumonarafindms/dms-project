@@ -1,3 +1,4 @@
+import { bpDisplayName } from "../../../../../lib/bp-name";
 import { requireUser } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { employeePerformance } from "../../../../../lib/performance";
@@ -7,6 +8,8 @@ import { monthBounds } from "../../../../../lib/month";
 import { parseYmd, monthStartsInRange } from "../../../../../lib/date-range";
 import { standardGaByAssignment } from "../../../../../lib/bp-activations";
 import { teamTotals } from "../../../../../lib/bp-rollup";
+import { targetFor } from "../../../../../lib/supervisor-target";
+import { supervisorTargets } from "../../../../../lib/supervisor-target-query";
 import { assignmentGaTarget, assignmentWindow } from "../../../../../lib/bp-period";
 import { notFound } from "next/navigation";
 import { EntityGrid } from "../../../../components/EntityGrid";
@@ -49,7 +52,7 @@ export default async function Page({
   const bps = await prisma.bpAssignment.findMany({
     where: { employeeId: { in: ids }, startDate: { lt: re }, OR: [{ endDate: null }, { endDate: { gte: rs } }] },
     include: {
-      retailer: { select: { retailerCode: true, retailerName: true } },
+      retailer: { select: { retailerCode: true, retailerName: true, bpName: true } },
       employee: { select: { id: true, name: true } },
       monthlyTargets: true,
     },
@@ -68,7 +71,15 @@ export default async function Page({
   // the RSO figures below stay exactly as the rows come and the BP figures get
   // their own card.
   const team = teamTotals(rows);
-  const rechargeTarget = team.totalRechargeTarget,
+  /*
+   * The supervisor's own target, which since v181 is what "Recharge" and the
+   * new "Supervisor GA" card are measured against. The RSO GA and BP GA cards
+   * below keep their own targets deliberately: those two answer a different
+   * question — what the team is MADE of — and the composition is the reason
+   * this page exists.
+   */
+  const ownTarget = targetFor(await supervisorTargets(rs, re, [id]), id);
+  const rechargeTarget = ownTarget.totalRechargeTarget,
     rechargeAchieved = team.totalRechargeAchieved,
     rsoGaT = rows.reduce((a, x) => a + x.gaTarget, 0),
     rsoTiers = rows.reduce<GaTiers>(
@@ -102,8 +113,24 @@ export default async function Page({
           { label: "BPs", value: bpStats.length.toLocaleString("en-US") },
         ]}
       />
-      <SectionHead title="Team execution" sub="Every metric is the sum of this team's RSO targets." />
+      <SectionHead
+        title="Team execution"
+        sub={
+          ownTarget.set
+            ? "Supervisor GA and Recharge are this supervisor's own targets. RSO GA and BP GA show what the team is made of, each against its own target."
+            : "No target has been set for this supervisor this month. RSO GA and BP GA below show what the team is made of, each against its own target."
+        }
+      />
       <div className="kit-kpi-grid kit-mb-20">
+        {/* The supervisor's own GA target against everything the team sold —
+            RSOs and BPs together, a shared outlet counted once. */}
+        <KpiCard
+          label="Supervisor GA"
+          achieved={team.gaAchieved}
+          target={ownTarget.gaTarget}
+          pace={paceFor(ownTarget.gaTarget, team.gaAchieved)}
+          tiers={{ total: team.gaAchieved, ga170: team.ga170, ga300: team.ga300 }}
+        />
         <KpiCard label="RSO GA" achieved={rsoGaA} target={rsoGaT} pace={paceFor(rsoGaT, rsoGaA)} tiers={rsoTiers} />
         <KpiCard label="BP GA" achieved={bpGaA} target={bpGaT} pace={paceFor(bpGaT, bpGaA)} tiers={bpTiers} />
         <KpiCard
@@ -124,6 +151,8 @@ export default async function Page({
           percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
           metrics: [
             { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
+            { label: "SSO", achieved: r.ssoAchieved, target: r.ssoTarget },
+            { label: "LSO", achieved: r.lsoAchieved, target: r.lsoTarget },
             { label: "Recharge", achieved: r.totalRechargeAchieved, target: r.totalRechargeTarget, unit: "৳" },
           ],
           search: `${r.name} ${r.employeeCode || ""} ${r.rsoMsisdn}`.toLowerCase(),
@@ -150,7 +179,7 @@ export default async function Page({
                 key={b.id}
                 href={`/admin/performance/bps/${b.id}?${range}`}
                 icon={<Icon name="sim" />}
-                title={b.retailer.retailerName || b.retailer.retailerCode}
+                title={bpDisplayName(b.retailer)}
                 sub={`${b.retailer.retailerCode} · RSO ${b.employee.name}`}
                 value={`${b.achieved}/${b.target}`}
                 valueSub="BP GA"

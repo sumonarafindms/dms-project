@@ -32,23 +32,33 @@ const assignment = (over: Partial<Parameters<typeof bpLedger>[0][number]> = {}) 
 });
 
 /** A rollup row carrying nothing but this RSO's BP portion. */
+/**
+ * A row carrying nothing but the BP portion, as `employeePerformance` builds
+ * one for an RSO whose own outlets sold nothing.
+ *
+ * Since v183 the row's SSO, LSO, C2C and C2S already include what the RSO
+ * holds as a BP — those metrics have no BP target, so the holder is credited
+ * at source. GA does not, because a BP assignment carries its own GA target.
+ * Written out here rather than zeroed, so these tests exercise the same row
+ * shape the application produces.
+ */
 const rowFor = (bp: RollupRow["bp"]): RollupRow => ({
   gaTarget: 0,
   gaAchieved: 0,
   ga170: 0,
   ga300: 0,
   ssoTarget: 0,
-  ssoAchieved: 0,
+  ssoAchieved: bp.ssoAchieved,
   c2cTarget: 0,
-  c2cAchieved: 0,
+  c2cAchieved: bp.c2cAchieved,
   lsoTarget: 0,
-  lsoAchieved: 0,
+  lsoAchieved: bp.lsoAchieved,
   scTarget: 0,
   scAchieved: 0,
   totalRechargeTarget: 0,
-  totalRechargeAchieved: 0,
-  c2sAmount: 0,
-  c2sTransactions: 0,
+  totalRechargeAchieved: bp.c2cAchieved,
+  c2sAmount: bp.c2sAmount,
+  c2sTransactions: bp.c2sTransactions,
   retailerCount: 0,
   bp,
 });
@@ -128,6 +138,13 @@ describe("one outlet, two RSOs", () => {
       expect(p.c2sAmount, rso).toBe(700);
       expect(p.c2sTransactions, rso).toBe(9);
     }
+    /*
+     * Each holder sees the whole outlet on their own row (above), and the team
+     * counts it once. Since v183 that de-duplication has to survive the figure
+     * being folded INTO the row: `teamTotals` takes each row's BP share back
+     * out before adding the deduped one, or two holders on one team would
+     * bring the same shop twice.
+     */
     const total = teamTotals([rowFor(ledger.portionFor("rso-1")), rowFor(ledger.portionFor("rso-2"))]);
     expect(total.c2cAchieved).toBe(5000);
     expect(total.ssoAchieved).toBe(1);

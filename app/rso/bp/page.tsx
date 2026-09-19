@@ -1,3 +1,4 @@
+import { bpDisplayName } from "../../../lib/bp-name";
 import Link from "next/link";
 import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
@@ -47,6 +48,7 @@ export default async function Page() {
           select: {
             retailerCode: true,
             retailerName: true,
+            bpName: true,
             bpUser: { select: { displayName: true, mobileNumber: true, active: true, role: true } },
           },
         },
@@ -57,7 +59,7 @@ export default async function Page() {
       where: { employeeId: u.employeeId, active: false },
       orderBy: { endDate: "desc" },
       take: 8,
-      include: { retailer: { select: { retailerCode: true, retailerName: true } } },
+      include: { retailer: { select: { retailerCode: true, retailerName: true, bpName: true } } },
     }),
   ]);
 
@@ -85,7 +87,7 @@ export default async function Page() {
               <Row
                 key={h.id}
                 icon={<Icon name="users" />}
-                title={h.retailer.retailerName || h.retailer.retailerCode}
+                title={bpDisplayName(h.retailer)}
                 sub={h.retailer.retailerCode}
                 value={h.startDate.toISOString().slice(0, 10)}
                 valueSub={`to ${h.endDate?.toISOString().slice(0, 10) || "ended"}`}
@@ -142,14 +144,14 @@ export default async function Page() {
               key={a.id}
               href={`/rso/bp/${a.id}?month=${dhakaMonth()}`}
               className="kit-card kit-card-p is-clickable"
-              aria-label={`${a.retailer.retailerName || a.retailer.retailerCode} — daily activation record`}
+              aria-label={`${bpDisplayName(a.retailer)} — daily activation record`}
             >
               <div className="kit-row-between">
                 {/* kit-entity-main, not kit-readiness-head: the latter belongs
                     to the Data Readiness grid, and borrowing a class named for
                     another screen is how a design system loses its meaning. */}
                 <div className="kit-entity-main">
-                  <strong>{a.retailer.retailerName || a.retailer.retailerCode}</strong>
+                  <strong>{bpDisplayName(a.retailer)}</strong>
                   <span>
                     {a.retailer.retailerCode} · since {a.startDate.toISOString().slice(0, 10)}
                   </span>

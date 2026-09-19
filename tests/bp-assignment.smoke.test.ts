@@ -150,8 +150,30 @@ describe("every BP reaches the target list", () => {
      */
     const start = api.indexOf("bpAssignment.findMany");
     expect(start, "the BP query was not found").toBeGreaterThan(-1);
-    const bpQuery = api.slice(start, api.indexOf("return NextResponse.json", start));
+    /*
+     * The slice ends where the QUERY ends, by matching its braces.
+     *
+     * It used to run to the next `return NextResponse.json`, which was fine
+     * until another query was added after this one — v181's supervisor list,
+     * whose `targets: { where: { month }, take: 1 }` is a perfectly correct
+     * nested include. The old slice swallowed it and failed on right code. A
+     * guard whose boundary depends on what happens to come next in the file is
+     * a guard that reports on the wrong thing sooner or later.
+     */
+    const open = api.indexOf("{", api.indexOf("(", start));
+    let depth = 0,
+      stop = open;
+    for (let i = open; i < api.length; i++) {
+      if (api[i] === "{") depth++;
+      else if (api[i] === "}" && --depth === 0) {
+        stop = i + 1;
+        break;
+      }
+    }
+    const bpQuery = api.slice(start, stop);
     expect(bpQuery.length, "the slice is empty, so this test would check nothing").toBeGreaterThan(100);
+    expect(bpQuery, "the slice does not cover the BP query").toMatch(/bpAssignment\.findMany/);
+    expect(bpQuery, "the slice ran past the BP query into another one").not.toMatch(/supervisor\.findMany/);
     // `monthlyTargets: { where: { month }, take: 1 }` is a nested include and
     // entirely correct — one month has one target. Only a `take` on the
     // assignment list itself would hide a BP.

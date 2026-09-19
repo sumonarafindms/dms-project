@@ -114,7 +114,12 @@ describe("My BP answers both halves of the question", () => {
   it("names the destination for a screen reader", () => {
     // The card's visible text is the BP's name and numbers; "daily activation
     // record" is what the link actually does.
-    expect(LIST).toMatch(/aria-label=\{`\$\{a\.retailer\.retailerName \|\| a\.retailer\.retailerCode\}/);
+    //
+    // v181: the name comes from `bpDisplayName`, the one rule for what a BP is
+    // called — so the label a screen reader hears is the same name the sighted
+    // reader sees, wherever that name was set.
+    expect(LIST).toMatch(/aria-label=\{`\$\{bpDisplayName\(a\.retailer\)\}/);
+    expect(LIST).toMatch(/import \{ bpDisplayName \}/);
   });
 });
 

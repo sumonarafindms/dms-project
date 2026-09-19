@@ -68,6 +68,23 @@ for (const role of ROLES) {
     test.skip(!user || !pass, `set E2E_${role.key}_USER and E2E_${role.key}_PASS to run`);
 
     test(`${role.key} pages lay out correctly`, async ({ page }, testInfo) => {
+      /*
+       * The budget scales with the work, because one number cannot fit both.
+       *
+       * This test signs in once and then walks its role's routes, running
+       * three layout audits on each. The flat 30s default fitted BP's two
+       * routes with room to spare and did not fit ACCOUNTS' five or ADMIN's
+       * seven: on a two-core machine under concurrent workers those walks run
+       * past half a minute, and eighteen of them failed on the timeout alone
+       * with no page having failed a single assertion. Run one at a time, the
+       * same six roles pass together in 44.6s.
+       *
+       * That is the same mistake v179 found in `coverage.spec.ts`, so the
+       * budget is now stated as what it actually is: a base for the sign-in,
+       * plus an allowance for each route and its three audits.
+       */
+      test.setTimeout(30_000 + role.routes.length * 15_000);
+
       // One login for the whole role, then walk its routes: logging in per
       // route would triple the runtime for nothing.
       const landed = await login(page, user!, pass!, role.admin);

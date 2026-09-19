@@ -43,6 +43,15 @@ import { withSimSwap, withStandardGa } from "./business-rules";
 import { coversDate, overlapsRange } from "./bp-period";
 import { retailerOpportunities } from "./retailer-opportunities";
 import type { RetailerOpportunity } from "./retailer-opportunities";
+import { employeePerformance } from "./performance";
+import type { EmployeePerformance } from "./performance";
+
+/** What `employeePerformance` returns — shared by every builder below. */
+type EmployeePerformanceRows = EmployeePerformance[];
+import { groupSizes, groupTotals, teamTotals } from "./bp-rollup";
+import { supervisorTargets } from "./supervisor-target-query";
+import { sumSupervisorTargets, targetFor } from "./supervisor-target";
+import { bpDisplayName } from "./bp-name";
 
 /* ------------------------------------------------------------------ *
  * Data readiness — MOVED
@@ -130,77 +139,129 @@ export type SupervisorSummaryRow = {
   gaTarget: number;
 };
 
-export async function supervisorSummary(range: ReportRange): Promise<SupervisorSummaryRow[]> {
-  const { start, endExclusive } = rangeBounds(range);
-  const window = { gte: start, lt: endExclusive };
-
-  const [supervisors, retailers, gaGroups, c2cGroups, c2sGroups, targets] = await Promise.all([
-    prisma.supervisor.findMany({
-      where: { active: true },
-      select: { id: true, name: true, employees: { where: { active: true }, select: { id: true } } },
-      orderBy: { name: "asc" },
-    }),
-    prisma.retailer.findMany({
-      where: { active: true, employeeId: { not: null } },
-      select: { id: true, employeeId: true },
-    }),
-    prisma.gaActivation.groupBy({
-      by: ["retailerId"],
-      where: withStandardGa({ activationDate: window }),
-      _count: { _all: true },
-    }),
-    prisma.c2cRecord.groupBy({ by: ["retailerId"], where: { date: window }, _sum: { amount: true } }),
-    prisma.c2sRecord.groupBy({ by: ["retailerId"], where: { date: window }, _sum: { amount: true } }),
-    // Supervisors hold no targets of their own — a supervisor's target is the
-    // sum of their RSOs' monthly targets. Every month the range touches counts.
-    prisma.monthlyTarget.findMany({
-      where: { month: { gte: monthStartOf(start), lt: endExclusive } },
-      select: { employeeId: true, gaTarget: true },
-    }),
-  ]);
-
-  const employeeOfRetailer = new Map(retailers.map((r) => [r.id, r.employeeId!]));
-  const gaByEmployee = new Map<string, number>();
-  const c2cByEmployee = new Map<string, number>();
-  const c2sByEmployee = new Map<string, number>();
-  const retailerCountByEmployee = new Map<string, number>();
-
-  for (const r of retailers) {
-    retailerCountByEmployee.set(r.employeeId!, (retailerCountByEmployee.get(r.employeeId!) ?? 0) + 1);
-  }
-  const addTo = (map: Map<string, number>, retailerId: string, value: number) => {
-    const employeeId = employeeOfRetailer.get(retailerId);
-    if (!employeeId) return; // unassigned retailer: counted nowhere, never silently attributed
-    map.set(employeeId, (map.get(employeeId) ?? 0) + value);
-  };
-  for (const g of gaGroups) addTo(gaByEmployee, g.retailerId, g._count._all);
-  for (const g of c2cGroups) addTo(c2cByEmployee, g.retailerId, Number(g._sum.amount ?? 0));
-  for (const g of c2sGroups) addTo(c2sByEmployee, g.retailerId, Number(g._sum.amount ?? 0));
-
-  const targetByEmployee = new Map<string, number>();
-  for (const t of targets) {
-    targetByEmployee.set(t.employeeId, (targetByEmployee.get(t.employeeId) ?? 0) + t.gaTarget);
-  }
-
-  const sum = (ids: string[], map: Map<string, number>) => ids.reduce((a, id) => a + (map.get(id) ?? 0), 0);
-
-  return supervisors.map((s) => {
-    const ids = s.employees.map((e) => e.id);
-    return {
-      id: s.id,
-      name: s.name,
-      rsoCount: ids.length,
-      retailerCount: sum(ids, retailerCountByEmployee),
-      standardGa: sum(ids, gaByEmployee),
-      c2cAmount: sum(ids, c2cByEmployee),
-      c2sAmount: sum(ids, c2sByEmployee),
-      gaTarget: sum(ids, targetByEmployee),
-    };
-  });
+export async function supervisorSummary(
+  range: ReportRange,
+  prefetched?: EmployeePerformanceRows,
+): Promise<SupervisorSummaryRow[]> {
+  /*
+   * ## One supervisor calculation, not two
+   *
+   * This used to roll GA, C2C and C2S up to an RSO by RETAILER OWNERSHIP
+   * (`Retailer.employeeId`) and then add the RSOs together per supervisor.
+   * Every dashboard in the app routes a BP-held outlet's sales to the BP
+   * holder instead — the ledger v139 and v142 established and v178 spelled
+   * out — so the Reporting Center and the dashboards answered the same
+   * question two different ways. Measured on the production-volume database
+   * for September, three RSOs differed: 1,575 GA against 1,680, 470 against
+   * 481, 447 against 451, with SSO, LSO and C2C wrong the same way.
+   *
+   * It is now the same rollup the Target vs Achievement report uses, mapped
+   * into this report's column names. Two functions that must agree are one
+   * function with two shapes.
+   */
+  const rows = await rollUpToSupervisor(range, prefetched);
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    rsoCount: r.rsoCount,
+    retailerCount: r.retailerCount,
+    standardGa: r.ga,
+    c2cAmount: r.c2c,
+    c2sAmount: r.c2s,
+    gaTarget: r.gaTarget,
+  }));
 }
 
 function monthStartOf(d: Date) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
+
+/* ------------------------------------------------------------------ *
+ * The company's own totals, for a report's summary strip
+ * ------------------------------------------------------------------ */
+
+/**
+ * What the COMPANY did, for the figure above a grouped report.
+ *
+ * ## Why a strip cannot add up the rows it is showing
+ *
+ * Found by auditing v181's own work. Every grouped report built its summary
+ * strip with `rows.reduce(...)` over the rows on screen, and that is wrong in
+ * two opposite directions:
+ *
+ *   - **Grouped by RSO**, each row is that RSO's OWN credit, with the Business
+ *     Partner share held aside by design. Adding them leaves the BP share out
+ *     of a figure labelled as the report's total. Measured on the
+ *     production-volume database for September: GA short by 120, GA target by
+ *     175, SSO by 4, LSO by 3 and C2C by ৳127,260.
+ *
+ *   - **Grouped by supervisor**, an outlet worked as a BP by two RSOs on two
+ *     different teams counts once in each team — correctly, because both teams
+ *     really work it. Adding the teams then counts it twice. Measured: GA 11
+ *     too high, SSO 1 too high. 67,409 is not any real quantity.
+ *
+ * `lib/bp-rollup.ts` states the rule this breaks: "Only a total ACROSS groups
+ * needs `teamTotals()` over the underlying rows, never a sum of these."
+ *
+ * ## The target basis follows the grouping
+ *
+ * The numerator is always the company's achievement. The denominator has to be
+ * the company's target *on the same basis as the rows*, or the percentage
+ * compares two different questions — the defect this version already fixed one
+ * level down. Grouped by RSO that is the RSO targets plus the BP targets;
+ * grouped by supervisor it is the supervisors' own targets (v181).
+ */
+export type CompanyTotals = {
+  ga: number;
+  gaTarget: number;
+  sso: number;
+  ssoTarget: number;
+  lso: number;
+  lsoTarget: number;
+  c2c: number;
+  c2cTarget: number;
+  c2s: number;
+  totalRecharge: number;
+  totalRechargeTarget: number;
+};
+
+/**
+ * The performance rows a report is built from — fetched ONCE per request.
+ *
+ * `employeePerformance` company-wide costs about 0.9s at production volume,
+ * and a report page needs the same rows twice: for the grouped table and for
+ * the company figure above it. Calling it twice took the Target report to 5
+ * seconds. Every builder now fetches here and passes the rows down.
+ */
+export const reportPerformanceRows = (range: ReportRange) =>
+  employeePerformance(`${range.from.slice(0, 7)}-01`, undefined, range.from, range.to);
+
+export async function companyTotals(
+  range: ReportRange,
+  basis: "rso" | "supervisor",
+  prefetched?: EmployeePerformanceRows,
+): Promise<CompanyTotals> {
+  const { start, endExclusive } = rangeBounds(range);
+  const [rows, stored] = await Promise.all([
+    prefetched ?? reportPerformanceRows(range),
+    basis === "supervisor" ? supervisorTargets(start, endExclusive) : Promise.resolve(null),
+  ]);
+  // teamTotals, not a sum: Business Partners included, a shared outlet once.
+  const t = teamTotals(rows);
+  const sup = stored ? sumSupervisorTargets(stored.values()) : null;
+  return {
+    ga: t.gaAchieved,
+    gaTarget: sup ? sup.gaTarget : t.gaTarget,
+    sso: t.ssoAchieved,
+    ssoTarget: sup ? sup.ssoTarget : t.ssoTarget,
+    lso: t.lsoAchieved,
+    lsoTarget: sup ? sup.lsoTarget : t.lsoTarget,
+    c2c: t.c2cAchieved,
+    c2cTarget: sup ? sup.c2cTarget : t.c2cTarget,
+    c2s: t.c2sAmount,
+    totalRecharge: t.totalRechargeAchieved,
+    totalRechargeTarget: sup ? sup.totalRechargeTarget : t.totalRechargeTarget,
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -260,45 +321,31 @@ export type ActivationRow = {
   target: number;
 };
 
-export async function rsoActivation(range: ReportRange): Promise<ActivationRow[]> {
-  const { start, endExclusive } = rangeBounds(range);
-  const [employees, gaGroups, targets] = await Promise.all([
-    prisma.employee.findMany({
-      where: { active: true },
-      select: {
-        id: true,
-        name: true,
-        employeeCode: true,
-        rsoMsisdn: true,
-        supervisor: { select: { name: true } },
-        retailers: { select: { id: true } },
-      },
-      orderBy: { name: "asc" },
-    }),
-    prisma.gaActivation.groupBy({
-      by: ["retailerId", "activationDate"],
-      where: withStandardGa({ activationDate: { gte: start, lt: endExclusive } }),
-      _count: { _all: true },
-    }),
-    prisma.monthlyTarget.findMany({
-      where: { month: { gte: monthStartOf(start), lt: endExclusive } },
-      select: { employeeId: true, gaTarget: true },
-    }),
-  ]);
-
-  const gaByRetailer = new Map(gaGroups.map((g) => [g.retailerId, g._count._all]));
-  const targetByEmployee = new Map<string, number>();
-  for (const t of targets) {
-    targetByEmployee.set(t.employeeId, (targetByEmployee.get(t.employeeId) ?? 0) + t.gaTarget);
-  }
-
-  return employees.map((e) => ({
-    id: e.id,
-    name: e.name,
-    code: e.employeeCode || e.rsoMsisdn,
-    sub: e.supervisor?.name ?? "Unassigned",
-    activation: e.retailers.reduce((a, r) => a + (gaByRetailer.get(r.id) ?? 0), 0),
-    target: targetByEmployee.get(e.id) ?? 0,
+export async function rsoActivation(
+  range: ReportRange,
+  prefetched?: EmployeePerformanceRows,
+): Promise<ActivationRow[]> {
+  /*
+   * ## The same correction as `rsoSummary`
+   *
+   * This counted an RSO's activations by walking the retailers they OWN. An
+   * outlet held as a Business Partner has its activations credited to the BP
+   * holder on every other screen in the app, so this report credited the owner
+   * for SIMs the app told the owner were not theirs — and compared that figure
+   * against the owner's own GA target, which never covered them.
+   *
+   * `employeePerformance` is the one function every role screen already asks,
+   * and it returns both halves of this report: the RSO's own GA credit and the
+   * RSO's own GA target. The BP side has its own report, immediately below.
+   */
+  const rows = prefetched ?? (await reportPerformanceRows(range));
+  return rows.map((r) => ({
+    id: r.employeeId,
+    name: r.name,
+    code: r.employeeCode || r.rsoMsisdn,
+    sub: r.supervisor,
+    activation: r.gaAchieved,
+    target: r.gaTarget,
   }));
 }
 
@@ -316,7 +363,7 @@ export async function bpActivation(range: ReportRange): Promise<ActivationRow[]>
         gaTarget: true,
         startDate: true,
         endDate: true,
-        retailer: { select: { retailerCode: true, retailerName: true } },
+        retailer: { select: { retailerCode: true, retailerName: true, bpName: true } },
         employee: { select: { name: true } },
       },
     }),
@@ -343,7 +390,7 @@ export async function bpActivation(range: ReportRange): Promise<ActivationRow[]>
   return assignments
     .map((a) => ({
       id: a.id,
-      name: a.retailer.retailerName || a.retailer.retailerCode,
+      name: bpDisplayName(a.retailer),
       code: a.retailer.retailerCode,
       sub: a.employee.name,
       activation: gaGroups.reduce(
@@ -375,8 +422,19 @@ export type RsoSummaryRow = {
   code: string;
   /** The RSO's wallet number, kept apart from `code` so a sheet can show both. */
   msisdn: string;
+  /**
+   * The supervisor's id alongside the name.
+   *
+   * `rollUpToSupervisor` grouped on the NAME, so two supervisors who share one
+   * silently shared a row — the same defect the dashboards fixed by grouping
+   * on id. It also had no way to look up a supervisor's own target, which
+   * v181 needs.
+   */
+  supervisorId: string | null;
   supervisor: string;
   retailerCount: number;
+  /** How many RSOs this row covers. 1 for an RSO row, the team size for a rollup. */
+  rsoCount: number;
   ga: number;
   gaTarget: number;
   c2c: number;
@@ -389,120 +447,132 @@ export type RsoSummaryRow = {
   totalRechargeTarget: number;
 };
 
-export async function rsoSummary(range: ReportRange): Promise<RsoSummaryRow[]> {
-  // Only the target query needs raw bounds here; the retailer rollup below
-  // gets its range through retailerReport().
-  const { start, endExclusive } = rangeBounds(range);
-
-  const [employees, retailers, targets] = await Promise.all([
-    prisma.employee.findMany({
-      where: { active: true },
-      select: {
-        id: true,
-        name: true,
-        employeeCode: true,
-        rsoMsisdn: true,
-        supervisor: { select: { name: true } },
-      },
-      orderBy: { name: "asc" },
-    }),
-    // Retailer-level rows already carry GA, C2C, C2S and the SSO/LSO verdicts
-    // for this range; rolling them up by employee is cheaper and more
-    // consistent than a second set of groupBy queries.
-    retailerReport(range),
-    prisma.monthlyTarget.findMany({
-      where: { month: { gte: monthStartOf(start), lt: endExclusive } },
-      select: {
-        employeeId: true,
-        gaTarget: true,
-        c2cTarget: true,
-        ssoTarget: true,
-        lsoTarget: true,
-        totalRechargeTarget: true,
-      },
-    }),
-  ]);
-
-  type Acc = { retailerCount: number; ga: number; c2c: number; c2s: number; sso: number; lso: number };
-  const byEmployee = new Map<string, Acc>();
-  for (const r of retailers) {
-    if (!r.employeeId) continue; // unassigned retailer: never silently attributed
-    const acc = byEmployee.get(r.employeeId) ?? { retailerCount: 0, ga: 0, c2c: 0, c2s: 0, sso: 0, lso: 0 };
-    acc.retailerCount += 1;
-    acc.ga += r.ga;
-    acc.c2c += r.c2c;
-    acc.c2s += r.c2s;
-    if (r.simSeller && r.ssoComplete) acc.sso += 1;
-    if (r.lsoComplete) acc.lso += 1;
-    byEmployee.set(r.employeeId, acc);
-  }
-
-  const targetByEmployee = new Map<string, RsoSummaryRow>();
-  for (const t of targets) {
-    const cur = targetByEmployee.get(t.employeeId);
-    const add = {
-      gaTarget: t.gaTarget,
-      c2cTarget: Number(t.c2cTarget),
-      ssoTarget: t.ssoTarget,
-      lsoTarget: t.lsoTarget,
-      totalRechargeTarget: Number(t.totalRechargeTarget),
-    };
-    targetByEmployee.set(t.employeeId, {
-      ...(cur ?? ({} as RsoSummaryRow)),
-      gaTarget: (cur?.gaTarget ?? 0) + add.gaTarget,
-      c2cTarget: (cur?.c2cTarget ?? 0) + add.c2cTarget,
-      ssoTarget: (cur?.ssoTarget ?? 0) + add.ssoTarget,
-      lsoTarget: (cur?.lsoTarget ?? 0) + add.lsoTarget,
-      totalRechargeTarget: (cur?.totalRechargeTarget ?? 0) + add.totalRechargeTarget,
-    } as RsoSummaryRow);
-  }
-
-  return employees.map((e) => {
-    const a = byEmployee.get(e.id) ?? { retailerCount: 0, ga: 0, c2c: 0, c2s: 0, sso: 0, lso: 0 };
-    const t = targetByEmployee.get(e.id);
-    return {
-      id: e.id,
-      name: e.name,
-      code: e.employeeCode || e.rsoMsisdn,
-      msisdn: e.rsoMsisdn,
-      supervisor: e.supervisor?.name ?? "Unassigned",
-      retailerCount: a.retailerCount,
-      ga: a.ga,
-      c2c: a.c2c,
-      c2s: a.c2s,
-      sso: a.sso,
-      lso: a.lso,
-      gaTarget: t?.gaTarget ?? 0,
-      c2cTarget: t?.c2cTarget ?? 0,
-      ssoTarget: t?.ssoTarget ?? 0,
-      lsoTarget: t?.lsoTarget ?? 0,
-      totalRechargeTarget: t?.totalRechargeTarget ?? 0,
-    };
-  });
+export async function rsoSummary(range: ReportRange, prefetched?: EmployeePerformanceRows): Promise<RsoSummaryRow[]> {
+  /*
+   * ## Why this asks `employeePerformance` rather than adding retailers up
+   *
+   * It used to roll `retailerReport(range)` up by `Retailer.employeeId` — who
+   * OWNS each outlet. But an outlet held as a Business Partner has its sales
+   * credited to the BP holder on every dashboard in the app, not to the owner
+   * (v139, v142, v178). So the Reporting Center credited the owner, the RSO's
+   * own page credited the BP, and the two never agreed.
+   *
+   * Worse, the target came from the RSO's own `MonthlyTarget`, which excludes
+   * the BP target by design. The achievement percentage therefore divided a
+   * figure that included somebody else's BP outlets by a target that did not
+   * cover them. Measured on the production-volume database for September, GA
+   * was out by 105, 11 and 4 for the three RSOs involved with BPs, and SSO,
+   * LSO and C2C were out the same way.
+   *
+   * `employeePerformance` is the one function every role screen already asks.
+   * Asking it here is the whole fix: the rows are the RSO's own credit, with
+   * the BP share held aside in `row.bp` and reported on its own screens.
+   *
+   * The BP side of the business is not lost — `bpActivation()` below is the
+   * report for it, and `/rso/bp` is the screen.
+   */
+  const rows = prefetched ?? (await reportPerformanceRows(range));
+  return rows.map((r) => ({
+    id: r.employeeId,
+    name: r.name,
+    code: r.employeeCode || r.rsoMsisdn,
+    msisdn: r.rsoMsisdn,
+    supervisorId: r.supervisorId,
+    supervisor: r.supervisor,
+    retailerCount: r.retailerCount,
+    rsoCount: 1,
+    ga: r.gaAchieved,
+    gaTarget: r.gaTarget,
+    c2c: r.c2cAchieved,
+    c2cTarget: r.c2cTarget,
+    c2s: r.c2sAmount,
+    sso: r.ssoAchieved,
+    ssoTarget: r.ssoTarget,
+    lso: r.lsoAchieved,
+    lsoTarget: r.lsoTarget,
+    totalRechargeTarget: r.totalRechargeTarget,
+  }));
 }
 
 /** Rolls RSO rows up to their supervisors. */
-export function rollUpToSupervisor(rows: RsoSummaryRow[]): RsoSummaryRow[] {
-  const bySup = new Map<string, RsoSummaryRow>();
-  for (const r of rows) {
-    const cur = bySup.get(r.supervisor);
-    if (!cur) {
-      // A supervisor row is a rollup, not a person with a wallet: blanking the
-      // msisdn stops the first RSO in the group lending theirs to the total.
-      bySup.set(r.supervisor, { ...r, id: r.supervisor, name: r.supervisor, code: "—", msisdn: "—", supervisor: "" });
-      continue;
-    }
-    cur.retailerCount += r.retailerCount;
-    cur.ga += r.ga;
-    cur.c2c += r.c2c;
-    cur.c2s += r.c2s;
-    cur.sso += r.sso;
-    cur.lso += r.lso;
-    cur.gaTarget += r.gaTarget;
-    cur.c2cTarget += r.c2cTarget;
-    cur.ssoTarget += r.ssoTarget;
-    cur.lsoTarget += r.lsoTarget;
-    cur.totalRechargeTarget += r.totalRechargeTarget;
-  }
-  return [...bySup.values()].sort((a, b) => a.name.localeCompare(b.name));
+export async function rollUpToSupervisor(
+  range: ReportRange,
+  prefetched?: EmployeePerformanceRows,
+): Promise<RsoSummaryRow[]> {
+  /*
+   * ## Why this fetches rather than folding `rsoSummary`'s rows
+   *
+   * It used to take `RsoSummaryRow[]` and add them up. That worked while those
+   * rows were ownership-based totals, but `rsoSummary` now returns each RSO's
+   * OWN credit with the Business Partner share held aside — so adding them
+   * would give a supervisor a territory figure with every BP outlet missing,
+   * while the daily report's supervisor rows (`supervisorSummary` above)
+   * include them. Two supervisor figures in one Reporting Center, disagreeing:
+   * exactly the defect this version exists to remove.
+   *
+   * So both go through `groupTotals`, which is the one place allowed to add a
+   * BP's figures to a team's and which counts an outlet held by two RSOs on
+   * the same team once.
+   */
+  const { start, endExclusive } = rangeBounds(range);
+  const [rows, stored, supervisors] = await Promise.all([
+    prefetched ?? reportPerformanceRows(range),
+    supervisorTargets(start, endExclusive),
+    prisma.supervisor.findMany({ where: { active: true }, select: { id: true, name: true } }),
+  ]);
+
+  // By id, never by name: two supervisors sharing a name used to share one row.
+  const totals = groupTotals(rows, (r) => r.supervisorId);
+  const sizes = groupSizes(rows, (r) => r.supervisorId);
+  const nameOf = new Map<string | null, string>(supervisors.map((s) => [s.id, s.name]));
+  for (const r of rows) if (!nameOf.has(r.supervisorId)) nameOf.set(r.supervisorId, r.supervisor);
+
+  /*
+   * Every active supervisor, not only those with rows.
+   *
+   * A supervisor whose team sold nothing, or who has no RSOs assigned yet,
+   * still has a target and still belongs on a report about targets. Dropping
+   * them would be the v175 defect again: an empty row is information, an
+   * absent row is a silence the reader has to notice.
+   */
+  const ids = [...new Set([...supervisors.map((x) => x.id), ...totals.keys()])];
+  return ids
+    .map((supervisorId) => {
+      const t = totals.get(supervisorId) ?? EMPTY_TOTALS;
+      // v181: the achievement is the territory's, the target is the
+      // supervisor's own. See lib/supervisor-target.ts.
+      const target = targetFor(stored, supervisorId);
+      return {
+        id: supervisorId ?? "unassigned",
+        name: nameOf.get(supervisorId) || "Unassigned",
+        // A supervisor row is a rollup, not a person with a wallet.
+        code: "—",
+        msisdn: "—",
+        supervisorId,
+        supervisor: "",
+        retailerCount: t.retailerCount,
+        rsoCount: sizes.get(supervisorId) ?? 0,
+        ga: t.gaAchieved,
+        gaTarget: target.gaTarget,
+        c2c: t.c2cAchieved,
+        c2cTarget: target.c2cTarget,
+        c2s: t.c2sAmount,
+        sso: t.ssoAchieved,
+        ssoTarget: target.ssoTarget,
+        lso: t.lsoAchieved,
+        lsoTarget: target.lsoTarget,
+        totalRechargeTarget: target.totalRechargeTarget,
+      } satisfies RsoSummaryRow;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/** A supervisor with no rows at all: every figure genuinely zero. */
+const EMPTY_TOTALS = {
+  retailerCount: 0,
+  gaAchieved: 0,
+  c2cAchieved: 0,
+  c2sAmount: 0,
+  ssoAchieved: 0,
+  lsoAchieved: 0,
+};

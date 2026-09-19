@@ -52,6 +52,16 @@ export async function POST(req: Request) {
         bpRetailerId: role === "BP" ? bpRetailerId : null,
       },
     });
+    /*
+     * A BP login's display name IS the BP's name.
+     *
+     * Two screens can set it — this one and /admin/employees/bps — and if they
+     * wrote to different places the app would show a different name depending
+     * on which door was used last. So both write `Retailer.bpName`, which is
+     * what every list, report and export reads (lib/bp-name.ts).
+     */
+    if (role === "BP" && bpRetailerId)
+      await prisma.retailer.update({ where: { id: bpRetailerId }, data: { bpName: displayName } });
     await audit(me, "CREATE_USER", "accounts", {
       targetType: "User",
       targetId: user.id,
@@ -122,6 +132,9 @@ export async function PATCH(req: Request) {
     data.employeeId = role === "RSO" ? employeeId : null;
     data.supervisorId = role === "SUPERVISOR" ? supervisorId : null;
     data.bpRetailerId = role === "BP" ? bpRetailerId : null;
+    // Same rule as on create: the two doors onto a BP's name write one place.
+    if (role === "BP" && bpRetailerId)
+      await prisma.retailer.update({ where: { id: bpRetailerId }, data: { bpName: displayName } });
   }
 
   const pin = typeof b.pin === "string" ? b.pin.trim() : "";

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bpNameToStore } from "@/lib/bp-name";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
@@ -21,7 +22,14 @@ export async function POST(req: Request) {
   const employeeId = String(b.employeeId || ""),
     retailerId = String(b.retailerId || ""),
     startDate = parseDay(b.startDate),
-    gaTarget = Math.max(0, Math.trunc(Number(b.gaTarget) || 0));
+    gaTarget = Math.max(0, Math.trunc(Number(b.gaTarget) || 0)),
+    /*
+     * The third door onto a BP, and until v181 the only one with no name
+     * field at all — so a BP created here had nothing but the master file's
+     * retailer name, whatever an operator meant to call it. Blank leaves the
+     * stored name exactly as it was; it does not wipe one set elsewhere.
+     */
+    bpName = bpNameToStore(b.bpName);
   if (!employeeId || !retailerId || !startDate)
     return NextResponse.json({ error: "RSO, retailer and effective date are required." }, { status: 400 });
   const retailer = await prisma.retailer.findUnique({
@@ -60,11 +68,13 @@ export async function POST(req: Request) {
       // place rather than creating a duplicate.
       if (existing) {
         const same = await tx.bpAssignment.update({ where: { id: existing.id }, data: { startDate, gaTarget } });
+        if (bpName) await tx.retailer.update({ where: { id: retailerId }, data: { bpName } });
         return { assignment: same, updated: true };
       }
       const assignment = await tx.bpAssignment.create({
         data: { employeeId, retailerId, startDate, gaTarget, active: true },
       });
+      if (bpName) await tx.retailer.update({ where: { id: retailerId }, data: { bpName } });
       return { assignment, updated: false };
     });
     return NextResponse.json({

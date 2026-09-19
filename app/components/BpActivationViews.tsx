@@ -10,6 +10,7 @@
  * own figure and never inside the GA total.
  */
 
+import { bpDisplayName } from "../../lib/bp-name";
 import Link from "next/link";
 import { FilterForm } from "./DrillUI";
 import { Icon } from "./icons";
@@ -55,6 +56,7 @@ export async function BpActivationListView({
           endDate: a.endDate?.toISOString().slice(0, 10) ?? null,
           retailerCode: a.retailer.retailerCode,
           retailerName: a.retailer.retailerName || "",
+          bpName: a.retailer.bpName,
           rsoName: a.employee.name,
           supervisorName: a.employee.supervisor?.name || "",
         }))}
@@ -112,7 +114,7 @@ export async function BpActivationDetailView({
         <Icon name="arrow" /> Back
       </Link>
       <PageHeader
-        title={d.assignment.retailer.retailerName || d.assignment.retailer.retailerCode}
+        title={bpDisplayName(d.assignment.retailer)}
         subtitle={`${d.assignment.retailer.retailerCode} · RSO ${d.assignment.employee.name} · ${d.assignment.employee.supervisor?.name || "No supervisor"}`}
       />
 

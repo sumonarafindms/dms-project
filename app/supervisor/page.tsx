@@ -38,6 +38,9 @@ import { Icon } from "../components/icons";
 import { performanceComparison } from "../../lib/comparison-data";
 import { teamTotals } from "../../lib/bp-rollup";
 import { parseComparisonKind } from "../../lib/comparison";
+import { monthBounds } from "../../lib/month";
+import { targetFor, withSupervisorTarget } from "../../lib/supervisor-target";
+import { supervisorTargets } from "../../lib/supervisor-target-query";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +64,15 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
    */
   const sp = await searchParams;
   const compareKind = parseComparisonKind(sp.compare);
-  const [rows, attentionRows, daily, comparison] = await Promise.all([
+  const bounds = monthBounds(month);
+  const [rows, attentionRows, daily, comparison, supTargets] = await Promise.all([
     employeePerformance(month, ids),
     retailerOpportunities(monthKey, ids),
     latestDailySnapshot(ids),
     performanceComparison(compareKind, ids),
+    // The supervisor's OWN target, which since v181 is what they are measured
+    // against — not their RSOs' and BPs' targets added up.
+    supervisorTargets(bounds.start, bounds.end, u.supervisorId ? [u.supervisorId] : []),
   ]);
 
   const attention = attentionRows.filter((x) => x.priority > 0).length;
@@ -75,7 +82,18 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
   // the whole territory, and each RSO row now excludes its BPs. Summing the
   // rows directly would quietly drop every BP's SIMs and recharge from the
   // team figure. See lib/bp-rollup.ts.
-  const team = teamTotals(rows);
+  const ownTarget = targetFor(supTargets, u.supervisorId);
+  /*
+   * Achievement from the territory, target from the supervisor's own row.
+   *
+   * The achieved side still has to be `teamTotals`: a supervisor answers for
+   * everything sold under them, each RSO row now excludes its BPs, and a
+   * shared outlet must be counted once. Only the target side changed — see
+   * lib/supervisor-target.ts. When no target has been set the six figures are
+   * zero, and `KpiCard` already says "No target set" rather than drawing a
+   * ring at nought percent.
+   */
+  const team = withSupervisorTarget(teamTotals(rows), ownTarget);
   // One clock read for the whole page, so four cards cannot straddle a Dhaka
   // midnight and disagree about how many days are left.
   const now = new Date();
@@ -111,8 +129,12 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
       <FeedNote note={dailyFeedNote(daily)} />
 
       <SectionHead
-        title="Team targets"
-        sub={`Expected pace is ${expected}% for this month. Projections are estimates from the team's current rate.`}
+        title="Your targets"
+        sub={
+          ownTarget.set
+            ? `Your own monthly target, against everything sold across your team. Expected pace is ${expected}% for this month.`
+            : "No target has been set for you this month. Ask Admin to set one on the Target page — the figures below are what your team has sold."
+        }
       />
       <div className="kit-kpi-grid kit-mb-20">
         <KpiCard

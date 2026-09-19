@@ -76,27 +76,46 @@ const bp = (over: Partial<BpPortion> = {}, retailerId = `bp-retailer-${++bpSeq}`
   };
 };
 
-const row = (over: Partial<RollupRow> = {}): RollupRow => ({
-  gaTarget: 0,
-  gaAchieved: 0,
-  ga170: 0,
-  ga300: 0,
-  ssoTarget: 0,
-  ssoAchieved: 0,
-  c2cTarget: 0,
-  c2cAchieved: 0,
-  lsoTarget: 0,
-  lsoAchieved: 0,
-  scTarget: 0,
-  scAchieved: 0,
-  totalRechargeTarget: 0,
-  totalRechargeAchieved: 0,
-  c2sAmount: 0,
-  c2sTransactions: 0,
-  retailerCount: 0,
-  bp: bp(),
-  ...over,
-});
+/*
+ * A row, built the way `employeePerformance` builds one.
+ *
+ * The fixture states the RSO's OWN figures and the BP they hold; the helper
+ * then folds the BP's SSO, LSO, C2C and C2S into the row exactly as v183 made
+ * the real builder do, because no BP target exists for those metrics and the
+ * RSO's target covers the outlets they hold. GA is NOT folded — a BP carries
+ * its own GA target, so that one stays apart on the row and is added only by
+ * `withBp` and `teamTotals`.
+ *
+ * Building fixtures by hand in the old shape would have made every assertion
+ * below a test of a row shape the application no longer produces.
+ */
+const row = (over: Partial<RollupRow> = {}): RollupRow => {
+  const partner = over.bp ?? bp();
+  const ownC2c = over.c2cAchieved ?? 0;
+  const ownSc = over.scAchieved ?? 0;
+  return {
+    gaTarget: 0,
+    gaAchieved: 0,
+    ga170: 0,
+    ga300: 0,
+    ssoTarget: 0,
+    c2cTarget: 0,
+    lsoTarget: 0,
+    scTarget: 0,
+    totalRechargeTarget: 0,
+    retailerCount: 0,
+    ...over,
+    bp: partner,
+    ssoAchieved: (over.ssoAchieved ?? 0) + partner.ssoAchieved,
+    c2cAchieved: ownC2c + partner.c2cAchieved,
+    scAchieved: ownSc,
+    lsoAchieved: (over.lsoAchieved ?? 0) + partner.lsoAchieved,
+    c2sAmount: (over.c2sAmount ?? 0) + partner.c2sAmount,
+    c2sTransactions: (over.c2sTransactions ?? 0) + partner.c2sTransactions,
+    // Always C2C + SC, as the real builder computes it.
+    totalRechargeAchieved: ownC2c + partner.c2cAchieved + ownSc,
+  };
+};
 
 describe("a BP's sales reach the team, not the RSO", () => {
   const rso = row({
@@ -120,10 +139,35 @@ describe("a BP's sales reach the team, not the RSO", () => {
     }),
   });
 
-  it("adds every BP metric back at team level", () => {
+  it("credits the holder with the BP's SSO, LSO, C2C and C2S", () => {
+    /*
+     * v183. A BP assignment carries a GA target and nothing else, while the
+     * RSO's SSO, LSO and C2C targets are set against their whole base — the
+     * outlets they hold as a BP included. Holding the achievement aside
+     * measured them against a goal that still covered those shops, so an SSO
+     * completed at a BP outlet is the holder's SSO and appears on their own
+     * row, not only on their team's.
+     */
+    expect(rso.ssoAchieved).toBe(4);
+    expect(rso.lsoAchieved).toBe(3);
+    expect(rso.c2cAchieved).toBe(150_000);
+    expect(rso.c2sAmount).toBe(29_000);
+    expect(rso.c2sTransactions).toBe(101);
+  });
+
+  it("keeps GA apart on the row, because a BP has its own GA target", () => {
+    expect(rso.gaAchieved).toBe(40);
+    expect(rso.gaTarget).toBe(60);
+    expect(rso.bp.gaAchieved).toBe(25);
+    expect(rso.bp.gaTarget).toBe(30);
+  });
+
+  it("adds only GA at territory level, and adds it once", () => {
     const t = withBp(rso);
     expect(t.gaAchieved).toBe(65);
     expect(t.gaTarget).toBe(90);
+    // Already on the row. Adding the BP share again here would count one
+    // outlet twice on every territory view.
     expect(t.c2cAchieved).toBe(150_000);
     expect(t.ssoAchieved).toBe(4);
     expect(t.lsoAchieved).toBe(3);
@@ -132,11 +176,13 @@ describe("a BP's sales reach the team, not the RSO", () => {
     expect(t.bpCount).toBe(1);
   });
 
-  it("recomputes total recharge rather than trusting the row's", () => {
-    // The row's totalRechargeAchieved already had the BP's C2C removed, so
-    // reading it and adding the BP's C2C would be right only by accident.
-    // C2C + SC, both including the BP share.
-    expect(withBp(rso).totalRechargeAchieved).toBe(155_000);
+  it("keeps total recharge equal to C2C plus SC, wherever it is read", () => {
+    // The invariant that survives the change: whatever else moves, recharge is
+    // the money figure plus the manually entered SC, never a stale field.
+    expect(rso.totalRechargeAchieved).toBe(rso.c2cAchieved + rso.scAchieved);
+    const t = withBp(rso);
+    expect(t.totalRechargeAchieved).toBe(t.c2cAchieved + t.scAchieved);
+    expect(t.totalRechargeAchieved).toBe(155_000);
   });
 
   it("leaves the RSO's own row untouched", () => {
@@ -478,8 +524,32 @@ describe("no page adds the BP share by hand", () => {
      */
     const METRICS =
       "gaAchieved|gaTarget|totalRechargeAchieved|totalRechargeTarget|c2cAchieved|ssoAchieved|lsoAchieved|retailerCount";
+    /*
+     * The one page that sums target fields legitimately, with its reason.
+     *
+     * `/targets` adds up TargetRow — rows straight out of the targets API,
+     * which are stored figures and carry no BP share at all — to show a
+     * supervisor what their RSOs' targets come to. There is nothing for the
+     * helper to de-duplicate, and there is no `withBp` shape to use.
+     *
+     * The exemption is checked back against the file below, so it cannot
+     * quietly start covering a page that DOES handle performance rows.
+     */
+    const SUMS_STORED_TARGETS: Record<string, string> = {
+      "app/targets/page.tsx":
+        "sums TargetRow, the stored targets themselves — no performance row, no BP share, nothing to dedupe",
+    };
+    for (const [file, why] of Object.entries(SUMS_STORED_TARGETS)) {
+      const src = stripComments(read(file));
+      expect(why.length, `${file}: an exemption with no reason`).toBeGreaterThan(20);
+      for (const forbidden of ["withBp(", "employeePerformance", ".bp.byRetailer"])
+        expect(src.includes(forbidden), `${file} is exempt from the hand-sum rule and yet uses ${forbidden}`).toBe(
+          false,
+        );
+    }
     const offenders: string[] = [];
     for (const file of pages) {
+      if (SUMS_STORED_TARGETS[rel(file)]) continue;
       const src = stripComments(fs.readFileSync(file, "utf8"));
       for (const loop of src.matchAll(/for \(const (\w+) of (?:rows|all)\)\s*\{([\s\S]*?)\n  \}/g)) {
         const [, variable, body] = loop;
@@ -500,5 +570,68 @@ describe("the rollup module stays usable from the browser", () => {
     expect(src).not.toMatch(/@prisma\/client/);
     expect(src).not.toMatch(/from "\.\/prisma"/);
     expect(src).not.toMatch(/from "\.\/performance"/);
+  });
+});
+
+describe("both aggregation paths credit a BP's execution the same way", () => {
+  /**
+   * v183, and the reason it needs a guard of its own.
+   *
+   * The app has two places that build an RSO's row — `lib/performance.ts` for
+   * every role screen and `/api/dashboard/summary` for the admin dashboard —
+   * and the comments in both have said for several versions that they must
+   * apply one rule or the same RSO reads differently on two screens. The fold
+   * added here is exactly the kind of thing that gets applied to one and
+   * forgotten in the other.
+   *
+   * The rule: SSO, LSO and C2C are folded into the RSO's own figures, because
+   * a BP assignment carries a GA target and nothing else while the RSO's
+   * targets cover their whole base. GA is NOT folded.
+   */
+  const PRODUCERS = {
+    "lib/performance.ts": "every role screen",
+    "app/api/dashboard/summary/route.ts": "the admin dashboard",
+  };
+
+  it("folds SSO, LSO and C2C into the row in both", () => {
+    for (const [file, what] of Object.entries(PRODUCERS)) {
+      const src = stripComments(read(file));
+      for (const field of ["ssoAchieved", "lsoAchieved"])
+        expect(src, `${file} (${what}) does not credit the holder with the BP's ${field}`).toMatch(
+          new RegExp(`${field}:[^,]*\\+ bp\\.${field}`),
+        );
+      expect(src, `${file} (${what}) does not credit the holder with the BP's C2C`).toMatch(
+        /c2cAchieved:[^,]*\+ bp\.c2cAchieved/,
+      );
+    }
+  });
+
+  it("does NOT fold GA, which has a BP target of its own", () => {
+    // Folding GA would target the same SIMs twice — v139's ruling, and the
+    // reason the split exists at all.
+    for (const file of Object.keys(PRODUCERS)) {
+      const src = stripComments(read(file));
+      expect(src, `${file} folds the BP's GA into the RSO's own figure`).not.toMatch(
+        /gaAchieved:[^,]*\+ bp\.gaAchieved/,
+      );
+    }
+  });
+
+  it("takes the share back out before a team total, so a shared outlet counts once", () => {
+    const src = stripComments(read("lib/bp-rollup.ts"));
+    for (const field of ["ssoAchieved", "c2cAchieved", "lsoAchieved"])
+      expect(src, `teamTotals does not remove each row's ${field} BP share`).toMatch(
+        new RegExp(`${field}[^\\n]*- row\\.bp\\.${field}`),
+      );
+    // And withBp must not add them a second time.
+    const withBpBody = src.slice(src.indexOf("export function withBp("), src.indexOf("export function teamTotals("));
+    expect(withBpBody, "withBp adds the BP's SSO again").not.toMatch(/ssoAchieved: row\.ssoAchieved \+/);
+    expect(withBpBody, "withBp adds the BP's C2C again").not.toMatch(/c2cAchieved: row\.c2cAchieved \+/);
+  });
+
+  it("still adds GA at territory level", () => {
+    const src = stripComments(read("lib/bp-rollup.ts"));
+    const withBpBody = src.slice(src.indexOf("export function withBp("), src.indexOf("export function teamTotals("));
+    expect(withBpBody).toMatch(/gaAchieved: row\.gaAchieved \+ bp\.gaAchieved/);
   });
 });
