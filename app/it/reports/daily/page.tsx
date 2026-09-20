@@ -19,7 +19,7 @@
  * would read as "this BP sold nothing" rather than "we do not track that here".
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../../../components/AppLink";
 import { requireUser } from "../../../../lib/auth";
 import { rangeLabel, resolveRange, rangeQuery, isMonthToDate } from "../../../../lib/report-range";
 import { rangeTotals } from "../../../../lib/report-data";
@@ -75,7 +75,10 @@ export default async function DailySummary({
                 className="kit-tablelink"
                 href={reportPageHref(
                   "/it/reports/daily",
-                  { from: range.from, to: range.to, level: "rso", supervisor: r.name },
+                  // The ID, not the name: renaming a supervisor used to
+                  // empty every link and bookmark pointing at their team, and
+                  // two supervisors sharing a name shared one view.
+                  { from: range.from, to: range.to, level: "rso", supervisor: r.supervisorId || r.name },
                   1,
                 )}
               >
@@ -126,10 +129,23 @@ export default async function DailySummary({
       : []),
   ];
 
+  /*
+   * The team's name, for every place that shows one.
+   *
+   * `supervisor` is what the URL holds, and since v186 that is an ID — so the
+   * three places that used to print it would have shown a cuid to an operator.
+   * The builder resolves it from the rows it filtered; when the team has no
+   * RSOs in this range there is nothing to resolve, and the raw value is the
+   * honest fallback for an old name-based link.
+   */
+  const supervisorName = supervisor ? built.filterLabel || supervisor : undefined;
+
   const summary = [
     `DMS Daily Summary`,
     `Period: ${rangeLabel(range)}`,
-    ...(supervisor ? [`Supervisor: ${supervisor}`] : []),
+    // The builder resolves the id back to a name; if the team has no rows in
+    // this range there is nothing to resolve, and saying so beats printing an id.
+    ...(supervisorName ? [`Supervisor: ${supervisorName}`] : []),
     ``,
     `Total GA: ${totals.standardGa.toLocaleString("en-US")}`,
     `SIM Swap: ${totals.simSwap.toLocaleString("en-US")}`,
@@ -156,7 +172,9 @@ export default async function DailySummary({
       </Link>
       <PageHeader
         title="Daily Summary"
-        subtitle={`Report Period: ${rangeLabel(range)}${supervisor ? ` • ${supervisor}` : ""}`}
+        /* `built.filterLabel`, not `supervisor`: the URL carries the team's id
+           now, and an id is not something to show a reader. */
+        subtitle={`Report Period: ${rangeLabel(range)}${supervisorName ? ` • ${supervisorName}` : ""}`}
         action={
           <ReportActionBar
             exportHref={reportExportHref("daily", range, {
@@ -193,7 +211,7 @@ export default async function DailySummary({
         <div className="kit-note is-info no-print" role="status">
           <Icon name="filter" />
           <span>
-            Showing only <b>{supervisor}</b>&apos;s RSOs.{" "}
+            Showing only <b>{supervisorName}</b>&apos;s RSOs.{" "}
             <Link href={reportPageHref("/it/reports/daily", { from: range.from, to: range.to, level: "rso" }, 1)}>
               Show every RSO →
             </Link>

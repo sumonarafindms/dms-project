@@ -28,7 +28,9 @@ export type EntityRow = {
   eyebrow: string;
   name: string;
   code: string;
-  percent: number;
+  /** `null` when no headline target exists for this row — the card then
+   *  shows "No target" rather than a red nought. */
+  percent: number | null;
   metrics: { label: string; achieved: number; target: number; unit?: string; tiers?: GaTiers | null }[];
   search: string;
   sortKeys: Record<string, number>;
@@ -119,6 +121,7 @@ export function EntityGrid({
         to={to}
         resultCount={shown.length}
         resultNoun={noun}
+        countShownBelow
       />
       <p className="kit-list-caption">
         {shown.length.toLocaleString("en-US")} {shown.length === 1 ? noun : `${noun}s`} · sorted by{" "}

@@ -10,7 +10,7 @@
  * pages and in the Reporting Center.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { requirePagePermission } from "../../lib/auth";
 import { employeePerformance } from "../../lib/performance";
 import { retailerOpportunities } from "../../lib/retailer-opportunities";
@@ -198,7 +198,7 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
                 eyebrow="RSO"
                 name={r.name}
                 code={`${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount} retailers`}
-                percent={pct(r.totalRechargeAchieved, r.totalRechargeTarget)}
+                percent={r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null}
                 metrics={[
                   {
                     label: "GA",
@@ -228,7 +228,7 @@ export default async function Supervisor({ searchParams }: { searchParams: Promi
               eyebrow="RSO"
               name={r.name}
               code={`${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount} retailers`}
-              percent={pct(r.totalRechargeAchieved, r.totalRechargeTarget)}
+              percent={r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null}
               metrics={[
                 {
                   label: "GA",

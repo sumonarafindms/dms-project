@@ -7,7 +7,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   await requireUser(["ADMIN", "IT"]);
   const { id } = await params,
     [s, employees] = await Promise.all([
-      prisma.supervisor.findUnique({ where: { id }, include: { user: true, employees: { select: { id: true } } } }),
+      prisma.supervisor.findUnique({
+        where: { id },
+        include: {
+          user: true,
+          employees: { select: { id: true, _count: { select: { retailers: true } } } },
+        },
+      }),
       prisma.employee.findMany({
         where: { active: true },
         orderBy: { name: "asc" },
@@ -19,6 +25,20 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     <>
       <AdminEmployeeForm
         role="supervisors"
+        heading={s.name}
+        identity={[
+          { label: "RSOs", value: s.employees.length.toLocaleString("en-US") },
+          {
+            label: "Retailers",
+            value: s.employees.reduce((a, x) => a + x._count.retailers, 0).toLocaleString("en-US"),
+            sub: "across the team",
+          },
+          {
+            label: "Login",
+            value: s.user?.mobileNumber || "No login",
+            sub: s.user ? undefined : "mobile + PIN not set",
+          },
+        ]}
         initial={{
           id: s.id,
           name: s.name,

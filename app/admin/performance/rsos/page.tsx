@@ -51,7 +51,7 @@ export default async function Page({
           eyebrow: "RSO",
           name: r.name,
           code: `${r.employeeCode || r.rsoMsisdn} · ${r.supervisor} · ${r.retailerCount} retailers`,
-          percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
+          percent: r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null,
           metrics: [
             {
               label: "GA",

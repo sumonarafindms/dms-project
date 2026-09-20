@@ -97,10 +97,18 @@ export function hueGap(a: string, b: string) {
 
 const AA_BODY = 4.5;
 
-/** The surfaces text actually sits on in this app. */
+/**
+ * The surfaces text actually sits on in this app.
+ *
+ * The page surface is read from `--surface-page`, not from a step on the
+ * neutral scale: v183 moved the page off `--color-neutral-50` so that a white
+ * card has a ground to be raised above, and a test that kept measuring the old
+ * step would have gone on passing while the real page got darker underneath
+ * the same text.
+ */
 const SURFACES: Record<string, string> = {
   "card white": "#ffffff",
-  "page neutral-50": resolve("var(--color-neutral-50)"),
+  "page surface": resolve("var(--surface-page)"),
 };
 
 describe("the ratio maths", () => {

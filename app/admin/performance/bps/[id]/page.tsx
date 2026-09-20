@@ -3,7 +3,7 @@ import { requireUser } from "../../../../../lib/auth";
 import { bpAssignmentDetail } from "../../../../../lib/bp-activations";
 import { normalizeMonth } from "../../../../../lib/drilldown";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import { AppLink as Link } from "../../../../components/AppLink";
 import { Card, EmptyState, MetricBar, PageHeader, Row, SectionHead, SummaryStrip } from "../../../../components/Kit";
 import { Icon } from "../../../../components/icons";
 import { FilterForm } from "../../../../components/DrillUI";

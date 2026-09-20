@@ -31,7 +31,7 @@
  * dataset entirely.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { DateRangeForm } from "./ListControls";
 import { ServerSearchBar, ServerSelect } from "./ServerSearchBar";
 import { Icon } from "./icons";

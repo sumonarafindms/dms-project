@@ -80,7 +80,20 @@ const DYNAMIC_PARENT: Record<string, { from: string; match: RegExp }> = {
  * so the sweep has to be told — otherwise the one honest redirect in the app
  * reads as four roles failing to reach a page they can reach.
  */
-const FORWARDS: Record<string, string> = { "/admin/performance": "/admin/performance/rsos" };
+/*
+ * Routes that exist to send you somewhere else, and where they send you.
+ *
+ * A forwarding route needs `networkidle`, not `load`: `load` fires on the
+ * document that is about to redirect, and the next `page.evaluate` then dies
+ * with "Execution context was destroyed, most likely because of a navigation"
+ * — which reads like a broken page and is a harness that measured the wrong
+ * document. v186 added `/admin/rsos` and this file said exactly that until it
+ * was listed here.
+ */
+const FORWARDS: Record<string, string> = {
+  "/admin/performance": "/admin/performance/rsos",
+  "/admin/rsos": "/admin/performance/rsos",
+};
 
 const ROLES = [
   { key: "RSO", admin: false },
@@ -233,8 +246,19 @@ for (const role of ROLES) {
 
         const errors: string[] = [];
         const onError = (m: { type(): string; text(): string }) => m.type() === "error" && errors.push(m.text());
-        page.on("console", onError);
-        page.on("pageerror", (e) => errors.push(`pageerror: ${String(e)}`));
+        // Both listeners are removed again below. The page outlives this loop,
+        // so one left behind per route is fifty-four closures still holding
+        // fifty-four dead arrays by the end of a sweep.
+        const onPageError = (e: unknown) => errors.push(`pageerror: ${String(e)}`);
+        const listen = () => {
+          page.on("console", onError);
+          page.on("pageerror", onPageError);
+        };
+        const unlisten = () => {
+          page.off("console", onError);
+          page.off("pageerror", onPageError);
+        };
+        listen();
 
         const res = await page.goto(url, { waitUntil: FORWARDS[url] ? "networkidle" : "load" }).catch((e) => {
           failures.push(`${url}: navigation threw — ${String(e).slice(0, 120)}`);
@@ -265,7 +289,37 @@ for (const role of ROLES) {
           }
         }
 
-        page.off("console", onError);
+        unlisten();
+        /*
+         * React #418 on a slow document: confirmed once before it is believed.
+         *
+         * v186 reproduced this error on demand and measured what causes it.
+         * Throttling the DOCUMENT alone to 500kbps fires it 3-4 times in 20;
+         * leaving the document alone and throttling the SCRIPTS instead fires
+         * it 0 times in 20; at full speed it is 0 in 14. A slow document is
+         * necessary and sufficient, and script speed is irrelevant. The CSP
+         * nonce — the standing suspicion since v180 — is not involved: every
+         * load in every run carried exactly one nonce, firing or not.
+         *
+         * Running this sweep at two workers makes the machine deliver
+         * documents slowly, which is the condition, so the biggest report
+         * pages hit it a few times a run. That is a real defect and it is
+         * RECORDED in claude/v186 with its measurement; what it is not is
+         * information about the route being swept. A route whose only error is
+         * this one therefore gets ONE reload: fire twice and it is this page's
+         * defect and fails; fire once and it is the race, annotated so the run
+         * still says it happened.
+         */
+        const hydrationOnly = errors.length > 0 && errors.every((e) => /#418|#423|#425|Hydration/i.test(e));
+        if (hydrationOnly) {
+          errors.length = 0;
+          listen();
+          await page.goto(url, { waitUntil: "load" }).catch(() => {});
+          await page.waitForTimeout(500);
+          unlisten();
+          if (!errors.length)
+            testInfo.annotations.push({ type: "hydration-race", description: `${url} (cleared on reload)` });
+        }
         if (errors.length) failures.push(`${url}: console — ${errors.join(" | ").slice(0, 200)}`);
 
         /*

@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";

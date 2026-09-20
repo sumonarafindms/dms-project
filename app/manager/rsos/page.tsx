@@ -4,7 +4,7 @@ import { normalizeMonth } from "../../../lib/drilldown";
 import { managerScope } from "../../../lib/manager-scope";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
 import { EntityGrid } from "../../components/EntityGrid";
-import { ACHIEVEMENT_ON_TRACK_PERCENT, targetPercent as pct } from "../../../lib/achievement";
+import { splitByTarget, targetPercent as pct } from "../../../lib/achievement";
 
 // A plain description, not comparators: functions cannot cross the
 // Server-to-Client boundary.
@@ -27,18 +27,23 @@ export default async function Page({
     month = normalizeMonth(s.from?.slice(0, 7) || s.month);
   const all = await employeePerformance(`${month}-01`, scope.employeeIds, s.from, s.to);
   const rows = all;
-  const onTrack = all.filter(
-    (r) => pct(r.totalRechargeAchieved, r.totalRechargeTarget) >= ACHIEVEMENT_ON_TRACK_PERCENT,
-  ).length;
+  // See supervisor/rsos: an RSO with no recharge target is not below one.
+  const split = splitByTarget(
+    all,
+    (r) => r.totalRechargeAchieved,
+    (r) => r.totalRechargeTarget,
+  );
   return (
     <main className="page">
       <PageHeader title="RSO Performance" subtitle="Assigned RSOs compared by target execution." />
       <SummaryStrip
         items={[
           { label: "Active RSOs", value: all.length.toLocaleString("en-US") },
-          { label: "On Track", value: onTrack.toLocaleString("en-US"), tone: "brand" },
-          { label: "Below Target", value: (all.length - onTrack).toLocaleString("en-US"), tone: "amber" },
-          { label: "Showing", value: rows.length.toLocaleString("en-US") },
+          { label: "On Track", value: split.onTrack.toLocaleString("en-US"), tone: "brand" },
+          { label: "Below Target", value: split.behind.toLocaleString("en-US"), tone: "amber" },
+          split.untargeted
+            ? { label: "No Target", value: split.untargeted.toLocaleString("en-US") }
+            : { label: "Showing", value: rows.length.toLocaleString("en-US") },
         ]}
       />
       <EntityGrid
@@ -48,7 +53,7 @@ export default async function Page({
           eyebrow: "RSO",
           name: r.name,
           code: `${r.employeeCode || r.rsoMsisdn} · ${r.supervisor}`,
-          percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
+          percent: r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null,
           metrics: [
             {
               label: "GA",

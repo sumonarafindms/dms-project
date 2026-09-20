@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { requireUser } from "../../lib/auth";
 import { buildLiveGa, dhakaToday, type LiveRow, type LiveSection } from "../../lib/live-ga";
 import { Avatar, Card, TierLine, fmt } from "../components/Kit";

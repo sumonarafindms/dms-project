@@ -344,17 +344,78 @@
   --surface-brand-tint: var(--color-brand-50);
   --text-brand: var(--color-brand-700);
 
-  /* Elevation — warmed to match the neutrals. A blue-black shadow under a
-     warm-grey card is the detail that makes a theme look half-converted. */
-  --shadow-card: 0 1px 2px 0 rgb(92 55 32 / 0.05), 0 1px 3px 0 rgb(92 55 32 / 0.07);
-  --shadow-panel: 0 4px 6px -2px rgb(92 55 32 / 0.07), 0 10px 20px -4px rgb(92 55 32 / 0.1);
-  --shadow-elevated: 0 12px 24px -6px rgb(92 55 32 / 0.16), 0 4px 8px -2px rgb(92 55 32 / 0.09);
+  /*
+   * Elevation — warmed to match the neutrals. A blue-black shadow under a
+   * warm-grey card is the detail that makes a theme look half-converted.
+   *
+   * Each level is TWO shadows, not one, because that is the difference between
+   * a card that looks printed on the page and a card that looks like it is
+   * sitting above it:
+   *
+   *   - a tight, nearly opaque CONTACT shadow, 1-2px, no blur to speak of. It
+   *     is what the eye reads as the edge touching the surface.
+   *   - a wide, faint AMBIENT shadow, offset further than it is blurred, which
+   *     is the light in the room rather than the light on the card.
+   *
+   * One shadow has to be either tight (and then the card floats with no room
+   * light) or wide (and then it has no edge and looks blurry). The previous
+   * scale used two nearly identical tight shadows, which is why every surface
+   * read flat no matter how the radius changed.
+   */
+  --shadow-card: 0 1px 1px -0.5px rgb(92 55 32 / 0.06), 0 3px 8px -2px rgb(92 55 32 / 0.07);
+  --shadow-raised:
+    0 1px 2px -0.5px rgb(92 55 32 / 0.07), 0 6px 16px -4px rgb(92 55 32 / 0.1), 0 14px 32px -12px rgb(92 55 32 / 0.1);
+  --shadow-panel:
+    0 1px 2px -0.5px rgb(92 55 32 / 0.07), 0 8px 20px -6px rgb(92 55 32 / 0.12), 0 18px 40px -14px rgb(92 55 32 / 0.12);
+  --shadow-elevated:
+    0 2px 4px -1px rgb(92 55 32 / 0.1), 0 14px 28px -8px rgb(92 55 32 / 0.16), 0 28px 56px -20px rgb(92 55 32 / 0.16);
   --shadow-sidebar: 4px 0 24px -8px rgb(42 26 20 / 0.4);
 
-  /* Radius scale used across cards, controls, pills */
-  --radius-card: 0.875rem;
+  /*
+   * The hairline around a surface.
+   *
+   * `--color-neutral-200` as a border is a grey line drawn ON the card. A rim
+   * is the card's own edge catching light, so it is the neutral tilted a few
+   * degrees warmer and let through at less than full strength — present enough
+   * to separate two stacked cards, quiet enough that twelve of them in a
+   * column do not read as a grid of boxes. Named so a rule can ask for "the
+   * edge" without picking a step off a scale that is also used for dividers.
+   */
+  --border-hairline: rgb(196 178 165 / 0.55);
+  --border-hairline-strong: rgb(178 155 138 / 0.7);
+
+  /*
+   * The page a card sits on.
+   *
+   * This was `--color-neutral-50` (#fdf9f6), which is 1.6% darker than the
+   * white of a card — so a card had no ground to be raised above, and every
+   * screen read as one flat sheet with lines drawn on it. #f4eee8 is enough
+   * separation to see the edge of a surface without the page starting to look
+   * grey.
+   *
+   * The value is chosen against the text that sits DIRECTLY on it, not by eye:
+   * muted text measures 4.81:1 here, "near target" amber 4.76:1 and "achieved"
+   * green 4.76:1, all clear of AA's 4.5. `tests/contrast.smoke.test.ts`
+   * computes those rather than trusting this note, and it reads this token, so
+   * darkening the page any further fails the suite rather than the user.
+   */
+  --surface-page: #f4eee8;
+
+  /*
+   * Radius scale used across cards, controls, pills.
+   *
+   * Nested radii are not the same number: a control inside a card wants a
+   * smaller one, or its corner reads as fighting the card's. The step between
+   * them is roughly the padding, which is the rule that makes nesting look
+   * drawn rather than assembled.
+   */
+  --radius-card: 1rem;
+  --radius-card-lg: 1.25rem;
   --radius-control: 0.625rem;
   --radius-pill: 999px;
 
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A shorter, flatter curve for things that must feel instant — a pressed
+     button, a focus ring. The premium ease is for things that MOVE. */
+  --ease-snappy: cubic-bezier(0.32, 0.72, 0, 1);
 }

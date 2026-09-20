@@ -6,7 +6,7 @@
  * reason the date range does — a grouped view should be a shareable link.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../../components/AppLink";
 import { rangeLabel, rangeQuery } from "../../../lib/report-range";
 import type { ReportRange } from "../../../lib/report-range";
 import { PageHeader, SummaryStrip } from "../../components/Kit";

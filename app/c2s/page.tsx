@@ -8,6 +8,7 @@ import {
   OpsMetric,
   OpsDataCard,
   OpsTable,
+  OpsLevelTabs,
   PersonCell,
   ProgressCell,
   EmptyState,
@@ -18,12 +19,14 @@ import { Btn } from "../components/Kit";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { apiFetch, apiUpload } from "@/lib/api-client";
 import { fmtDate, fmtDateTime } from "../../lib/format";
+import { groupOps, groupOpsBySupervisor, opsCountLabel, type OpsLevel } from "../../lib/ops-rollup";
 
 type Row = {
   employeeId: string;
   employeeCode?: string | null;
   name: string;
   rsoMsisdn: string;
+  supervisorId: string;
   supervisor: string;
   retailerCount: number;
   transactionCount: number;
@@ -36,8 +39,10 @@ type Row = {
 type DailyRow = {
   retailerCode: string;
   retailerName: string;
+  employeeId: string;
   employee: string;
   rsoMsisdn: string;
+  supervisorId: string;
   supervisor: string;
   amount: number;
 };
@@ -68,6 +73,16 @@ type History = {
 function todayYmd() {
   return dhakaTodayYmd();
 }
+/*
+ * Declared at module scope, not inside the component.
+ *
+ * A `const [...] as const` written in the body is a NEW array on every
+ * render, so a `useMemo` that depends on it memoises nothing and eslint
+ * says so. These are constants; this is where a constant lives.
+ */
+const DAY_FIELDS = ["amount"] as const;
+const MONTH_FIELDS = ["retailerCount", "transactionCount", "c2sAmount", "lsoTarget", "lsoAchieved"] as const;
+
 function money(n: number) {
   return new Intl.NumberFormat("en-BD", { maximumFractionDigits: 2 }).format(n);
 }
@@ -81,6 +96,9 @@ export default function C2sPage() {
   const [toDate, setToDate] = useState(() => todayYmd());
   const [rows, setRows] = useState<Row[]>([]);
   const [dailyRows, setDailyRows] = useState<DailyRow[]>([]);
+  /* Two switches, two periods — see app/ga/page.tsx. */
+  const [monthLevel, setMonthLevel] = useState<OpsLevel>("rso");
+  const [dayLevel, setDayLevel] = useState<OpsLevel>("retailer");
   const [history, setHistory] = useState<History[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -150,6 +168,18 @@ export default function C2sPage() {
     [rows],
   );
   const dayTotal = useMemo(() => dailyRows.reduce((s, r) => s + r.amount, 0), [dailyRows]);
+  const dayByRso = useMemo(
+    () =>
+      groupOps(
+        dailyRows,
+        (r) => ({ key: r.employeeId, name: r.employee, sub: r.rsoMsisdn }),
+        DAY_FIELDS,
+        (r, f) => r[f],
+      ),
+    [dailyRows],
+  );
+  const dayBySupervisor = useMemo(() => groupOpsBySupervisor(dailyRows, DAY_FIELDS, (r, f) => r[f]), [dailyRows]);
+  const monthBySupervisor = useMemo(() => groupOpsBySupervisor(rows, MONTH_FIELDS, (r, f) => r[f]), [rows]);
   if (!canView) return null;
   return (
     <main className="page">
@@ -222,11 +252,78 @@ export default function C2sPage() {
       </section>
 
       <OpsDataCard
-        title="RSO LSO Performance"
-        subtitle="Employee-level C2S sales and LSO completion."
-        count={`${rows.length} employees`}
+        title="LSO Performance"
+        subtitle={
+          monthLevel === "rso"
+            ? "Employee-level C2S sales and LSO completion."
+            : "The same period, with each supervisor's RSOs added together."
+        }
+        count={
+          monthLevel === "rso"
+            ? opsCountLabel(rows.length, "RSO")
+            : opsCountLabel(monthBySupervisor.length, "supervisor")
+        }
+        tabs={
+          <OpsLevelTabs
+            value={monthLevel}
+            onChange={setMonthLevel}
+            levels={["rso", "supervisor"]}
+            counts={{ rso: rows.length, supervisor: monthBySupervisor.length }}
+          />
+        }
       >
-        {rows.length ? (
+        {monthLevel === "supervisor" && monthBySupervisor.length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>Supervisor</th>
+                <th>RSOs</th>
+                <th>Retailers</th>
+                <th>Transactions</th>
+                <th>C2S Amount</th>
+                <th>LSO Target</th>
+                <th>LSO Achieved</th>
+                <th>LSO Progress</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthBySupervisor.map((g) => (
+                <tr key={g.key}>
+                  <td>
+                    <PersonCell name={g.name} sub="Supervisor" />
+                  </td>
+                  <td>
+                    <span className="kit-count-pill">{g.count}</span>
+                  </td>
+                  <td>
+                    <span className="kit-count-pill">{g.totals.retailerCount.toLocaleString("en-US")}</span>
+                  </td>
+                  <td>{g.totals.transactionCount.toLocaleString("en-US")}</td>
+                  <td>
+                    <strong className="kit-num">৳{money(g.totals.c2sAmount)}</strong>
+                  </td>
+                  <td>{g.totals.lsoTarget.toLocaleString("en-US")}</td>
+                  <td>
+                    <strong className="kit-num">{g.totals.lsoAchieved.toLocaleString("en-US")}</strong>
+                  </td>
+                  <td>
+                    {/* From the summed pair, not the mean of the RSOs' own
+                        percentages — those are only equal when every target
+                        is. */}
+                    <ProgressCell
+                      target={g.totals.lsoTarget}
+                      value={
+                        g.totals.lsoTarget ? Number(((g.totals.lsoAchieved / g.totals.lsoTarget) * 100).toFixed(1)) : 0
+                      }
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : null}
+
+        {monthLevel === "rso" && rows.length ? (
           <OpsTable>
             <thead>
               <tr>
@@ -261,13 +358,15 @@ export default function C2sPage() {
                     <strong className="kit-num">{r.lsoAchieved}</strong>
                   </td>
                   <td>
-                    <ProgressCell value={r.lsoPercent} />
+                    <ProgressCell value={r.lsoPercent} target={r.lsoTarget} />
                   </td>
                 </tr>
               ))}
             </tbody>
           </OpsTable>
-        ) : (
+        ) : null}
+
+        {rows.length ? null : (
           <EmptyState title="No C2S performance yet" subtitle="Upload C2S data to populate employee LSO performance." />
         )}
       </OpsDataCard>
@@ -301,11 +400,57 @@ export default function C2sPage() {
       </section>
 
       <OpsDataCard
-        title="Retailer C2S Sales"
-        subtitle="Retailer-level sales for the selected date."
-        count={`${dailyRows.length} retailers`}
+        title="C2S on this date"
+        subtitle={
+          dayLevel === "retailer"
+            ? "Retailer-level sales for the selected date."
+            : dayLevel === "rso"
+              ? "The same date's sales added up under the RSO who owns each outlet."
+              : "The same date's sales added up under each supervisor."
+        }
+        count={
+          dayLevel === "retailer"
+            ? opsCountLabel(dailyRows.length, "retailer")
+            : dayLevel === "rso"
+              ? opsCountLabel(dayByRso.length, "RSO")
+              : opsCountLabel(dayBySupervisor.length, "supervisor")
+        }
+        tabs={
+          <OpsLevelTabs
+            value={dayLevel}
+            onChange={setDayLevel}
+            counts={{ retailer: dailyRows.length, rso: dayByRso.length, supervisor: dayBySupervisor.length }}
+          />
+        }
       >
-        {dailyRows.length ? (
+        {dayLevel !== "retailer" && (dayLevel === "rso" ? dayByRso : dayBySupervisor).length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>{dayLevel === "rso" ? "RSO" : "Supervisor"}</th>
+                <th>Retailers</th>
+                <th>Sales Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(dayLevel === "rso" ? dayByRso : dayBySupervisor).map((g) => (
+                <tr key={g.key}>
+                  <td>
+                    <PersonCell name={g.name} sub={dayLevel === "rso" ? g.sub : "Supervisor"} />
+                  </td>
+                  <td>
+                    <span className="kit-count-pill">{g.count}</span>
+                  </td>
+                  <td>
+                    <strong className="kit-num">৳{money(g.totals.amount)}</strong>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : null}
+
+        {dayLevel === "retailer" && dailyRows.length ? (
           <OpsTable>
             <thead>
               <tr>
@@ -335,7 +480,9 @@ export default function C2sPage() {
               ))}
             </tbody>
           </OpsTable>
-        ) : (
+        ) : null}
+
+        {dailyRows.length ? null : (
           <EmptyState title="No sales on this date" subtitle={`No C2S sales stored for ${date}.`} />
         )}
       </OpsDataCard>

@@ -13,7 +13,7 @@ import { supervisorTargets } from "../../../../../lib/supervisor-target-query";
 import { assignmentGaTarget, assignmentWindow } from "../../../../../lib/bp-period";
 import { notFound } from "next/navigation";
 import { EntityGrid } from "../../../../components/EntityGrid";
-import Link from "next/link";
+import { AppLink as Link } from "../../../../components/AppLink";
 import { Card, EmptyState, KpiCard, PageHeader, Row, SectionHead, SummaryStrip } from "../../../../components/Kit";
 import { addTiers, noTiers, type GaTiers } from "../../../../../lib/ga-category";
 import { Icon } from "../../../../components/icons";
@@ -148,7 +148,7 @@ export default async function Page({
           eyebrow: "RSO",
           name: r.name,
           code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount.toLocaleString("en-US")} retailers`,
-          percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
+          percent: r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null,
           metrics: [
             { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
             { label: "SSO", achieved: r.ssoAchieved, target: r.ssoTarget },
@@ -181,7 +181,11 @@ export default async function Page({
                 icon={<Icon name="sim" />}
                 title={bpDisplayName(b.retailer)}
                 sub={`${b.retailer.retailerCode} · RSO ${b.employee.name}`}
-                value={`${b.achieved}/${b.target}`}
+                // `achieved` is a GaTiers object, not a number — v177 changed
+                // it when the 170/300 split arrived, and this line kept
+                // interpolating the object, so every row read "[object
+                // Object]/25". The total is the figure this row is about.
+                value={`${b.achieved.total.toLocaleString("en-US")}/${b.target.toLocaleString("en-US")}`}
                 valueSub="BP GA"
               />
             ))}

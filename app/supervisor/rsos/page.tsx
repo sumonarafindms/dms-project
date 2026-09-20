@@ -4,7 +4,7 @@ import { employeePerformance } from "../../../lib/performance";
 import { normalizeMonth } from "../../../lib/drilldown";
 import { PageHeader, SummaryStrip } from "../../components/Kit";
 import { EntityGrid } from "../../components/EntityGrid";
-import { ACHIEVEMENT_ON_TRACK_PERCENT, targetPercent as pct } from "../../../lib/achievement";
+import { splitByTarget, targetPercent as pct } from "../../../lib/achievement";
 
 // A plain description, not comparators: functions cannot cross the
 // Server-to-Client boundary.
@@ -35,9 +35,14 @@ export default async function Page({
       s.to,
     ),
     rows = all;
-  const strong = all.filter(
-    (r) => pct(r.totalRechargeAchieved, r.totalRechargeTarget) >= ACHIEVEMENT_ON_TRACK_PERCENT,
-  ).length;
+  // Three buckets, not two: an RSO with no recharge target is not behind one.
+  // Counting them as "Below Target" is what made this strip read "7" while
+  // every card below it said "No target".
+  const split = splitByTarget(
+    all,
+    (r) => r.totalRechargeAchieved,
+    (r) => r.totalRechargeTarget,
+  );
   return (
     <main className="page">
       <PageHeader
@@ -47,9 +52,11 @@ export default async function Page({
       <SummaryStrip
         items={[
           { label: "Active RSOs", value: all.length.toLocaleString("en-US") },
-          { label: "On Track", value: strong.toLocaleString("en-US"), tone: "brand" },
-          { label: "Below Target", value: (all.length - strong).toLocaleString("en-US"), tone: "amber" },
-          { label: "Showing", value: rows.length.toLocaleString("en-US") },
+          { label: "On Track", value: split.onTrack.toLocaleString("en-US"), tone: "brand" },
+          { label: "Below Target", value: split.behind.toLocaleString("en-US"), tone: "amber" },
+          split.untargeted
+            ? { label: "No Target", value: split.untargeted.toLocaleString("en-US") }
+            : { label: "Showing", value: rows.length.toLocaleString("en-US") },
         ]}
       />
       <EntityGrid
@@ -59,7 +66,7 @@ export default async function Page({
           eyebrow: "RSO",
           name: r.name,
           code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount} retailers`,
-          percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
+          percent: r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null,
           metrics: [
             {
               label: "GA",

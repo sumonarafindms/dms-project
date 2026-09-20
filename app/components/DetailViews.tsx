@@ -11,7 +11,7 @@
  * same rule).
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { Icon } from "./icons";
 import { Badge, Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";
 import { GA_CATEGORY_LABEL } from "../../lib/business-rules";

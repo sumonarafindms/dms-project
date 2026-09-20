@@ -6,7 +6,7 @@
   .app-root {
     display: flex;
     min-height: 100dvh;
-    background: var(--color-neutral-50);
+    background: var(--surface-page);
   }
 
   .app-main {

@@ -7,7 +7,7 @@
  * activation and must never inflate an activation figure.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../../../components/AppLink";
 import { requireUser } from "../../../../lib/auth";
 import { rangeLabel, resolveRange, rangeQuery } from "../../../../lib/report-range";
 import type { ActivationRow } from "../../../../lib/report-data";

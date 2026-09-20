@@ -19,7 +19,7 @@
  * an empty page is worse than no shortcut.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../../components/AppLink";
 import { requireUser } from "../../../lib/auth";
 import { resolveRange, rangeQuery } from "../../../lib/report-range";
 import { rangeTotals } from "../../../lib/report-data";

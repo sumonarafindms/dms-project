@@ -30,28 +30,53 @@
   /* ==================================================================
      1. Surfaces
      ================================================================== */
+  /*
+   * The surface everything in this app sits on.
+   *
+   * Three things changed in v183 and each is doing a job:
+   *
+   *   - the radius comes from `--radius-card` instead of a hardcoded 0.75rem,
+   *     so the scale in tokens.css is the scale, not a suggestion;
+   *   - the edge is `--border-hairline`, a translucent warm rim rather than a
+   *     flat grey line, because a column of twelve cards drawn with a solid
+   *     border reads as a table of boxes;
+   *   - it carries `--shadow-card`. A card with an edge and no shadow is a
+   *     rectangle; the contact shadow is the whole difference between a drawn
+   *     box and a surface above the page.
+   */
   .kit-card {
     background: #fff;
-    border: 1px solid var(--color-neutral-200);
-    border-radius: 0.75rem;
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
   }
   .kit-card.is-clickable {
     cursor: pointer;
     transition:
-      border-color 0.15s var(--ease-premium),
-      box-shadow 0.15s var(--ease-premium),
-      transform 0.15s var(--ease-premium);
+      border-color 0.18s var(--ease-premium),
+      box-shadow 0.18s var(--ease-premium),
+      transform 0.18s var(--ease-premium);
   }
   .kit-card.is-clickable:hover {
     border-color: var(--color-brand-300);
-    box-shadow: var(--shadow-panel);
+    box-shadow: var(--shadow-raised);
+  }
+  /* Pressing has to answer, on a phone as much as under a mouse: the card
+     settles back onto the page for as long as the finger is down. */
+  .kit-card.is-clickable:active {
+    box-shadow: var(--shadow-card);
+    transform: scale(0.995);
   }
   /* Hover lift is a pointer affordance; a touch device has no hover state to
      leave, so it would stick after a tap. */
   @media (hover: hover) and (pointer: fine) {
     .kit-card.is-clickable:hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
     }
+  }
+  /* A card that is only a container for other cards should not be a card. */
+  .kit-card.is-flat {
+    box-shadow: none;
   }
   .kit-card-p {
     padding: 1rem;
@@ -298,32 +323,59 @@
   /* ==================================================================
      6. Buttons
      ================================================================== */
+  /*
+   * A button is a slab, not a line of text with a background.
+   *
+   * `min-height` rather than padding alone: padding sizes a button to its
+   * label, so "Save" and "Download the whole report" came out different
+   * heights on the same row, and a one-word button on a phone was a 26px
+   * target. A floor of 2.25rem (36px) makes every button the same slab and
+   * clears WCAG 2.5.8's 24px with room for a thumb that is not precise.
+   *
+   * The weight went 500 -> 600 and the tracking slightly negative. At 14px a
+   * medium label on a coloured fill reads thin and slightly loose; this is the
+   * one change that most makes the control look deliberate rather than
+   * default.
+   */
   .kit-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
+    gap: 0.4375rem;
+    min-height: 2.25rem;
     border: 1px solid transparent;
     border-radius: var(--radius-control);
-    padding: 0.5rem 0.875rem;
+    padding: 0.5rem 0.9375rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: -0.006em;
+    line-height: 1.2;
     cursor: pointer;
     transition:
-      background-color 0.15s var(--ease-premium),
-      box-shadow 0.15s var(--ease-premium),
-      transform 0.08s var(--ease-premium);
+      background-color 0.16s var(--ease-snappy),
+      border-color 0.16s var(--ease-snappy),
+      box-shadow 0.16s var(--ease-snappy),
+      transform 0.08s var(--ease-snappy);
+  }
+  /* One focus ring for every button in the app, drawn OUTSIDE the button so a
+     ring on a primary fill is still visible against the fill. */
+  .kit-btn:focus-visible {
+    outline: 2px solid var(--color-brand-700);
+    outline-offset: 2px;
   }
   .kit-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
   .kit-btn.size-sm {
-    padding: 0.375rem 0.625rem;
+    min-height: 2rem;
+    padding: 0.375rem 0.6875rem;
     font-size: 0.75rem;
   }
   .kit-btn.size-lg {
-    padding: 0.625rem 1rem;
+    min-height: 2.75rem;
+    padding: 0.6875rem 1.125rem;
+    font-size: 0.9375rem;
   }
   /* The mark, as a gradient, dark enough to read.
      --grad-brand-strong runs brand-700 -> brand-600, so its LIGHTEST stop is
@@ -353,26 +405,44 @@
     background-image: var(--grad-brand-hover);
     transform: translateY(1px);
   }
+  /* The secondary is a real surface — hairline rim and contact shadow, the
+     same two things that make a card a card — not an outline. Next to a
+     gradient primary, an outlined button reads as disabled. */
   .kit-btn.is-secondary {
     background: #fff;
     color: var(--color-neutral-700);
-    border-color: var(--color-neutral-300);
+    border-color: var(--border-hairline-strong);
+    box-shadow: var(--shadow-card);
   }
   .kit-btn.is-secondary:hover:not(:disabled) {
     background: var(--color-neutral-50);
+    border-color: var(--color-brand-300);
+    color: var(--color-neutral-800);
+  }
+  .kit-btn.is-secondary:active:not(:disabled) {
+    box-shadow: none;
+    transform: translateY(1px);
   }
   .kit-btn.is-ghost {
     color: var(--color-neutral-600);
   }
   .kit-btn.is-ghost:hover:not(:disabled) {
-    background: var(--color-neutral-100);
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
   }
   .kit-btn.is-danger {
     background: var(--color-rose-600);
     color: #fff;
+    box-shadow:
+      0 1px 2px rgb(136 19 55 / 0.25),
+      inset 0 1px 0 rgb(255 255 255 / 0.16);
   }
   .kit-btn.is-danger:hover:not(:disabled) {
     background: var(--color-rose-700);
+    box-shadow: 0 6px 16px -6px rgb(190 18 60 / 0.55);
+  }
+  .kit-btn.is-danger:active:not(:disabled) {
+    transform: translateY(1px);
   }
   .kit-btn.is-block {
     width: 100%;
@@ -389,10 +459,17 @@
     background: transparent;
     color: var(--color-neutral-500);
     cursor: pointer;
+    transition:
+      background-color 0.16s var(--ease-snappy),
+      color 0.16s var(--ease-snappy);
   }
   .kit-icon-btn:hover {
-    background: var(--color-neutral-100);
-    color: var(--color-neutral-700);
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
+  }
+  .kit-icon-btn:focus-visible {
+    outline: 2px solid var(--color-brand-700);
+    outline-offset: 2px;
   }
 
   /* ==================================================================
@@ -609,6 +686,28 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
+  }
+  /* A grid whose cards hold one figure each rather than a whole entity. Those
+     tile two to a phone row; an entity card — name, code, four metric bars —
+     does not, which is why this is opt-in rather than the default.
+
+     The wider steps are repeated rather than inherited: `.kit-card-grid.is-compact`
+     outranks `.kit-card-grid` on specificity, so the plain grid's media queries
+     never reach it and three cards would have sat 2 + 1 on a 1440px screen. */
+  .kit-card-grid.is-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  @media (max-width: 359px) {
+    .kit-card-grid.is-compact {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (min-width: 640px) {
+    .kit-card-grid.is-compact {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
   }
   @media (min-width: 640px) {
     .kit-card-grid {
@@ -1385,14 +1484,27 @@
      for the value, which is not enough for a taka figure at full size; one-up
      gives it the whole card and every KPI keeps its 1.25rem. From 480px the
      demo's 2-up composition returns. */
+  /*
+   * Two per row on a phone.
+   *
+   * This grid was one column below 480px because the old card put the figure
+   * and the ring side by side and a currency figure would not fit beside a
+   * ring in half a 390px screen. The card now stacks them (see KpiCard), so
+   * the constraint is gone — and with it the reason an RSO's home page was
+   * 2,636px tall with five identical cards stacked down it.
+   *
+   * 360px is the floor this app designs to (`w320` is in the suite, and at
+   * that width two cards would be 140px each, which is still a readable
+   * figure at 1.375rem). Below it, one column.
+   */
   .kit-kpi-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
-  @media (min-width: 480px) {
+  @media (max-width: 359px) {
     .kit-kpi-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
     }
   }
   @media (min-width: 640px) {
@@ -1405,42 +1517,46 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
-  .kit-kpi-top {
+  /* The label and the ring. The ring never shrinks — it is a fixed 36px and
+     the label wraps around it. */
+  .kit-kpi-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.5rem;
+    min-height: 2.25rem;
   }
-  /* The text column is named, not "any div child": the Ring is also a direct
-     div child here, so `.kit-kpi-top > div > span` claimed the ring's own
-     percentage label and blockified it out of its centring flexbox. */
-  .kit-kpi-meta {
+  .kit-kpi-head > .kit-label {
     min-width: 0;
   }
-  /* The value shares one flex row with the ring. A long currency figure
-     (৳12,480,900) is a single unbreakable token: at 1.25rem it measured 131px
-     inside a 92px box on a 390px screen and painted straight over the ring.
-     The room comes from the grid (a KPI card is one big number, so shrinking
-     the number to fit two per row defeats the card) — see .kit-kpi-grid. The
-     ellipsis here is only the backstop for a figure longer than any real one;
-     it truncates visibly instead of sitting on top of the ring. */
-  .kit-kpi-top strong {
+  /*
+   * The figure, with the whole card to itself.
+   *
+   * `overflow-wrap: anywhere` rather than an ellipsis: ৳12,480,900 truncated
+   * to "৳12,480…" is a wrong number printed confidently, which is the one
+   * thing this app is not allowed to do. It wraps instead.
+   */
+  .kit-kpi-value {
     display: block;
-    margin-top: 0.25rem;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: 1.25rem;
+    margin-top: 0.125rem;
+    font-size: 1.375rem;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
     font-variant-numeric: tabular-nums;
     color: var(--color-neutral-900);
   }
-  .kit-kpi-meta > span:last-child {
+  @media (min-width: 640px) {
+    .kit-kpi-value {
+      font-size: 1.5rem;
+    }
+  }
+  .kit-kpi-of {
     display: block;
-    margin-top: 0.125rem;
+    margin-top: 0.1875rem;
     font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
     color: var(--text-muted);
   }
   .kit-kpi-foot {
@@ -1458,12 +1574,48 @@
      entity card, the BP's hero ring — so the same sentence reads the same size
      and weight wherever the owner asked for it, and a new GA block gets it
      right by using the class rather than by remembering the rule. */
+  /* Two figures, not a sentence — so a narrow card wraps between them rather
+     than through the middle of one. */
   .kit-tier-line {
-    margin-top: 0.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.1875rem 0.625rem;
+    margin-top: 0.3125rem;
     font-size: 0.6875rem;
     font-weight: 500;
     color: var(--text-muted);
     letter-spacing: 0.01em;
+  }
+  .kit-tier-line > span {
+    white-space: nowrap;
+  }
+  /* Where a Ring would be, when there is no target to draw one from. Same
+     footprint, so a column of cards does not jump about when one row has a
+     target and the next does not. */
+  .kit-ring-empty {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 54px;
+    height: 54px;
+    border: 2px dashed var(--border-hairline-strong);
+    border-radius: var(--radius-pill);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1;
+  }
+  /* "No target" where a percentage would be. Deliberately not a band colour:
+     it is not achievement of any kind, good or bad. */
+  .kit-metric-value em.is-unset {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .kit-tier-line b {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-neutral-700);
   }
   /* Inside a hero ring's figure stack the line is centred with its figure. */
   .kit-hero-figures .kit-tier-line {
@@ -1620,12 +1772,30 @@
 @layer components {
   /* Search + date range on one line, wrapping on narrow screens. Wraps
      LiveFilterForm, which debounces typing and submits date changes at once. */
+  /*
+   * The controls above a list, on a surface of their own.
+   *
+   * They used to float loose on the page — a search box, two date inputs, a
+   * submit button and a select, all at different heights with nothing holding
+   * them together, which on a phone read as five unrelated widgets stacked
+   * down the screen before the list even started. Grouping them on one panel
+   * is the single change that most makes a list screen look composed: it says
+   * "these four things are one job" without a word of explanation.
+   *
+   * Tinted rather than white, because it sits ABOVE white cards and a white
+   * panel on a white card is an outline, not a surface.
+   */
   .kit-filter-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 0.75rem;
     margin-bottom: 1rem;
+    padding: 0.875rem;
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-card);
+    background: linear-gradient(180deg, #fff 0%, var(--color-neutral-50) 100%);
+    box-shadow: var(--shadow-card);
   }
   .kit-filter-bar > .kit-search {
     flex: 1 1 16rem;
@@ -1682,6 +1852,19 @@
     padding-bottom: 0.5rem;
     font-size: 0.6875rem;
     color: var(--text-muted);
+  }
+  /* Still announced, no longer drawn — the caller prints the same count, with
+     more in it, immediately below. Clipped rather than `display: none`, which
+     would take it out of the accessibility tree along with its aria-live. */
+  .kit-filter-note.is-announce-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
@@ -1753,6 +1936,58 @@
 
   /* A field whose value cannot be edited here — shown in place of the control
      so the form does not silently lose the row. */
+  /*
+   * "Which record am I editing?", answered above the fields.
+   *
+   * A definition list rather than a row of cards: these are facts about one
+   * thing, and each needs its label read with it. Two columns on a phone, four
+   * on a desk, so a BP's retailer / RSO / supervisor / dates fit one band.
+   */
+  /* "No target" where a progress bar would be, in an operator table. Not a
+     band colour: a target nobody set is neither good news nor bad. */
+  .kit-cell-unset {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .kit-identity {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.875rem 1.25rem;
+    margin: 0;
+  }
+  @media (min-width: 720px) {
+    .kit-identity {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .kit-identity > div {
+    min-width: 0;
+  }
+  .kit-identity dt {
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+  .kit-identity dd {
+    margin: 0.1875rem 0 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    color: var(--color-neutral-900);
+  }
+  .kit-identity dd > small {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
   .kit-readonly {
     padding: 0.5rem 0.75rem;
     border: 1px dashed var(--color-neutral-300);
@@ -2674,6 +2909,82 @@
   }
 
   /* Metrics row on an import workspace: 2 up on a phone, 3 then 4 wider. */
+  /* ==================================================================
+     Import workspace — the Retailer / RSO / Supervisor level switch
+     ================================================================== */
+
+  /*
+   * A segmented control, not a row of buttons.
+   *
+   * The three tabs are one choice over one feed, so they share a track and
+   * only the chosen one is filled. Given its own classes rather than reusing
+   * `.kit-btn`, because a button says "this does something" and a tab says
+   * "you are here" — and because three `.kit-btn.is-secondary` in a row next
+   * to a gradient primary is exactly the pile of grey the v183 pass set out
+   * to stop.
+   */
+  .ops-level-tabs {
+    display: inline-flex;
+    gap: 0.25rem;
+    margin-bottom: 0.875rem;
+    padding: 0.25rem;
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-pill);
+    background: var(--color-neutral-100);
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ops-level-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .ops-level-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex: 0 0 auto;
+    min-height: 2rem;
+    padding: 0.375rem 0.875rem;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-neutral-600);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: -0.006em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background-color 0.16s var(--ease-snappy),
+      color 0.16s var(--ease-snappy),
+      box-shadow 0.16s var(--ease-snappy);
+  }
+  .ops-level-tab:hover:not(.is-active) {
+    color: var(--color-neutral-800);
+    background: rgb(255 255 255 / 0.7);
+  }
+  .ops-level-tab:focus-visible {
+    outline: 2px solid var(--color-brand-700);
+    outline-offset: 2px;
+  }
+  .ops-level-tab.is-active {
+    background: #fff;
+    color: var(--color-brand-700);
+    box-shadow: var(--shadow-card);
+  }
+  /* The row count riding on the tab. Tabular so the three tabs do not jiggle
+     as the counts change with the date range. */
+  .ops-level-tab > em {
+    font-style: normal;
+    font-weight: 600;
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+  .ops-level-tab.is-active > em {
+    color: var(--color-brand-700);
+  }
+
   .kit-metrics-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

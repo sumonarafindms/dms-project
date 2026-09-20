@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
         where: { active: true },
         orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
         include: {
-          supervisor: { select: { name: true } },
+          supervisor: { select: { id: true, name: true } },
           _count: { select: { retailers: true } },
           targets: { where: { month: { gte: targetStart, lt: targetEnd } } },
         },
@@ -117,9 +117,10 @@ export async function GET(req: NextRequest) {
                   employeeId: true,
                   employee: {
                     select: {
+                      id: true,
                       name: true,
                       rsoMsisdn: true,
-                      supervisor: { select: { name: true } },
+                      supervisor: { select: { id: true, name: true } },
                     },
                   },
                 },
@@ -204,6 +205,7 @@ export async function GET(req: NextRequest) {
         employeeCode: employee.employeeCode,
         name: employee.name,
         rsoMsisdn: employee.rsoMsisdn,
+        supervisorId: employee.supervisor?.id ?? "unassigned",
         supervisor: employee.supervisor?.name ?? "Unassigned",
         retailerCount: employee._count.retailers,
         ga170: ga.ga170,
@@ -217,11 +219,19 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    /*
+     * The ids ride along with the names so the page can roll these rows up to
+     * an RSO and a supervisor without grouping on a name — two supervisors can
+     * share one, and a name-keyed roll-up merges their teams in silence (the
+     * defect v181 found in the Reporting Center).
+     */
     type DailyRetailerRow = ReturnType<typeof emptyGaBreakdown> & {
       retailerCode: string;
       retailerName: string;
+      employeeId: string;
       employee: string;
       rsoMsisdn: string;
+      supervisorId: string;
       supervisor: string;
     };
     const dailyMap = new Map<string, DailyRetailerRow>();
@@ -231,8 +241,10 @@ export async function GET(req: NextRequest) {
       const current: DailyRetailerRow = dailyMap.get(activation.retailerId) || {
         retailerCode: info.retailerCode,
         retailerName: info.retailerName || "",
+        employeeId: info.employee?.id || "unassigned",
         employee: info.employee?.name || "Unassigned",
         rsoMsisdn: info.employee?.rsoMsisdn || "",
+        supervisorId: info.employee?.supervisor?.id || "unassigned",
         supervisor: info.employee?.supervisor?.name || "Unassigned",
         ...emptyGaBreakdown(),
       };

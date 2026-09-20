@@ -173,7 +173,12 @@ describe("a missing target is not a target of zero", () => {
   });
 
   it("says the target is missing in words", () => {
-    expect(CARD).toContain("No target set");
+    // v183 folded the card's two sentences into one — it used to print "No
+    // target set" and then "Ask Admin to upload this month's target." on the
+    // line below, and an RSO's home renders five of these. Both facts still
+    // reach the reader; the assertion is that BOTH still do.
+    expect(CARD).toContain("No target");
+    expect(CARD).toContain("ask Admin");
   });
 
   it("does not print a remaining figure it cannot compute", () => {
@@ -184,8 +189,106 @@ describe("a missing target is not a target of zero", () => {
   });
 
   it("still shows what was achieved, because that part is real", () => {
-    const meta = CARD.slice(CARD.indexOf('className="kit-kpi-meta"'), CARD.indexOf("</div>"));
-    expect(meta).toContain("fmt(Math.round(achieved))");
+    // The figure moved out of `.kit-kpi-meta` and onto a line of its own in
+    // v183 (so two cards fit a phone row); it is still printed, and it is
+    // still printed OUTSIDE the hasTarget branch, which is the part that
+    // matters.
+    const value = CARD.slice(CARD.indexOf('className="kit-kpi-value"'), CARD.indexOf('className="kit-kpi-of"'));
+    expect(value).toContain("fmt(Math.round(achieved))");
+    expect(CARD.indexOf('className="kit-kpi-value"')).toBeLessThan(CARD.indexOf("hasTarget ? ("));
+  });
+
+  /* ---------------------------------------------------------------- *
+   * v183: the same ruling, applied to the cards that had not had it
+   * ---------------------------------------------------------------- */
+
+  it("an entity card draws no ring and no band when there is no target", () => {
+    const entity = KIT.slice(KIT.indexOf("export function EntityCard"), KIT.indexOf("export function DropZone"));
+    // A supervisor's RSO list showed seven red "Behind Target" badges and
+    // seven 0% rings for a month whose recharge target nobody had uploaded.
+    expect(entity).toContain("percent: number | null");
+    expect(entity).toContain("percent === null");
+    expect(entity).toContain("kit-ring-empty");
+  });
+
+  it("the status badge names the missing target instead of a band", () => {
+    const badge = KIT.slice(KIT.indexOf("export function StatusBadge"), KIT.indexOf("type BtnVariant"));
+    expect(badge).toContain("percent: number | null");
+    expect(badge).toContain('if (percent === null) return <Badge tone="neutral">No target</Badge>');
+  });
+
+  it("a metric bar prints no bar and no percentage against a target of zero", () => {
+    const bar = KIT.slice(KIT.indexOf("export function MetricBar"), KIT.indexOf("export function ProgressLine"));
+    expect(bar).toContain("const hasTarget = target > 0");
+    expect(bar).toMatch(/\{hasTarget && <Bar value=\{p\} \/>\}/);
+    expect(bar).toContain('<em className="is-unset">No target</em>');
+    // The achievement is real and stays.
+    expect(bar).toContain("fmt(Math.round(achieved))");
+  });
+
+  it("no page passes a raw percentage where a missing target is possible", () => {
+    /*
+     * Every call site computes the headline percentage from an achieved and a
+     * target it has in hand, so each one has to decide. This catches the one
+     * that forgets and goes back to `pct(a, t)`, which silently means 0%.
+     */
+    const offenders: string[] = [];
+    for (const f of [
+      "app/supervisor/rsos/page.tsx",
+      "app/supervisor/page.tsx",
+      "app/manager/rsos/page.tsx",
+      "app/manager/page.tsx",
+      "app/manager/supervisors/page.tsx",
+      "app/manager/supervisors/[id]/page.tsx",
+      "app/admin/performance/rsos/page.tsx",
+      "app/admin/performance/supervisors/page.tsx",
+      "app/admin/performance/supervisors/[id]/page.tsx",
+      "app/admin/performance/bps/page.tsx",
+    ]) {
+      const src = code(f);
+      for (const m of src.matchAll(/percent[:=]\s*\{?pct\(/g)) offenders.push(`${f}: ${m[0]}`);
+    }
+    expect(offenders, `a headline percentage that cannot say "no target": ${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("an operator table prints 'No target' rather than a 0% bar", () => {
+    /*
+     * v186, and the last place still painting it. The four import screens
+     * showed "1,666 achieved · 0 target · 0%" with an empty red bar under a
+     * column headed "GA Progress" for every RSO whose target nobody had
+     * uploaded.
+     */
+    const ui = code("app/components/OperationsPremiumUI.tsx");
+    expect(ui).toContain("export function ProgressCell({ value, target }");
+    expect(ui).toContain(
+      'if (target !== undefined && !(target > 0)) return <span className="kit-cell-unset">No target</span>',
+    );
+    // And every caller hands it the target it already has.
+    for (const f of ["app/ga/page.tsx", "app/c2c/page.tsx", "app/c2s/page.tsx"]) {
+      const src = code(f);
+      const cells = src.match(/<ProgressCell/g)?.length ?? 0;
+      const withTarget = src.match(/target=\{/g)?.length ?? 0;
+      expect(cells, `${f} renders no progress cells`).toBeGreaterThan(0);
+      expect(
+        withTarget,
+        `${f} has a ProgressCell that cannot tell a missing target from a zero one`,
+      ).toBeGreaterThanOrEqual(cells);
+    }
+  });
+
+  it("a list's own summary does not count an untargeted row as behind", () => {
+    /*
+     * The strip above the cards said "Below Target 7" while all seven cards
+     * below it said "No target". One rule, in one place, counts three buckets.
+     */
+    const lib = code("lib/achievement.ts");
+    expect(lib).toContain("export function splitByTarget");
+    expect(lib).toContain("untargeted");
+    for (const f of ["app/supervisor/rsos/page.tsx", "app/manager/rsos/page.tsx"]) {
+      const src = code(f);
+      expect(src, `${f} still tallies its own bands`).toContain("splitByTarget(");
+      expect(src, `${f} still counts everything-not-on-track as behind`).not.toMatch(/all\.length - (strong|onTrack)/);
+    }
   });
 
   it("agrees with the pacing line, which already declined to guess", () => {

@@ -63,6 +63,7 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/admin/permissions/[id]": ["ADMIN", "IT"],
   "/admin/retailers": ["ADMIN", "IT"],
   "/admin/retailers/[id]": ["ADMIN", "IT"],
+  "/admin/rsos": ["ADMIN", "IT"],
   "/admin/rsos/[id]": ["ADMIN", "IT"],
   "/admin/upload": ["ADMIN", "IT"],
   "/admin/upload/retailers": ["ADMIN", "IT"],

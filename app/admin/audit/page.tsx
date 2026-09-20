@@ -6,7 +6,7 @@
  * counted against; "today" is the Dhaka day, not the server's UTC day.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../../components/AppLink";
 import { ServerSearchBar, ServerSelect } from "../../components/ServerSearchBar";
 import { Icon } from "../../components/icons";
 import { requireUser } from "../../../lib/auth";

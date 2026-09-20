@@ -13,12 +13,12 @@
  */
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { Icon } from "./icons";
 import { TARGET_BAND_LABEL, targetBand, targetPercent } from "../../lib/achievement";
 import type { TargetBand } from "../../lib/achievement";
 import { perDayLabel, riskTone } from "../../lib/pacing";
-import { gaTierLine } from "../../lib/ga-category";
+import { gaTierParts } from "../../lib/ga-category";
 import type { GaTiers } from "../../lib/ga-category";
 import { COMPARISON_KINDS, COMPARISON_KIND_LABEL, changeLabel, changeTone } from "../../lib/comparison";
 import type { ComparisonKind } from "../../lib/comparison";
@@ -39,13 +39,26 @@ export function Ring({ value, size = 46, stroke = 5 }: { value: number; size?: n
   const p = Math.min(shown, 100);
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
+  /*
+   * The label has to fit inside the ring, and some of these are enormous.
+   *
+   * The company GA card reads 5,617% of a target set for one supervisor, and
+   * at the standard size/4 the digits painted straight over the ring's own
+   * stroke on both sides. The figure is not wrong and is not going to be
+   * rounded away — it is shown in full on the bar beside it too — so the
+   * label shrinks to fit rather than the number being trimmed to suit the
+   * label. Four digits and up get a smaller step; the aria-label is untouched,
+   * so a screen reader always hears the whole figure.
+   */
+  const digits = String(shown).length;
+  const fontScale = digits >= 5 ? 6 : digits === 4 ? 5 : 4;
   return (
     <div
       className={`kit-ring band-${targetBand(value)}`}
       style={
         {
           "--kit-ring-size": `${size}px`,
-          "--kit-ring-font": `${Math.max(10, size / 4)}px`,
+          "--kit-ring-font": `${Math.max(8, size / fontScale)}px`,
         } as React.CSSProperties
       }
       role="img"
@@ -93,6 +106,15 @@ export function MetricBar({
   /** For a GA bar: the 170/300 split of `achieved`. */
   tiers?: GaTiers | null;
 }) {
+  /*
+   * No target is not a target of zero — the same ruling KpiCard has followed
+   * since v175, applied here in v183.
+   *
+   * This bar printed "৳1,818,560 / ৳0" and a red "0%" under an empty track for
+   * every metric nobody had uploaded a target for. The achievement is real and
+   * is still shown; what is missing is named instead of drawn as a failure.
+   */
+  const hasTarget = target > 0;
   const p = targetPercent(achieved, target);
   const band = targetBand(p);
   return (
@@ -109,15 +131,21 @@ export function MetricBar({
             {unit}
             {fmt(Math.round(achieved))}
           </b>
-          <span>
-            {" "}
-            / {unit}
-            {fmt(Math.round(target))}
-          </span>
-          <em className={`band-${band}`}>{p}%</em>
+          {hasTarget ? (
+            <>
+              <span>
+                {" "}
+                / {unit}
+                {fmt(Math.round(target))}
+              </span>
+              <em className={`band-${band}`}>{p}%</em>
+            </>
+          ) : (
+            <em className="is-unset">No target</em>
+          )}
         </span>
       </div>
-      <Bar value={p} />
+      {hasTarget && <Bar value={p} />}
       <TierLine tiers={tiers} />
     </div>
   );
@@ -173,8 +201,18 @@ export function Badge({ tone = "neutral", children }: { tone?: BadgeTone; childr
   return <span className={`kit-badge tone-${tone}`}>{children}</span>;
 }
 
-/** Badge for an achievement percentage, labelled the way the demos label it. */
-export function StatusBadge({ percent }: { percent: number }) {
+/**
+ * Badge for an achievement percentage, labelled the way the demos label it.
+ *
+ * `null` means no target was ever set, and that is not the same as being at
+ * zero percent of one. Until v183 every RSO on a supervisor's list wore a red
+ * "Behind Target" for a month nobody had uploaded a recharge target for —
+ * seven cards accusing seven people of missing a number that did not exist.
+ * `KpiCard` has declined to guess since v175; this is the same ruling applied
+ * to the other card.
+ */
+export function StatusBadge({ percent }: { percent: number | null }) {
+  if (percent === null) return <Badge tone="neutral">No target</Badge>;
   const band = targetBand(percent);
   return <Badge tone={band}>{TARGET_BAND_LABEL[band]}</Badge>;
 }
@@ -392,9 +430,17 @@ export function SummaryStrip({
  * printing "GA 170 0 · GA 300 0".
  */
 export function TierLine({ tiers }: { tiers: GaTiers | null | undefined }) {
-  const line = gaTierLine(tiers);
-  if (!line) return null;
-  return <p className="kit-tier-line">{line}</p>;
+  const parts = gaTierParts(tiers);
+  if (!parts) return null;
+  return (
+    <p className="kit-tier-line">
+      {parts.map((part) => (
+        <span key={part.label}>
+          {part.label} <b>{part.value}</b>
+        </span>
+      ))}
+    </p>
+  );
 }
 
 export function FeedNote({ note }: { note: string | null }) {
@@ -847,26 +893,45 @@ export function KpiCard({
   const p = targetPercent(achieved, target);
   return (
     <Card padded>
-      <div className="kit-kpi-top">
-        <div className="kit-kpi-meta">
-          <span className="kit-label">{label}</span>
-          <strong>
-            {unit}
-            {fmt(Math.round(achieved))}
-          </strong>
-          <span>
-            {hasTarget ? (
-              <>
-                of {unit}
-                {fmt(Math.round(target))}
-              </>
-            ) : (
-              "No target set"
-            )}
-          </span>
-        </div>
-        {hasTarget && <Ring value={p} size={40} stroke={4} />}
+      {/*
+        The label and the ring share the top line; the figure gets the whole
+        card width below them.
+
+        It used to be a two-column flex — text on the left, ring on the right —
+        which meant the number was competing with the ring for width on a
+        390px phone. That is why `.kit-kpi-grid` could not go to two columns
+        below 480px, and why an RSO's home was three screens of scrolling with
+        one card per row. A long currency figure now wraps under the label
+        instead of being ellipsed next to the ring, so two cards fit a phone
+        row and every figure is readable in full.
+      */}
+      <div className="kit-kpi-head">
+        <span className="kit-label">{label}</span>
+        {hasTarget && <Ring value={p} size={36} stroke={4} />}
       </div>
+      <strong className="kit-kpi-value">
+        {unit}
+        {fmt(Math.round(achieved))}
+      </strong>
+      {/*
+        One line for the empty state, not two.
+
+        This used to print "No target set" here and "Ask Admin to upload this
+        month's target." again underneath, and an RSO's home renders five of
+        these cards — so the same sentence appeared five times on one screen,
+        in two halves. Both facts still reach the reader; they now cost one
+        line per card instead of two.
+      */}
+      <span className="kit-kpi-of">
+        {hasTarget ? (
+          <>
+            of {unit}
+            {fmt(Math.round(target))}
+          </>
+        ) : (
+          "No target — ask Admin"
+        )}
+      </span>
       <TierLine tiers={tiers} />
       {hasTarget ? (
         <>
@@ -881,11 +946,7 @@ export function KpiCard({
             </b>
           </p>
         </>
-      ) : (
-        // Short on purpose: five of these stack on one phone screen, and the
-        // card above already says "No target set".
-        <p className="kit-kpi-foot">Ask Admin to upload this month&apos;s target.</p>
-      )}
+      ) : null}
       {pace && <PaceFoot pace={pace} unit={unit} />}
     </Card>
   );
@@ -1006,7 +1067,10 @@ export function ComparisonSection({
         sub="Each figure names the two dates it was measured between, because the feeds do not always arrive together."
         link={<PeriodSwitch value={kind} control={control} />}
       />
-      <div className="kit-card-grid kit-mb-20">
+      {/* `is-compact`: these three carry one figure each, so they tile two to a
+          phone row. The plain grid stays one-up because it also carries entity
+          cards, which do not. */}
+      <div className="kit-card-grid is-compact kit-mb-20">
         {loading
           ? [1, 2, 3].map((i) => (
               <Card key={i} padded>
@@ -1161,14 +1225,23 @@ export function EntityCard({
   eyebrow?: string;
   name: string;
   code: string;
-  percent: number;
+  /** `null` when this entity has no headline target — see StatusBadge. */
+  percent: number | null;
   metrics: { label: string; achieved: number; target: number; unit?: string; tiers?: GaTiers | null }[];
   footer?: ReactNode;
 }) {
   return (
     <Link href={href} className="kit-card kit-card-p is-clickable">
       <div className="kit-entity-top">
-        <Ring value={percent} size={54} stroke={5} />
+        {percent === null ? (
+          // The ring's space is kept rather than collapsed, so a list of cards
+          // where some have targets and some do not still reads as a column.
+          <span className="kit-ring-empty" aria-hidden="true">
+            —
+          </span>
+        ) : (
+          <Ring value={percent} size={54} stroke={5} />
+        )}
         <div className="kit-entity-main">
           {eyebrow && <p className="kit-eyebrow">{eyebrow}</p>}
           <strong>{name}</strong>

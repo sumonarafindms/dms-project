@@ -284,7 +284,11 @@ describe("the split is actually on the screens the owner named", () => {
      */
     const kit = code("app/components/Kit.tsx");
     expect(kit).toContain("export function TierLine");
-    expect(kit).toContain("gaTierLine(tiers)");
+    // v183: the screen renders the split as two labelled figures rather than
+    // one sentence, so a half-width card wraps between them instead of through
+    // the middle of one. `gaTierLine` is still the single source of the
+    // wording for the string contexts (feed notes, exports).
+    expect(kit).toContain("gaTierParts(tiers)");
     expect(read("styles/kit.css")).toContain(".kit-tier-line");
     // The sentence itself is written once, in the dependency-free module.
     const label = code("lib/ga-category.ts");

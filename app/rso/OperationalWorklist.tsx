@@ -16,7 +16,7 @@
  */
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { Badge, Card, EmptyState, PageHeader, ProgressLine, SummaryStrip } from "../components/Kit";
 import { Icon } from "../components/icons";
 

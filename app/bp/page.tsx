@@ -40,7 +40,7 @@ import { Icon } from "../components/icons";
 import { latestGaDay } from "../../lib/intelligence";
 import { businessDayBounds, dhakaMonth, dhakaYesterdayYmd } from "../../lib/business-time";
 import { feedDay, feedDayLabel, stalenessNote } from "../../lib/feed-day";
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 
 export const dynamic = "force-dynamic";
 

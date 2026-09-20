@@ -77,6 +77,14 @@ export type Built<T> = {
   rows: T[];
   /** The same rows as spreadsheet records, keys being the on-screen headings. */
   exportRows: ExportRow[];
+  /**
+   * What to call the thing the view is filtered to, when it is filtered.
+   *
+   * The daily report drills from a supervisor into that team's RSOs. The URL
+   * now carries the supervisor's ID, which nothing can print, so the builder —
+   * which has the rows and therefore the name — says what to display.
+   */
+  filterLabel?: string;
 };
 
 const round = (n: number) => Math.round(n);
@@ -248,6 +256,8 @@ export type DailyRow = {
   name: string;
   /** Blank at supervisor level, where the row IS the supervisor. */
   supervisor: string;
+  /** The supervisor's id, so a drill-down can key on it rather than a name. */
+  supervisorId: string | null;
   /** RSOs under a supervisor; 0 for an RSO or BP row. */
   rsoCount: number;
   retailerCount: number;
@@ -292,6 +302,7 @@ export async function buildDaily(
         id: b.id,
         name: b.name,
         supervisor: b.sub, // the RSO this BP reports to
+        supervisorId: null,
         rsoCount: 0,
         retailerCount: 0,
         standardGa: b.activation,
@@ -312,6 +323,7 @@ export async function buildDaily(
         id: r.id,
         name: r.name,
         supervisor: r.supervisor,
+        supervisorId: r.supervisorId,
         rsoCount: 0,
         retailerCount: r.retailerCount,
         standardGa: r.ga,
@@ -324,13 +336,29 @@ export async function buildDaily(
       };
     });
     /*
-     * Drill-down from a supervisor's name.
+     * Drill-down from a supervisor.
      *
      * Filtered here rather than in the page so the row count in the summary and
      * the pager agree with what is on screen, and so the link is a complete
      * description of the view.
+     *
+     * ## By id, not by name
+     *
+     * This matched `r.supervisor === supervisor` — a NAME. Two supervisors
+     * sharing one merged into a single view belonging to neither, and renaming
+     * a supervisor silently emptied every link and bookmark pointing at their
+     * team. It is the same defect v181 found in the roll-up and v184 found in
+     * the import screens, one level along.
+     *
+     * The id is matched first. A value that matches no id falls back to the
+     * name, because report URLs get shared and pasted into chat, and a link
+     * somebody sent last week should still open the team it named rather than
+     * an empty table.
      */
-    if (supervisor) rows = rows.filter((r) => r.supervisor === supervisor);
+    if (supervisor) {
+      const byId = rows.filter((r) => r.supervisorId === supervisor);
+      rows = byId.length ? byId : rows.filter((r) => r.supervisor === supervisor);
+    }
   } else {
     const [now, then] = await Promise.all([
       supervisorSummary(range),
@@ -343,6 +371,8 @@ export async function buildDaily(
         id: s.id,
         name: s.name,
         supervisor: "",
+        // A supervisor row IS the supervisor, so it keys on its own id.
+        supervisorId: s.id,
         rsoCount: s.rsoCount,
         retailerCount: s.retailerCount,
         standardGa: s.standardGa,
@@ -359,6 +389,14 @@ export async function buildDaily(
   const who = level === "supervisor" ? "Supervisor" : level === "rso" ? "RSO" : "BP";
   return {
     rows,
+    /*
+     * The team's NAME for the chip above the table, resolved from the rows.
+     *
+     * The URL carries an id now, and printing an id at a reader is worse than
+     * printing a stale name. Taken from the first matching row rather than
+     * looked up separately, because the rows already know.
+     */
+    filterLabel: supervisor ? rows[0]?.supervisor || undefined : undefined,
     exportRows: rows.map((r) => ({
       [who]: r.name,
       // "RSOs"/"Retailers", not "RSO"/"Retailer": these are counts, and the

@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         where: { active: true },
         orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
         include: {
-          supervisor: { select: { name: true } },
+          supervisor: { select: { id: true, name: true } },
           _count: { select: { retailers: true } },
           targets: { where: { month: { gte: targetStart, lt: targetEnd } } },
           manualMetrics: { where: { month: { gte: targetStart, lt: targetEnd } } },
@@ -65,7 +65,12 @@ export async function GET(req: NextRequest) {
                   retailerCode: true,
                   retailerName: true,
                   employee: {
-                    select: { id: true, name: true, rsoMsisdn: true, supervisor: { select: { name: true } } },
+                    select: {
+                      id: true,
+                      name: true,
+                      rsoMsisdn: true,
+                      supervisor: { select: { id: true, name: true } },
+                    },
                   },
                 },
               },
@@ -148,6 +153,7 @@ export async function GET(req: NextRequest) {
         employeeCode: employee.employeeCode,
         name: employee.name,
         rsoMsisdn: employee.rsoMsisdn,
+        supervisorId: employee.supervisor?.id ?? "unassigned",
         supervisor: employee.supervisor?.name ?? "Unassigned",
         retailerCount: employee._count.retailers,
         transactionCount: c2c.transactions,
@@ -167,8 +173,12 @@ export async function GET(req: NextRequest) {
     const day = dailyRows.map((row) => ({
       retailerCode: row.retailer.retailerCode,
       retailerName: row.retailer.retailerName || "",
+      // Ids as well as names: the page rolls these rows up per RSO and per
+      // supervisor, and grouping on a name merges two people who share one.
+      employeeId: row.retailer.employee?.id || "unassigned",
       employee: row.retailer.employee?.name || "Unassigned",
       rsoMsisdn: row.retailer.employee?.rsoMsisdn || "",
+      supervisorId: row.retailer.employee?.supervisor?.id || "unassigned",
       supervisor: row.retailer.employee?.supervisor?.name || "Unassigned",
       amount: Number(row.amount),
     }));

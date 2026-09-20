@@ -25,7 +25,7 @@
  */
 
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { Badge, Card, EmptyState, PageHeader, Pager, Row, SectionHead, SummaryStrip } from "./Kit";
 import { DateRangeForm } from "./ListControls";
 import { ServerSearchBar, ServerSelect } from "./ServerSearchBar";

@@ -63,6 +63,10 @@ export default async function Page() {
             {bps.map((x) => (
               <Row
                 key={x.id}
+                // A BP is an outlet, and the accounts role already has an
+                // outlet page. These rows looked exactly like every other row
+                // in the app and were the only ones that did nothing.
+                href={`/accounts/retailers/${x.retailerId}`}
                 avatar={bpDisplayName(x.retailer)}
                 title={bpDisplayName(x.retailer)}
                 sub={x.retailer.retailerCode}
@@ -88,6 +92,13 @@ export default async function Page() {
             {rsos.map((x) => (
               <Row
                 key={x.id}
+                /*
+                 * Into this RSO's outlets, searched by WALLET rather than by
+                 * name: the wallet is unique and a name is not, and this
+                 * section exists for "retailer ownership checks", which is
+                 * exactly that list.
+                 */
+                href={`/accounts/retailers?q=${encodeURIComponent(x.rsoMsisdn)}`}
                 avatar={x.name}
                 title={x.name}
                 // employeeCode falls back to the MSISDN, so without this an

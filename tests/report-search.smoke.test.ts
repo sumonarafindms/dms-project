@@ -226,7 +226,24 @@ describe("Daily Summary has three levels", () => {
   it("makes the supervisor name a link into that team's RSOs", () => {
     // The gesture that used to do nothing.
     const src = codeOf(daily());
-    expect(src).toMatch(/level: "rso"[\s\S]{0,80}supervisor: r\.name|supervisor: r\.name[\s\S]{0,80}level: "rso"/);
+    expect(src).toMatch(/level: "rso"/);
+    /*
+     * By ID since v186. It used to send the supervisor's NAME, so renaming a
+     * supervisor emptied every link and bookmark pointing at their team, and
+     * two supervisors sharing a name shared one view — the defect v181 found
+     * in the roll-up and v184 in the import screens, one level along.
+     */
+    expect(src, "the drill-down must carry the supervisor's id").toContain("supervisor: r.supervisorId || r.name");
+    const builders = fs.readFileSync(path.join(ROOT, "lib", "report-builders.ts"), "utf8");
+    expect(builders, "the filter must match on the id first").toContain(
+      "const byId = rows.filter((r) => r.supervisorId === supervisor)",
+    );
+    // A shared link written last week still opens the team it named.
+    expect(builders, "an old name-based link must still work").toContain(
+      "rows = byId.length ? byId : rows.filter((r) => r.supervisor === supervisor)",
+    );
+    // And the chip above the table prints a name, never the id from the URL.
+    expect(src).toContain("built.filterLabel");
   });
 
   it("drops the supervisor filter when the level is not RSO", () => {

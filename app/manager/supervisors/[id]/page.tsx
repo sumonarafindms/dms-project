@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "../../../components/AppLink";
 import { requirePagePermission } from "../../../../lib/auth";
 import { prisma } from "../../../../lib/prisma";
 import { employeePerformance } from "../../../../lib/performance";
@@ -127,7 +127,7 @@ export default async function Page({
           eyebrow: "RSO",
           name: r.name,
           code: `${r.employeeCode || r.rsoMsisdn} · ${r.retailerCount.toLocaleString("en-US")} retailers`,
-          percent: pct(r.totalRechargeAchieved, r.totalRechargeTarget),
+          percent: r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null,
           metrics: [
             { label: "GA", achieved: r.gaAchieved, target: r.gaTarget },
             { label: "SSO", achieved: r.ssoAchieved, target: r.ssoTarget },

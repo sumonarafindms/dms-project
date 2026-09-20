@@ -12,7 +12,7 @@
  * never reach the browser bundle.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../components/icons";
 import { fmtNumber } from "../../lib/format";
@@ -174,18 +174,41 @@ export default function Dashboard() {
   const companyTarget = useMemo(() => sumSupervisorTargets(supTargets.values()), [supTargets]);
   const totals = useMemo(() => withSupervisorTarget(teamTotals(rows), companyTarget), [rows, companyTarget]);
 
-  // Composite score: recharge, GA and the SSO/LSO execution pair, weighted
-  // equally. One number for "is this RSO keeping up overall".
+  /*
+   * Composite score: recharge, GA and the SSO/LSO execution pair, weighted
+   * equally. One number for "is this RSO keeping up overall".
+   *
+   * Only the parts that HAVE a target count, and an RSO with no target at all
+   * gets no score rather than a zero.
+   *
+   * It used to average all four regardless. `targetPercent` returns 0 against
+   * a target of zero — correctly, there is no percentage of nothing — so an
+   * RSO nobody had set a target for scored 0 and went straight to the top of
+   * a list headed "Lowest composite execution scores first". Six of them sat
+   * there with "GA 0% · Recharge 0%" beside real GA figures in the thousands,
+   * above every RSO who genuinely was behind. The dashboard already counts
+   * those people, on its own "No target set" tile, which is where they belong.
+   */
   const scored = useMemo(
     () =>
       rows
         .map((r) => {
-          const recharge = pct(r.totalRechargeAchieved, r.totalRechargeTarget);
-          const ga = pct(r.gaAchieved, r.gaTarget);
-          const execution = Math.round((pct(r.ssoAchieved, r.ssoTarget) + pct(r.lsoAchieved, r.lsoTarget)) / 2);
-          return { ...r, score: Math.round((recharge + ga + execution) / 3), recharge, ga };
+          const parts: number[] = [];
+          if (r.totalRechargeTarget > 0) parts.push(pct(r.totalRechargeAchieved, r.totalRechargeTarget));
+          if (r.gaTarget > 0) parts.push(pct(r.gaAchieved, r.gaTarget));
+          const execution: number[] = [];
+          if (r.ssoTarget > 0) execution.push(pct(r.ssoAchieved, r.ssoTarget));
+          if (r.lsoTarget > 0) execution.push(pct(r.lsoAchieved, r.lsoTarget));
+          if (execution.length) parts.push(Math.round(execution.reduce((a, b) => a + b, 0) / execution.length));
+          return {
+            ...r,
+            // null, not 0: "we cannot say" is a different answer from "nought".
+            score: parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : null,
+            recharge: r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null,
+            ga: r.gaTarget > 0 ? pct(r.gaAchieved, r.gaTarget) : null,
+          };
         })
-        .sort((a, b) => b.score - a.score),
+        .sort((a, b) => (b.score ?? -1) - (a.score ?? -1)),
     [rows],
   );
 
@@ -220,13 +243,17 @@ export default function Dashboard() {
     return [...map.values()].sort((a, b) => pct(b.achieved, b.target) - pct(a.achieved, a.target));
   }, [rows, supTargets]);
 
-  const behind = scored.filter((r) => r.score < ACHIEVEMENT_WATCH_PERCENT).length;
-  const onTrack = scored.filter((r) => r.score >= ACHIEVEMENT_ON_TRACK_PERCENT).length;
+  // Every tally below counts only the RSOs that can be scored at all.
+  const behind = scored.filter((r) => r.score !== null && r.score < ACHIEVEMENT_WATCH_PERCENT).length;
+  const onTrack = scored.filter((r) => r.score !== null && r.score >= ACHIEVEMENT_ON_TRACK_PERCENT).length;
   const targetReady = rows.filter(
     (r) => r.gaTarget || r.c2cTarget || r.totalRechargeTarget || r.ssoTarget || r.lsoTarget,
   ).length;
   const targetCoverage = rows.length ? Math.round((targetReady / rows.length) * 100) : 0;
-  const watchlist = [...scored].filter((r) => r.score < ACHIEVEMENT_ON_TRACK_PERCENT).sort((a, b) => a.score - b.score);
+  const watchlist = [...scored]
+    .filter((r): r is (typeof scored)[number] & { score: number } => r.score !== null)
+    .filter((r) => r.score < ACHIEVEMENT_ON_TRACK_PERCENT)
+    .sort((a, b) => a.score - b.score);
   const firstLoad = loading && rows.length === 0;
 
   // The dashboard shows whichever month the picker selects, so pacing handles
@@ -376,7 +403,9 @@ export default function Dashboard() {
                 key={r.employeeId}
                 icon={<Icon name="chart" />}
                 title={r.name}
-                sub={`${r.supervisor} · GA ${r.ga}% · Recharge ${r.recharge}%`}
+                sub={`${r.supervisor} · GA ${r.ga === null ? "no target" : `${r.ga}%`} · Recharge ${
+                  r.recharge === null ? "no target" : `${r.recharge}%`
+                }`}
                 value={r.score}
                 valueSub="score"
               />

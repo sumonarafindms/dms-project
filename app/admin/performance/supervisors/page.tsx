@@ -156,7 +156,7 @@ export default async function Page({
           eyebrow: "Supervisor",
           name: x.name,
           code: `${x.rsos} RSOs · ${x.bps.size} BPs · ${x.retailers.toLocaleString("en-US")} retailers`,
-          percent: pct(x.achieved, x.target),
+          percent: x.target > 0 ? pct(x.achieved, x.target) : null,
           metrics: [
             { label: "GA", achieved: x.gaA, target: x.gaT },
             { label: "Recharge", achieved: x.achieved, target: x.target, unit: "৳" },

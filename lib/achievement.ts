@@ -114,3 +114,39 @@ export const TARGET_BAND_LABEL: Record<TargetBand, string> = {
 export function targetPercent(achieved: number, target: number) {
   return target ? Math.round((achieved / target) * 100) : 0;
 }
+
+/* ------------------------------------------------------------------ *
+ * Counting a list, when some of it has no target
+ * ------------------------------------------------------------------ */
+
+/**
+ * Split a list into on track, behind, and not measured at all.
+ *
+ * The third bucket is the point. Every list that summarised itself counted
+ * "Below Target" as *everything that was not on track*, so a team where no
+ * recharge target had been uploaded read "Below Target 7" — seven people
+ * failing a number that did not exist. The cards underneath had already
+ * stopped saying that (v175 for KpiCard, v183 for EntityCard and MetricBar);
+ * the strip above them had not, so the same screen disagreed with itself.
+ *
+ * `targetPercent` returns 0 for a zero target by design — there is no honest
+ * percentage of nothing — which is exactly why a caller must not compare its
+ * result against a cut-off without asking whether a target exists first. This
+ * asks, once, so nine callers cannot each forget.
+ */
+export function splitByTarget<T>(
+  rows: readonly T[],
+  achieved: (row: T) => number,
+  target: (row: T) => number,
+): { onTrack: number; behind: number; untargeted: number } {
+  let onTrack = 0,
+    behind = 0,
+    untargeted = 0;
+  for (const row of rows) {
+    const t = target(row);
+    if (!(t > 0)) untargeted++;
+    else if (targetPercent(achieved(row), t) >= ACHIEVEMENT_ON_TRACK_PERCENT) onTrack++;
+    else behind++;
+  }
+  return { onTrack, behind, untargeted };
+}

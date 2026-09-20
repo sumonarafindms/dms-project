@@ -15,7 +15,7 @@ import type { GaTiers } from "../../lib/ga-category";
  */
 
 import { useMemo } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { ListControls, useListControls } from "./ListControls";
 import { matchesTokens } from "../../lib/text-search";
 import { Icon } from "./icons";

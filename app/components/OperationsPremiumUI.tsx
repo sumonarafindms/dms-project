@@ -11,12 +11,13 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { TableScrollHint } from "./TableScrollHint";
 import { Icon } from "./icons";
 import { Badge, Card, EmptyState as KitEmptyState, LinkBtn, PageHeader, SectionHead } from "./Kit";
 import type { BadgeTone } from "./Kit";
 import { fmtDate, fmtDateTime } from "../../lib/format";
+import { OPS_LEVELS, OPS_LEVEL_LABEL, type OpsLevel } from "../../lib/ops-rollup";
 
 export function OpsHeader({
   title,
@@ -167,11 +168,14 @@ export function OpsDataCard({
   title,
   subtitle,
   count,
+  tabs,
   children,
 }: {
   title: string;
   subtitle?: string;
   count?: string;
+  /** Rendered between the heading and the table — see OpsLevelTabs. */
+  tabs?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -182,9 +186,57 @@ export function OpsDataCard({
         link={count ? <span className="kit-filter-note">{count}</span> : undefined}
       />
       <Card className="kit-mb-20" padded>
+        {tabs}
         {children}
       </Card>
     </>
+  );
+}
+
+/**
+ * Retailer / RSO / Supervisor, over one feed.
+ *
+ * The same numbers at three levels of the same tree. Before this, /ob offered
+ * only the retailer level — an operator wanting an RSO's total balance had to
+ * page through 2,190 outlets and add them up by hand — while /ga, /c2c and
+ * /c2s offered two levels as two separate cards stacked down the page, so the
+ * same question was answered in a different shape on every screen.
+ *
+ * A segmented control rather than links: switching level is a view change, not
+ * a different dataset, and the page already has everything it needs.
+ */
+export function OpsLevelTabs({
+  value,
+  onChange,
+  counts,
+  levels = OPS_LEVELS,
+}: {
+  value: OpsLevel;
+  onChange: (next: OpsLevel) => void;
+  /** How many rows each level holds, printed on its tab. */
+  counts: Partial<Record<OpsLevel, number>>;
+  levels?: readonly OpsLevel[];
+}) {
+  return (
+    <div className="ops-level-tabs" role="tablist" aria-label="Group this feed by">
+      {levels.map((level) => {
+        const active = level === value;
+        const n = counts[level];
+        return (
+          <button
+            key={level}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={`ops-level-tab${active ? " is-active" : ""}`}
+            onClick={() => onChange(level)}
+          >
+            <span>{OPS_LEVEL_LABEL[level]}</span>
+            {n === undefined ? null : <em>{n.toLocaleString("en-US")}</em>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -226,7 +278,21 @@ export function PersonCell({ name, sub }: { name: string; sub?: string }) {
   );
 }
 
-export function ProgressCell({ value }: { value: number }) {
+/**
+ * A progress bar in a table cell — or the words "No target", when there is none.
+ *
+ * `targetPercent(a, 0)` is 0 by design: there is no honest percentage of
+ * nothing. v175 stopped KpiCard painting that 0 as failure and v183 did the
+ * same for the entity cards, the status badges and the metric bars. These four
+ * operator tables were the last place still doing it: an RSO with no GA target
+ * uploaded read "1,666 achieved · 0 target · 0%" with an empty red bar, in a
+ * column headed "GA Progress".
+ *
+ * `target` is optional only so a caller that genuinely has no target figure to
+ * hand keeps the old behaviour; every caller in this app passes one.
+ */
+export function ProgressCell({ value, target }: { value: number; target?: number }) {
+  if (target !== undefined && !(target > 0)) return <span className="kit-cell-unset">No target</span>;
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div className="kit-cell-progress">

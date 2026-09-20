@@ -635,3 +635,75 @@ describe("both aggregation paths credit a BP's execution the same way", () => {
     expect(withBpBody).toMatch(/gaAchieved: row\.gaAchieved \+ bp\.gaAchieved/);
   });
 });
+
+describe("no screen adds a shared BP up twice", () => {
+  /**
+   * The mistake, measured.
+   *
+   * `teamTotals()` and `groupTotals()` are tested above until the rule cannot
+   * move. What nothing checked is whether a SCREEN uses them. Each RSO row
+   * carries its BP's whole figures — correctly, because each holder is measured
+   * on the whole outlet — so adding `r.bp.gaAchieved` across rows is one line
+   * of ordinary-looking code that silently counts a shared outlet once per
+   * holder.
+   *
+   * The v186 audit wrote that line, in the audit script itself, and the
+   * September figures answered:
+   *
+   *     own GA 67,278 + BP rows added   = 67,409
+   *     own GA 67,278 + BP rows unioned = 67,398   <- SQL agrees
+   *
+   * Eleven SIMs from ONE outlet held by two RSOs. Nothing looked wrong; the
+   * number was simply larger than the company had sold. That is the whole
+   * failure mode this project keeps finding, so the union stays the only way in
+   * and a naive sum is a test failure rather than a discrepancy someone notices
+   * a quarter later.
+   */
+  const BP_ACHIEVEMENT = ["gaAchieved", "ga170", "ga300", "ssoAchieved", "c2cAchieved", "lsoAchieved", "c2sAmount"];
+
+  const walk = (dir: string, out: string[] = []) => {
+    for (const name of fs.readdirSync(dir)) {
+      if (name === "node_modules" || name === ".next" || name === ".scratch") continue;
+      const full = path.join(dir, name);
+      if (fs.statSync(full).isDirectory()) walk(full, out);
+      else if (full.endsWith(".ts") || full.endsWith(".tsx")) out.push(full);
+    }
+    return out;
+  };
+
+  it("nothing outside lib/bp-rollup.ts accumulates a BP figure across rows", () => {
+    const files = [...walk(path.join(ROOT, "app")), ...walk(path.join(ROOT, "lib"))].filter(
+      (f) => !f.endsWith(path.join("lib", "bp-rollup.ts")),
+    );
+    const offenders: string[] = [];
+    for (const file of files) {
+      const src = stripComments(fs.readFileSync(file, "utf8"));
+      for (const field of BP_ACHIEVEMENT) {
+        /*
+         * An ACCUMULATION, not a read. `x + bp.gaAchieved` on one row is the
+         * fold every role page does and is right; `acc + r.bp.gaAchieved`
+         * inside a reduce over rows is the bug. The difference on the page is
+         * the accumulator on the left.
+         */
+        const pattern = new RegExp(String.raw`\b(acc|a|sum|total|totals)\s*(\+=|\+\s*[\w.?]*\bbp\??\.${field})`, "g");
+        for (const m of src.matchAll(pattern))
+          if (m[0].includes(`bp`) && m[0].includes(field))
+            offenders.push(`${relativeTo(file)}: ${m[0].replace(/\s+/g, " ")}`);
+      }
+    }
+    expect(
+      offenders,
+      `a shared BP counted once per holder — use teamTotals()/groupTotals(), which union by retailer:\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  it("the union is what makes the company total right, on the audit's own numbers", () => {
+    // The September shape, reduced to three rows: two RSOs holding one outlet
+    // worth 11, and a third RSO holding nothing.
+    const held = bp({ count: 1, gaAchieved: 11 }, "shared-outlet");
+    const rows = [row({ gaAchieved: 100, bp: held }), row({ gaAchieved: 80, bp: held }), row({ gaAchieved: 60 })];
+    const naive = rows.reduce((a, r) => a + r.gaAchieved + r.bp.gaAchieved, 0);
+    expect(naive, "adding the rows invents a second outlet").toBe(100 + 80 + 60 + 11 + 11);
+    expect(teamTotals(rows).gaAchieved, "the union counts it once").toBe(100 + 80 + 60 + 11);
+  });
+});

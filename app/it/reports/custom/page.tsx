@@ -9,7 +9,7 @@
  * that quietly produces zeros.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../../../components/AppLink";
 import { requireUser } from "../../../../lib/auth";
 import { rangeDayCount, resolveRange, rangeQuery } from "../../../../lib/report-range";
 import {

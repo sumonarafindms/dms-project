@@ -11,7 +11,7 @@
  * 40% on the 12th is ahead; the same 40% on the 28th is behind.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { requirePagePermission } from "../../lib/auth";
 import { employeePerformance } from "../../lib/performance";
 import { prisma } from "../../lib/prisma";
@@ -248,7 +248,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
                 eyebrow="Supervisor"
                 name={x.name}
                 code={`${x.rsos} RSOs · ${fmtNumber(x.retailers)} retailers`}
-                percent={progress}
+                percent={x.target > 0 ? progress : null}
                 metrics={[
                   { label: "GA", achieved: x.ga, target: x.gaTarget, tiers: x.tiers },
                   { label: "Recharge", achieved: x.achieved, target: x.target, unit: "৳" },
@@ -288,7 +288,7 @@ export default async function Manager({ searchParams }: { searchParams: Promise<
             eyebrow="RSO"
             name={r.name}
             code={`${r.employeeCode || r.rsoMsisdn} · ${r.supervisor}`}
-            percent={pct(r.totalRechargeAchieved, r.totalRechargeTarget)}
+            percent={r.totalRechargeTarget > 0 ? pct(r.totalRechargeAchieved, r.totalRechargeTarget) : null}
             metrics={[
               {
                 label: "GA",

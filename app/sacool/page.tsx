@@ -15,7 +15,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { Icon } from "../components/icons";
 import { apiSend } from "@/lib/api-client";
 

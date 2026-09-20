@@ -9,7 +9,7 @@
  * across all four instead of copied four times.
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../../components/AppLink";
 import { rangeLabel, rangeQuery } from "../../../lib/report-range";
 import type { ReportRange } from "../../../lib/report-range";
 import type { RetailerReportRow } from "../../../lib/report-data";

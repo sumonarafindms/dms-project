@@ -19,7 +19,7 @@ import { reportPageHref } from "../../../../lib/report-paging";
 import { RetailerReportView, identityColumns, money } from "../RetailerReportView";
 import type { Column } from "../../../components/ReportTable";
 import type { RetailerReportRow } from "../../../../lib/report-data";
-import Link from "next/link";
+import { AppLink as Link } from "../../../components/AppLink";
 
 export const dynamic = "force-dynamic";
 

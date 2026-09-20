@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { Btn, Card, Check, EmptyState, PageHeader, Skeleton } from "./Kit";
 import { Icon } from "./icons";
 import { apiFetch, apiSend } from "@/lib/api-client";

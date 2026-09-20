@@ -21,6 +21,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     <>
       <AdminEmployeeForm
         role="managers"
+        heading={u.displayName}
+        identity={[
+          { label: "Supervisors", value: u.managedSupervisors.length.toLocaleString("en-US"), sub: "in scope" },
+          {
+            label: "Login",
+            value: u.mobileNumber || "No login",
+            sub: u.mobileNumber ? undefined : "mobile + PIN not set",
+          },
+          { label: "Status", value: u.active ? "Active" : "Disabled" },
+        ]}
         initial={{ id: u.id, name: u.displayName, mobile: u.mobileNumber || "", active: u.active }}
       />
       <div className="page is-flush">

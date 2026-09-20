@@ -10,6 +10,7 @@ import {
   OpsMetric,
   OpsDataCard,
   OpsTable,
+  OpsLevelTabs,
   PersonCell,
   ProgressCell,
   EmptyState,
@@ -20,12 +21,14 @@ import { Btn } from "../components/Kit";
 import { apiFetch, apiUpload } from "@/lib/api-client";
 import { fmtDate, fmtDateTime } from "../../lib/format";
 import { GA_CATEGORY_LABEL } from "../../lib/ga-category";
+import { groupOps, groupOpsBySupervisor, opsCountLabel, type OpsLevel } from "../../lib/ops-rollup";
 
 type EmployeeRow = {
   employeeId: string;
   employeeCode?: string | null;
   name: string;
   rsoMsisdn: string;
+  supervisorId: string;
   supervisor: string;
   retailerCount: number;
   ga170: number;
@@ -40,8 +43,10 @@ type EmployeeRow = {
 type RetailerDailyRow = {
   retailerCode: string;
   retailerName: string;
+  employeeId: string;
   employee: string;
   rsoMsisdn: string;
+  supervisorId: string;
   supervisor: string;
   total: number;
   ga170: number;
@@ -85,6 +90,16 @@ function prettyDate(value?: string | null) {
   return Number.isNaN(new Date(value).getTime()) ? value : fmtDate(value, "-");
 }
 
+/*
+ * Declared at module scope, not inside the component.
+ *
+ * A `const [...] as const` written in the body is a NEW array on every
+ * render, so a `useMemo` that depends on it memoises nothing and eslint
+ * says so. These are constants; this is where a constant lives.
+ */
+const DAY_FIELDS = ["total", "simSwap", "ga170", "ga300"] as const;
+const MONTH_FIELDS = ["retailerCount", "ga170", "ga300", "gaTarget", "gaAchieved", "ssoAchieved", "ssoTarget"] as const;
+
 export default function GaPage() {
   const canView = useCan("ga", "view");
   const canAdd = useCan("ga", "add");
@@ -95,6 +110,17 @@ export default function GaPage() {
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [retailerDaily, setRetailerDaily] = useState<RetailerDailyRow[]>([]);
   const [history, setHistory] = useState<History[]>([]);
+  /*
+   * Which level each of the two tables is showing.
+   *
+   * TWO pieces of state, not one, because the two cards are not the same
+   * question. The retailer table is one DAY's activations; the performance
+   * table is the MONTH against target. Putting both behind one switch would
+   * let a reader carry a day's figure over to a monthly heading, which is the
+   * "two numbers wearing one word" defect this project keeps finding.
+   */
+  const [dayLevel, setDayLevel] = useState<OpsLevel>("retailer");
+  const [monthLevel, setMonthLevel] = useState<OpsLevel>("rso");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -208,6 +234,31 @@ export default function GaPage() {
     [rows],
   );
 
+  /*
+   * The day's activations, added up per RSO and per supervisor.
+   *
+   * Grouped on the CLIENT because the whole day is already here — unlike /ob,
+   * whose retailer table is server-paged at fifty rows and whose roll-ups
+   * therefore have to come from the server. Summing what is on screen is only
+   * safe when what is on screen is everything.
+   */
+  const dayByRso = useMemo(
+    () =>
+      groupOps(
+        retailerDaily,
+        (r) => ({ key: r.employeeId, name: r.employee, sub: r.rsoMsisdn }),
+        DAY_FIELDS,
+        (r, f) => r[f],
+      ),
+    [retailerDaily],
+  );
+  const dayBySupervisor = useMemo(
+    () => groupOpsBySupervisor(retailerDaily, DAY_FIELDS, (r, f) => r[f]),
+    [retailerDaily],
+  );
+  /* The month, one level up. The rows are already one per RSO. */
+  const monthBySupervisor = useMemo(() => groupOpsBySupervisor(rows, MONTH_FIELDS, (r, f) => r[f]), [rows]);
+
   const dayTotals = useMemo(
     () =>
       retailerDaily.reduce(
@@ -294,11 +345,102 @@ export default function GaPage() {
       </div>
 
       <OpsDataCard
-        title="Retailer GA"
-        subtitle="Retailer-wise activation for the selected day."
-        count={`${retailerDaily.length} retailers`}
+        title="GA for the selected day"
+        subtitle={
+          dayLevel === "retailer"
+            ? "Retailer-wise activation for the selected day."
+            : dayLevel === "rso"
+              ? "The same day's activations added up under the RSO who owns each outlet."
+              : "The same day's activations added up under each supervisor."
+        }
+        count={
+          dayLevel === "retailer"
+            ? opsCountLabel(retailerDaily.length, "retailer")
+            : dayLevel === "rso"
+              ? opsCountLabel(dayByRso.length, "RSO")
+              : opsCountLabel(dayBySupervisor.length, "supervisor")
+        }
+        tabs={
+          <OpsLevelTabs
+            value={dayLevel}
+            onChange={setDayLevel}
+            counts={{ retailer: retailerDaily.length, rso: dayByRso.length, supervisor: dayBySupervisor.length }}
+          />
+        }
       >
-        {retailerDaily.length ? (
+        {dayLevel === "rso" && dayByRso.length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>RSO</th>
+                <th className="is-right">Retailers</th>
+                <th className="is-right">Total GA</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.SIM_SWAP}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_170}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_300}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dayByRso.map((g) => (
+                <tr key={g.key}>
+                  <td>
+                    <PersonCell name={g.name} sub={g.sub} />
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill">{g.count}</span>
+                  </td>
+                  <td className="is-right">
+                    <strong>{g.totals.total.toLocaleString("en-US")}</strong>
+                    <small>Standard GA only</small>
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill">{g.totals.simSwap.toLocaleString("en-US")}</span>
+                  </td>
+                  <td className="is-right">{g.totals.ga170.toLocaleString("en-US")}</td>
+                  <td className="is-right">{g.totals.ga300.toLocaleString("en-US")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : null}
+
+        {dayLevel === "supervisor" && dayBySupervisor.length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>Supervisor</th>
+                <th className="is-right">Retailers</th>
+                <th className="is-right">Total GA</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.SIM_SWAP}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_170}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_300}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dayBySupervisor.map((g) => (
+                <tr key={g.key}>
+                  <td>
+                    <PersonCell name={g.name} sub="Supervisor" />
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill">{g.count}</span>
+                  </td>
+                  <td className="is-right">
+                    <strong>{g.totals.total.toLocaleString("en-US")}</strong>
+                    <small>Standard GA only</small>
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill">{g.totals.simSwap.toLocaleString("en-US")}</span>
+                  </td>
+                  <td className="is-right">{g.totals.ga170.toLocaleString("en-US")}</td>
+                  <td className="is-right">{g.totals.ga300.toLocaleString("en-US")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : null}
+
+        {dayLevel === "retailer" && retailerDaily.length ? (
           <OpsTable>
             <thead>
               <tr>
@@ -339,9 +481,11 @@ export default function GaPage() {
               ))}
             </tbody>
           </OpsTable>
-        ) : (
+        ) : null}
+
+        {retailerDaily.length ? null : (
           <EmptyState
-            title="No retailer GA yet"
+            title="No GA for this day"
             subtitle={`No GA data stored for ${prettyDate(dataDate)}.`}
             icon="sim"
           />
@@ -370,11 +514,83 @@ export default function GaPage() {
       </div>
 
       <OpsDataCard
-        title="Employee performance"
-        subtitle="Monthly RSO performance overview."
-        count={`${rows.length} employees`}
+        title="Monthly performance"
+        subtitle={
+          monthLevel === "rso"
+            ? "Monthly RSO performance overview."
+            : "The same month, with each supervisor's RSOs added together."
+        }
+        count={
+          monthLevel === "rso"
+            ? opsCountLabel(rows.length, "RSO")
+            : opsCountLabel(monthBySupervisor.length, "supervisor")
+        }
+        tabs={
+          /* No retailer level here: this table is target-against-achievement,
+             and a target is set per RSO and per BP, never per outlet. */
+          <OpsLevelTabs
+            value={monthLevel}
+            onChange={setMonthLevel}
+            levels={["rso", "supervisor"]}
+            counts={{ rso: rows.length, supervisor: monthBySupervisor.length }}
+          />
+        }
       >
-        {rows.length ? (
+        {monthLevel === "supervisor" && monthBySupervisor.length ? (
+          <OpsTable>
+            <thead>
+              <tr>
+                <th>Supervisor</th>
+                <th className="is-right">RSOs</th>
+                <th className="is-right">Retailers</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_170}</th>
+                <th className="is-right">{GA_CATEGORY_LABEL.GA_300}</th>
+                <th className="is-right">GA Target</th>
+                <th className="is-right">GA Achieved</th>
+                <th>GA Progress</th>
+                <th className="is-right">SSO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthBySupervisor.map((g) => (
+                <tr key={g.key}>
+                  <td>
+                    <PersonCell name={g.name} sub="Supervisor" />
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill">{g.count}</span>
+                  </td>
+                  <td className="is-right">
+                    <span className="kit-count-pill">{g.totals.retailerCount.toLocaleString("en-US")}</span>
+                  </td>
+                  <td className="is-right">{g.totals.ga170.toLocaleString("en-US")}</td>
+                  <td className="is-right">{g.totals.ga300.toLocaleString("en-US")}</td>
+                  <td className="is-right">{g.totals.gaTarget.toLocaleString("en-US")}</td>
+                  <td className="is-right">
+                    <strong>{g.totals.gaAchieved.toLocaleString("en-US")}</strong>
+                  </td>
+                  <td>
+                    {/* Recomputed from the summed pair, not averaged from the
+                        RSO percentages: the mean of eight percentages is not
+                        the team's percentage unless every target is equal. */}
+                    <ProgressCell
+                      target={g.totals.gaTarget}
+                      value={
+                        g.totals.gaTarget ? Number(((g.totals.gaAchieved / g.totals.gaTarget) * 100).toFixed(1)) : 0
+                      }
+                    />
+                  </td>
+                  <td className="is-right">
+                    <strong>{g.totals.ssoAchieved.toLocaleString("en-US")}</strong>
+                    <small>of {g.totals.ssoTarget.toLocaleString("en-US")}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </OpsTable>
+        ) : null}
+
+        {monthLevel === "rso" && rows.length ? (
           <OpsTable>
             <thead>
               <tr>
@@ -408,7 +624,7 @@ export default function GaPage() {
                     <strong>{r.gaAchieved}</strong>
                   </td>
                   <td>
-                    <ProgressCell value={r.gaPercent} />
+                    <ProgressCell value={r.gaPercent} target={r.gaTarget} />
                   </td>
                   <td className="is-right">
                     <strong>{r.ssoAchieved}</strong>
@@ -418,9 +634,11 @@ export default function GaPage() {
               ))}
             </tbody>
           </OpsTable>
-        ) : (
+        ) : null}
+
+        {rows.length ? null : (
           <EmptyState
-            title="No employee performance yet"
+            title="No monthly performance yet"
             subtitle="Upload an activation file to populate monthly GA performance."
             icon="chart"
           />

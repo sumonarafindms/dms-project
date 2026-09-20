@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { AppLink as Link } from "../../../components/AppLink";
 import { useCan } from "../../../components/PermissionContext";
 import { Icon } from "../../../components/icons";
 import { Btn, Card, DropZone, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";

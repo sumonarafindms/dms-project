@@ -1,5 +1,5 @@
 import { bpDisplayName } from "../../../lib/bp-name";
-import Link from "next/link";
+import { AppLink as Link } from "../../components/AppLink";
 import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { monthBounds } from "../../../lib/month";

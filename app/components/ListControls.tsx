@@ -37,6 +37,7 @@ export function ListControls({
   showDates = true,
   resultCount,
   resultNoun = "result",
+  countShownBelow = false,
 }: {
   query: string;
   onQuery: (next: string) => void;
@@ -51,6 +52,16 @@ export function ListControls({
   /** Announced politely as the list narrows, so the change is not silent. */
   resultCount?: number;
   resultNoun?: string;
+  /**
+   * True when the caller already prints the count where the reader is looking.
+   *
+   * The line stays in the DOM and keeps its `aria-live`, because the whole
+   * point of it is that a list narrowing under a screen-reader user is not
+   * silent. It just stops being drawn twice: EntityGrid prints "7 RSOs ·
+   * sorted by Recharge % — high to low" directly beneath this bar, and "7
+   * RSOs" on its own above it added a line and no fact.
+   */
+  countShownBelow?: boolean;
 }) {
   return (
     <div className="kit-filter-bar no-print">
@@ -84,8 +95,8 @@ export function ListControls({
         </label>
       ) : null}
 
-      <span className="kit-filter-note" aria-live="polite">
-        <Icon name="filter" />
+      <span className={`kit-filter-note${countShownBelow ? " is-announce-only" : ""}`} aria-live="polite">
+        {countShownBelow ? null : <Icon name="filter" />}
         {resultCount === undefined
           ? "Instant filter"
           : `${resultCount.toLocaleString("en-US")} ${resultCount === 1 ? resultNoun : `${resultNoun}s`}`}

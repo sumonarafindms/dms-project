@@ -13,7 +13,7 @@
  * has no equivalent (Rule 4).
  */
 
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { requirePagePermission } from "../../lib/auth";
 import { employeePerformance } from "../../lib/performance";
 import { prisma } from "../../lib/prisma";

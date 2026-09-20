@@ -8,9 +8,11 @@ import {
   OpsMetric,
   OpsDataCard,
   OpsTable,
+  OpsLevelTabs,
   PersonCell,
   EmptyState,
 } from "../components/OperationsPremiumUI";
+import { opsCountLabel, type OpsLevel } from "../../lib/ops-rollup";
 import { Btn } from "../components/Kit";
 import { apiFetch, apiUpload } from "@/lib/api-client";
 import { fmtDate, fmtTime } from "../../lib/format";
@@ -41,8 +43,22 @@ type Pagination = {
   hasNext: boolean;
   hasPrevious: boolean;
 };
+/** One RSO's share of the snapshot, rolled up on the server. */
+type EmployeeRow = {
+  key: string;
+  name: string;
+  sub: string;
+  supervisorId: string;
+  supervisor: string;
+  count: number;
+  amount: number;
+};
+/** One supervisor's, built from the RSO rows above. */
+type SupervisorRow = { key: string; name: string; rsos: number; count: number; amount: number };
 type ObSummary = {
   rows?: Row[];
+  byEmployee?: EmployeeRow[];
+  bySupervisor?: SupervisorRow[];
   batch?: Batch;
   snapshotDate?: string | null;
   pagination?: Pagination;
@@ -80,6 +96,15 @@ export default function ObPage() {
     hasPrevious: false,
   });
   const [totalBalance, setTotalBalance] = useState(0);
+  const [byEmployee, setByEmployee] = useState<EmployeeRow[]>([]);
+  const [bySupervisor, setBySupervisor] = useState<SupervisorRow[]>([]);
+  /*
+   * Which level the table is showing.
+   *
+   * Retailer is the default because it is what the file contains and what this
+   * page has always shown; the other two are the same snapshot added up.
+   */
+  const [level, setLevel] = useState<OpsLevel>("retailer");
   async function load(nextPage = page) {
     const res = await apiFetch<ObSummary>(`/api/ob/summary?page=${nextPage}&pageSize=50`, { cache: "no-store" });
     if (!res.ok) return setMessage(res.message);
@@ -98,6 +123,8 @@ export default function ObPage() {
       },
     );
     setTotalBalance(Number(d.totalOpeningBalance || 0));
+    setByEmployee(d.byEmployee || []);
+    setBySupervisor(d.bySupervisor || []);
   }
   useEffect(() => {
     void load(page);
@@ -174,48 +201,148 @@ export default function ObPage() {
       </section>
 
       <OpsDataCard
-        title="Retailer Opening Balance"
-        subtitle="Latest balance by retailer and responsible field employee."
-        count={`${pageMeta.total} retailers`}
-      >
-        {rows.length ? (
-          <OpsTable>
-            <thead>
-              <tr>
-                <th>Supervisor</th>
-                <th>Employee</th>
-                <th>Retailer</th>
-                <th>Opening Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.retailerCode}>
-                  <td>
-                    <PersonCell name={r.supervisor} />
-                  </td>
-                  <td>
-                    <PersonCell name={r.employee} sub={r.rsoMsisdn} />
-                  </td>
-                  <td>
-                    <b>{r.retailerCode}</b>
-                    <small>{r.retailerName}</small>
-                  </td>
-                  <td>
-                    <strong className="kit-num">৳{money(r.amount)}</strong>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </OpsTable>
-        ) : (
-          <EmptyState
-            title="No opening balance yet"
-            subtitle="Upload the latest OB file to populate retailer balances."
-            icon="◫"
+        title="Opening Balance"
+        subtitle={
+          level === "retailer"
+            ? "Latest balance by retailer and responsible field employee."
+            : level === "rso"
+              ? "Every retailer's balance added up under the RSO who owns the outlet."
+              : "Every RSO's total added up under their supervisor."
+        }
+        count={
+          level === "retailer"
+            ? opsCountLabel(pageMeta.total, "retailer")
+            : level === "rso"
+              ? opsCountLabel(byEmployee.length, "RSO")
+              : opsCountLabel(bySupervisor.length, "supervisor")
+        }
+        tabs={
+          <OpsLevelTabs
+            value={level}
+            onChange={setLevel}
+            counts={{ retailer: pageMeta.total, rso: byEmployee.length, supervisor: bySupervisor.length }}
           />
-        )}
-        {pageMeta.totalPages > 1 && (
+        }
+      >
+        {/*
+          The roll-ups are whole and the retailer list is a page of fifty.
+
+          That asymmetry is deliberate and is why the RSO and supervisor totals
+          are computed on the server: adding up what happens to be on screen
+          would total one page of the snapshot, which looks like an answer and
+          is not one. So those two tabs carry no pager — there is nothing left
+          to page through.
+        */}
+        {level === "retailer" &&
+          (rows.length ? (
+            <OpsTable>
+              <thead>
+                <tr>
+                  <th>Supervisor</th>
+                  <th>Employee</th>
+                  <th>Retailer</th>
+                  <th>Opening Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.retailerCode}>
+                    <td>
+                      <PersonCell name={r.supervisor} />
+                    </td>
+                    <td>
+                      <PersonCell name={r.employee} sub={r.rsoMsisdn} />
+                    </td>
+                    <td>
+                      <b>{r.retailerCode}</b>
+                      <small>{r.retailerName}</small>
+                    </td>
+                    <td>
+                      <strong className="kit-num">৳{money(r.amount)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </OpsTable>
+          ) : (
+            <EmptyState
+              title="No opening balance yet"
+              subtitle="Upload the latest OB file to populate retailer balances."
+              icon="◫"
+            />
+          ))}
+
+        {level === "rso" &&
+          (byEmployee.length ? (
+            <OpsTable>
+              <thead>
+                <tr>
+                  <th>Supervisor</th>
+                  <th>RSO</th>
+                  <th>Retailers</th>
+                  <th>Total Opening Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byEmployee.map((r) => (
+                  <tr key={r.key}>
+                    <td>
+                      <PersonCell name={r.supervisor} />
+                    </td>
+                    <td>
+                      <PersonCell name={r.name} sub={r.sub} />
+                    </td>
+                    <td className="kit-num">{r.count.toLocaleString("en-US")}</td>
+                    <td>
+                      <strong className="kit-num">৳{money(r.amount)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </OpsTable>
+          ) : (
+            <EmptyState
+              title="No opening balance yet"
+              subtitle="Upload the latest OB file to see each RSO's total."
+              icon="◫"
+            />
+          ))}
+
+        {level === "supervisor" &&
+          (bySupervisor.length ? (
+            <OpsTable>
+              <thead>
+                <tr>
+                  <th>Supervisor</th>
+                  <th>RSOs</th>
+                  <th>Retailers</th>
+                  <th>Total Opening Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bySupervisor.map((r) => (
+                  <tr key={r.key}>
+                    <td>
+                      <PersonCell name={r.name} />
+                    </td>
+                    <td className="kit-num">{r.rsos.toLocaleString("en-US")}</td>
+                    <td className="kit-num">{r.count.toLocaleString("en-US")}</td>
+                    <td>
+                      <strong className="kit-num">৳{money(r.amount)}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </OpsTable>
+          ) : (
+            <EmptyState
+              title="No opening balance yet"
+              subtitle="Upload the latest OB file to see each team's total."
+              icon="◫"
+            />
+          ))}
+
+        {level === "retailer" && pageMeta.totalPages > 1 && (
           <div className="kit-pagination" aria-label="Opening Balance pages">
             <button type="button" disabled={!pageMeta.hasPrevious} onClick={() => setPage((p) => Math.max(1, p - 1))}>
               Previous

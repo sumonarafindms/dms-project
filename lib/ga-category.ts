@@ -92,3 +92,24 @@ export function gaTierLine(tiers: GaTiers | null | undefined): string | null {
   if (!tiers || tiers.total <= 0) return null;
   return `${GA_CATEGORY_LABEL.GA_170} ${tiers.ga170} · ${GA_CATEGORY_LABEL.GA_300} ${tiers.ga300}`;
 }
+
+/**
+ * The same split, as two labelled figures rather than one sentence.
+ *
+ * `gaTierLine` stays: a CSV note, an Excel cell and a feed summary all want a
+ * string, and it is the one place the wording is written. On a SCREEN the
+ * string was the wrong shape — inside a KPI card half a phone wide,
+ * "GA 170 1035 · GA 300 540" wrapped wherever it ran out of room, which put
+ * "GA 300" on one line and "540" on the next, so the reader had to reassemble
+ * a figure that had been split in half. Two parts wrap as two parts.
+ *
+ * Same labels, same source, same null-when-empty rule, so the two cannot
+ * drift apart or start saying different things.
+ */
+export function gaTierParts(tiers: GaTiers | null | undefined): { label: string; value: string }[] | null {
+  if (!tiers || tiers.total <= 0) return null;
+  return [
+    { label: GA_CATEGORY_LABEL.GA_170, value: tiers.ga170.toLocaleString("en-US") },
+    { label: GA_CATEGORY_LABEL.GA_300, value: tiers.ga300.toLocaleString("en-US") },
+  ];
+}

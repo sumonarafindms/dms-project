@@ -11,7 +11,7 @@
  */
 
 import { bpDisplayName } from "../../lib/bp-name";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { FilterForm } from "./DrillUI";
 import { Icon } from "./icons";
 import { Card, EmptyState, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";

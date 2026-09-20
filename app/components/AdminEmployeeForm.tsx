@@ -10,7 +10,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { AppLink as Link } from "./AppLink";
 import { SaveNotice } from "./AdminEmployeesUI";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { Btn, Card, Check, Field, LinkBtn, NumberInput, PageHeader } from "./Kit";
@@ -20,6 +20,12 @@ import { apiSend } from "@/lib/api-client";
 import { Picker } from "./Picker";
 
 type Option = { id: string; name: string; meta?: string; employeeId?: string };
+/**
+ * One fact about the record being edited: shown, never typed into.
+ *
+ * `value` is what identifies it; `sub` is the quiet second line.
+ */
+export type IdentityFact = { label: string; value: string; sub?: string };
 type Initial = {
   id?: string;
   name?: string;
@@ -40,12 +46,24 @@ export default function AdminEmployeeForm({
   supervisors = [],
   employees = [],
   retailers = [],
+  heading,
+  identity = [],
 }: {
   role: "managers" | "supervisors" | "rsos" | "bps";
   initial?: Initial;
   supervisors?: Option[];
   employees?: Option[];
   retailers?: Option[];
+  /**
+   * What to call the record in the page title, when it has a name of its own.
+   *
+   * A BP has none it can be edited by: its display name is optional and
+   * usually blank, so "Edit BP" was the entire heading and the operator had no
+   * way to tell which of two hundred assignments they had opened.
+   */
+  heading?: string;
+  /** The facts that say WHICH record this is — see IdentityFact. */
+  identity?: IdentityFact[];
 }) {
   const router = useRouter(),
     edit = Boolean(initial.id);
@@ -93,13 +111,38 @@ export default function AdminEmployeeForm({
         <Icon name="arrow" /> {title}s
       </Link>
       <PageHeader
-        title={edit ? `Edit ${title}` : `Add ${title}`}
+        title={edit && heading ? `${title} · ${heading}` : edit ? `Edit ${title}` : `Add ${title}`}
         subtitle={
           role === "bps"
             ? "Assign a retailer code under an RSO and optionally create the BP mobile login."
             : "Manage employee identity, hierarchy and login access."
         }
       />
+
+      {/*
+        Who this is, before anything editable.
+
+        The BP form had no identity at all: the only thing above the fields was
+        the display name, which is itself one of the fields and is blank for
+        almost every assignment — so the screen read "Edit BP / Current BP
+        assignment" whichever of them you had opened. These are facts, not
+        inputs: retailer code, RSO, supervisor, the dates the assignment runs.
+      */}
+      {edit && identity.length > 0 && (
+        <Card className="kit-mb-20" padded>
+          <dl className="kit-identity">
+            {identity.map((fact) => (
+              <div key={fact.label}>
+                <dt>{fact.label}</dt>
+                <dd>
+                  {fact.value}
+                  {fact.sub ? <small>{fact.sub}</small> : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+      )}
 
       <form method="post" onSubmit={submit}>
         <Card className="kit-mb-20" padded="lg">
@@ -181,15 +224,28 @@ export default function AdminEmployeeForm({
                 ) : (
                   <Field label="BP Assignment" wide>
                     <div className="kit-readonly">
-                      <strong>{initial.name || "Current BP assignment"}</strong>
-                      <span>To change retailer code, create a new BP assignment.</span>
+                      {/*
+                        Why the retailer cannot be changed here, and nothing
+                        else — the identity panel above this form now names the
+                        outlet, the RSO, the team and the dates.
+
+                        It used to print `initial.name`, which is the editable
+                        display name and is blank on almost every assignment,
+                        so this box read "Current BP assignment" whichever of
+                        two hundred BPs you had opened, and the screen named
+                        none of them.
+                      */}
+                      <span>
+                        The retailer code and RSO are fixed for this assignment. To move the BP to a different retailer
+                        code, create a new assignment.
+                      </span>
                     </div>
                   </Field>
                 )}
                 <Field label="BP GA Target">
                   <NumberInput min="0" name="gaTarget" defaultValue={initial.gaTarget || 0} />
                 </Field>
-                <Field label="BP Display Name">
+                <Field label="BP Display Name" hint="blank uses the retailer file's name">
                   <input className="kit-input" name="name" defaultValue={initial.name || ""} />
                 </Field>
               </>

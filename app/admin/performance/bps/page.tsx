@@ -78,7 +78,7 @@ export default async function Page({
           eyebrow: "BP",
           name: bpDisplayName(b.retailer),
           code: `${b.retailer.retailerCode} · RSO ${b.employee.name}`,
-          percent: b.gaTarget ? Math.round((b.monthGa.total / b.gaTarget) * 100) : 0,
+          percent: b.gaTarget ? Math.round((b.monthGa.total / b.gaTarget) * 100) : null,
           metrics: [{ label: "SIM Sales", achieved: b.monthGa.total, target: b.gaTarget, tiers: b.monthGa }],
           search:
             `${b.retailer.retailerCode} ${b.retailer.retailerName || ""} ${b.retailer.bpName || ""} ${b.employee.name}`.toLowerCase(),

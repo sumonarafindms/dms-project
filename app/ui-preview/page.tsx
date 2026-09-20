@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "../components/AppLink";
 import { PageHeader } from "../components/Kit";
 const roles = [
   { href: "/dashboard", name: "Admin", desc: "Full system management", icon: "⚙️" },

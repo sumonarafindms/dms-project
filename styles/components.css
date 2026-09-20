@@ -18,8 +18,14 @@
      padding and font-size, and nothing in the kit re-declares height, so
      every small kit button rendered at the full 2.5rem and every ghost
      button picked up this rule's white fill. Same shape as the .kit-input
-     exclusion in forms.css — the kit owns the classes it defines. */
-  .page button:not(.kit-btn):not(.kit-icon-btn) {
+     exclusion in forms.css — the kit owns the classes it defines.
+
+     `.ops-level-tab` joined the list in v184 for the same reason and with the
+     same symptom: a segmented control's inactive tabs came out white-filled
+     and bordered, so all three read as selected at once and the control said
+     nothing. This rule outranks a single class (0,1,1 against 0,1,0), so the
+     exclusion is the fix rather than a louder selector. */
+  .page button:not(.kit-btn):not(.kit-icon-btn):not(.ops-level-tab) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -39,11 +45,11 @@
       box-shadow 0.14s var(--ease-premium),
       transform 0.06s var(--ease-premium);
   }
-  .page button:not(.kit-btn):not(.kit-icon-btn):hover {
+  .page button:not(.kit-btn):not(.kit-icon-btn):not(.ops-level-tab):hover {
     border-color: var(--color-neutral-300);
     background: var(--color-neutral-50);
   }
-  .page button:not(.kit-btn):not(.kit-icon-btn):active {
+  .page button:not(.kit-btn):not(.kit-icon-btn):not(.ops-level-tab):active {
     transform: translateY(1px);
   }
   .page button:disabled {

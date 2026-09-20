@@ -15,7 +15,7 @@
 
   body {
     margin: 0;
-    background: var(--color-neutral-50);
+    background: var(--surface-page);
     color: var(--color-neutral-800);
     font-family: var(--font-sans);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";

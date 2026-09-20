@@ -107,9 +107,25 @@ export async function retailerOpportunities(
       },
       select: { retailerId: true, month: true, totalAmount: true, transactionCount: true },
     }),
+    /*
+     * The date comes back too, so the newest row per retailer can be picked.
+     *
+     * `importOb` clears the table before writing, so normally there is one
+     * snapshot and every retailer has one row. When there is more than one —
+     * a restore, a seed, an interrupted import — this query returned several
+     * rows per retailer and the Map below kept whichever the database happened
+     * to return LAST, so a retailer's "opening balance" could silently be an
+     * August figure sitting on a September screen.
+     *
+     * Settled in memory rather than by looking up `max(date)` first, because
+     * `tests/query-depth.smoke.test.ts` holds this function to a single wave
+     * of queries and a lookup-then-filter is two waves. Same answer, same
+     * round trips. `lib/drilldown.ts` settles it the same way one retailer at
+     * a time, with `orderBy: { date: "desc" }`.
+     */
     prisma.obRecord.findMany({
       where: employeeIds ? { retailer: { employeeId: { in: employeeIds } } } : {},
-      select: { retailerId: true, amount: true },
+      select: { retailerId: true, amount: true, date: true },
     }),
   ]);
 
@@ -141,7 +157,13 @@ export async function retailerOpportunities(
     arr.push({ month: x.month.toISOString().slice(0, 7), amount: Number(x.totalAmount), trx: x.transactionCount });
     monthlyByRetailer.set(x.retailerId, arr);
   }
-  const obMap = new Map(ob.map((x) => [x.retailerId, Number(x.amount)]));
+  // Newest row wins, rather than whichever arrived last — see the note above.
+  const obLatest = new Map<string, { date: Date; amount: number }>();
+  for (const x of ob) {
+    const held = obLatest.get(x.retailerId);
+    if (!held || x.date > held.date) obLatest.set(x.retailerId, { date: x.date, amount: Number(x.amount) });
+  }
+  const obMap = new Map([...obLatest].map(([id, x]) => [id, x.amount] as const));
   const monthKeys = months.map((x) => x.toISOString().slice(0, 7));
 
   return retailers.map((r) => {
