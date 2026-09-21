@@ -707,46 +707,12 @@ export function Field({
   );
 }
 
-/** Centre dialog on desktop, bottom sheet on phones — as in every demo. */
-export function Modal({
-  title,
-  sub,
-  onClose,
-  footer,
-  labelledBy = "kit-modal-title",
-  children,
-}: {
-  title: string;
-  sub?: string;
-  onClose: () => void;
-  footer?: ReactNode;
-  labelledBy?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      className="kit-modal-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.currentTarget === e.target) onClose();
-      }}
-    >
-      <section className="kit-modal" role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
-        <header className="kit-modal-head">
-          <div>
-            <h2 id={labelledBy}>{title}</h2>
-            {sub && <p>{sub}</p>}
-          </div>
-          <button type="button" className="kit-icon-btn" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </header>
-        <div className="kit-modal-body">{children}</div>
-        {footer && <footer className="kit-modal-foot">{footer}</footer>}
-      </section>
-    </div>
-  );
-}
+/*
+ * Re-exported so `import { Modal } from "./Kit"` keeps working. The component
+ * itself lives in ./Modal.tsx because it needs hooks and this file has no
+ * "use client" — see the note at the top of that file.
+ */
+export { Modal } from "./Modal";
 
 /** A checkbox with its label, sized and coloured in the brand accent. */
 export function Check({

@@ -5,6 +5,8 @@ import { Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { PermissionProvider, type ClientPermissionMap } from "./PermissionContext";
 import { AccountMenu } from "./AccountMenu";
+import { NavMore } from "./NavMore";
+import { barLabel, bottomSlots } from "@/lib/bottom-nav";
 
 /**
  * `group` places the item in the collapsible admin sidebar. It exists because
@@ -32,7 +34,22 @@ type NavGroup = "Overview" | "Reports" | "Performance" | "Data Operations" | "Ma
  * rather than a special case in the renderer so the indicator belongs to the
  * item, and so there can only ever be one kind of it.
  */
-type NavItem = { href: string; label: string; icon: string; module?: string; group?: NavGroup; live?: boolean };
+/**
+ * `short` is the name the BOTTOM BAR uses when the real one will not fit a
+ * 64px cell. The sidebar, the More sheet and the page heading all keep the
+ * full label — a menu that renames a destination depending on where you read
+ * it is the "two words for one thing" problem this project keeps finding, so
+ * the short form is an abbreviation of the same name, never a different one.
+ */
+type NavItem = {
+  href: string;
+  label: string;
+  short?: string;
+  icon: string;
+  module?: string;
+  group?: NavGroup;
+  live?: boolean;
+};
 type RoleConfig = { name: string; title: string; initials: string; home: string; nav: NavItem[]; bottom: NavItem[] };
 const adminNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "home", module: "dashboard", group: "Overview" },
@@ -40,7 +57,14 @@ const adminNav: NavItem[] = [
   // Reports were IT-only in the demos, but the routes have always allowed
   // ADMIN too, and an admin who cannot reach the Reporting Center from the
   // menu has to know the URL. Both roles get the group.
-  { href: "/it/reports", label: "Reporting Center", icon: "file", module: "dashboard", group: "Reports" },
+  {
+    href: "/it/reports",
+    label: "Reporting Center",
+    short: "Reports",
+    icon: "file",
+    module: "dashboard",
+    group: "Reports",
+  },
   { href: "/it/readiness", label: "Data Readiness", icon: "alert", module: "dashboard", group: "Reports" },
   {
     href: "/admin/performance/supervisors",
@@ -52,6 +76,7 @@ const adminNav: NavItem[] = [
   {
     href: "/admin/performance/rsos",
     label: "RSO Performance",
+    short: "RSOs",
     icon: "chart",
     module: "performance",
     group: "Performance",
@@ -64,7 +89,14 @@ const adminNav: NavItem[] = [
     module: "performance",
     group: "Performance",
   },
-  { href: "/admin/upload", label: "Upload Center", icon: "upload", module: "ga", group: "Data Operations" },
+  {
+    href: "/admin/upload",
+    label: "Upload Center",
+    short: "Upload",
+    icon: "upload",
+    module: "ga",
+    group: "Data Operations",
+  },
   { href: "/ga", label: "GA Upload", icon: "sim", module: "ga", group: "Data Operations" },
   { href: "/c2c", label: "C2C Upload", icon: "wallet", module: "c2c", group: "Data Operations" },
   { href: "/c2s", label: "C2S Upload", icon: "chart", module: "c2s", group: "Data Operations" },
@@ -124,7 +156,7 @@ const configs: Record<string, RoleConfig> = {
       // written; the entry was simply never added, so the module was
       // unreachable except by typing the URL.
       { href: "/manager/retailers", label: "Retailers", icon: "shop", module: "retailers" },
-      { href: "/manager/bp-activations", label: "BP Activations", icon: "sim", module: "bp" },
+      { href: "/manager/bp-activations", label: "BP Activations", short: "BP Activ.", icon: "sim", module: "bp" },
     ],
     bottom: [],
   },
@@ -139,7 +171,7 @@ const configs: Record<string, RoleConfig> = {
       { href: "/supervisor/attention", label: "Attention", icon: "target", module: "attention" },
       { href: "/supervisor/rsos", label: "My RSOs", icon: "users", module: "employees" },
       { href: "/supervisor/retailers", label: "Retailers", icon: "shop", module: "retailers" },
-      { href: "/supervisor/bp-activations", label: "BP Activations", icon: "sim", module: "bp" },
+      { href: "/supervisor/bp-activations", label: "BP Activations", short: "BP Activ.", icon: "sim", module: "bp" },
     ],
     bottom: [],
   },
@@ -152,10 +184,16 @@ const configs: Record<string, RoleConfig> = {
       { href: "/accounts", label: "Overview", icon: "home", module: "dashboard" },
       { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       { href: "/accounts/operations", label: "Operations", icon: "upload", module: "ga" },
-      { href: "/accounts/retailers", label: "Retailer Search", icon: "search", module: "retailers" },
+      { href: "/accounts/retailers", label: "Retailer Search", short: "Search", icon: "search", module: "retailers" },
       { href: "/accounts/attention", label: "Opportunity", icon: "target", module: "attention" },
       { href: "/accounts/people", label: "RSO & BP", icon: "users", module: "employees" },
-      { href: "/accounts/operations/targets", label: "SC & Targets", icon: "target", module: "targets" },
+      {
+        href: "/accounts/operations/targets",
+        label: "SC & Targets",
+        short: "Targets",
+        icon: "target",
+        module: "targets",
+      },
     ],
     bottom: [],
   },
@@ -299,6 +337,11 @@ export default function AppShell({
     : path === "/dashboard" || path.startsWith("/admin/");
   const visibleNav = role.nav.filter((i) => allowed(i, permissions, isAdmin));
   const visibleBottom = role.bottom.filter((i) => allowed(i, permissions, isAdmin));
+  /*
+   * Five cells at most. `lib/bottom-nav.ts` carries the measurement that
+   * settled the number and the rule for what happens to the rest.
+   */
+  const bar = bottomSlots(visibleBottom, path, active);
   return (
     <PermissionProvider permissions={permissions}>
       <div className={`app-root ${isAdmin ? "admin-app" : `${roleKey}-app`}`}>
@@ -372,8 +415,8 @@ export default function AppShell({
              * stylesheet's own default rather than falling back to an inline
              * style.
              */
-            <nav className={`bottom-nav is-cols-${Math.min(8, Math.max(2, visibleBottom.length))}`}>
-              {visibleBottom.map((i) => (
+            <nav className={`bottom-nav is-cols-${bar.shown.length + (bar.hasMore ? 1 : 0)}`}>
+              {bar.shown.map((i) => (
                 <Link
                   key={i.href}
                   href={i.href}
@@ -391,9 +434,25 @@ export default function AppShell({
                     would be invisible to exactly the people it is for.
                   */}
                   {i.live ? <span className="nav-live-dot is-corner" aria-hidden="true" /> : null}
-                  <span>{i.label}</span>
+                  <span>{barLabel(i)}</span>
                 </Link>
               ))}
+              {bar.hasMore && (
+                <NavMore
+                  items={visibleBottom}
+                  path={path}
+                  isActive={active}
+                  onNavigate={setNavPending}
+                  /*
+                   * `bar.overflow`, not "is the current page missing from the
+                   * bar": the swap above means the page you are on is almost
+                   * never in the overflow, so this lights up only in the case
+                   * it is meant for — a route with no bar entry of its own,
+                   * such as a detail page opened from a list.
+                   */
+                  highlight={!bar.shown.some((i) => active(path, i.href))}
+                />
+              )}
             </nav>
           )}
         </div>
@@ -438,7 +497,15 @@ function AdminNav({
                 <Icon name={g.icon} />
                 {g.label}
               </span>
-              <b>⌄</b>
+              {/*
+                An icon, not the character "⌄". The glyph was drawn by whatever
+                font the device had, so it sat on the text baseline rather than
+                the row's optical centre, its stroke did not match the nav
+                icons beside it, and on the owner's screenshots it read as a
+                bare "^" and "v". This is the same 24px grid and the same
+                1.8px stroke as every other icon in the menu.
+              */}
+              <Icon name="chevron" className="nav-icon nav-chevron" />
             </summary>
             <div className="admin-nav-items">
               {items.map((i) => (

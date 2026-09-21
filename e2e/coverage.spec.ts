@@ -310,15 +310,34 @@ for (const role of ROLES) {
          * defect and fails; fire once and it is the race, annotated so the run
          * still says it happened.
          */
-        const hydrationOnly = errors.length > 0 && errors.every((e) => /#418|#423|#425|Hydration/i.test(e));
-        if (hydrationOnly) {
+        let hydrationOnly = errors.length > 0 && errors.every((e) => /#418|#423|#425|Hydration/i.test(e));
+        /*
+         * THREE loads, not two, and the number comes from the measurement.
+         *
+         * v186 measured the worst-affected page in the app, `/it/reports/sso`
+         * at 222KB, firing 3 times in 16 loads under a slow document — 19%. On
+         * two loads that is a 3.5% chance of a false failure per affected
+         * route, which over a 54-route sweep run twice a day is a red suite
+         * most weeks. On three it is 0.7%.
+         *
+         * A page with a REAL hydration mismatch fires every time, so it still
+         * fails on the third. The cost of the extra load is two seconds on the
+         * rare route that needs it.
+         */
+        for (let attempt = 0; hydrationOnly && attempt < 2; attempt++) {
           errors.length = 0;
           listen();
           await page.goto(url, { waitUntil: "load" }).catch(() => {});
           await page.waitForTimeout(500);
           unlisten();
-          if (!errors.length)
-            testInfo.annotations.push({ type: "hydration-race", description: `${url} (cleared on reload)` });
+          hydrationOnly = errors.length > 0 && errors.every((e) => /#418|#423|#425|Hydration/i.test(e));
+          if (!errors.length) {
+            testInfo.annotations.push({
+              type: "hydration-race",
+              description: `${url} (cleared on reload ${attempt + 1})`,
+            });
+            break;
+          }
         }
         if (errors.length) failures.push(`${url}: console — ${errors.join(" | ").slice(0, 200)}`);
 

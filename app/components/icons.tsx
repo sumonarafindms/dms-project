@@ -161,6 +161,11 @@ export function Icon({ name, className = "nav-icon" }: { name: string; className
         <path {...p} d="M7 3h3l1 5-2 1c1 3 3 5 6 6l1.2-2 4.8 1v3c0 2-1.5 4-4 4C9 21 3 15 3 7c0-2.5 2-4 4-4Z" />
       </>
     ),
+    chevron: (
+      <>
+        <path {...p} d="m6 9 6 6 6-6" />
+      </>
+    ),
     settings: (
       <>
         <circle {...p} cx="12" cy="12" r="3" />

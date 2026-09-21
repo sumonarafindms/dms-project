@@ -159,6 +159,21 @@ describe("text tokens clear AA on every surface they appear on", () => {
     expect(ratio, `brand text on brand-50 is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_BODY);
   });
 
+  it("a sheet's row icons are brand-coloured, not left over from the teal theme", () => {
+    /*
+     * `.kit-row-icon` carried `--text-success` from the palette this app was
+     * built on before Banglalink, so every row icon in every sheet drew green
+     * on a warm peach chip. Caught by looking at the navigation sheet on a
+     * phone, not by any test — so here is the test.
+     */
+    // Comments stripped first: the rule's own note names the colour it moved
+    // away from, which a naive match would read as the declaration.
+    const kit = fs.readFileSync(path.join(ROOT, "styles", "kit.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, " ");
+    const rule = kit.match(/\.kit-row > \.kit-row-icon\s*\{([\s\S]*?)\}/)![1];
+    expect(rule, "a green icon on a brand chip").not.toMatch(/color:\s*var\(--text-success\)/);
+    expect(rule).toMatch(/color:\s*var\(--text-brand\)/);
+  });
+
   it("--text-success is readable on its own pale tile", () => {
     // "On track", "Complete", "Online" — a green figure on a green tint.
     const ratio = contrast(resolve("var(--text-success)"), resolve("var(--color-success-50)"));

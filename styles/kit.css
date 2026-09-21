@@ -648,8 +648,20 @@
     width: 2.25rem;
     border-radius: var(--radius-control);
     background: var(--grad-brand-soft);
-    /* Initials are read, not decoration: teal-600 on teal-50 is under AA. */
-    color: var(--text-success);
+    /*
+     * BRAND, on a brand chip.
+     *
+     * This kept `--text-success` from the teal theme it was written under, so
+     * every row icon in every sheet — the account sheet's shield and sign-out,
+     * and now the navigation sheet's seven destinations — drew green on a warm
+     * peach tile, in an app whose entire palette is orange. The note it
+     * carried ("teal-600 on teal-50 is under AA") was about a colour pair that
+     * no longer exists.
+     *
+     * `--text-brand` on this chip is the pair `tests/contrast.smoke.test.ts`
+     * already measures: 4.5:1 or better, where a graphic needs 3:1.
+     */
+    color: var(--text-brand);
   }
   .kit-tile > div {
     min-width: 0;
@@ -1062,26 +1074,93 @@
     resize: vertical;
   }
 
-  /* Table on wide screens, one card per row on narrow ones. Only one is
-     ever displayed — rendering both was the targets-page bug in v102. */
+  /*
+   * Table on wide screens, one card per row on narrow ones — from ONE set of
+   * markup.
+   *
+   * It used to be two: a <table> and a second list of cards, with CSS hiding
+   * whichever did not apply. Both shipped to every reader. On
+   * /it/reports/sso at 60 rows the table was 10.1KB and the card list 34.8KB —
+   * 3.4x larger, because every cell repeated its column label — and the RSC
+   * flight payload carried a copy of each, which is most of that page's
+   * 146.4KB of inline script. See the note in ReportTable.tsx.
+   *
+   * Now the cell carries `data-label` and this stylesheet prints it. The label
+   * cannot drift from the column heading, because it IS the column heading.
+   */
   .kit-report-table {
-    display: none;
     overflow: hidden;
-  }
-  .kit-report-cards {
-    display: grid;
-    gap: 0.5rem;
-  }
-  @media (min-width: 768px) {
-    .kit-report-table {
-      display: block;
-    }
-    .kit-report-cards {
-      display: none;
-    }
   }
   .kit-report-scroll {
     overflow-x: auto;
+  }
+
+  /* --- the card layout, below 768px --- */
+  @media (max-width: 767px) {
+    /*
+     * The table's own box is dropped so the rows can stack. `display: block`
+     * on a table removes its row/cell layout entirely, which is what lets a
+     * <tr> be a card and a <td> be a line inside it.
+     */
+    .kit-report-table,
+    .kit-report-table > .kit-report-scroll {
+      background: none;
+      border: 0;
+      box-shadow: none;
+      padding: 0;
+      overflow: visible;
+    }
+    .kit-report-table table,
+    .kit-report-table tbody,
+    .kit-report-table tr,
+    .kit-report-table td {
+      display: block;
+      width: auto;
+    }
+    /* The headings are printed per cell below, so the header row is noise. */
+    .kit-report-table thead {
+      display: none;
+    }
+    .kit-report-table tbody tr {
+      margin-bottom: 0.5rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border-hairline, var(--color-neutral-200));
+      border-radius: var(--radius-card);
+      background: var(--surface-card, #fff);
+      box-shadow: var(--shadow-card, none);
+    }
+    .kit-report-table tbody tr:last-child {
+      margin-bottom: 0;
+    }
+    .kit-report-table tbody td {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.75rem;
+      padding: 0.125rem 0;
+      border: 0;
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--color-neutral-700);
+      text-align: right;
+    }
+    .kit-report-table tbody td::before {
+      content: attr(data-label);
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      text-align: left;
+    }
+    /* `is-right` aligns a column in the TABLE; in a card every value is
+       already on the right, so the modifier has nothing left to do. */
+    .kit-report-table tbody td.is-right {
+      text-align: right;
+    }
+    .kit-report-table tbody tr:hover td {
+      background: none;
+    }
   }
   .kit-report-table table {
     width: 100%;
@@ -1128,41 +1207,43 @@
   .kit-report-table tbody tr:hover td {
     background: var(--color-neutral-50);
   }
-
-  .kit-report-cardrow {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.125rem 0;
-  }
-  .kit-report-cardrow > span {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-  .kit-report-cardrow > b {
-    font-size: 0.75rem;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-neutral-700);
-    text-align: right;
-  }
 }
 
-/* On paper the card list is redundant with the table, and the table is the
-   readable one. Outside @layer so it cannot lose to the breakpoint rules. */
+/* Paper is wide, so a report prints as a table whatever the screen was doing.
+   Outside @layer so it cannot lose to the breakpoint rules above. */
 @media print {
-  .kit-report-cards {
-    display: none !important;
-  }
   .kit-report-table {
     display: block !important;
     border: 0;
   }
-  .kit-report-scroll {
-    overflow: visible !important;
+  .kit-report-table table {
+    display: table !important;
+  }
+  .kit-report-table thead {
+    display: table-header-group !important;
+  }
+  .kit-report-table tbody {
+    display: table-row-group !important;
   }
   .kit-report-table tbody tr {
+    display: table-row !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
     break-inside: avoid;
+  }
+  .kit-report-table tbody td {
+    display: table-cell !important;
+    text-align: left;
+  }
+  /* The per-cell label belongs to the card layout; on paper the column
+     headings are back, so printing both would say everything twice. */
+  .kit-report-table tbody td::before {
+    content: none !important;
+  }
+  .kit-report-scroll {
+    overflow: visible !important;
   }
 }
 
@@ -1285,8 +1366,20 @@
     width: 2rem;
     border-radius: var(--radius-control);
     background: var(--grad-brand-soft);
-    /* Initials are read, not decoration: teal-600 on teal-50 is under AA. */
-    color: var(--text-success);
+    /*
+     * BRAND, on a brand chip.
+     *
+     * This kept `--text-success` from the teal theme it was written under, so
+     * every row icon in every sheet — the account sheet's shield and sign-out,
+     * and the navigation sheet's destinations — drew green on a warm peach
+     * tile, in an app whose entire palette is orange. The note it carried
+     * ("teal-600 on teal-50 is under AA") was about a pair that no longer
+     * exists.
+     *
+     * `--text-brand` on this chip is the pair the contrast suite already
+     * measures: 4.5:1 or better, where a graphic needs 3:1.
+     */
+    color: var(--text-brand);
   }
   .kit-row > .kit-row-main {
     flex: 1;
@@ -3489,6 +3582,17 @@
    * More specific than mobile.css's `body .bottom-link`, so it wins there
    * without an !important.
    */
+  /*
+   * Five cells get their own step, because the bar now stops at five.
+   *
+   * mobile.css puts a 0.72rem floor under `.bottom-link` for legibility, and
+   * at five cells that floor is what makes "Attention" (74px) miss a 71px box
+   * by three pixels and wrap. 0.66rem brings the common labels back onto one
+   * line and stays a step above the 0.6rem the six-to-eight bars use.
+   */
+  .bottom-nav.is-cols-5 .bottom-link {
+    font-size: 0.66rem;
+  }
   .bottom-nav.is-cols-6 .bottom-link,
   .bottom-nav.is-cols-7 .bottom-link,
   .bottom-nav.is-cols-8 .bottom-link {

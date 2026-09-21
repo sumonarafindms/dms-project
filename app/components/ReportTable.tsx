@@ -96,13 +96,50 @@ export function ReportTable<T extends { id?: string }>({
 
   return (
     <>
+      {/*
+       * ONE rendering of the rows, presented two ways.
+       *
+       * This used to draw the rows TWICE — a <table> for wide screens and a
+       * second list of cards for narrow ones — with CSS hiding whichever did
+       * not apply. Both shipped in every document, to every reader. Measured
+       * on /it/reports/sso at 60 rows and 8 columns:
+       *
+       *     desktop <tbody>          10.1KB
+       *     phone .kit-report-cards  34.8KB   <- 3.4x, because every cell
+       *                                          repeated its column label
+       *     document total          217.5KB   (146.4KB of it the flight payload,
+       *                                        which carries a copy of both)
+       *
+       * So a phone downloaded the table it would never see, a desktop
+       * downloaded the cards it would never see, and the flight payload
+       * carried a second copy of each. The label is now an attribute on the
+       * cell and the card layout is drawn from it by CSS, so the markup
+       * describes the data once and the breakpoint decides how it looks.
+       *
+       * v186 established that document SIZE is what makes React #418 fire —
+       * a slow document is necessary and sufficient, and the rate tracks the
+       * byte count. This is the largest single thing in these documents.
+       */}
       <Card className="kit-report-table">
         <div className="kit-report-scroll">
-          <table>
+          {/*
+           * The roles are written out because the card layout sets
+           * `display: block` on these elements below 768px, and that strips a
+           * table of its semantics in the accessibility tree — rows and cells
+           * stop being rows and cells. Stating the role keeps the table a
+           * table for a screen reader at every width, which is more than the
+           * card list this replaced ever offered: it was plain divs.
+           */}
+          <table role="table">
             <thead>
-              <tr>
+              <tr role="row">
                 {columns.map((c) => (
-                  <th key={c.key} className={c.align === "right" ? "is-right" : undefined}>
+                  <th
+                    key={c.key}
+                    role="columnheader"
+                    scope="col"
+                    className={c.align === "right" ? "is-right" : undefined}
+                  >
                     {c.label}
                   </th>
                 ))}
@@ -110,9 +147,21 @@ export function ReportTable<T extends { id?: string }>({
             </thead>
             <tbody>
               {slice.rows.map((row, i) => (
-                <tr key={row.id ?? i}>
+                <tr role="row" key={row.id ?? i}>
                   {columns.map((c) => (
-                    <td key={c.key} className={c.align === "right" ? "is-right" : undefined}>
+                    /*
+                     * `data-label` is what the card layout prints beside the
+                     * value below 768px, through `content: attr(data-label)`.
+                     * It is the same string the <th> carries, so the two
+                     * presentations cannot drift apart the way two separate
+                     * renderings could.
+                     */
+                    <td
+                      key={c.key}
+                      role="cell"
+                      data-label={c.label}
+                      className={c.align === "right" ? "is-right" : undefined}
+                    >
                       {cell(c, row)}
                     </td>
                   ))}
@@ -122,18 +171,6 @@ export function ReportTable<T extends { id?: string }>({
           </table>
         </div>
       </Card>
-      <div className="kit-report-cards">
-        {slice.rows.map((row, i) => (
-          <Card key={row.id ?? i} padded>
-            {columns.map((c) => (
-              <div className="kit-report-cardrow" key={c.key}>
-                <span>{c.label}</span>
-                <b>{cell(c, row)}</b>
-              </div>
-            ))}
-          </Card>
-        ))}
-      </div>
       {paging && (
         <Pager
           page={slice.page}

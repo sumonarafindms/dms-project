@@ -26,7 +26,32 @@
  *     /it/reports       57KB,  36 inline scripts ....... 4 / 20
  *     /it/reports/sso  222KB, 101 inline scripts ....... 3 / 16
  *
- * See claude/v186 for what that rules out and what it leaves.
+ *
+ * v188 then halved those documents — the report rows were being rendered twice,
+ * once as a table and once as cards, with CSS hiding one — and re-ran the same
+ * measurements:
+ *
+ *     /it/reports/sso     217KB -> 130KB ..... 0 / 16, 0 / 20, 0 / 16
+ *     /it/reports/low-c2s 220KB -> 131KB ..... 0 / 16
+ *
+ * But the index page, which has no table and did not change, still fires:
+ *
+ *     /it/reports         57KB, unchanged .... 3 / 20 and 4 / 20
+ *     /dashboard          36KB, unchanged .... 0 / 20
+ *
+ * So size is NOT the whole story: /it/reports is SMALLER than the reports that
+ * stopped firing and fires anyway, while /dashboard never does. Two things were
+ * ruled out by experiment there — removing ReportDateBar, the only client
+ * component on it that reads the clock, left it at 4/20; and link count does
+ * not separate it from /dashboard (43 against 40).
+ *
+ * What a firing load does show, from capturing the server's HTML and the
+ * post-hydration DOM and comparing them, is that the client tree has DISCARDED
+ * React's streaming Suspense markers (<!--$--> <!--/$-->) that a clean load
+ * keeps. What React threw away is the streaming scaffolding, not any
+ * component's own output.
+ *
+ * See claude/v186 and claude/v188.
  *
  * v180 established the conditions: 0 in 60 on a quiet machine at full speed,
  * 3-4 in 20 with the DOCUMENT alone throttled to 500kbps — which takes CPU out

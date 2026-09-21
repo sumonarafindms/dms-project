@@ -40,6 +40,7 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").rep
 const SHELL_CODE = stripComments(SHELL);
 const SHELL_CSS = read("styles", "shell.css");
 const KIT_CSS = read("styles", "kit.css");
+const BOTTOM_NAV = read("lib/bottom-nav.ts");
 
 describe("the bottom nav is inside the page column", () => {
   it("is nested within the .app-main element", () => {
@@ -109,35 +110,80 @@ describe("the nav's own columns are equal", () => {
     }
   });
 
-  it("has a column rule for every count the roles actually use", () => {
+  it("has a column rule for every count the bar can reach", () => {
     /*
-     * On a phone the bottom bar IS the navigation — the sidebar is hidden below
-     * 900px — so a role's entries all have to fit in one row. The RSO has seven
-     * and the grid only defined up to six, so the seventh wrapped onto a second
-     * row and took a chunk out of a 390px screen.
+     * The bar caps at `MAX_SLOTS`. Before v187 it drew every destination a
+     * role had — seven for RSO, Manager and Accounts — which measured 45px
+     * cells at 320px, "BP Activations" clipped at 390px, and a bar whose
+     * height swung between 54px and 65px depending on whether a label wrapped.
+     * `lib/bottom-nav.ts` carries the full measurement.
      *
-     * Read from AppShell rather than hard-coded: add an eighth destination to a
-     * role and this fails instead of quietly wrapping again.
+     * Read from the library rather than hard-coded: raise MAX_SLOTS without
+     * adding the matching grid rule and this fails instead of quietly falling
+     * back to the previous column count.
      */
-    const capped = SHELL.match(/is-cols-\$\{Math\.min\((\d+),/);
-    expect(capped, "the bottom-nav column cap was not found in AppShell").toBeTruthy();
-    const cap = Number(capped![1]);
-    const longest = Math.max(
-      ...[...SHELL.matchAll(/nav:\s*\[([\s\S]*?)\n\s*\],/g)].map((m) => [...m[1].matchAll(/\bhref:/g)].length),
-    );
-    expect(cap, `a role has ${longest} nav entries but the grid caps at ${cap}`).toBeGreaterThanOrEqual(longest);
+    const cap = Number(BOTTOM_NAV.match(/MAX_SLOTS = (\d+)/)![1]);
+    expect(cap).toBeGreaterThanOrEqual(2);
     for (let n = 2; n <= cap; n++)
       expect(KIT_CSS, `.bottom-nav.is-cols-${n} has no rule`).toMatch(
         new RegExp(`\\.bottom-nav\\.is-cols-${n}\\s*\\{`),
       );
   });
 
-  it("does not cap the bar below what a role needs", () => {
-    // A cap here silently removes destinations on mobile, where there is no
-    // other menu. The block that claimed to cap at four never did — the lines
-    // after it assigned the whole nav — which is worse than either choice made
-    // on purpose.
-    expect(SHELL_CODE).not.toMatch(/bottom = configs\[key\]\.nav\.slice\(/);
+  it("gives every role more slots than the bar has ever had to draw at once", () => {
+    // The shell sizes the grid from what it is about to render, so a role with
+    // fewer entries than the cap gets exactly that many columns.
+    expect(SHELL).toMatch(/is-cols-\$\{bar\.shown\.length \+ \(bar\.hasMore \? 1 : 0\)\}/);
+  });
+
+  describe("nothing becomes unreachable", () => {
+    /*
+     * The objection that kept the bar at seven, and it was right: below 900px
+     * the sidebar is `display: none`, so anything missing from the bar cannot
+     * be opened at all. The cap is only allowed to exist because the last cell
+     * opens a sheet — and the sheet has to be given the WHOLE list.
+     */
+    it("the More sheet is handed every destination, not just the overflow", () => {
+      expect(
+        SHELL,
+        "NavMore must receive the full visible nav; handing it bar.overflow would hide the four in the bar from the one complete list",
+      ).toMatch(/<NavMore\s+items=\{visibleBottom\}/);
+    });
+
+    it("the sheet renders a link per destination", () => {
+      const more = read("app/components/NavMore.tsx");
+      expect(more).toMatch(/items\.map\(/);
+      expect(more).toMatch(/href=\{i\.href\}/);
+    });
+
+    it("the bar only caps when there is a More cell to catch the rest", () => {
+      // `hasMore` and the slice are decided in one place, so a future edit
+      // cannot drop entries without also drawing the button.
+      expect(BOTTOM_NAV).toMatch(
+        /if \(items\.length <= max\) return \{ shown: items, overflow: \[\], hasMore: false \}/,
+      );
+    });
+
+    it("the page you are on is always visible in the bar", () => {
+      // Otherwise opening something from the sheet leaves four cells, none of
+      // them current, and nothing on screen says where you are.
+      expect(BOTTOM_NAV).toMatch(/const current = overflow\.find\(/);
+    });
+
+    it("the shell does not slice the list itself", () => {
+      /*
+       * The cap belongs in one place. An earlier version capped in the shell
+       * with `configs[key].bottom = configs[key].nav.slice(0, 4)` and the four
+       * lines after it assigned the whole nav back, so the rule applied to
+       * nobody — code that states a rule it does not apply. A second slice
+       * here would drop destinations before `bottomSlots` ever sees them, and
+       * the More sheet would list only what was left.
+       */
+      expect(SHELL_CODE).not.toMatch(/bottom = configs\[key\]\.nav\.slice\(/);
+      expect(SHELL_CODE, "the bar's contents come from bottomSlots, nowhere else").toMatch(
+        /const bar = bottomSlots\(visibleBottom, path, active\)/,
+      );
+    });
   });
 
   it("lets a nav item shrink below its label", () => {
