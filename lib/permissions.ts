@@ -12,6 +12,23 @@ export const permissionModules = [
   { key: "c2s", label: "C2S", group: "Operations" },
   { key: "ob", label: "Opening Balance", group: "Operations" },
   { key: "bp", label: "BP / SIM Sales", group: "Operations" },
+  /*
+   * v189. Two new areas, and they are separate modules rather than folded into
+   * `targets` because the people who may SET them are not the people who may
+   * set a monthly target: Accounts owns targets and has no business writing a
+   * campaign, while a Manager owns campaigns and cannot upload a target file.
+   */
+  { key: "campaigns", label: "Campaigns", group: "Operations" },
+  { key: "support", label: "Sim Support", group: "Operations" },
+  /*
+   * v192. Stock and cash accounting is its own module because the people who
+   * may WRITE it are nobody else: the owner's ruling is "aita sudu accounts
+   * entry korbe". Six roles read it — an RSO and a BP their own, a supervisor
+   * and a manager their team's, IT and Admin everything — so "may see the
+   * area" and "may enter a day" are genuinely different questions and this
+   * module answers only the first. lib/stock-data.ts answers the second.
+   */
+  { key: "stock", label: "Stock & Cash", group: "Operations" },
 ] as const;
 export type PermissionModule = (typeof permissionModules)[number]["key"];
 export type PermissionAction = "view" | "add" | "edit" | "update";
@@ -27,6 +44,11 @@ export const roleDefaults: Record<
     employees: { view: true, add: false, edit: false, update: false },
     retailers: { view: true, add: false, edit: false, update: false },
     bp: { view: true, add: false, edit: false, update: false },
+    // A manager SETS campaigns and support schemes — the owner's ruling.
+    campaigns: { view: true, add: true, edit: true, update: true },
+    support: { view: true, add: true, edit: true, update: true },
+    // Reads their team's stock and dues; does not enter them.
+    stock: { view: true, add: false, edit: false, update: false },
   },
   SUPERVISOR: {
     dashboard: { view: true, add: false, edit: false, update: false },
@@ -35,6 +57,10 @@ export const roleDefaults: Record<
     employees: { view: true, add: false, edit: false, update: false },
     retailers: { view: true, add: false, edit: false, update: false },
     bp: { view: true, add: false, edit: false, update: false },
+    // Sees what their team needs; does not set it.
+    campaigns: { view: true, add: false, edit: false, update: false },
+    support: { view: true, add: false, edit: false, update: false },
+    stock: { view: true, add: false, edit: false, update: false },
   },
   ACCOUNTS: {
     dashboard: { view: true, add: false, edit: false, update: false },
@@ -47,17 +73,30 @@ export const roleDefaults: Record<
     c2s: { view: true, add: true, edit: true, update: true },
     ob: { view: true, add: true, edit: true, update: true },
     bp: { view: true, add: true, edit: true, update: true },
+    campaigns: { view: true, add: false, edit: false, update: false },
+    support: { view: true, add: false, edit: false, update: false },
+    // The only role that enters stock and cash.
+    stock: { view: true, add: true, edit: true, update: true },
   },
   RSO: {
     dashboard: { view: true, add: false, edit: false, update: false },
     attention: { view: true, add: false, edit: false, update: false },
     retailers: { view: true, add: false, edit: false, update: false },
     bp: { view: true, add: false, edit: false, update: false },
+    // Their own campaign target and today's support. This is the screen the
+    // whole feature is for.
+    campaigns: { view: true, add: false, edit: false, update: false },
+    support: { view: true, add: false, edit: false, update: false },
+    // Their own stock and their own due. The owner: "rso individual dekhbe".
+    stock: { view: true, add: false, edit: false, update: false },
   },
   BP: {
     dashboard: { view: true, add: false, edit: false, update: false },
     ga: { view: true, add: false, edit: false, update: false },
     bp: { view: true, add: false, edit: false, update: false },
+    campaigns: { view: true, add: false, edit: false, update: false },
+    support: { view: true, add: false, edit: false, update: false },
+    stock: { view: true, add: false, edit: false, update: false },
   },
 };
 

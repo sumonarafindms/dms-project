@@ -77,6 +77,28 @@ export function fmtDate(value: Date | string | number | null | undefined, fallba
   }).format(d);
 }
 
+/**
+ * `Wed 22 Sep 2026` — a date with its weekday.
+ *
+ * Added for the Sim Support screens, where the day IS the record: an offer
+ * belongs to one date and the operator picks days by name as often as by
+ * number ("did Friday's offer run?"). It lives here rather than in the page
+ * for the reason every other formatter does — the locale and the time zone are
+ * decided in one file, and `tests/number-locale.smoke.test.ts` fails a page
+ * that reaches for `toLocaleDateString` itself.
+ */
+export function fmtWeekdayDate(value: Date | string | number | null | undefined, fallback = "—") {
+  const d = asDate(value);
+  if (!d) return fallback;
+  return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: DISPLAY_TIME_ZONE,
+  }).format(d);
+}
+
 /** `10:15 AM`. */
 export function fmtTime(value: Date | string | number | null | undefined, fallback = "—") {
   const d = asDate(value);

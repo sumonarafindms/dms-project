@@ -1,0 +1,445 @@
+"use client";
+
+/**
+ * One holder, one day, four tabs, one save.
+ *
+ * The spec suggested four separate screens and combining them "later". They
+ * are one screen from the start, for two reasons that are not style:
+ *
+ *   1. Four screens each ask for the same Date and the same person. That is
+ *      four times the typing, on a phone, for one visit.
+ *   2. The bottom bar holds five cells (v187, lib/bottom-nav.ts). Four entry
+ *      routes would push everything a person actually navigates to into the
+ *      More sheet.
+ *
+ * The tabs are Give, Sell, Return and Collect — the real sequence of a day,
+ * with Return present because the owner's business has it and the spec did
+ * not: *"chaile she baki 10000 taka and 5ta sim accounts ke farot diye dite
+ * pare"*.
+ *
+ * ## The running total under the form
+ *
+ * The figure that decides whether the day was entered correctly is the due
+ * AFTER saving, and an operator should not have to save to find out. So this
+ * recomputes it live from exactly the arithmetic in lib/stock.ts — never a
+ * second formula written out again here, which is how two numbers on one
+ * screen start to disagree.
+ *
+ * `dueBefore` is the holder's due with THIS DAY REMOVED, computed on the
+ * server. Subtracting the saved day there rather than here means re-opening a
+ * day already entered shows the same number as leaving it alone, instead of
+ * counting it twice.
+ *
+ * ## Prices on this screen
+ *
+ * Give and Sell show the price in force **on the date being entered**, sent by
+ * the server with the day. Correcting a day from before a price change must
+ * use the price that applied then; v193 exists because v192 would have used
+ * today's.
+ *
+ * Return is different and has its own editable price column. The owner's
+ * ruling is *"je dame nice sei dame"* — stock handed back clears at what it
+ * was lifted at. The default is what the holder is actually carrying that
+ * product at (`carryPrice`), and it is shown rather than applied silently,
+ * because a default nobody can see is how a wrong number survives.
+ */
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Badge, Btn, Card, EmptyState, Field, NumberInput, SectionHead, type BadgeTone } from "./Kit";
+import { Picker } from "./Picker";
+import { Icon } from "./icons";
+import { apiSend } from "@/lib/api-client";
+import { fmtMoney } from "@/lib/format";
+import {
+  DUE_TONE_LABEL,
+  MOVE_KIND_LABEL,
+  PRODUCT_CATEGORY_LABEL,
+  dueOf,
+  dueTone,
+  isMoneyProduct,
+  lineValue,
+  paisa,
+  type DueTone,
+  type MoveKind,
+  type ProductRow,
+} from "@/lib/stock";
+
+type EntryTab = "GIVEN" | "SOLD" | "RETURNED" | "COLLECT";
+
+/*
+ * Due is risk money and wears the same colour wherever it appears — the
+ * owner's ruling. "behind" is the palette's red; a settled account is neutral
+ * rather than green, because owing nothing is normal, not an achievement.
+ */
+const DUE_BADGE_TONE: Record<DueTone, BadgeTone> = {
+  owing: "behind",
+  over: "pending",
+  clear: "neutral",
+};
+
+const TABS: { key: EntryTab; label: string; hint: string }[] = [
+  { key: "GIVEN", label: "Give", hint: "Stock handed out from company stock today." },
+  { key: "SOLD", label: "Sell", hint: "What they reported selling. This does not reduce the due." },
+  { key: "RETURNED", label: "Return", hint: "Unsold stock and unused balance handed back." },
+  { key: "COLLECT", label: "Collect", hint: "Money deposited today. This is what reduces the due." },
+];
+
+/** A product with the price in force on the day being entered. Null: none yet. */
+export type EntryProduct = ProductRow & { price: number | null };
+
+export type StockDayEntryProps = {
+  holders: { id: string; label: string; meta?: string }[];
+  holderKey: string;
+  date: string;
+  products: EntryProduct[];
+  initial: {
+    given: Record<string, number>;
+    sold: Record<string, number>;
+    returned: Record<string, number>;
+    returnPrice: Record<string, number>;
+    cash: number;
+    bank: number;
+    bankRef: string;
+    notes: string;
+  };
+  /** The holder's due with this day taken out of it. */
+  dueBefore: number;
+  /**
+   * What this holder is carrying each product at, ignoring this day — the
+   * default a return credits at. Keyed by product id.
+   */
+  carryPrice: Record<string, number>;
+  basePath: string;
+};
+
+type Qty = Record<string, string>;
+
+const toQty = (saved: Record<string, number>): Qty =>
+  Object.fromEntries(Object.entries(saved).map(([k, v]) => [k, String(v)]));
+
+const num = (v: string | undefined) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+export function StockDayEntry({
+  holders,
+  holderKey,
+  date,
+  products,
+  initial,
+  dueBefore,
+  carryPrice,
+  basePath,
+}: StockDayEntryProps) {
+  const router = useRouter();
+  const [tab, setTab] = useState<EntryTab>("GIVEN");
+  const [given, setGiven] = useState<Qty>(toQty(initial.given));
+  const [sold, setSold] = useState<Qty>(toQty(initial.sold));
+  const [returned, setReturned] = useState<Qty>(toQty(initial.returned));
+  /*
+   * The price each return credits at. Seeded from what was SAVED for this day
+   * where a line already exists, so re-opening an untouched day and saving it
+   * again cannot quietly reprice it; otherwise from what the holder is
+   * carrying.
+   */
+  const [retPrice, setRetPrice] = useState<Qty>(
+    Object.fromEntries(
+      products.map((p) => [p.id, String(initial.returnPrice[p.id] ?? carryPrice[p.id] ?? p.price ?? "")]),
+    ),
+  );
+  const [cash, setCash] = useState(String(initial.cash || ""));
+  const [bank, setBank] = useState(String(initial.bank || ""));
+  const [bankRef, setBankRef] = useState(initial.bankRef);
+  const [notes, setNotes] = useState(initial.notes);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [ok, setOk] = useState(false);
+
+  const table: Record<Exclude<EntryTab, "COLLECT">, [Qty, (q: Qty) => void]> = {
+    GIVEN: [given, setGiven],
+    SOLD: [sold, setSold],
+    RETURNED: [returned, setReturned],
+  };
+
+  const totals = useMemo(() => {
+    let givenValue = 0;
+    let soldValue = 0;
+    let returnedValue = 0;
+    for (const p of products) {
+      // A product with no price on this date contributes nothing and the row
+      // says why; the save refuses it rather than recording a free handout.
+      const day = p.price ?? 0;
+      givenValue += lineValue(num(given[p.id]), day);
+      soldValue += lineValue(num(sold[p.id]), day);
+      returnedValue += lineValue(num(returned[p.id]), num(retPrice[p.id]) || day);
+    }
+    return {
+      givenValue: paisa(givenValue),
+      soldValue: paisa(soldValue),
+      returnedValue: paisa(returnedValue),
+    };
+  }, [products, given, sold, returned, retPrice]);
+
+  /** Products typed into today that have no price for this date. */
+  const unpriced = products.filter(
+    (p) => p.price === null && (num(given[p.id]) || num(sold[p.id]) || num(returned[p.id])),
+  );
+
+  const after = dueOf({
+    openingDue: dueBefore,
+    givenValue: totals.givenValue,
+    returnedValue: totals.returnedValue,
+    cash: num(cash),
+    bank: num(bank),
+  });
+
+  function setQty(kind: Exclude<EntryTab, "COLLECT">, productId: string, value: string) {
+    const [current, set] = table[kind];
+    set({ ...current, [productId]: value });
+  }
+
+  function go(nextHolder: string, nextDate: string) {
+    router.push(`${basePath}?holder=${encodeURIComponent(nextHolder)}&date=${nextDate}`);
+  }
+
+  async function save() {
+    setBusy(true);
+    setMessage("");
+    const [type, ...rest] = holderKey.split(":");
+    const lines: { productId: string; kind: MoveKind; qty: number; unitPrice?: number }[] = [];
+    for (const p of products) {
+      // Every product is sent every time, including the zeros: a zero is how
+      // a line that was entered yesterday and is wrong today gets removed.
+      lines.push({ productId: p.id, kind: "GIVEN", qty: num(given[p.id]) });
+      lines.push({ productId: p.id, kind: "SOLD", qty: num(sold[p.id]) });
+      // The return carries its own price; the server prices the other two by
+      // the date, so it cannot be told a different figure for those.
+      lines.push({
+        productId: p.id,
+        kind: "RETURNED",
+        qty: num(returned[p.id]),
+        unitPrice: num(retPrice[p.id]) || undefined,
+      });
+    }
+    const r = await apiSend("/api/stock/day", "POST", {
+      holderType: type,
+      holderId: rest.join(":"),
+      date,
+      lines,
+      cash: num(cash),
+      bank: num(bank),
+      bankRef,
+      notes,
+    });
+    setBusy(false);
+    setOk(r.ok);
+    setMessage(r.ok ? "Saved." : r.message);
+    if (r.ok) router.refresh();
+  }
+
+  if (!products.length)
+    return (
+      <EmptyState
+        title="No products yet"
+        hint="Add what you hand out — SIMs, cards, routers, iTopup — on the Products page first."
+        icon={<Icon name="shop" />}
+      />
+    );
+
+  const tone = dueTone(after.due);
+
+  return (
+    <>
+      <Card className="kit-card-p kit-mb-20">
+        <div className="kit-form-grid">
+          <Field label="Date">
+            <input
+              className="kit-input"
+              type="date"
+              value={date}
+              onChange={(e) => e.target.value && go(holderKey, e.target.value)}
+            />
+          </Field>
+          <Field label="Person" hint="RSO, supervisor or BP code">
+            <Picker
+              name="holder"
+              options={holders}
+              value={holderKey}
+              onChange={(id) => id && go(id, date)}
+              placeholder="Type a name or code"
+            />
+          </Field>
+        </div>
+      </Card>
+
+      <div className="kit-tabs kit-mb-16" role="tablist" aria-label="What to enter">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <Card className="kit-card-p kit-mb-20">
+        <SectionHead
+          title={TABS.find((t) => t.key === tab)!.label}
+          sub={
+            tab === "RETURNED"
+              ? "Credited at what this person lifted it at, not today's price. Change a figure if the lot differs."
+              : tab === "COLLECT"
+                ? TABS.find((t) => t.key === tab)!.hint
+                : `${TABS.find((t) => t.key === tab)!.hint} Priced as at ${date}.`
+          }
+        />
+
+        {tab === "COLLECT" ? (
+          <div className="kit-form-grid">
+            <Field label="Cash deposited">
+              <NumberInput min="0" step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} />
+            </Field>
+            <Field label="Bank deposited">
+              <NumberInput min="0" step="0.01" value={bank} onChange={(e) => setBank(e.target.value)} />
+            </Field>
+            <Field label="Bank reference" hint="Slip or transaction number">
+              <input className="kit-input" value={bankRef} onChange={(e) => setBankRef(e.target.value)} />
+            </Field>
+            <Field label="Note" wide>
+              <input className="kit-input" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </Field>
+          </div>
+        ) : (
+          <div className="kit-table-wrap">
+            <table className="kit-report-table" role="table">
+              <thead>
+                <tr role="row">
+                  <th role="columnheader" scope="col">
+                    Product
+                  </th>
+                  <th role="columnheader" scope="col" className="is-right">
+                    {tab === "RETURNED" ? "Credit at" : "Price"}
+                  </th>
+                  <th role="columnheader" scope="col" className="is-right">
+                    {MOVE_KIND_LABEL[tab as MoveKind]}
+                  </th>
+                  <th role="columnheader" scope="col" className="is-right">
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p) => {
+                  const kind = tab as Exclude<EntryTab, "COLLECT">;
+                  const qty = table[kind][0][p.id] ?? "";
+                  const money = isMoneyProduct(p.category);
+                  const isReturn = kind === "RETURNED";
+                  const dayPrice = p.price;
+                  const unit = isReturn ? num(retPrice[p.id]) || dayPrice || 0 : (dayPrice ?? 0);
+                  const carrying = carryPrice[p.id] || 0;
+                  /*
+                   * The holder is carrying this product at a different price
+                   * from today's. Worth saying on a RETURN row, because that
+                   * is precisely when the two must not be confused.
+                   */
+                  const lots = isReturn && carrying > 0 && dayPrice !== null && carrying !== dayPrice;
+                  return (
+                    <tr role="row" key={p.id}>
+                      <td role="cell" data-label="Product">
+                        <strong>{p.subType}</strong>
+                        <span className="kit-cell-sub">{PRODUCT_CATEGORY_LABEL[p.category]}</span>
+                      </td>
+                      <td role="cell" data-label={isReturn ? "Credit at" : "Price"} className="is-right">
+                        {isReturn ? (
+                          <>
+                            <NumberInput
+                              min="0"
+                              step="0.01"
+                              className="kit-input kit-input-qty"
+                              aria-label={`Return price — ${p.subType}`}
+                              value={retPrice[p.id] ?? ""}
+                              onChange={(e) => setRetPrice({ ...retPrice, [p.id]: e.target.value })}
+                            />
+                            {lots && <span className="kit-cell-sub">carried at {fmtMoney(carrying)}</span>}
+                          </>
+                        ) : dayPrice === null ? (
+                          <span className="kit-cell-unset">No price</span>
+                        ) : (
+                          fmtMoney(dayPrice)
+                        )}
+                      </td>
+                      <td role="cell" data-label={MOVE_KIND_LABEL[tab as MoveKind]} className="is-right">
+                        <NumberInput
+                          min="0"
+                          className="kit-input kit-input-qty"
+                          aria-label={`${MOVE_KIND_LABEL[tab as MoveKind]} — ${p.subType}`}
+                          value={qty}
+                          onChange={(e) => setQty(kind, p.id, e.target.value)}
+                        />
+                        {money && <span className="kit-cell-sub">Taka</span>}
+                      </td>
+                      <td role="cell" data-label="Value" className="is-right">
+                        {fmtMoney(lineValue(num(qty), unit))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/*
+       * The day and the balance it lands on, side by side. "Sold" sits here
+       * deliberately greyed out of the sum: it is the one figure an operator
+       * expects to reduce the due and the only one that does not.
+       */}
+      <Card className="kit-card-p kit-mb-20">
+        <SectionHead title="This day" sub="Sold is shown for the record. Only money and returns reduce the due." />
+        <dl className="kit-daysum">
+          <div>
+            <dt>Given</dt>
+            <dd>{fmtMoney(totals.givenValue)}</dd>
+          </div>
+          <div>
+            <dt>Sold</dt>
+            <dd className="is-muted">{fmtMoney(totals.soldValue)}</dd>
+          </div>
+          <div>
+            <dt>Returned</dt>
+            <dd>−{fmtMoney(totals.returnedValue)}</dd>
+          </div>
+          <div>
+            <dt>Deposited</dt>
+            <dd>−{fmtMoney(after.deposited)}</dd>
+          </div>
+          <div className="is-total">
+            <dt>Due after saving</dt>
+            <dd className={`kit-due is-${tone}`}>
+              {fmtMoney(Math.abs(after.due))} <Badge tone={DUE_BADGE_TONE[tone]}>{DUE_TONE_LABEL[tone]}</Badge>
+            </dd>
+          </div>
+        </dl>
+      </Card>
+
+      {unpriced.length > 0 && (
+        <p className="kit-note is-bad">
+          <Icon name="alert" /> {unpriced.map((p) => p.subType).join(", ")} {unpriced.length === 1 ? "has" : "have"} no
+          price on {date}. Set one on the Products page — a line with no price would record as free.
+        </p>
+      )}
+      {message && <p className={ok ? "kit-note is-ok" : "kit-note is-bad"}>{message}</p>}
+      <Btn onClick={save} disabled={busy || unpriced.length > 0} block>
+        {busy ? "Saving…" : "Save this day"}
+      </Btn>
+    </>
+  );
+}

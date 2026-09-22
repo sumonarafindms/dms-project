@@ -112,6 +112,43 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/rso/retailers": ["RSO"],
   "/rso/retailers/[id]": ["RSO"],
   "/rso/sso": ["RSO"],
+  /*
+   * v189 — Campaigns and Sim Support. Every authenticated role may VIEW them:
+   * the whole point of the field screens is that an RSO can see their own
+   * target and today's money. Creating and editing is Admin, IT and Manager,
+   * which the pages enforce with `requirePagePermission(..., "add" | "edit")`
+   * rather than with a narrower entry here — this map is about who may reach a
+   * route at all.
+   */
+  "/campaigns": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  "/campaigns/new": ["ADMIN", "IT", "MANAGER"],
+  "/campaigns/[id]": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  "/campaigns/[id]/edit": ["ADMIN", "IT", "MANAGER"],
+  "/support": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  "/support/codes": ["ADMIN", "IT", "MANAGER"],
+  "/support/schemes": ["ADMIN", "IT", "MANAGER"],
+  "/support/schemes/new": ["ADMIN", "IT", "MANAGER"],
+  "/support/schemes/[id]/edit": ["ADMIN", "IT", "MANAGER"],
+  /*
+   * v192. Every role reads stock; only Accounts enters it. The three entry
+   * routes are ACCOUNTS-only here AND redirect in the page, because a map
+   * entry is a claim and the page is the enforcement.
+   */
+  "/stock": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  "/stock/[type]/[id]": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  "/stock/daily": ["ACCOUNTS"],
+  "/stock/opening": ["ACCOUNTS"],
+  "/stock/products": ["ACCOUNTS"],
+  /*
+   * v194. The buying price stays with Accounts, IT and Admin — the owner's
+   * ruling. A manager may read every RSO's due and still have no business
+   * knowing what we paid the company.
+   */
+  "/stock/lifting": ["ACCOUNTS", "ADMIN", "IT"],
+  "/stock/expenses": ["ACCOUNTS", "ADMIN", "IT"],
+  "/stock/profit": ["ACCOUNTS", "ADMIN", "IT"],
+  /* Wider: no purchase price on it, and the gap is a supervisor's job first. */
+  "/stock/sim-check": ["ACCOUNTS", "ADMIN", "IT", "MANAGER", "SUPERVISOR"],
   "/sacool": "PUBLIC",
   "/setup": "PUBLIC",
   "/supervisor": ["SUPERVISOR"],

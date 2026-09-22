@@ -21,7 +21,8 @@ import { barLabel, bottomSlots } from "@/lib/bottom-nav";
  *
  * Grouping by a field on the item makes both impossible.
  */
-type NavGroup = "Overview" | "Reports" | "Performance" | "Data Operations" | "Management";
+type NavGroup =
+  "Overview" | "Reports" | "Performance" | "Incentives" | "Stock & Cash" | "Data Operations" | "Management";
 /**
  * `group` is optional because the field roles (manager, supervisor, accounts,
  * rso, bp) render a FLAT list and have no groups. It is required in practice for
@@ -49,6 +50,26 @@ type NavItem = {
   module?: string;
   group?: NavGroup;
   live?: boolean;
+  /**
+   * Shown only to the roles that may CREATE and EDIT in this module.
+   *
+   * A permission module answers "may this role see the area", which is the
+   * right question for a destination. It is the wrong question for a setup
+   * screen inside an area everybody can read: every RSO may view Sim Support,
+   * and none of them may pick support codes. The page enforces it either way —
+   * this keeps a door out of the menu that opens onto a redirect.
+   */
+  writersOnly?: boolean;
+  /**
+   * The house's own books — what we paid the company, and what we spend.
+   *
+   * A separate flag from `writersOnly` because it answers a different
+   * question. `writersOnly` means "may this role EDIT the area"; this means
+   * "may this role see the BUYING side at all", and the owner's answer is
+   * Accounts, IT and Admin only — a manager writes campaigns and reads every
+   * due, and still does not see a purchase price.
+   */
+  booksOnly?: boolean;
 };
 type RoleConfig = { name: string; title: string; initials: string; home: string; nav: NavItem[]; bottom: NavItem[] };
 const adminNav: NavItem[] = [
@@ -89,6 +110,56 @@ const adminNav: NavItem[] = [
     module: "performance",
     group: "Performance",
   },
+  { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns", group: "Incentives" },
+  { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support", group: "Incentives" },
+  /*
+   * Its own entry, not just a button on the Sim Support page.
+   *
+   * Picking an RSO's slab codes is a setup job somebody does on its own, not
+   * something reached on the way to reading a day's money — and an RSO with no
+   * code earns no slab at all, so the office needs a standing way in. It is
+   * listed only for the roles that may edit: `allowed()` checks the module, and
+   * "support" alone would put it in front of every RSO.
+   */
+  {
+    href: "/support/codes",
+    label: "Support Codes",
+    short: "Codes",
+    icon: "shop",
+    module: "support",
+    group: "Incentives",
+    writersOnly: true,
+  },
+  /*
+   * v192. Stock and cash is its own group, not a line under Data Operations:
+   * everything in that group is a vendor file arriving from the company, and
+   * this is the distribution house's own money. One entry reaches the rest.
+   */
+  { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "wallet", module: "stock", group: "Stock & Cash" },
+  /*
+   * v194. The house's own books. `booksOnly` keeps them out of a manager's
+   * menu: every role may VIEW the stock module, and the buying price is a
+   * narrower question than that — the same shape as `writersOnly` in v190.
+   */
+  { href: "/stock/lifting", label: "Lifting", icon: "upload", module: "stock", group: "Stock & Cash", booksOnly: true },
+  {
+    href: "/stock/expenses",
+    label: "Expenses",
+    icon: "balance",
+    module: "stock",
+    group: "Stock & Cash",
+    booksOnly: true,
+  },
+  {
+    href: "/stock/profit",
+    label: "Profit & Loss",
+    short: "Profit",
+    icon: "chart",
+    module: "stock",
+    group: "Stock & Cash",
+    booksOnly: true,
+  },
+  { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock", group: "Stock & Cash" },
   {
     href: "/admin/upload",
     label: "Upload Center",
@@ -129,6 +200,13 @@ const NAV_GROUPS: { label: NavGroup; icon: string }[] = [
   { label: "Overview", icon: "home" },
   { label: "Reports", icon: "file" },
   { label: "Performance", icon: "chart" },
+  /*
+   * v189. Campaigns and Sim Support are neither reports nor uploads: they are
+   * things the office SETS and the field chases. Folding them into Performance
+   * would put an editable target beside a read-only figure under one heading.
+   */
+  { label: "Incentives", icon: "target" },
+  { label: "Stock & Cash", icon: "wallet" },
   { label: "Data Operations", icon: "upload" },
   { label: "Management", icon: "users" },
 ];
@@ -157,6 +235,10 @@ const configs: Record<string, RoleConfig> = {
       // unreachable except by typing the URL.
       { href: "/manager/retailers", label: "Retailers", icon: "shop", module: "retailers" },
       { href: "/manager/bp-activations", label: "BP Activations", short: "BP Activ.", icon: "sim", module: "bp" },
+      { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
+      { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
+      { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock" },
     ],
     bottom: [],
   },
@@ -172,6 +254,10 @@ const configs: Record<string, RoleConfig> = {
       { href: "/supervisor/rsos", label: "My RSOs", icon: "users", module: "employees" },
       { href: "/supervisor/retailers", label: "Retailers", icon: "shop", module: "retailers" },
       { href: "/supervisor/bp-activations", label: "BP Activations", short: "BP Activ.", icon: "sim", module: "bp" },
+      { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
+      { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
+      { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock" },
     ],
     bottom: [],
   },
@@ -194,6 +280,13 @@ const configs: Record<string, RoleConfig> = {
         icon: "target",
         module: "targets",
       },
+      { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
+      { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
+      { href: "/stock/lifting", label: "Lifting", icon: "upload", module: "stock" },
+      { href: "/stock/expenses", label: "Expenses", icon: "balance", module: "stock" },
+      { href: "/stock/profit", label: "Profit & Loss", short: "Profit", icon: "chart", module: "stock" },
+      { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock" },
     ],
     bottom: [],
   },
@@ -224,6 +317,15 @@ const configs: Record<string, RoleConfig> = {
        * where the day-by-day activations live. /rso/bp/activations is gone.
        */
       { href: "/rso/bp", label: "My BP", icon: "users", module: "bp" },
+      /*
+       * The field's two new destinations, at the END of the list on purpose:
+       * the bar shows the first four and these fall into the More sheet, which
+       * is where a target you check once a day belongs. The worklists above are
+       * what an RSO opens twenty times.
+       */
+      { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
+      { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
     ],
     bottom: [],
   },
@@ -236,6 +338,9 @@ const configs: Record<string, RoleConfig> = {
       { href: "/bp", label: "Home", icon: "home", module: "dashboard" },
       { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       { href: "/bp/sales", label: "Sales", icon: "sim", module: "ga" },
+      { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
+      { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
     ],
     bottom: [],
   },
@@ -280,7 +385,22 @@ function active(path: string, href: string) {
   if (homes.has(href)) return path === href;
   return path === href || (href !== "/" && path.startsWith(href + "/"));
 }
-function allowed(item: NavItem, permissions: ClientPermissionMap, admin: boolean) {
+/** The three roles that may create and edit campaigns and support offers. */
+const WRITER_ROLES = ["ADMIN", "IT", "MANAGER"];
+
+/** The three roles the owner allows to see what we paid the company (v194). */
+const BOOKS_ROLES = ["ACCOUNTS", "ADMIN", "IT"];
+
+function allowed(item: NavItem, permissions: ClientPermissionMap, admin: boolean, role = "") {
+  // `writersOnly` is checked BEFORE the admin shortcut's twin below, because a
+  // Manager is not `admin` here and must still see it.
+  if (item.writersOnly && !WRITER_ROLES.includes(role.toUpperCase())) return false;
+  /*
+   * And `booksOnly` before it too, but for the opposite reason: a Manager IS
+   * allowed by the admin shortcut in some configurations, and must still not
+   * see a purchase price.
+   */
+  if (item.booksOnly && !BOOKS_ROLES.includes(role.toUpperCase())) return false;
   if (admin) return true;
   if (item.href === "/accounts/operations")
     return ["ga", "c2c", "c2s", "ob", "targets"].some((m) => permissions[m]?.view);
@@ -335,8 +455,8 @@ export default function AppShell({
   const isAdmin = user
     ? roleName === "ADMIN" || roleName === "IT"
     : path === "/dashboard" || path.startsWith("/admin/");
-  const visibleNav = role.nav.filter((i) => allowed(i, permissions, isAdmin));
-  const visibleBottom = role.bottom.filter((i) => allowed(i, permissions, isAdmin));
+  const visibleNav = role.nav.filter((i) => allowed(i, permissions, isAdmin, roleName));
+  const visibleBottom = role.bottom.filter((i) => allowed(i, permissions, isAdmin, roleName));
   /*
    * Five cells at most. `lib/bottom-nav.ts` carries the measurement that
    * settled the number and the rule for what happens to the rest.
@@ -351,7 +471,7 @@ export default function AppShell({
           </div>
           <div className="sidebar-section">{role.title}</div>
           {isAdmin ? (
-            <AdminNav nav={role.nav} path={path} permissions={permissions} onNavigate={setNavPending} />
+            <AdminNav nav={role.nav} path={path} permissions={permissions} onNavigate={setNavPending} role={roleName} />
           ) : (
             visibleNav.map((i) => <NavLink key={i.href} item={i} path={path} onNavigate={setNavPending} />)
           )}
@@ -473,17 +593,20 @@ function AdminNav({
   path,
   permissions,
   onNavigate,
+  role,
 }: {
   nav: NavItem[];
   path: string;
   permissions: ClientPermissionMap;
   onNavigate: (href: string) => void;
+  /** The signed-in role, for the entries that only writers may see. */
+  role: string;
 }) {
   const groups = NAV_GROUPS.map((g) => ({ ...g, items: nav.filter((i) => i.group === g.label) }));
   return (
     <nav className="admin-sidebar-nav">
       {groups.map((g) => {
-        const items = g.items.filter((i) => allowed(i, permissions, true));
+        const items = g.items.filter((i) => allowed(i, permissions, true, role));
         if (!items.length) return null;
         const groupActive = items.some((i) => active(path, i.href));
         return (

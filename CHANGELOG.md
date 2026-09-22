@@ -959,3 +959,284 @@
 - **The whole month recounted in SQL again**: 16 checks, every one agreeing — company standard GA 67,398 of 74,864 rows, the 170/300 split 44,943 / 22,455, C2C ৳72,105,925, C2S ৳41,501,975, the OB snapshot 1,930 outlets / ৳9,168,905 with both roll-ups adding to it, per-RSO and per-supervisor GA, and own-GA + BP-held GA back to the company total.
 - **And a second audit for what this version changed**: for all eight reports, the row count the page prints against the row count in the server-built Excel export — SSO 37, LSO 260, Low C2S 2,190, OB 2,190, and 7 each for the four supervisor reports — plus every cell carrying a label, every label matching its column heading, and zero second renderings anywhere. 16 comparisons, no page errors.
 - No schema change, no permission change, no business rule changed, and no report's rows or ordering changed.
+
+## v189 - Campaigns, and Sim Support
+
+Two new features, both asked for by the owner, both built on the rules this app already has: a SIM is standard GA (swaps excluded) and a day an outlet is held as a BP belongs to the holder. Nothing existing changed.
+
+### Campaigns — a target with a start and an end
+
+- Every other target here is monthly. A campaign is **"500 SIMs between the 1st and the 10th"** or **"25 each, this fortnight"**, so its window is its own and nothing about it can be derived from a month. Created by **IT, Admin and Manager** — the owner's ruling, and not the usual Admin/IT pair, because a campaign is a field instrument and the manager runs the field. Everybody else sees it.
+- **Two scopes, and they answer different questions.** _Whole distribution_ is one total: the screens show how many SIMs are needed and how many are done, and nothing else, because nothing else was set. _Per RSO / BP_ is a number each, so a supervisor sees what their own team still needs and a manager sees the same for every team.
+- **A distribution-wide campaign has no per-RSO number, and the code says so** — `targetFor()` returns null for it rather than 0. Otherwise every RSO's phone would print "0 of 0 · 0%" for a campaign running perfectly well at company level, which is the defect v175, v183 and v186 each found somewhere else.
+- **One number for everyone, with exceptions.** The campaign carries a number; an exceptions table overrides it for one person — a new RSO given 10 where everyone else has 25. **A zero is a decision**, not an absence: it means "this RSO is out of this campaign", their SIMs still count toward the distribution, and their absent target does not pull their team's target down. A team of eight with six in the campaign reads "6 of 8", never "8".
+- **The field's own number leads.** An RSO's campaign card shows _their_ figure with the distribution's in the footer; the first build showed the company's 67,398 above their target of 15, which reads as if they were tens of thousands ahead. On the detail screen their line sits above the distribution's for the same reason — it is the question they opened the app to answer.
+- The level switch is `OpsLevelTabs`, the same control the four import screens got in v184. There is no retailer level, because a campaign target is set per person and never per outlet.
+
+### Sim Support — what today's SIMs are worth
+
+- IT sets an offer for a **day**: slabs of "from N SIMs, ৳R each", and optionally the SSO offer. Most days carry none, and the screens say that rather than showing zero.
+- **A slab reprices the whole day.** It does not pay a margin on the SIMs above the threshold. That is the owner's own arithmetic and it is worth stating, because the other reading is the obvious one and gives different money: at _from 11 → ৳50_ and _from 15 → ৳100_, **14 SIMs pay ৳700 and 15 pay ৳1,500**. One more SIM there is worth ৳800, not ৳100 — and showing that is the whole point of the RSO's screen. The marginal answer, ৳800 for fifteen, is pinned as a wrong answer in the tests so it cannot creep back.
+- **Support is paid on two retailer codes per RSO**, marked in advance, and on a BP's own held outlet. SIMs on any other code are real GA and count on every other screen; they are simply not what this money is for. An RSO with no code set **cannot earn a taka however many SIMs they sell**, so their screen says exactly that instead of "৳0", and the operator screens name who is missing and link to where it is fixed.
+- **The SSO offer, which is not every day.** An outlet that had not completed SSO and completes it today earns a rate on **every SIM it did today**, paid **on top** of the slab because the two are paid for different things. Both shapes the owner described fall out of one rule: "two SIMs today" is the case where the outlet had none before, and "one before and one today, so they get today's" is the case where it had one. An outlet already past the threshold yesterday does not qualify — the offer is for completing. The stricter form ("and at least N on the day itself") is a field on the offer and defaults to no condition at all.
+- The scheme form **previews the money as you type** — each threshold and the SIM just below it — so the jump a slab creates is obvious before it is saved and paid.
+
+### Found by the audit, on its first run
+
+- **A campaign team total counted a shared BP outlet twice.** The audit read 67,409 against SQL's 67,398: eleven SIMs from one outlet held by two RSOs. Each RSO's row carries the whole outlet — correctly, because each is measured on the whole outlet — so adding the rows invents the second one. This is exactly what `teamTotals()` in `lib/bp-rollup.ts` exists to prevent, and v186's guard did not catch it because the guard looks for `bp.gaAchieved` and a campaign row does not have one. A campaign row now carries its BP figures **keyed on retailer id**, and `groupTotal()` unions them before adding.
+- The same run confirmed what must NOT be unioned: an outlet held by RSOs in two different teams is counted by both, because v143 ruled that a supervisor answers for their own territory. Only a total across teams unions, and the audit checks each team against the union over its own rows rather than comparing the cross-team sum to the company's.
+
+### The rest
+
+- **Two new permission modules**, `campaigns` and `support`, rather than folding either into `targets`: Accounts owns targets and has no business writing a campaign, while a Manager owns campaigns and cannot upload a target file.
+- **A new sidebar group, "Incentives."** These two are neither reports nor uploads — they are things the office sets and the field chases — and putting them under Performance would stand an editable target beside a read-only figure under one heading. On a phone they sit at the end of each field role's list, so they fall into v187's More sheet, which is where a target you check once a day belongs.
+- **Schema:** `Campaign`, `CampaignTarget`, `SupportScheme`, `SupportSlab`, and `Retailer.supportEligible`. Additive only — nothing existing is altered or dropped, so the migration is safe against a database already serving. Campaign dates are `@db.Date`, not timestamps: they are calendar dates somebody typed, and storing an instant is how a campaign ends a day early for a reader in another offset.
+- Five of this project's own guards caught the new code before any test of mine did, and each was a real inconsistency: raw `<input type="number">` where the wheel guard requires `NumberInput`, `toLocaleDateString` where the locale belongs in `lib/format` (now `fmtWeekdayDate`), `className="kit-btn"` on a link instead of `LinkBtn`, a form with no `method="post"` fallback, and a rate limiter hidden inside a shared helper where the API guard could not see it.
+- 1,095 unit tests across 76 files pass — 45 of them new, on the two rule libraries. eslint 0 errors and the same 27 pre-existing warnings; prettier clean; `npm run build` clean. 22 SQL comparisons against the production-volume database, all agreeing. Verified in a browser as Admin, IT and RSO on both a desktop and a 390px phone: no page errors.
+
+## v190 - Sim Support: the SSO offer counts every outlet, and the codes have no cap
+
+Three corrections to v189's Sim Support, all of them about money.
+
+- **The SSO offer is counted on EVERY outlet under an RSO, picked or not.** v189 paid it only on the slab codes, which was wrong: the owner's ruling is _"SSO ta rso under ar jai retailer gula sim sell kore tader sobar, kono selection nai."_ Measured on the seeded month, 2 September: **693 outlets completed SSO and 664 of them are not picked codes** — ৳221,400 that v189 would not have paid. The slab is unchanged and still counts only the picked codes, so the two payments now count different outlets, which is the most important sentence in `lib/sim-support-data.ts` and is written at the top of it.
+- **The SSO offer is for RSOs only.** A BP earns its slab and nothing else, so no outlet can draw the bonus twice — once for the BP and once for the RSO who owns it.
+- **A picked code that is held as a BP that day is not also counted for its RSO.** One outlet's SIMs paid to two people is the one error that cannot be argued about, and it follows the rule every other figure in this app already uses: a day an outlet is held as a BP belongs to the holder.
+- **No cap on how many codes may be picked.** v189 refused more than two. The owner's ruling is that the number must not live in the code — _"bar bar update korte hobe na"_ — so any number is accepted and the screens simply say how many. Two is what the office picks today and the page says so, as a hint. One RSO in the seeded data now carries three.
+- **Support Codes is its own menu entry**, under Incentives, not just a button on the Sim Support page: picking codes is a setup job somebody does on its own, and an RSO with none earns no slab at all. It is shown only to the three roles that may edit — a `writersOnly` flag on the nav item, because a permission module answers "may this role see the area" and every RSO may see Sim Support. Verified: an RSO who types the URL lands back on their own home.
+
+### The two conditions, checked at the edges
+
+The owner restated them, so both are written out in the tests in their own words and checked at the boundaries rather than at one example each:
+
+- **nothing before, two or more today** → completes today. One today does not.
+- **one before, one or more today** → completes today. Nothing today does not.
+- already at the threshold yesterday → does **not** complete again, whatever today brings.
+- and the offer's own extra condition — _"tar kintu 1ta korle SSO complete hoye jaito, but company sorto dice minimum 2ta korle taka pabe"_ — excludes the one-SIM case while still paying for **both** SIMs when the second arrives.
+
+That last case does not occur anywhere in the seeded month, so it was **built**: `.scratch/ssoprobe.ts` inserts one SIM yesterday and one today on a clean outlet, checks it is paid ৳50 with no extra condition, **not** paid when the day demands two, paid ৳100 once a second SIM arrives, and not paid at all once it was already complete before today — then removes its own rows. Nine checks, all passing. A rule that never fires against real data is a rule nobody has tested.
+
+### Also found
+
+- **The nudge was subtracting money.** An RSO earning ৳6,400 from the SSO offer and nothing from the slab was told that four more SIMs "takes today's support to ৳40" — the slab step's own total, which reads as a cut of ৳6,360 for selling more. The bonus is already earned and does not move, so it is counted into the total while the gain stays what the extra SIMs are actually worth: **"4 more SIMs on your picked codes — 4 in total — takes today's support to ৳6,440, which is ৳40 more."**
+- The same card said "৳6,400 · 0 SIMs counted", which looks like a mistake. It now names which SIMs: "0 SIMs on your picked codes · 16 outlets completed SSO".
+- `SupportViews` began importing `SSO_MIN_MONTHLY_STANDARD_GA` to explain the rule on screen, and that module reaches Prisma — so the people table moved into the client island that uses it. `tests/client-bundle.smoke.test.ts` caught it before the build did.
+
+### Gates
+
+- **1,105 unit tests across 76 files** pass — 11 new on the SSO edges and the two-payment split, including source guards so a later tidy cannot narrow the SSO offer back to the picked codes or re-introduce a cap.
+- eslint 0 errors and the same 27 pre-existing warnings; prettier clean; `npm run build` clean.
+- **29 SQL comparisons** against the production-volume database, all agreeing — including the whole SSO rule rebuilt from scratch in SQL on four days, two of them with hundreds of real completions: 693 outlets / 4,428 SIMs / ৳221,400 on 2 September, and 643 / 4,435 / ৳443,500 on 3 September under the stricter offer.
+- No schema change: v189's tables carry all of this.
+
+## v191 — reading every page, as every role, on a real phone
+
+No new feature. The owner asked for the whole app to be checked again and for the UI/UX to be perfect, so every page was read as every role at phone and desktop width and compared against what it claims. Four findings, all of them the same defect this project keeps finding: **output that renders perfectly and means something else.**
+
+### A percentage nobody set, one column further left
+
+`/it/reports/target` printed **`289 / 0`** and **`0 / 0`** in its GA, SSO and LSO columns — an achievement against a target of zero — while the percentage column immediately beside it correctly printed `—`. One row, two answers, and the dishonest one is the bigger number.
+
+The percentage columns learned this in v175 and the cards in v183; the raw pair beside them never did, because no component owned it — eight screens each interpolated `${a} / ${b}` for themselves. The rule now lives once, beside `targetPercent`, which has returned 0 for a zero target on purpose since v175:
+
+```ts
+export function againstTarget(achieved, target, fmt = String) {
+  return `${fmt(achieved)} / ${target > 0 ? fmt(target) : NO_TARGET_MARK}`;
+}
+```
+
+Applied to the target report, `/ga`, the employee detail strip and the supervisor detail page. Three more screens — `/ga`, `/c2c`, `/c2s` — were falling back to a literal **`"0%"`** for a month whose target was never uploaded, which is the v175 defect verbatim, four years of versions later; they print `—` now. A source guard in `tests/empty-states.smoke.test.ts` rejects any page that builds an achieved/target pair by hand or falls back to `"0%"`, and it was verified by putting the old line back and watching it fail.
+
+### Links a thumb could miss
+
+Eleven links measured **18–20px tall** on a phone: the `View all →` / `See all →` / `Open list →` action beside a section heading on all seven role home pages, and every name in the daily report's table. Padding the table cell had made the **row** taller without making the **link** bigger, so a tap landing beside the words did nothing at all. Both now take a real 44px height on a touch screen only — unchanged under a mouse — and the cell gives its padding back so a column of names does not double in height.
+
+### The sweep was measuring a phone that does not exist
+
+The reason those links had never been caught: a default headless browser reports `pointer: fine` at any width, so **every `@media (pointer: coarse)` rule in `styles/mobile.css` was switched off** in the measurement. The first run of the new sweep reported 14 short tap targets that a real phone never sees, and would have missed a genuinely broken coarse rule entirely. `390px` now means `hasTouch`, and re-running it that way immediately found something the old configuration could not:
+
+**Four pages scrolled sideways by 56px on a phone** — `/ga`, `/c2s`, `/c2c` and `/ob`. The upload field holds a native file input, which takes the 16px font every input gets on a touch screen so iOS will not zoom the page; a flex item will not shrink below its content unless told to, so the field pushed the whole document past the viewport. `min-width: 0` on the field and `max-width: 100%` on the input. Measured after: `scrollWidth` 390 on all four.
+
+### Gates
+
+- **`.scratch/sweep191.ts`** reads all 148 role-and-route combinations at 390 (touch) and 1440, checking each for `[object Object]`, `NaN`, a bare `undefined`, `Invalid Date`, a printed `null`, an error boundary, a percentage against a zero target, horizontal overflow, tap targets under 28px and page errors. **0 problems.**
+- **1,106 unit tests across 76 files** pass.
+- All four SQL audits re-run against the production-volume database and clean: company GA 67,398 (**0 failed**), campaigns and Sim Support 29 checks (**0 failed**), the nine SSO edge cases (**0 failed**), eight reports against their Excel exports (**0 failed**).
+- `npm run build` clean. No schema change, no business-logic change, no new route.
+
+### Still open
+
+React error **#418** and the `parentNode` error that follows it remain reproducible on `/admin/attention` — **2 loads in 30** — but only while six parallel clients are hammering the heaviest report route at once, which is what v186 characterised: a slow **document** makes React discard its own streaming Suspense markers. Not reproducible at rest (0 in 40 loads), no app code is involved, and nothing the user sees is wrong when it happens. It is recorded here rather than claimed fixed.
+
+## v192 — Stock & Cash: what Accounts hands out, and what comes back
+
+The Accounts role has been a feed-import operator since it existed: GA, C2C, C2S, OB and Target files arriving from the company. This is the other half of the job, and it is a different business — physical stock and money moving through the distribution house itself. The two share exactly one thing, the person, and the GA product classification in `lib/business-rules.ts` is deliberately **not** the new Product master: one is a tariff on an activation in a vendor feed, the other is a thing in a box with a price on it.
+
+### The one formula
+
+```
+Due = opening due + Σ(given) − Σ(returned) − Σ(cash) − Σ(bank)
+```
+
+Three things follow, and each is the owner's ruling rather than a choice this code made:
+
+- **A reported sale does not reduce the due.** Only money or goods coming back do. Someone who sells ৳25,000 and deposits ৳20,000 has reduced their due by ৳20,000; the other ৳5,000 is in their pocket, which is what a due is for. `dueOf()` has no argument for a sale at all, so no caller can make that mistake by passing the wrong field.
+- **The due contains the value of stock still in hand.** Straight from the owner's arithmetic — *"100000 takar product niche, 80000 taka sale dekhaice, tahole tar due 20000 taka"* — and the ৳20,000 of goods has not gone anywhere.
+- **It is a running balance, per person, forever.** His second day (took ৳10,000 more, deposited ৳25,000) lands on ৳5,000, and `tests/stock.smoke.test.ts` checks that exact pair of days in his numbers.
+
+Nobody's stock is added to anybody else's — *"proti ta person ar stock alada"*. There is no team total anywhere in `lib/stock.ts` and a test asserts there never will be: a supervisor reading their team sees a list of people who each owe something, not a sum nobody can collect.
+
+### iTopup is a product
+
+The recharge float is taken in the morning, spent during the day and handed back at night — the same three movements as a box of SIMs, in Taka instead of pieces. So it is a `Product` of category `ITOPUP` priced at 1.00, and `qty` is the amount. One movement table, one due formula, and no second set of rules to drift out of step with the first. The owner's own return example proves it: *"baki 10000 taka and 5ta sim accounts ke farot"* — two units, one mechanic.
+
+### A price is frozen once anything points at it
+
+Every figure a product has ever appeared in is `qty × price` read off the row that was chosen, so editing a price rewrites history silently. Once one movement refers to a row the price is frozen and a change becomes a **new row** that records which one it superseded; the old row goes inactive. Before that — a typo caught the same minute — there is nothing to protect and an edit is just an edit. `priceIsEditable()` is that single distinction, and the button says which of the two it is about to do *before* it is pressed. An old-price card and a new-price card stay two lines on a holder's stock table and are never merged; in the seeded month **12 people carry both versions of the same card at once**.
+
+### Screens
+
+One new nav group, **Stock & Cash**, at `/stock` for every role — not under `/accounts`, because a URL that says "accounts" in front of an RSO's own ledger reads like somebody else's page.
+
+- **Stock & Cash** — everyone who owes something, largest first, plus the iTopup still out. A person who holds stock themselves lands on their own ledger instead.
+- **Daily entry** — one Date and one person, then four tabs: **Give · Sell · Return · Collect**, saved in **one** request. Four separate screens would ask for the same date and person four times, on a phone, and four more routes would push everything real into the More sheet. Return is there because the business has it and the spec did not. Under the form, the due **after saving** moves as the numbers are typed, computed from `lib/stock.ts` and never from a second copy of the formula.
+- **Ledger** — one person's stock product by product, how the due is made up line by line, and their last 30 days.
+- **Products** and **Opening positions** — Accounts only.
+
+Opening positions exist because history is not being imported: each person gets one statement of where they stood and the ledger runs forward. `openingDue` is the *whole* amount outstanding including the stock typed in the same form, so the field is prefilled from those rows rather than left for somebody to remember.
+
+### Who may do what
+
+Entry is **Accounts alone**. Reading: an RSO and a BP their own, a supervisor their own row plus their RSOs and the BP outlets those RSOs hold, a manager their assigned supervisors' teams, IT and Admin everything. A BP holder is the **outlet**, not the RSO holding it — an outlet changes hands (v142/v143) and the boxes stay in the shop. An RSO who types somebody else's ledger URL is redirected to their own, not shown a 404, because a 404 would tell them whether an id exists in another team.
+
+### Gates
+
+- **`.scratch/audit192.ts`** rebuilds every due in SQL that shares no code with the app and compares: **24 checks, 0 failed**, over **6,885 movements, 650 deposits and 54 holders** — every holder's due one by one, the company total (৳12,872,675), and a proof that the ৳26,695,746 of recorded sales moves the due by nothing at all.
+- **`.scratch/stockwrite.ts`** drives the real API end to end — the owner's day, his return, a correction that replaces rather than adds (6 rows, not 12), a zero that deletes its line, four kinds of bad input refused, a used price that versions itself, and all three write routes refusing an RSO. **21 checks, 0 failed**, and it leaves the ledger exactly as it found it.
+- **`.scratch/stockread.ts`** reads every stock screen as all seven roles at 390 (touch) and 1440: **0 problems**.
+- **1,127 unit tests across 77 files**, 24 of them new. Four existing project guards caught this code as it was written — an unwatched `next/link`, a `<select>` over a data list, and two route-guard rules — which is what they are for.
+- All four earlier SQL audits re-run and clean. `npm run build` clean; eslint 0 errors and **0 new warnings**; prettier clean.
+- Schema: four new models and one migration, written by hand and applied to the local database only. Production `APP_DATABASE_URL` was never touched.
+
+## v193 — a price change can no longer reach a figure already recorded
+
+The owner, on v192:
+
+> *"amon vabe jinish ta ready koro jate price change korlau ager data te effect jate na pore... ager sell kora product ba rso der jai product lifting kora hoice oi product ar price change hole full hisab change hoye jabe. Tai ai jinish ta thik moto ready koro, karon accounts hisab onk gurutoo purno."*
+
+He was right to push. v192 protected history with a **rule** — a price was frozen once a movement referred to it, and a change made a duplicate product. But the money was still computed at display time as `qty × product.price`, so the entire protection rested on every future code path remembering that rule. For the number somebody gets paid on, a rule is not enough.
+
+### The fix is one column
+
+Every `StockMovement` now carries **`unitPrice`** — what one unit was worth when that line was recorded. Every figure in the module, from a single cell to a total three years from now, is `qty × that`. The product master is free to change: new price, back-dated price, renamed, retired, price row deleted. **There is no longer a path from any of it to a figure already saved.** Structure, not discipline.
+
+`ProductRow` lost its `price` field entirely, and that removal is load-bearing: a screen holding one cannot value a historical movement with today's figure even by accident. When the field went, the compiler found all sixteen places that had been reaching for it.
+
+### v192's second hole, which the owner's question exposed
+
+Any past date may be corrected — that was the owner's ruling in v192. But the entry screen priced every line at **today's** price, so correcting a day from before a price change would have rewritten it at the new one. The same fear, arriving through the back door. Give and Sell are now priced by **the date being entered**, on the server.
+
+### One product, many prices
+
+`Product` is identity — kind, name, unit, status. `ProductPrice` carries every price with the date it starts. That answers the owner's storage worry directly: a price change costs **one four-column row**, against the eleven-column duplicate `Product` row v192 created. It is *less* data, not more, and "Swap SIM" appears once in the catalogue instead of once per price it has ever had. A holder carrying two lots of the same card sees one line — `20 in hand, ৳790, carried at ৳39.50` — instead of v192's two.
+
+`priceOn(prices, date)` is the whole lookup. A product with no price on that date returns **null, not zero**: a product added in October genuinely has no September price, and a silent zero is a free handout nobody would ever notice. The entry screen names the product and refuses to save.
+
+### A return credits what it was lifted at
+
+The owner's ruling: *"je dame nice sei dame"*. Lift ten cards at ৳39, price rises to ৳40, hand those ten back — the due clears by exactly ৳390. At today's price it would clear ৳400 and leave him ৳10 ahead for doing nothing.
+
+The Return tab has its own editable price column, defaulted to what that holder is actually carrying the product at — blended across lots, so someone holding a ৳39 lot and a ৳55 lot is offered ৳43.57, not today's price. It is **shown rather than applied silently**, and says "carried at ৳39" when the lot differs from the catalogue, because a default nobody can see is how a wrong number survives. Give and Sell cannot be priced by the client at all; only a return may name its figure.
+
+### Migration
+
+Written by hand, and it moves nothing. `unitPrice` is backfilled from the price each movement was recorded against **before** that column is dropped; v192's version chains collapse into one product with dated prices, their movements following. Measured across the real 6,885-row dataset, every money total is byte-identical before and after: given ৳37,159,155 · sold ৳26,695,746 · returned ৳4,193,772 · opening ৳1,722,564.
+
+### The owner's catalogue
+
+`prisma/seed-stock-catalogue.ts` ships his real list — scratch cards at 20/39/100, SIMs at 150/300, Swap, EV and E-SIM, iTopup, 4G and 5G routers, two handsets — with prices that go **up and down** and an E-SIM that starts mid-month, so the catalogue itself contains both cases the entry screen has to get right. Safe to re-run; it cannot move a recorded figure.
+
+### Gates
+
+- **`.scratch/pricelock.ts`** answers the owner's question by experiment: record two real days through the API, fingerprint every figure the module can show, then change the price five ways — including one **back-dated over both recorded days** — and fingerprint again. **Eleven figures, not one moved.** A day entered afterwards correctly takes the new price, and the return case lands exactly on zero.
+- **`.scratch/audit192.ts`**, rebuilt against the new shape: **24 checks, 0 failed**. It now also proves the snapshot is doing real work — **12 rows worth ৳9,906 recorded that today's prices would call ৳10,160, a ৳254 difference v192 would have silently applied**.
+- **`.scratch/stockwrite.ts`** (21 checks) and **`.scratch/stockread.ts`** (7 roles × 2 widths): 0 failed, 0 problems.
+- Whole-app sweep over **216** role-and-route reads at 390 (touch) and 1440: **0 problems**. All four earlier SQL audits clean.
+- **1,139 unit tests across 77 files**, 12 new on price-by-date and the return rule. `tests/api-authorization` caught a `guard()` helper hiding the role check from it — v189's lesson, arriving on schedule.
+- Build clean; eslint **0 errors and 0 new warnings**; prettier clean. Production `APP_DATABASE_URL` never touched.
+
+## v194 — the house's own books, and what the SIM feed already knew
+
+Three things the owner asked for, and one defect the audit found on its way.
+
+### 1. SIM check — given, activated, sold
+
+> *"100 sim tar kach theke niche 50 ta active korce but 30 ta sell dekhaice.. ar mane baki 20tar taka tar kache ace... aita just tar knowledge ar jono"*
+
+The middle column is what makes this worth having, and **nobody types it**: the GA feed this app has imported since v1 already records every activation against a retailer, and every retailer belongs to an RSO. So the screen shows, per RSO and per period:
+
+| Given | Activated | Sold | **Not reported** | Worth | Not activated |
+|---|---|---|---|---|---|
+| 100 | 50 | 30 | **20** | ৳3,000 | 50 |
+
+**Not reported** = activated − sold, floored at zero. It is the figure to act on, because an activated SIM is proof the thing left the RSO's hands — somebody is using it — so the money exists whether or not it was reported. **Not activated** is shown quietly and never called a shortfall: stock in a bag or sitting with a retailer is ordinary.
+
+Sorted by **money**, not count — an RSO with 10 unreported swap SIMs outranks one with 20 cheap ones.
+
+It counts *every* activation, deliberately not `withStandardGa`: that filter answers "what counts towards a GA target" and excludes swaps, but a swap SIM is a product in the catalogue the RSO is charged for, so its activation is a SIM leaving their hands exactly as a new connection is. Different question, same table.
+
+**It never touches a due**, and the page says so — the two sides count slightly different things and always will (an activation can be of a SIM the retailer already had; an outlet that changed hands counts under whoever holds it now). A gap is a question to ask somebody, not a charge.
+
+### 2. Expenses
+
+> *"proti din tuk tak khoroj thake oi gular hisab o tar rakhte hoi... karon ai taka gula cash theke khoroj hoi"*
+
+Date, kind, amount, cash or bank, who it went to, a note. Eight fixed kinds — a free-text category becomes forty spellings of "transport" and no report at all — with **Other** requiring a note, because an entry nobody can explain next month is not a record. The date and the kind stay put between saves, since this is the thing somebody types twelve times a day between other jobs.
+
+It is the house's money and lives nowhere near a holder's due. The form says so under the button, because otherwise the first question anybody asks is whether it charges someone.
+
+### 3. Lifting, godown and profit
+
+> *"amader distribution ar lav los ar hisab ta amra bujte parbo.. and stock ta o bujte parbo"*
+
+`Lifting` records what the company charged us, with **`unitCost` snapshotted** for exactly the reason v193 snapshots the selling price: the supplier's price changes too, and a purchase recorded in September must keep September's cost or every margin this app has ever shown moves the next time somebody updates a price list. Two invoices for one product on one day are kept as two rows — collapsing them would lose the references Accounts reconciles against.
+
+**Godown** = `lifted − given to holders + returned by holders`. The owner's choice, and it needs no daily count. Two things it deliberately does not do: it does not subtract a holder's OPENING stock (that stock never passed through our godown — 84,133 units of it in the seeded data), and it does not add back what was SOLD (that went to a customer). A negative godown is shown in red, not clamped: it means a lifting nobody entered.
+
+A unit's cost is the **weighted average** across every lifting of it — not the latest, which would revalue last month's margin every time an invoice arrived, and not FIFO, which needs lot tracking this business does not keep.
+
+**Both margins, side by side**, as the owner asked:
+
+```
+Lifted from the company          ৳50,070,692
+Issued to the field, at our price ৳28,986,990
+  what that cost us               ৳25,161,046
+  margin if it all sells (13.2%)   ৳3,825,945
+Reported sold                     ৳23,375,050
+  what that cost us               ৳20,291,645
+  margin earned (13.2%)            ৳3,083,405
+Expenses                            −৳193,827
+───────────────────────────────────────────────
+Net for the period                ৳2,889,578
+```
+
+The net is on the **sold** basis. Stock sitting with an RSO is not profit — it is stock with an RSO, and calling it profit is how a distributor finds out at the end of a quarter that the money was never there. The godown figure on the same page is **all time** whatever period is chosen, and is labelled so: "what was in the godown between the 1st and the 14th" is not a question with an answer.
+
+### The defect the audit found
+
+`.scratch/audit194.ts`, on its first run, disagreed with the app by **৳3,320,696**.
+
+A product with **no lifting recorded** had an average cost of zero, so its margin came out as `soldValue − 0` — its entire sale value, as pure profit. The per-row screen already printed "no cost yet"; the **total** did not. This is the rule the percentage columns learned in v175 and the raw pairs in v191, arriving in a third place: **no cost is not a cost of zero.**
+
+Uncosted lines now contribute nothing to any margin, and what was left out is **reported rather than silently dropped** — naming the products and the value excluded — because omitting it understates the business exactly as counting it at zero cost overstated it.
+
+### Who sees what
+
+The buying price is **Accounts, IT and Admin** — the owner's ruling. A manager writes campaigns and reads every RSO's due and still has no business knowing what we paid, so the nav carries a new `booksOnly` flag, separate from v190's `writersOnly` because it answers a different question. The SIM check is wider (Accounts, IT, Admin, Manager, Supervisor, each team-scoped) since it carries no purchase price and spotting a gap is a supervisor's job before it is anybody else's.
+
+### Gates
+
+- **`.scratch/audit194.ts`**: 22 checks rebuilding every new figure in independent SQL — **0 failed** — including that the total due is **still ৳12,872,675** after 50 liftings and 50 expenses. Not one moved.
+- **`.scratch/bookswrite.ts`**: 36 checks end to end — weighted average across two invoices, every rejection, and **changing the selling price leaving the cost untouched**. Every role below Accounts refused at the API *and* redirected from the pages. **0 failed.**
+- **1,172 unit tests across 78 files**, 33 new. `tests/picker.smoke.test.ts` caught the expense-category `<select>`, as designed.
+- Whole-app sweep at 390 (touch) and 1440, and the stock read pass across all seven roles: **0 problems**. v192's and v193's audits and the price-lock probe re-run clean.
+- Build clean; eslint **0 errors, 0 new warnings**; prettier clean. Production `APP_DATABASE_URL` never touched.

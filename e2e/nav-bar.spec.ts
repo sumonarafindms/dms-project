@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 import { login } from "./helpers";
 
 /**
@@ -16,6 +18,21 @@ import { login } from "./helpers";
  */
 
 const WIDTH_PROJECT = "w390";
+
+/**
+ * How many destinations the RSO role has, read from the shell.
+ *
+ * The sheet must hold every one of them; that is the whole bargain the
+ * five-cell cap is allowed to exist under. Counting them here rather than
+ * writing the number down means adding a destination changes the expectation
+ * with it, and REMOVING one from the sheet still fails.
+ */
+function rsoNavCount() {
+  const src = fs.readFileSync(path.join(__dirname, "..", "app", "components", "AppShell.tsx"), "utf8");
+  const block = src.slice(src.indexOf("  rso: {"));
+  const nav = block.slice(block.indexOf("nav: ["), block.indexOf("bottom:"));
+  return [...nav.matchAll(/\bhref:/g)].length;
+}
 
 const user = process.env.E2E_RSO_USER;
 const pass = process.env.E2E_RSO_PASS;
@@ -44,10 +61,15 @@ test.describe("the bottom bar on a phone", () => {
       expect(box.height).toBeGreaterThanOrEqual(44);
     }
 
-    // The sheet lists the WHOLE nav, not only what the bar could not fit.
+    /*
+     * The sheet lists the WHOLE nav, not only what the bar could not fit — and
+     * the count comes from the shell's own config rather than a number typed
+     * here. v189 added two destinations to this role and a hard-coded 7 failed
+     * for the one reason that is not a defect: the app grew.
+     */
     await page.locator(".bottom-more").click();
     const rows = page.locator(".kit-modal .kit-row");
-    await expect(rows).toHaveCount(7);
+    await expect(rows).toHaveCount(rsoNavCount());
     const names = (await rows.allInnerTexts()).map((t) => t.split("\n")[0].trim());
     for (const shown of await cells.allInnerTexts()) {
       const label = shown.trim().split("\n")[0];

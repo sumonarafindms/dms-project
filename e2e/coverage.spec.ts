@@ -36,6 +36,10 @@ import { EXPECTED } from "../tests/route-map";
 /** The parent list whose first matching link reaches each dynamic route. */
 const DYNAMIC_PARENT: Record<string, { from: string; match: RegExp }> = {
   "/accounts/retailers/[id]": { from: "/accounts/retailers", match: /^\/accounts\/retailers\/[a-z0-9]{20,}/ },
+  // v189. Both are reached by clicking a card on their own list.
+  "/campaigns/[id]": { from: "/campaigns", match: /^\/campaigns\/[a-z0-9]{20,}/ },
+  "/campaigns/[id]/edit": { from: "/campaigns/[id]", match: /^\/campaigns\/[a-z0-9]{20,}\/edit/ },
+  "/support/schemes/[id]/edit": { from: "/support/schemes", match: /^\/support\/schemes\/[a-z0-9]{20,}\/edit/ },
   "/admin/employees/bps/[id]": { from: "/admin/employees/bps", match: /^\/admin\/employees\/bps\/[a-z0-9]{20,}/ },
   "/admin/employees/managers/[id]": {
     from: "/admin/employees/managers",
@@ -194,7 +198,23 @@ for (const role of ROLES) {
             continue;
           }
           if (!resolved.has(route)) {
-            await page.goto(parent.from).catch(() => null);
+            /*
+             * `from` may name ANOTHER dynamic route, whose resolved URL is used.
+             *
+             * `/campaigns/[id]/edit` is reached from the campaign's own detail
+             * page, not from the list — the list's cards open the campaign and
+             * the Edit button lives there. Sorting puts `/campaigns/[id]`
+             * before `/campaigns/[id]/edit`, so by the time this runs the
+             * detail's real URL is already in `resolved`. The alternative was
+             * to put an Edit link on every card, which is a change to the
+             * product to suit the test.
+             */
+            const chained = parent.from.includes("[") ? resolved.get(parent.from) : parent.from;
+            if (!chained) {
+              failures.push(`${route}: its parent ${parent.from} was not resolved first — check the ordering`);
+              continue;
+            }
+            await page.goto(chained).catch(() => null);
             /*
              * WAIT FOR THE LINK, never for a fixed number of milliseconds.
              *

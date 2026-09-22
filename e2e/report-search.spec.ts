@@ -122,8 +122,23 @@ test.describe("Daily Summary levels", () => {
    * a heading unique to the destination is what makes the assertion about the
    * level it names.
    */
+  /**
+   * The URL FIRST, then the heading — which is what the note above says and
+   * what this function did not do.
+   *
+   * Without the URL wait, the heading check can read the level the page is
+   * still showing. Under a two-worker run it did exactly that: the sweep
+   * reported "no RSO column" on a page whose address was still the supervisor
+   * view's, and the same test passed on its own a moment later. The level a
+   * link carries is in its href, so waiting for it is waiting for the thing
+   * the click was for.
+   */
   async function switchTo(page: import("@playwright/test").Page, label: string, expectHeading: RegExp) {
-    await page.getByRole("link", { name: label, exact: true }).click();
+    const link = page.getByRole("link", { name: label, exact: true });
+    const href = await link.getAttribute("href");
+    const level = href ? new URL(href, "http://x").searchParams.get("level") : null;
+    await link.click();
+    await page.waitForURL((u) => u.searchParams.get("level") === level, { timeout: 15_000 });
     await expect(page.locator("table thead th").filter({ hasText: expectHeading }).first()).toBeVisible({
       timeout: 15_000,
     });

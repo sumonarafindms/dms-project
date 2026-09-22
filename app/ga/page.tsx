@@ -20,6 +20,7 @@ import {
 import { Btn } from "../components/Kit";
 import { apiFetch, apiUpload } from "@/lib/api-client";
 import { fmtDate, fmtDateTime } from "../../lib/format";
+import { againstTarget, NO_TARGET_MARK } from "../../lib/achievement";
 import { GA_CATEGORY_LABEL } from "../../lib/ga-category";
 import { groupOps, groupOpsBySupervisor, opsCountLabel, type OpsLevel } from "../../lib/ops-rollup";
 
@@ -503,12 +504,12 @@ export default function GaPage() {
         <OpsMetric label={GA_CATEGORY_LABEL.GA_300} value={totals.ga300.toLocaleString("en-US")} note="MMST / MMSTS" />
         <OpsMetric
           label="GA %"
-          value={totals.target ? `${((totals.achieved / totals.target) * 100).toFixed(1)}%` : "0%"}
+          value={totals.target ? `${((totals.achieved / totals.target) * 100).toFixed(1)}%` : NO_TARGET_MARK}
           note="Achievement rate"
         />
         <OpsMetric
           label="SSO"
-          value={`${totals.ssoA.toLocaleString("en-US")} / ${totals.ssoT.toLocaleString("en-US")}`}
+          value={againstTarget(totals.ssoA, totals.ssoT, (n) => n.toLocaleString("en-US"))}
           note="Achieved / target"
         />
       </div>

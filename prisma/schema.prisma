@@ -8,15 +8,15 @@ datasource db {
 }
 
 model Supervisor {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  active    Boolean    @default(true)
-  employees Employee[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  user      User?
+  id                 String                    @id @default(cuid())
+  name               String                    @unique
+  active             Boolean                   @default(true)
+  employees          Employee[]
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  user               User?
   managerAssignments ManagerSupervisor[]
-  targets   SupervisorMonthlyTarget[]
+  targets            SupervisorMonthlyTarget[]
 }
 
 model ManagerSupervisor {
@@ -32,79 +32,88 @@ model ManagerSupervisor {
 }
 
 model Employee {
-  id            String          @id @default(cuid())
-  rsoMsisdn     String          @unique
-  employeeCode  String?         @unique
-  name          String
-  supervisorId  String?
-  supervisor    Supervisor?     @relation(fields: [supervisorId], references: [id])
-  active        Boolean         @default(true)
-  retailers     Retailer[]
-  targets       MonthlyTarget[]
-  manualMetrics ManualMetric[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  user          User?
-  bpAssignments BpAssignment[]
+  id              String           @id @default(cuid())
+  rsoMsisdn       String           @unique
+  employeeCode    String?          @unique
+  name            String
+  supervisorId    String?
+  supervisor      Supervisor?      @relation(fields: [supervisorId], references: [id])
+  active          Boolean          @default(true)
+  retailers       Retailer[]
+  targets         MonthlyTarget[]
+  manualMetrics   ManualMetric[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  user            User?
+  bpAssignments   BpAssignment[]
+  campaignTargets CampaignTarget[]
 
   @@index([supervisorId])
 }
 
 model Retailer {
-  id               String      @id @default(cuid())
-  retailerCode     String      @unique
-  retailerName     String?
+  id                  String              @id @default(cuid())
+  retailerCode        String              @unique
+  retailerName        String?
   /**
    * What this outlet is called when it acts as a Business Partner.
-   *
    * `retailerName` cannot carry it: that column is owned by the master import
    * and is re-asserted from the vendor's file on every upload, so a name typed
    * here would be overwritten by the next master file. Before v181 the BP
    * display name was written only to the BP login's `User.displayName`, which
    * meant a BP with no mobile number and PIN had nowhere to keep one and the
    * typed name was dropped in silence.
-   *
    * Null means "no BP name given" — every reader falls back to `retailerName`
    * and then to `retailerCode`, through `bpDisplayName()` in lib/bp-name.ts.
    */
-  bpName           String?
-  simSeller        String?
-  iTopUpSeller     String?
-  tranMobileNo     String?
-  iTopUpSrNumber   String?
-  iTopUpNumber     String?
-  category         String?
-  rsoCode          String?
-  route             String?
-  employeeId       String?
-  employee         Employee?   @relation(fields: [employeeId], references: [id])
-  active            Boolean     @default(true)
-  gaRecords         GaRecord[]
-  gaActivations     GaActivation[]
-  c2cRecords        C2cRecord[]
-  c2sRecords        C2sRecord[]
+  bpName              String?
+  simSeller           String?
+  iTopUpSeller        String?
+  tranMobileNo        String?
+  iTopUpSrNumber      String?
+  iTopUpNumber        String?
+  category            String?
+  rsoCode             String?
+  route               String?
+  employeeId          String?
+  employee            Employee?           @relation(fields: [employeeId], references: [id])
+  active              Boolean             @default(true)
+  gaRecords           GaRecord[]
+  gaActivations       GaActivation[]
+  c2cRecords          C2cRecord[]
+  c2sRecords          C2sRecord[]
   c2cMonthlySummaries C2cMonthlySummary[]
   c2sMonthlySummaries C2sMonthlySummary[]
-  obRecords         ObRecord[]
-  bpAssignments     BpAssignment[]
-  bpUser            User?           @relation("BpRetailerUser")
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  obRecords           ObRecord[]
+  bpAssignments       BpAssignment[]
+  bpUser              User?               @relation("BpRetailerUser")
+  /**
+   * Does this outlet earn Sim Support?
+   * Support is paid on TWO retailer codes per RSO, chosen in advance — not on
+   * everything the RSO sells. The SIMs on any other code are real GA and count
+   * everywhere else in the app; they are simply not what that money is for.
+   * A BP is paid on the outlet it holds as a BP, which the BP assignment
+   * already says, so this flag is for RSO codes.
+   * Owned by hand, never by the master import: the import re-asserts vendor
+   * columns on every upload and would wipe a choice an operator made here.
+   */
+  supportEligible     Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   @@index([employeeId])
   @@index([iTopUpSrNumber])
+  @@index([employeeId, supportEligible])
 }
 
 /**
  * A supervisor's own monthly target.
- *
  * Until v181 a supervisor had no target of their own: every supervisor figure
  * in the app was the SUM of their RSOs' targets, plus their BPs' GA target on
  * the dashboard path. Two code comments used to state that as a rule. The
  * owner's ruling is that it produced a number too high to manage against — a
  * supervisor is not simply the addition of the people under them — so a
  * supervisor now carries a target that is set directly and stands on its own.
- *
  * The columns mirror MonthlyTarget exactly, and deliberately: every screen that
  * shows a supervisor a GA, SSO, LSO, C2C, SC or Recharge target must still find
  * one, or a card that used to carry a figure would quietly go blank.
@@ -115,9 +124,9 @@ model SupervisorMonthlyTarget {
   supervisor          Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
   month               DateTime
   gaTarget            Int        @default(0)
-  c2cTarget           Decimal    @default(0) @db.Decimal(18,2)
-  scTarget            Decimal    @default(0) @db.Decimal(18,2)
-  totalRechargeTarget Decimal    @default(0) @db.Decimal(18,2)
+  c2cTarget           Decimal    @default(0) @db.Decimal(18, 2)
+  scTarget            Decimal    @default(0) @db.Decimal(18, 2)
+  totalRechargeTarget Decimal    @default(0) @db.Decimal(18, 2)
   ssoTarget           Int        @default(0)
   lsoTarget           Int        @default(0)
   createdAt           DateTime   @default(now())
@@ -133,9 +142,9 @@ model MonthlyTarget {
   employee            Employee @relation(fields: [employeeId], references: [id])
   month               DateTime
   gaTarget            Int      @default(0)
-  c2cTarget           Decimal  @default(0) @db.Decimal(18,2)
-  scTarget            Decimal  @default(0) @db.Decimal(18,2)
-  totalRechargeTarget Decimal  @default(0) @db.Decimal(18,2)
+  c2cTarget           Decimal  @default(0) @db.Decimal(18, 2)
+  scTarget            Decimal  @default(0) @db.Decimal(18, 2)
+  totalRechargeTarget Decimal  @default(0) @db.Decimal(18, 2)
   ssoTarget           Int      @default(0)
   lsoTarget           Int      @default(0)
   createdAt           DateTime @default(now())
@@ -150,7 +159,7 @@ model ManualMetric {
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id])
   month      DateTime
-  scAchieved Decimal  @default(0) @db.Decimal(18,2)
+  scAchieved Decimal  @default(0) @db.Decimal(18, 2)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -158,23 +167,23 @@ model ManualMetric {
 }
 
 model ImportBatch {
-  id           String       @id @default(cuid())
-  type         ImportType
-  fileName     String
-  businessDate DateTime?
-  uploadedAt   DateTime     @default(now())
-  totalRows    Int          @default(0)
-  successRows  Int          @default(0)
-  failedRows   Int          @default(0)
-  duplicateRows Int         @default(0)
-  hash         String?      @unique
-  status       ImportStatus @default(PROCESSING)
-  errors       ImportError[]
-  gaRecords    GaRecord[]
+  id            String         @id @default(cuid())
+  type          ImportType
+  fileName      String
+  businessDate  DateTime?
+  uploadedAt    DateTime       @default(now())
+  totalRows     Int            @default(0)
+  successRows   Int            @default(0)
+  failedRows    Int            @default(0)
+  duplicateRows Int            @default(0)
+  hash          String?        @unique
+  status        ImportStatus   @default(PROCESSING)
+  errors        ImportError[]
+  gaRecords     GaRecord[]
   gaActivations GaActivation[]
-  c2cRecords   C2cRecord[]
-  c2sRecords   C2sRecord[]
-  obRecords    ObRecord[]
+  c2cRecords    C2cRecord[]
+  c2sRecords    C2sRecord[]
+  obRecords     ObRecord[]
 
   // Data Readiness asks "is there a COMPLETED batch of this type with a
   // businessDate in the report range?" on every Reporting Centre page load,
@@ -217,7 +226,7 @@ model GaActivation {
   retailer       Retailer     @relation(fields: [retailerId], references: [id])
   activationDate DateTime
   activationTime String?
-  sellingPrice   Decimal      @db.Decimal(10,2)
+  sellingPrice   Decimal      @db.Decimal(10, 2)
   productCode    String?
   batchId        String?
   batch          ImportBatch? @relation(fields: [batchId], references: [id])
@@ -236,7 +245,7 @@ model C2cMonthlySummary {
   retailer         Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
   month            DateTime
   transactionCount Int      @default(0)
-  totalAmount      Decimal  @default(0) @db.Decimal(18,2)
+  totalAmount      Decimal  @default(0) @db.Decimal(18, 2)
   reportEndDate    DateTime
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -251,7 +260,7 @@ model C2sMonthlySummary {
   retailer         Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
   month            DateTime
   transactionCount Int      @default(0)
-  totalAmount      Decimal  @default(0) @db.Decimal(18,2)
+  totalAmount      Decimal  @default(0) @db.Decimal(18, 2)
   reportEndDate    DateTime
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -266,7 +275,7 @@ model C2cRecord {
   retailer         Retailer     @relation(fields: [retailerId], references: [id])
   date             DateTime
   transactionCount Int          @default(0)
-  amount           Decimal      @default(0) @db.Decimal(18,2)
+  amount           Decimal      @default(0) @db.Decimal(18, 2)
   batchId          String?
   batch            ImportBatch? @relation(fields: [batchId], references: [id])
   createdAt        DateTime     @default(now())
@@ -275,14 +284,13 @@ model C2cRecord {
   @@index([date])
 }
 
-
 model C2sRecord {
   id               String       @id @default(cuid())
   retailerId       String
   retailer         Retailer     @relation(fields: [retailerId], references: [id])
   date             DateTime
   transactionCount Int          @default(0)
-  amount           Decimal      @default(0) @db.Decimal(18,2)
+  amount           Decimal      @default(0) @db.Decimal(18, 2)
   enabled          Boolean?
   sellerStatus     String?
   batchId          String?
@@ -299,7 +307,7 @@ model ObRecord {
   retailer         Retailer     @relation(fields: [retailerId], references: [id])
   date             DateTime
   transactionCount Int          @default(0)
-  amount           Decimal      @default(0) @db.Decimal(18,2)
+  amount           Decimal      @default(0) @db.Decimal(18, 2)
   batchId          String?
   batch            ImportBatch? @relation(fields: [batchId], references: [id])
   createdAt        DateTime     @default(now())
@@ -325,20 +333,18 @@ enum ImportStatus {
   FAILED
 }
 
-
-
 model BpAssignment {
-  id         String   @id @default(cuid())
-  retailerId String
-  retailer   Retailer @relation(fields: [retailerId], references: [id])
-  employeeId String
-  employee   Employee @relation(fields: [employeeId], references: [id])
-  startDate  DateTime
-  endDate    DateTime?
-  active     Boolean  @default(true)
-  gaTarget   Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String            @id @default(cuid())
+  retailerId     String
+  retailer       Retailer          @relation(fields: [retailerId], references: [id])
+  employeeId     String
+  employee       Employee          @relation(fields: [employeeId], references: [id])
+  startDate      DateTime
+  endDate        DateTime?
+  active         Boolean           @default(true)
+  gaTarget       Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   monthlyTargets BpMonthlyTarget[]
 
   @@index([employeeId, active])
@@ -360,28 +366,30 @@ model BpMonthlyTarget {
 }
 
 model User {
-  id             String       @id @default(cuid())
-  displayName    String
-  mobileNumber   String?      @unique
-  username       String?      @unique
-  credentialHash String
-  role           UserRole
-  active         Boolean      @default(true)
-  employeeId     String?      @unique
-  employee       Employee?    @relation(fields: [employeeId], references: [id])
-  supervisorId   String?      @unique
-  supervisor     Supervisor?  @relation(fields: [supervisorId], references: [id])
-  bpRetailerId   String?      @unique
-  bpRetailer     Retailer?    @relation("BpRetailerUser", fields: [bpRetailerId], references: [id])
-  sessions       Session[]
+  id                 String              @id @default(cuid())
+  displayName        String
+  mobileNumber       String?             @unique
+  username           String?             @unique
+  credentialHash     String
+  role               UserRole
+  active             Boolean             @default(true)
+  employeeId         String?             @unique
+  employee           Employee?           @relation(fields: [employeeId], references: [id])
+  supervisorId       String?             @unique
+  supervisor         Supervisor?         @relation(fields: [supervisorId], references: [id])
+  bpRetailerId       String?             @unique
+  bpRetailer         Retailer?           @relation("BpRetailerUser", fields: [bpRetailerId], references: [id])
+  sessions           Session[]
   managedSupervisors ManagerSupervisor[] @relation("ManagerAssignments")
-  permissions     UserPermission[]
-  auditLogs       AuditLog[] @relation("AuditActor")
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  permissions        UserPermission[]
+  auditLogs          AuditLog[]          @relation("AuditActor")
+  campaigns          Campaign[]          @relation("CampaignAuthor")
+  supportSchemes     SupportScheme[]     @relation("SupportSchemeAuthor")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   /// Consecutive failed sign-ins. Cleared on a successful sign-in.
-  failedLoginCount Int        @default(0)
+  failedLoginCount Int       @default(0)
   /// Set when failedLoginCount reaches the limit. Only an admin clears it —
   /// there is deliberately no timer, so a locked account stays locked until a
   /// person looks at it.
@@ -458,4 +466,410 @@ enum UserRole {
   ACCOUNTS
   RSO
   BP
+}
+
+/**
+ * ------------------------------------------------------------------ *
+ * Campaigns
+ * ------------------------------------------------------------------
+ */
+
+/**
+ * A target with a start and an end.
+ * Every other target in this schema is keyed on a MONTH — MonthlyTarget,
+ * SupervisorMonthlyTarget, BpMonthlyTarget. A campaign is "500 SIMs between the
+ * 1st and the 10th", so its window is its own and nothing about it can be
+ * derived from a month. See lib/campaign.ts for the two scopes and why a
+ * distribution-wide campaign deliberately has no per-RSO number.
+ * `startDate` and `endDate` are @db.Date, not timestamps: they are calendar
+ * dates somebody typed, and storing an instant is how a campaign ends a day
+ * early for a reader in a different offset.
+ */
+model Campaign {
+  id                String           @id @default(cuid())
+  name              String
+  startDate         DateTime         @db.Date
+  endDate           DateTime         @db.Date
+  scope             CampaignScope
+  /// DISTRIBUTION only. Null on a per-employee campaign.
+  totalTarget       Int?
+  /// PER_EMPLOYEE only — the number everyone gets unless a target row overrides it.
+  perEmployeeTarget Int?
+  active            Boolean          @default(true)
+  note              String?
+  createdById       String?
+  createdBy         User?            @relation("CampaignAuthor", fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  targets           CampaignTarget[]
+
+  @@index([startDate, endDate])
+  @@index([active])
+}
+
+enum CampaignScope {
+  DISTRIBUTION
+  PER_EMPLOYEE
+}
+
+/**
+ * One person's campaign target, when it differs from the campaign's own.
+ * A row here is an OVERRIDE, and a target of 0 is a real decision — "this RSO
+ * is out of this campaign" — so `targetFor` in lib/campaign.ts tests for the
+ * row's presence rather than for a truthy number.
+ */
+model CampaignTarget {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  target     Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([campaignId, employeeId])
+  @@index([employeeId])
+}
+
+/**
+ * ------------------------------------------------------------------ *
+ * Sim Support
+ * ------------------------------------------------------------------
+ */
+
+/**
+ * One day's Sim Support offer.
+ * Unique on the date: a day has one offer or none, and "none" is the common
+ * case — most days carry no SSO rate and many carry no scheme at all. The
+ * arithmetic, including why a slab reprices the whole day rather than paying a
+ * margin, is in lib/sim-support.ts.
+ */
+model SupportScheme {
+  id                String        @id @default(cuid())
+  date              DateTime      @db.Date
+  name              String?
+  note              String?
+  /// Per-SIM rate for an outlet that completes SSO on this day. Null: no SSO offer.
+  ssoRatePerSim     Decimal?      @db.Decimal(10, 2)
+  /// The stricter form of the SSO offer. 1 (or null) means completing SSO is the only condition.
+  ssoMinSimsSameDay Int?
+  active            Boolean       @default(true)
+  createdById       String?
+  createdBy         User?         @relation("SupportSchemeAuthor", fields: [createdById], references: [id])
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  slabs             SupportSlab[]
+
+  @@unique([date])
+  @@index([active])
+}
+
+/**
+ * "From N SIMs, ৳R each". `minSims` is inclusive.
+ */
+model SupportSlab {
+  id         String        @id @default(cuid())
+  schemeId   String
+  scheme     SupportScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  minSims    Int
+  ratePerSim Decimal       @db.Decimal(10, 2)
+  createdAt  DateTime      @default(now())
+
+  @@unique([schemeId, minSims])
+  @@index([schemeId])
+}
+
+/**
+ * ==================================================================
+ * Stock and cash accounting (v192)
+ * ==================================================================
+ * A different business from everything above it. The models above describe
+ * what the COMPANY reports to us — activations, recharge, opening balance,
+ * arriving as vendor files. These describe what moves through the
+ * distribution house itself: physical stock handed to a person, what they
+ * sold, what they gave back, and the money they deposited.
+ * The two meet at nothing but the person. In particular the GA product
+ * classification in lib/business-rules.ts (MMSTC 170, MMST/MMSTS 300) is NOT
+ * the Product master below: one is a tariff on an activation in a vendor
+ * feed, the other is a thing in a box with a price on it. Merging them would
+ * break both.
+ * The arithmetic is in lib/stock.ts and stated once there.
+ */
+
+enum ProductCategory {
+  SIM
+  CARD
+  ROUTER
+  HANDSET
+  /// The recharge float. See the note on Product.unitLabel.
+  ITOPUP
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Who is holding stock. Each holder's stock is entirely their own — the
+/// owner's ruling: "proti ta person ar stock alada, kaur sathe kaur kono
+/// stock jog hobe na".
+enum StockHolderType {
+  RSO
+  SUPERVISOR
+  BP
+}
+
+enum StockMoveKind {
+  /// Handed out from company stock. Increases what the holder owes.
+  GIVEN
+  /// Reported as sold. Does NOT reduce what the holder owes — only money or
+  /// returned goods do that. See lib/stock.ts.
+  SOLD
+  /// Handed back to Accounts unsold. Reduces what the holder owes.
+  RETURNED
+  /// Stock the holder already had when the module went live. Counted in stock
+  /// on hand, NOT in the due — StockOpening.openingDue carries the whole
+  /// opening liability, including the value of this stock.
+  OPENING
+}
+
+/**
+ * A sellable thing at a price.
+ * A price is never edited once a movement refers to this row. A price change
+ * creates a NEW row and marks this one INACTIVE, because amountGiven and
+ * amountSold read `price` off the row that was chosen — editing it would
+ * silently rewrite every figure this product has ever appeared in. The API
+ * enforces it; `replacesId` records which row a version superseded so the
+ * history reads as one product rather than several unrelated ones.
+ * ITOPUP is a product whose unit is the Taka: price 1.00, qty = the amount.
+ * The recharge float is taken, spent and returned exactly as a box of SIMs
+ * is, so it is the same table and the same due arithmetic rather than a
+ * second set of rules to keep in step.
+ */
+/**
+ * A sellable thing. Its IDENTITY only — what it is called and what kind of
+ * thing it is. Not what it costs.
+ * v192 put the price on this row and created a new row every time it changed,
+ * so "Swap SIM" became a fresh product four times a year and a holder's stock
+ * table showed four lines for one thing in their hand. Worse, the money was
+ * read back through this row at display time, which meant the whole protection
+ * rested on a rule nobody could see from the data: *never edit this field*.
+ * The price now lives in ProductPrice, dated, and every recorded figure
+ * carries its own copy on the movement. So this row is free to change — retire
+ * it, rename it, correct a typo — and nothing already recorded can move.
+ */
+model Product {
+  id          String          @id @default(cuid())
+  category    ProductCategory
+  subType     String
+  /// What one unit is called on screen: "pc", "card", "Tk". Display only.
+  unitLabel   String?
+  status      ProductStatus   @default(ACTIVE)
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  prices      ProductPrice[]
+  movements   StockMovement[]
+  liftings    Lifting[]
+
+  @@index([status, category])
+}
+
+/**
+ * What a product cost, from a date.
+ * One small row per price change — four columns that matter, against the
+ * eleven a whole duplicate Product row cost in v192. The price in force on any
+ * day is the latest row whose `effectiveFrom` is on or before it, which is
+ * also what makes a BACK-DATED entry price itself correctly: v192 would have
+ * used today's price to correct a day three weeks ago.
+ * These rows are never rewritten either. Correcting a price that was typed
+ * wrong adds a row; the movements recorded under the wrong one keep it until
+ * somebody re-enters those days deliberately, which is the honest behaviour —
+ * a price list cannot retroactively change what a person was actually handed.
+ */
+model ProductPrice {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price         Decimal  @db.Decimal(18, 2)
+  effectiveFrom DateTime @db.Date
+  note          String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+
+  @@unique([productId, effectiveFrom])
+  @@index([productId, effectiveFrom])
+}
+
+model StockMovement {
+  id          String          @id @default(cuid())
+  date        DateTime        @db.Date
+  kind        StockMoveKind
+  holderType  StockHolderType
+  holderId    String
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id])
+  qty         Int
+  /**
+   * What one unit was worth WHEN THIS LINE WAS RECORDED.
+   * The most important column in the module. Every figure — the due, a
+   * ledger, a report, a total three years from now — is `qty × this`, never a
+   * lookup through the product. A price change, a retired product, a renamed
+   * one, even a deleted price row cannot reach backwards into a number that
+   * has already been recorded, because the number does not depend on any of
+   * them any more. That is structure, not a rule somebody has to remember.
+   * It is one Decimal per row on the largest table here, and for money it is
+   * worth many times that.
+   */
+  unitPrice   Decimal         @db.Decimal(18, 2)
+  note        String?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  /// One line per holder, day, product and kind — a second entry for the same
+  /// thing is a correction of the first, not an addition to it.
+  @@unique([holderType, holderId, date, productId, kind])
+  @@index([holderType, holderId, date])
+  @@index([date])
+  @@index([productId])
+}
+
+/**
+ * The money a holder deposited on one day. Cash and bank are separate columns
+ * because Accounts reconciles them separately, but both reduce the due
+ * identically.
+ */
+model CashDeposit {
+  id          String          @id @default(cuid())
+  date        DateTime        @db.Date
+  holderType  StockHolderType
+  holderId    String
+  cash        Decimal         @default(0) @db.Decimal(18, 2)
+  bank        Decimal         @default(0) @db.Decimal(18, 2)
+  bankRef     String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([holderType, holderId, date])
+  @@index([date])
+}
+
+/**
+ * Where a holder stood on the day this module went live.
+ * `openingDue` is the WHOLE outstanding amount on `asOfDate`, including the
+ * value of the stock they were holding — the owner's own arithmetic works
+ * that way: took ৳100,000, deposited ৳80,000, "due ৳20,000", and the ৳20,000
+ * of goods is still in their hands. The OPENING movements beside this row
+ * carry that stock as quantity so the stock table is right; their value is
+ * deliberately NOT added to the due, because this number already contains it.
+ */
+model StockOpening {
+  id          String          @id @default(cuid())
+  holderType  StockHolderType
+  holderId    String
+  asOfDate    DateTime        @db.Date
+  openingDue  Decimal         @default(0) @db.Decimal(18, 2)
+  note        String?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([holderType, holderId])
+}
+
+/**
+ * ==================================================================
+ * The distribution house's own books (v194)
+ * ==================================================================
+ * Everything above this point is money moving BETWEEN the house and its
+ * people. These two are the house's own side of it: what we paid the company
+ * for the stock, and what we spent running the place.
+ * Together with the stock module they answer the owner's question — *"amader
+ * distribution ar lav los ar hisab ta amra bujte parbo"* — because the margin
+ * is the difference between the price we were charged and the price we
+ * charged, and the net is that margin less what the day cost to run.
+ * The arithmetic is in lib/lifting.ts.
+ */
+
+enum LiftingKind {
+  /// Bought from the company.
+  PURCHASE
+  /// What was already in the godown when this module went live.
+  OPENING
+}
+
+/**
+ * One purchase from the company.
+ * Not unique on (date, product): two invoices for the same thing on the same
+ * day are ordinary, and collapsing them would lose the invoice references
+ * Accounts reconciles against.
+ * `unitCost` is a snapshot for exactly the reason `StockMovement.unitPrice`
+ * is one (v193): the company's price changes too, and a purchase recorded in
+ * September must keep September's cost whatever happens afterwards. Without
+ * it, every margin this app has ever shown would silently move the next time
+ * a supplier price was updated.
+ */
+model Lifting {
+  id          String      @id @default(cuid())
+  date        DateTime    @db.Date
+  kind        LiftingKind @default(PURCHASE)
+  productId   String
+  product     Product     @relation(fields: [productId], references: [id])
+  qty         Int
+  /// What the COMPANY charged us for one unit, when this was bought.
+  unitCost    Decimal     @db.Decimal(18, 2)
+  invoiceRef  String?
+  note        String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([date])
+  @@index([productId, date])
+}
+
+/// What the money was spent on. Deliberately a short fixed list: a free-text
+/// category becomes forty spellings of "transport" and no report at all.
+enum ExpenseCategory {
+  TRANSPORT
+  FOOD
+  OFFICE
+  UTILITY
+  SALARY
+  REPAIR
+  MARKETING
+  OTHER
+}
+
+enum PaidFrom {
+  CASH
+  BANK
+}
+
+/**
+ * A day's running cost.
+ * The owner: *"proti din tuk tak khoroj thake oi gular hisab o tar rakhte
+ * hoi... karon ai taka gula cash theke khoroj hoi"*.
+ * This is the HOUSE's money and it is deliberately nowhere near a holder's
+ * due: nobody's balance moves because the office bought tea. It reduces the
+ * net on the profit screen and nothing else.
+ */
+model Expense {
+  id          String          @id @default(cuid())
+  date        DateTime        @db.Date
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(18, 2)
+  paidFrom    PaidFrom        @default(CASH)
+  payee       String?
+  note        String?
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([date])
+  @@index([category, date])
 }

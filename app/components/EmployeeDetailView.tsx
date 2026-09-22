@@ -20,7 +20,7 @@ import { ListControls, useListControls } from "./ListControls";
 import { matchesTokens } from "../../lib/text-search";
 import { Icon } from "./icons";
 import { Card, EmptyState, KpiCard, PageHeader, Row, SectionHead, SummaryStrip } from "./Kit";
-import { targetPercent as pct } from "../../lib/achievement";
+import { againstTarget, NO_TARGET_MARK, targetPercent as pct } from "../../lib/achievement";
 import { activeSort, applySort, byNumberAsc, byNumberDesc, byText, sortOptions, type SortSpec } from "../../lib/sort";
 import { pacingForView } from "../../lib/pacing";
 
@@ -182,11 +182,14 @@ export function EmployeeDetailView({
             value: p.retailerCount.toLocaleString("en-US"),
           },
           {
-            label: `SSO · ${pct(p.ssoAchieved, p.ssoTarget)}%`,
-            value: `${p.ssoAchieved}/${p.ssoTarget}`,
+            label: `SSO · ${p.ssoTarget > 0 ? `${pct(p.ssoAchieved, p.ssoTarget)}%` : NO_TARGET_MARK}`,
+            value: againstTarget(p.ssoAchieved, p.ssoTarget),
             tone: "brand",
           },
-          { label: `LSO · ${pct(p.lsoAchieved, p.lsoTarget)}%`, value: `${p.lsoAchieved}/${p.lsoTarget}` },
+          {
+            label: `LSO · ${p.lsoTarget > 0 ? `${pct(p.lsoAchieved, p.lsoTarget)}%` : NO_TARGET_MARK}`,
+            value: againstTarget(p.lsoAchieved, p.lsoTarget),
+          },
         ]}
       />
 

@@ -150,3 +150,26 @@ export function splitByTarget<T>(
   }
   return { onTrack, behind, untargeted };
 }
+
+/* ------------------------------------------------------------------ *
+ * Printing an achievement against its target
+ * ------------------------------------------------------------------ */
+
+/** What a pair prints in place of a target nobody set. */
+export const NO_TARGET_MARK = "—";
+
+/**
+ * "289 / 300", or "289 / —" when no target exists.
+ *
+ * The percentage columns learned this in v175 and the cards in v183, but the
+ * raw pair beside them had not: the target report printed "289 / 0" and
+ * "0 / 0", which reads as 289 against a target of zero — a number nobody set,
+ * shown as if it had been missed. `targetPercent` already returns 0 for a
+ * zero target on purpose; this is the same honesty one column to the left, so
+ * a row cannot say "—" in its GA % cell and "0" in its GA cell at once.
+ *
+ * `fmt` exists for the callers that group thousands or prefix a currency.
+ */
+export function againstTarget(achieved: number, target: number, fmt: (n: number) => string = (n) => String(n)) {
+  return `${fmt(achieved)} / ${target > 0 ? fmt(target) : NO_TARGET_MARK}`;
+}

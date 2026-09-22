@@ -10,4 +10,7 @@
 /* Role-UI kit last among the component layers: a page migrated to the kit
    must win over the older per-page stylesheets above it. */
 @import "../styles/kit.css";
+/* Campaigns and Sim Support: after the kit, because it arranges the kit's own
+   atoms and must win over the generic card and list rules. */
+@import "../styles/incentives.css";
 @import "../styles/mobile.css";

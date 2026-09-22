@@ -295,4 +295,45 @@ describe("a missing target is not a target of zero", () => {
     const pace = KIT.slice(KIT.indexOf("export function PaceFoot"));
     expect(pace).toContain('if (pace.status === "No target") return null;');
   });
+
+  it("the raw achieved/target pair beside the percentage says it too", () => {
+    /*
+     * v191, found by reading every page as every role. The percentage columns
+     * on /it/reports/target correctly printed "—" for a target nobody set, and
+     * the column immediately to their left printed "289 / 0" and "0 / 0" on
+     * the same row. One row, two answers; the honest one is easy to miss when
+     * the dishonest one is the bigger number.
+     *
+     * The rule lives in lib/achievement.ts beside targetPercent, which has
+     * returned 0 for a zero target on purpose since v175, so the pair and the
+     * percentage cannot drift apart again.
+     */
+    const lib = code("lib/achievement.ts");
+    expect(lib).toContain("export function againstTarget");
+    expect(lib).toContain("export const NO_TARGET_MARK");
+
+    /*
+     * No page may interpolate an achievement and its target into one string by
+     * hand. `${a} / ${b}` and `${a}/${b}` are the two shapes this defect has
+     * taken; either is a page answering the question for itself.
+     */
+    const PAIR_PAGES = [
+      "app/it/reports/target/page.tsx",
+      "app/ga/page.tsx",
+      "app/components/EmployeeDetailView.tsx",
+      "app/admin/performance/supervisors/[id]/page.tsx",
+    ];
+    for (const f of PAIR_PAGES) {
+      const src = code(f);
+      expect(src, `${f} no longer prints a pair at all`).toContain("againstTarget(");
+      expect(src, `${f} still builds an achieved/target pair by hand`).not.toMatch(
+        /\$\{[^}]*\}\s*\/\s*\$\{[^}]*Target[^}]*\}/,
+      );
+    }
+
+    /* And no screen falls back to a literal "0%" when there is no target. */
+    for (const f of ["app/ga/page.tsx", "app/c2c/page.tsx", "app/c2s/page.tsx"]) {
+      expect(code(f), `${f} prints 0% for a target nobody set`).not.toContain(': "0%"');
+    }
+  });
 });

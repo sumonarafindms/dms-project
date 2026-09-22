@@ -16,6 +16,7 @@ import {
   OpsFreshness,
 } from "../components/OperationsPremiumUI";
 import { Btn } from "../components/Kit";
+import { NO_TARGET_MARK } from "../../lib/achievement";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { apiFetch, apiUpload } from "@/lib/api-client";
 import { fmtDate, fmtDateTime } from "../../lib/format";
@@ -245,7 +246,7 @@ export default function C2sPage() {
           <OpsMetric label="LSO Achieved" value={totals.lsoA.toLocaleString("en-US")} note="Completed outlets" />
           <OpsMetric
             label="LSO %"
-            value={totals.lsoT ? `${((totals.lsoA / totals.lsoT) * 100).toFixed(1)}%` : "0%"}
+            value={totals.lsoT ? `${((totals.lsoA / totals.lsoT) * 100).toFixed(1)}%` : NO_TARGET_MARK}
             note="Achievement rate"
           />
         </div>

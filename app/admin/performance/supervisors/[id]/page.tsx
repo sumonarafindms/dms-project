@@ -2,7 +2,7 @@ import { bpDisplayName } from "../../../../../lib/bp-name";
 import { requireUser } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
 import { employeePerformance } from "../../../../../lib/performance";
-import { targetPercent as pct } from "../../../../../lib/achievement";
+import { againstTarget, NO_TARGET_MARK, targetPercent as pct } from "../../../../../lib/achievement";
 import { normalizeMonth } from "../../../../../lib/drilldown";
 import { monthBounds } from "../../../../../lib/month";
 import { parseYmd, monthStartsInRange } from "../../../../../lib/date-range";
@@ -104,12 +104,16 @@ export default async function Page({
       <PageHeader title={sup.name} subtitle={`${rows.length} RSOs · ${bpStats.length} BP assignments`} />
       <SummaryStrip
         items={[
-          { label: "Recharge", value: `${pct(rechargeAchieved, rechargeTarget)}%`, tone: "brand" },
-          { label: "RSO GA", value: `${rsoGaA} / ${rsoGaT}` },
+          {
+            label: "Recharge",
+            value: rechargeTarget > 0 ? `${pct(rechargeAchieved, rechargeTarget)}%` : NO_TARGET_MARK,
+            tone: "brand",
+          },
+          { label: "RSO GA", value: againstTarget(rsoGaA, rsoGaT) },
           // BP GA is a separate target from RSO GA and is never added to it.
           // Before v136 this was only half true: `rows` still had the BP SIMs
           // inside "RSO GA", so a BP was counted here twice. It is not now.
-          { label: "BP GA", value: `${bpGaA} / ${bpGaT}` },
+          { label: "BP GA", value: againstTarget(bpGaA, bpGaT) },
           { label: "BPs", value: bpStats.length.toLocaleString("en-US") },
         ]}
       />
@@ -185,7 +189,7 @@ export default async function Page({
                 // it when the 170/300 split arrived, and this line kept
                 // interpolating the object, so every row read "[object
                 // Object]/25". The total is the figure this row is about.
-                value={`${b.achieved.total.toLocaleString("en-US")}/${b.target.toLocaleString("en-US")}`}
+                value={againstTarget(b.achieved.total, b.target, (n) => n.toLocaleString("en-US"))}
                 valueSub="BP GA"
               />
             ))}

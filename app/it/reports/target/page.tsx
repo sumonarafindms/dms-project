@@ -18,7 +18,7 @@ import {
 } from "../../../../lib/report-builders";
 import { reportPageHref } from "../../../../lib/report-paging";
 import type { RsoSummaryRow } from "../../../../lib/report-data";
-import { targetPercent } from "../../../../lib/achievement";
+import { againstTarget, targetPercent } from "../../../../lib/achievement";
 import { GroupSwitch, GroupedReportView, money } from "../GroupedReportView";
 import type { Column } from "../../../components/ReportTable";
 
@@ -40,11 +40,11 @@ export default async function TargetReport({
 
   const columns: Column<RsoSummaryRow>[] = [
     { key: "name", label: group === "supervisor" ? "Supervisor" : "RSO" },
-    { key: "ga", label: "GA", align: "right", render: (r) => `${r.ga} / ${r.gaTarget}` },
+    { key: "ga", label: "GA", align: "right", render: (r) => againstTarget(r.ga, r.gaTarget) },
     { key: "gaPct", label: "GA %", align: "right", render: (r) => pctCell(r.ga, r.gaTarget) },
-    { key: "sso", label: "SSO", align: "right", render: (r) => `${r.sso} / ${r.ssoTarget}` },
+    { key: "sso", label: "SSO", align: "right", render: (r) => againstTarget(r.sso, r.ssoTarget) },
     { key: "ssoPct", label: "SSO %", align: "right", render: (r) => pctCell(r.sso, r.ssoTarget) },
-    { key: "lso", label: "LSO", align: "right", render: (r) => `${r.lso} / ${r.lsoTarget}` },
+    { key: "lso", label: "LSO", align: "right", render: (r) => againstTarget(r.lso, r.lsoTarget) },
     { key: "lsoPct", label: "LSO %", align: "right", render: (r) => pctCell(r.lso, r.lsoTarget) },
     { key: "c2c", label: "C2C", align: "right", render: (r) => money(r.c2c) },
     { key: "c2cPct", label: "C2C %", align: "right", render: (r) => pctCell(r.c2c, r.c2cTarget) },
@@ -82,10 +82,10 @@ export default async function TargetReport({
         hrefFor: (p) => reportPageHref("/it/reports/target", { from: range.from, to: range.to, group: groupParam }, p),
       }}
       summaryItems={[
-        { label: "GA", value: `${t.ga} / ${t.gaTarget}`, tone: "brand" },
+        { label: "GA", value: againstTarget(t.ga, t.gaTarget), tone: "brand" },
         { label: "GA Achievement", value: pctCell(t.ga, t.gaTarget) },
-        { label: "SSO", value: `${t.sso} / ${t.ssoTarget}` },
-        { label: "LSO", value: `${t.lso} / ${t.lsoTarget}` },
+        { label: "SSO", value: againstTarget(t.sso, t.ssoTarget) },
+        { label: "LSO", value: againstTarget(t.lso, t.lsoTarget) },
       ]}
       emptyTitle="No targets or achievement for this period"
       emptyHint="Targets are set per RSO per month on the Targets page."

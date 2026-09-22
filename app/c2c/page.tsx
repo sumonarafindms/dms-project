@@ -17,6 +17,7 @@ import {
   OpsFreshness,
 } from "../components/OperationsPremiumUI";
 import { Btn } from "../components/Kit";
+import { NO_TARGET_MARK } from "../../lib/achievement";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { apiFetch, apiUpload } from "@/lib/api-client";
 import { fmtDate, fmtDateTime } from "../../lib/format";
@@ -273,7 +274,7 @@ export default function C2cPage() {
           <OpsMetric label="C2C Achieved" value={money(totals.c2cA)} note="Stock lifting" />
           <OpsMetric
             label="C2C %"
-            value={totals.c2cT ? `${((totals.c2cA / totals.c2cT) * 100).toFixed(1)}%` : "0%"}
+            value={totals.c2cT ? `${((totals.c2cA / totals.c2cT) * 100).toFixed(1)}%` : NO_TARGET_MARK}
             note="Achievement rate"
           />
           <OpsMetric label="SC Achieved" value={money(totals.sc)} note="Included for fully covered months" />

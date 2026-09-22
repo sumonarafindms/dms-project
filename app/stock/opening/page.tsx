@@ -1,0 +1,92 @@
+/**
+ * Opening positions — how the ledger starts without importing history.
+ */
+
+import { requireUser } from "../../../lib/auth";
+import { prisma } from "../../../lib/prisma";
+import { dhakaTodayYmd } from "../../../lib/business-time";
+import { holderKey, listHolders, parseHolderKey, pricedProducts, stockScope } from "../../../lib/stock-data";
+import { HOLDER_TYPE_LABEL } from "../../../lib/stock";
+import { EmptyState, PageHeader } from "../../components/Kit";
+import { Icon } from "../../components/icons";
+import { StockOpeningForm } from "../../components/StockOpeningForm";
+
+export const dynamic = "force-dynamic";
+
+export default async function Opening({ searchParams }: { searchParams: Promise<{ holder?: string; as?: string }> }) {
+  /*
+   * The literal, not STOCK_WRITE_ROLES, because tests/route-guards reads this
+   * call as source text and a map entry that cannot be read is not a guard.
+   * tests/stock.smoke.test.ts asserts the two say the same thing.
+   */
+  const u = await requireUser(["ACCOUNTS"]);
+
+  const scope = await stockScope(u);
+  const sp = await searchParams;
+  const holders = await listHolders(scope);
+
+  if (!holders.length)
+    return (
+      <main className="page">
+        <PageHeader title="Opening positions" subtitle="Where each person stood when the ledger started." />
+        <EmptyState
+          title="Nobody to open"
+          hint="No active RSO, supervisor or BP code was found."
+          icon={<Icon name="users" />}
+        />
+      </main>
+    );
+
+  /*
+   * Opening stock is valued at the price in force on the OPENING DATE, so the
+   * date drives the form. A ledger that starts in August must not be opened at
+   * October's prices.
+   */
+  const asOf = /^\d{4}-\d{2}-\d{2}$/.test(sp.as || "") ? sp.as! : dhakaTodayYmd();
+  const products = await pricedProducts(asOf);
+  const parsed = parseHolderKey(sp.holder || "");
+  const chosen = parsed && holders.find((h) => h.type === parsed.type && h.id === parsed.id);
+  const holder = chosen || holders[0];
+
+  const [existing, openingLines] = await Promise.all([
+    prisma.stockOpening.findUnique({
+      where: { holderType_holderId: { holderType: holder.type, holderId: holder.id } },
+      select: { asOfDate: true, openingDue: true },
+    }),
+    prisma.stockMovement.findMany({
+      where: { holderType: holder.type, holderId: holder.id, kind: "OPENING" },
+      select: { productId: true, qty: true },
+    }),
+  ]);
+
+  return (
+    <main className="page">
+      <PageHeader
+        title="Opening positions"
+        subtitle="Set once per person: the stock they already hold and the amount they already owe."
+      />
+      <StockOpeningForm
+        holders={holders.map((h) => ({
+          id: holderKey(h.type, h.id),
+          label: h.name,
+          meta: [HOLDER_TYPE_LABEL[h.type], h.code, h.supervisorName].filter(Boolean).join(" · "),
+        }))}
+        holderKey={holderKey(holder.type, holder.id)}
+        products={products}
+        today={dhakaTodayYmd()}
+        initial={{
+          asOfDate:
+            sp.as && /^\d{4}-\d{2}-\d{2}$/.test(sp.as)
+              ? sp.as
+              : existing?.asOfDate
+                ? existing.asOfDate.toISOString().slice(0, 10)
+                : dhakaTodayYmd(),
+          openingDue: Number(existing?.openingDue || 0),
+          lines: Object.fromEntries(openingLines.map((l) => [l.productId, l.qty])),
+          exists: Boolean(existing),
+        }}
+        basePath="/stock/opening"
+      />
+    </main>
+  );
+}

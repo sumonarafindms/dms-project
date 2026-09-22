@@ -323,6 +323,12 @@ async function typeSearch(page: import("@playwright/test").Page, term: string, b
   return false;
 }
 
+/**
+ * Roles whose every screen is about one record, so a list control would be
+ * wrong rather than missing. See the floor at the end of the sweep.
+ */
+const NO_LIST_ROLES = new Set(["BP"]);
+
 const ROLES = [
   { key: "RSO", admin: false },
   { key: "SUPERVISOR", admin: false },
@@ -526,11 +532,17 @@ for (const role of ROLES) {
        * `a.kit-row-XX` was caught by nothing — the precise failure this file
        * exists to rule out, reproduced inside the file itself.
        *
-       * So: a role that can reach five or more routes MUST find a list. BP
-       * reaches two, both about its own single outlet, and demanding a control
-       * there would be demanding one that should not exist.
+       * So: a role that can reach five or more routes MUST find a list.
+       *
+       * BP is exempt BY NAME, not by its route count. Every screen a BP has is
+       * about its own single outlet — its sales, its campaign number, today's
+       * support — so demanding a list control there would be demanding one
+       * that should not exist. It used to fall under the floor by accident
+       * because it reached only two routes; v189 gave it Campaigns and Sim
+       * Support and the accident ended. A reason written down survives the next
+       * route being added; a number does not.
        */
-      if (routes.length >= 5)
+      if (routes.length >= 5 && !NO_LIST_ROLES.has(role.key))
         expect(
           pagesWithLists,
           `${role.key} found no list at all across ${routes.length} routes — did the item selector change?`,

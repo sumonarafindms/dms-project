@@ -55,6 +55,24 @@
       padding-top: 0.85rem;
       padding-bottom: 0.85rem;
     }
+
+    /* The last two links a thumb could miss, found by the v191 sweep: a name
+       in a table cell (18px) and the "View all ->" action beside a section
+       heading (20px). Both are bare text with nothing tappable around them —
+       padding the cell made the ROW taller without making the LINK bigger, so
+       a tap landing beside the words did nothing at all. Each keeps its inline
+       look on a mouse and gets a real height only on a touch screen; the cell
+       gives its own padding back so a row of names does not double in height. */
+    .kit-tablelink,
+    .kit-section-head a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+    }
+    table tbody td:has(> .kit-tablelink:only-child) {
+      padding-top: 0.15rem;
+      padding-bottom: 0.15rem;
+    }
   }
 
   /* ==================================================================

@@ -117,6 +117,12 @@ describe("no long list is left in a native menu", () => {
     [path.join("app", "admin", "users", "UserManager.tsx")]: {
       ROLES: "the seven roles, fixed in code",
     },
+    [path.join("app", "components", "ProductMaster.tsx")]: {
+      PRODUCT_CATEGORIES: "the five product kinds, fixed in code — an enum, not a list of people or outlets",
+    },
+    [path.join("app", "components", "ExpenseViews.tsx")]: {
+      EXPENSE_CATEGORIES: "the eight expense kinds, fixed in code — an enum, not a list of people or outlets",
+    },
     [path.join("app", "components", "ServerSearchBar.tsx")]: {
       options:
         "ServerSelect is a URL-param filter over a short enumeration — sort orders, audit modules and actions — not a list of people or outlets",
