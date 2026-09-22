@@ -28,7 +28,7 @@ function dateOnly(value: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await apiUser(["ADMIN", "IT", "ACCOUNTS"])))
+  if (!(await apiUser(["ADMIN", "IT"])))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await apiPermission("ga", "view"))) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {

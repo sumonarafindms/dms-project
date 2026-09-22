@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isYmd } from "../../../../lib/business-time";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   const amount = Number(b.amount);
   const note = String(b.note || "").slice(0, 400);
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: "Which date?" }, { status: 400 });
+  if (!isYmd(date)) return NextResponse.json({ error: "Which date?" }, { status: 400 });
   if (!isCategory(category)) return NextResponse.json({ error: "What was it spent on?" }, { status: 400 });
   if (paidFrom !== "CASH" && paidFrom !== "BANK")
     return NextResponse.json({ error: "Paid from cash or bank?" }, { status: 400 });

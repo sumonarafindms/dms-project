@@ -26,13 +26,6 @@ export const PUBLIC = new Set(["/", "/login", "/sacool", "/setup"]);
 export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/": "PUBLIC",
   "/accounts": ["ACCOUNTS"],
-  "/accounts/attention": ["ACCOUNTS"],
-  "/accounts/operations": ["ACCOUNTS"],
-  "/accounts/operations/c2c": ["ACCOUNTS"],
-  "/accounts/operations/c2s": ["ACCOUNTS"],
-  "/accounts/operations/ga": ["ACCOUNTS"],
-  "/accounts/operations/ob": ["ACCOUNTS"],
-  "/accounts/operations/targets": ["ACCOUNTS"],
   "/accounts/people": ["ACCOUNTS"],
   "/accounts/retailers": ["ACCOUNTS"],
   "/accounts/retailers/[id]": ["ACCOUNTS"],
@@ -120,9 +113,9 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
    * rather than with a narrower entry here — this map is about who may reach a
    * route at all.
    */
-  "/campaigns": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  "/campaigns": ["ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   "/campaigns/new": ["ADMIN", "IT", "MANAGER"],
-  "/campaigns/[id]": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  "/campaigns/[id]": ["ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   "/campaigns/[id]/edit": ["ADMIN", "IT", "MANAGER"],
   "/support": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   "/support/codes": ["ADMIN", "IT", "MANAGER"],
@@ -147,6 +140,7 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/stock/lifting": ["ACCOUNTS", "ADMIN", "IT"],
   "/stock/expenses": ["ACCOUNTS", "ADMIN", "IT"],
   "/stock/profit": ["ACCOUNTS", "ADMIN", "IT"],
+  "/stock/day-report": ["ACCOUNTS", "ADMIN", "IT"],
   /* Wider: no purchase price on it, and the gap is a supervisor's job first. */
   "/stock/sim-check": ["ACCOUNTS", "ADMIN", "IT", "MANAGER", "SUPERVISOR"],
   "/sacool": "PUBLIC",

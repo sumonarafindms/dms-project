@@ -194,7 +194,18 @@ export function StockOpeningForm({
             <select
               className="kit-input"
               value={useStockValue ? "build" : "type"}
-              onChange={(e) => setUseStockValue(e.target.value === "build")}
+              onChange={(e) => {
+                /*
+                 * v199: switching how the total is built keeps the TOTAL. A
+                 * saved opening opens as "type the total", and switching to
+                 * "stock plus extra" used to add the stock on top of a figure
+                 * that already contained it — ৳20,000 became ৳40,000.
+                 */
+                const build = e.target.value === "build";
+                if (build === useStockValue) return;
+                setExtra(String(build ? Math.max(0, paisa(openingDue - stockValue)) || "" : openingDue || ""));
+                setUseStockValue(build);
+              }}
             >
               <option value="build">Stock value above, plus any extra owed</option>
               <option value="type">Type the total outright</option>

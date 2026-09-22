@@ -225,6 +225,31 @@ describe("the two margins", () => {
     expect(p.uncostedProducts).toEqual(["iTopup balance"]);
   });
 
+  it("godown stock with no cost is left unvalued and named, not valued at zero", () => {
+    /*
+     * The second place v194's rule applied, found by v195's hunt: the margin
+     * had learned that no cost is not a cost of zero, but the godown value and
+     * the "out with people" cost had not — ৳39.8 lakh of iTopup balance was
+     * printed as worth ৳0 on two screens.
+     */
+    const free: ProductRow = { id: "free", category: "ITOPUP", subType: "iTopup balance" };
+    const lines = houseLines(
+      [SIM, free],
+      [
+        { productId: "sim", qty: 100, unitCost: 120 },
+        { productId: "free", qty: 5000, unitCost: 0 },
+      ],
+      [],
+    );
+    const p = profitOf(lines, 0);
+    // Only the SIMs are valued: 100 × 120.
+    expect(p.godownValue).toBe(12_000);
+    expect(p.unvaluedProducts).toEqual(["iTopup balance"]);
+    // And every screen that shows a godown figure prints "no cost yet" for it.
+    expect(read("app/components/LiftingViews.tsx")).toContain("l.hasCost ? fmtMoney(l.godownValue)");
+    expect(read("app/stock/lifting/page.tsx")).toContain("Not valued above");
+  });
+
   it("the profit screen names what it excluded", () => {
     // Leaving it out understates the business exactly as counting it at zero
     // cost overstated it, so the screen says which products and how much.
@@ -274,6 +299,35 @@ describe("the SIM check", () => {
    * sell dekhaice.. ar mane baki 20tar taka tar kache ace".
    */
   const base = { employeeId: "e1", name: "RSO 1", code: "017", supervisorName: "Dhaka North", avgPrice: 150 };
+
+  it("an RSO never handed a SIM has no price, not a price of zero", () => {
+    /*
+     * v195's defect hunt: three RSOs activated 1,524 SIMs in the period but the
+     * ledger had never handed them one, so their gap printed "Worth ৳0". The
+     * honest answer is that nobody knows, and the check says so.
+     */
+    const c = simCheck({ ...base, given: 0, activated: 526, sold: 0, avgPrice: null });
+    expect(c.unreported).toBe(526);
+    expect(c.unreportedValue).toBeNull();
+  });
+
+  it("an unpriced gap sorts by its count, not to the bottom as if worthless", () => {
+    const rows = [
+      simCheck({ ...base, employeeId: "priced", name: "P", given: 10, activated: 12, sold: 10, avgPrice: 150 }),
+      simCheck({ ...base, employeeId: "unpriced", name: "U", given: 0, activated: 500, sold: 0, avgPrice: null }),
+    ];
+    // Priced money leads; the unpriced gap is still above anyone with no gap.
+    const ordered = bySuspicion([
+      ...rows,
+      simCheck({ ...base, employeeId: "clear", name: "C", given: 5, activated: 5, sold: 5, avgPrice: 150 }),
+    ]).map((r) => r.employeeId);
+    expect(ordered.indexOf("unpriced")).toBeLessThan(ordered.indexOf("clear"));
+  });
+
+  it("the price falls back to the RSO's own history before giving up", () => {
+    // Somebody handed nothing THIS period still has a known price from before.
+    expect(read("lib/lifting-data.ts")).toContain("byAllTime.get(e.id) ?? null");
+  });
 
   it("his own example comes out at twenty", () => {
     const c = simCheck({ ...base, given: 100, activated: 50, sold: 30 });

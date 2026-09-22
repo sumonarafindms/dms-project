@@ -31,12 +31,28 @@ import { apiSend } from "@/lib/api-client";
 import { fmtMoney } from "@/lib/format";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABEL, type ProductCategory } from "@/lib/stock";
 
+export type ActivationType = "GA_170" | "GA_300" | "SIM_SWAP";
+
+/** What a SIM product shows up as in the company's activation feed (v198). */
+export const ACTIVATION_LABEL: Record<ActivationType, string> = {
+  GA_170: "GA 170 (normal 150/170 SIM)",
+  GA_300: "GA 300 (normal 300 SIM)",
+  SIM_SWAP: "SIM swap",
+};
+const ACTIVATION_OPTIONS: [ActivationType | "", string][] = [
+  ["GA_170", ACTIVATION_LABEL.GA_170],
+  ["GA_300", ACTIVATION_LABEL.GA_300],
+  ["SIM_SWAP", ACTIVATION_LABEL.SIM_SWAP],
+  ["", "Not linked"],
+];
+
 export type MasterProduct = {
   id: string;
   category: ProductCategory;
   subType: string;
   unitLabel: string | null;
   status: "ACTIVE" | "INACTIVE";
+  activationType: ActivationType | null;
   movements: number;
   /** Newest first. */
   prices: { price: number; effectiveFrom: string }[];
@@ -58,6 +74,7 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
     unitLabel: "",
     price: "",
     effectiveFrom: today,
+    activationType: "" as ActivationType | "",
   });
   const [newPrice, setNewPrice] = useState({ price: "", effectiveFrom: today });
   const [rename, setRename] = useState("");
@@ -140,10 +157,26 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
               onChange={(e) => setAdd({ ...add, effectiveFrom: e.target.value })}
             />
           </Field>
+          {add.category === "SIM" && (
+            <Field label="Activates as" hint="so the Accounts home can show sold beside activated">
+              <select
+                className="kit-input"
+                value={add.activationType}
+                onChange={(e) => setAdd({ ...add, activationType: e.target.value as ActivationType | "" })}
+              >
+                {ACTIVATION_OPTIONS.map(([v, label]) => (
+                  <option key={v || "none"} value={v}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
         </div>
         <Btn
           onClick={async () => {
-            if (await send(add, "POST", "Product added.")) setAdd({ ...add, subType: "", unitLabel: "", price: "" });
+            if (await send(add, "POST", "Product added."))
+              setAdd({ ...add, subType: "", unitLabel: "", price: "", activationType: "" });
           }}
           disabled={busy || !add.subType || add.price === ""}
         >
@@ -215,6 +248,13 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
                         <strong>{p.subType}</strong>
                         {p.movements > 0 && (
                           <span className="kit-cell-sub">{p.movements.toLocaleString("en-US")} entries</span>
+                        )}
+                        {p.category === "SIM" && (
+                          <span className="kit-cell-sub">
+                            {p.activationType
+                              ? `Activates as ${ACTIVATION_LABEL[p.activationType]}`
+                              : "Activations not linked"}
+                          </span>
                         )}
                       </td>
                       <td role="cell" data-label="Price now" className="is-right">
@@ -317,6 +357,24 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
                     <Field label="Name" hint="A label; no figure reads it">
                       <input className="kit-input" value={rename} onChange={(e) => setRename(e.target.value)} />
                     </Field>
+                    {p.category === "SIM" && (
+                      <Field label="Activates as" hint="saved as soon as it is picked">
+                        <select
+                          className="kit-input"
+                          value={p.activationType ?? ""}
+                          disabled={busy}
+                          onChange={(e) =>
+                            send({ id: p.id, activationType: e.target.value }, "PATCH", "Activation link saved.")
+                          }
+                        >
+                          {ACTIVATION_OPTIONS.map(([v, label]) => (
+                            <option key={v || "none"} value={v}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    )}
                   </div>
                   <span className="kit-rowacts">
                     <Btn

@@ -31,6 +31,13 @@ export type Holder = {
   code: string | null;
   /** The supervisor this holder sits under, for grouping. Null for a supervisor. */
   supervisorName: string | null;
+  /** The supervisor's id, for team totals. Names can repeat; ids cannot (v181). */
+  supervisorId?: string | null;
+  /**
+   * v199: no longer an active RSO, supervisor or BP — but still holding stock
+   * or money in this ledger, so still listed. See `listHolders`.
+   */
+  inactive?: boolean;
 };
 
 /** A holder identified the way a URL and a form carry one. */
@@ -146,13 +153,20 @@ export async function listHolders(scope: StockScope): Promise<Holder[]> {
     prisma.supervisor.findMany({ where: { active: true }, select: { id: true, name: true } }),
     prisma.employee.findMany({
       where: { active: true },
-      select: { id: true, name: true, employeeCode: true, rsoMsisdn: true, supervisor: { select: { name: true } } },
+      select: {
+        id: true,
+        name: true,
+        employeeCode: true,
+        rsoMsisdn: true,
+        supervisorId: true,
+        supervisor: { select: { name: true } },
+      },
     }),
     prisma.bpAssignment.findMany({
       where: { active: true },
       select: {
         retailer: { select: { id: true, retailerCode: true, retailerName: true, bpName: true } },
-        employee: { select: { supervisor: { select: { name: true } } } },
+        employee: { select: { supervisorId: true, supervisor: { select: { name: true } } } },
       },
     }),
   ]);
@@ -167,6 +181,7 @@ export async function listHolders(scope: StockScope): Promise<Holder[]> {
       name: r.name,
       code: r.employeeCode || r.rsoMsisdn,
       supervisorName: r.supervisor?.name ?? null,
+      supervisorId: r.supervisorId ?? null,
     });
 
   // One outlet, one row, even when two RSOs hold it.
@@ -180,11 +195,74 @@ export async function listHolders(scope: StockScope): Promise<Holder[]> {
       name: bpDisplayName(a.retailer),
       code: a.retailer.retailerCode,
       supervisorName: a.employee.supervisor?.name ?? null,
+      supervisorId: a.employee.supervisorId ?? null,
     });
   }
 
+  /*
+   * v199 — somebody who has left is still in the books.
+   *
+   * Deactivating an RSO, a supervisor or ending a BP assignment never checked
+   * their stock or due, and every list here was built from the ACTIVE people
+   * only. An RSO who left owing ৳85,000 vanished from Stock & Cash, from the
+   * home's Outstanding total and from the dues export — and a ledger link to
+   * them opened Daily Entry on somebody else, so money collected from them
+   * could be saved against the wrong person.
+   *
+   * So anyone with a single line in the ledger — a movement, a deposit or an
+   * opening — stays listed, marked inactive, until the office has settled
+   * them. Only for viewers who see everyone; a team view is a team.
+   */
+  if (scope.holders === null) {
+    const listed = new Set(out.map((h) => holderKey(h.type, h.id)));
+    const inBooks = await prisma.$queryRaw<{ holderType: HolderType; holderId: string }[]>`
+      SELECT DISTINCT "holderType"::text AS "holderType", "holderId" FROM (
+        SELECT "holderType", "holderId" FROM "StockMovement"
+        UNION SELECT "holderType", "holderId" FROM "CashDeposit"
+        UNION SELECT "holderType", "holderId" FROM "StockOpening"
+      ) k`;
+    const missing = inBooks.filter((k) => !listed.has(holderKey(k.holderType, k.holderId)));
+    if (missing.length) {
+      const ids = (t: HolderType) => missing.filter((k) => k.holderType === t).map((k) => k.holderId);
+      const [sups, emps, outlets] = await Promise.all([
+        prisma.supervisor.findMany({ where: { id: { in: ids("SUPERVISOR") } }, select: { id: true, name: true } }),
+        prisma.employee.findMany({
+          where: { id: { in: ids("RSO") } },
+          select: { id: true, name: true, employeeCode: true, rsoMsisdn: true, supervisor: { select: { name: true } } },
+        }),
+        prisma.retailer.findMany({
+          where: { id: { in: ids("BP") } },
+          select: { id: true, retailerCode: true, retailerName: true, bpName: true },
+        }),
+      ]);
+      for (const x of sups)
+        out.push({ type: "SUPERVISOR", id: x.id, name: x.name, code: null, supervisorName: null, inactive: true });
+      for (const x of emps)
+        out.push({
+          type: "RSO",
+          id: x.id,
+          name: x.name,
+          code: x.employeeCode || x.rsoMsisdn,
+          supervisorName: x.supervisor?.name ?? null,
+          inactive: true,
+        });
+      for (const x of outlets)
+        out.push({
+          type: "BP",
+          id: x.id,
+          name: bpDisplayName(x),
+          code: x.retailerCode,
+          supervisorName: null,
+          inactive: true,
+        });
+    }
+  }
+
   const visible = scope.holders === null ? out : out.filter((h) => scope.holders!.has(holderKey(h.type, h.id)));
-  visible.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+  visible.sort(
+    (a, b) =>
+      a.type.localeCompare(b.type) || Number(!!a.inactive) - Number(!!b.inactive) || a.name.localeCompare(b.name),
+  );
   return visible;
 }
 
@@ -256,22 +334,31 @@ export async function allProducts(): Promise<ProductRow[]> {
  * than treating it as free. A product added in October genuinely has no price
  * in September, and pretending otherwise is how a zero-value line gets saved.
  */
-export type DatedProduct = ProductRow & { price: number | null };
+export type DatedProduct = ProductRow & { price: number | null; retired?: boolean };
 
-export async function pricedProducts(date: string): Promise<DatedProduct[]> {
+export async function pricedProducts(date: string, alsoIds: string[] = []): Promise<DatedProduct[]> {
+  /*
+   * v199: `alsoIds` brings in RETIRED products a form already has lines for.
+   * Listing active products only meant a retired product's saved lines were
+   * invisible on the screen — left out of "Due after saving", uncorrectable,
+   * and on the opening form silently DELETED by the next save, because that
+   * route clears every opening line and rewrites only what the form sent.
+   */
   const rows = await prisma.product.findMany({
-    where: { status: "ACTIVE" },
+    where: alsoIds.length ? { OR: [{ status: "ACTIVE" }, { id: { in: alsoIds } }] } : { status: "ACTIVE" },
     orderBy: [{ category: "asc" }, { subType: "asc" }],
     select: {
       id: true,
       category: true,
       subType: true,
       unitLabel: true,
+      status: true,
       prices: { select: { price: true, effectiveFrom: true } },
     },
   });
   return rows.map((p) => ({
     ...toProduct(p),
+    retired: p.status !== "ACTIVE",
     price: priceOn(
       p.prices.map((x) => ({ price: Number(x.price), effectiveFrom: x.effectiveFrom.toISOString().slice(0, 10) })),
       date,
@@ -281,6 +368,7 @@ export async function pricedProducts(date: string): Promise<DatedProduct[]> {
 
 export type ProductWithPrices = ProductRow & {
   status: "ACTIVE" | "INACTIVE";
+  activationType: "GA_170" | "GA_300" | "SIM_SWAP" | null;
   prices: PriceRow[];
   movements: number;
   /** The price in force today, or null if it has none yet. */
@@ -297,6 +385,7 @@ export async function productCatalogue(today: string): Promise<ProductWithPrices
       subType: true,
       unitLabel: true,
       status: true,
+      activationType: true,
       prices: { orderBy: { effectiveFrom: "desc" }, select: { price: true, effectiveFrom: true } },
       _count: { select: { movements: true } },
     },
@@ -309,6 +398,7 @@ export async function productCatalogue(today: string): Promise<ProductWithPrices
     return {
       ...toProduct(p),
       status: p.status as "ACTIVE" | "INACTIVE",
+      activationType: p.activationType,
       prices,
       movements: p._count.movements,
       current: priceOn(prices, today),
@@ -340,7 +430,10 @@ export type HolderPosition = {
 export async function holderPosition(holder: Holder): Promise<HolderPosition> {
   const where = { holderType: holder.type, holderId: holder.id } as const;
   const [movements, deposits, opening, products] = await Promise.all([
-    prisma.stockMovement.findMany({ where, select: { kind: true, productId: true, qty: true, unitPrice: true } }),
+    prisma.stockMovement.findMany({
+      where,
+      select: { kind: true, productId: true, qty: true, unitPrice: true, date: true },
+    }),
     prisma.cashDeposit.aggregate({ where, _sum: { cash: true, bank: true } }),
     prisma.stockOpening.findUnique({
       where: { holderType_holderId: { holderType: holder.type, holderId: holder.id } },
@@ -349,7 +442,16 @@ export async function holderPosition(holder: Holder): Promise<HolderPosition> {
     allProducts(),
   ]);
 
-  const lines = stockLines(movements.map((m) => ({ ...m, unitPrice: Number(m.unitPrice) })) as MovementRow[], products);
+  const lines = stockLines(
+    movements.map((m) => ({
+      kind: m.kind,
+      productId: m.productId,
+      qty: m.qty,
+      unitPrice: Number(m.unitPrice),
+      date: m.date.toISOString().slice(0, 10),
+    })) as MovementRow[],
+    products,
+  );
   const v = movementValue(lines);
   const cash = Number(deposits._sum.cash || 0);
   const bank = Number(deposits._sum.bank || 0);
@@ -402,9 +504,11 @@ type RawAgg = {
  * person. At the volumes this app already runs at (77k GaActivation rows) the
  * per-person version would be hundreds of round trips for one page.
  */
-export async function holderDues(scope: StockScope): Promise<HolderDue[]> {
+export async function holderDues(scope: StockScope, listed?: Holder[]): Promise<HolderDue[]> {
   const [holders, agg, deposits, openings] = await Promise.all([
-    listHolders(scope),
+    // A caller that already listed the holders passes them, rather than paying
+    // for the same four queries twice on one page load.
+    listed ? Promise.resolve(listed) : listHolders(scope),
     prisma.$queryRaw<RawAgg[]>`
       SELECT m."holderType"::text AS "holderType",
              m."holderId"         AS "holderId",
@@ -486,6 +590,12 @@ export type DayEntry = {
    * quietly reprice it.
    */
   returnPrice: Record<string, number>;
+  /**
+   * v199: the price each GIVEN and SOLD line was saved at. The server keeps
+   * it on a re-save, so the screen's running due must use it too.
+   */
+  givenPrice: Record<string, number>;
+  soldPrice: Record<string, number>;
   cash: number;
   bank: number;
   bankRef: string;
@@ -511,15 +621,21 @@ export async function dayEntry(type: HolderType, id: string, date: string): Prom
     sold: {},
     returned: {},
     returnPrice: {},
+    givenPrice: {},
+    soldPrice: {},
     cash: 0,
     bank: 0,
     bankRef: "",
     notes: "",
   };
   for (const m of movements) {
-    if (m.kind === "GIVEN") out.given[m.productId] = m.qty;
-    else if (m.kind === "SOLD") out.sold[m.productId] = m.qty;
-    else if (m.kind === "RETURNED") {
+    if (m.kind === "GIVEN") {
+      out.given[m.productId] = m.qty;
+      out.givenPrice[m.productId] = Number(m.unitPrice);
+    } else if (m.kind === "SOLD") {
+      out.sold[m.productId] = m.qty;
+      out.soldPrice[m.productId] = Number(m.unitPrice);
+    } else if (m.kind === "RETURNED") {
       out.returned[m.productId] = m.qty;
       out.returnPrice[m.productId] = Number(m.unitPrice);
     }

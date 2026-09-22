@@ -1240,3 +1240,188 @@ The buying price is **Accounts, IT and Admin** — the owner's ruling. A manager
 - **1,172 unit tests across 78 files**, 33 new. `tests/picker.smoke.test.ts` caught the expense-category `<select>`, as designed.
 - Whole-app sweep at 390 (touch) and 1440, and the stock read pass across all seven roles: **0 problems**. v192's and v193's audits and the price-lock probe re-run clean.
 - Build clean; eslint **0 errors, 0 new warnings**; prettier clean. Production `APP_DATABASE_URL` never touched.
+
+## v195 — the daily report, exports, and three more zeros that meant "unknown"
+
+### The daily report
+
+> *"accounts ar proti din report dite hoi.. je tar koto takar sell hoice.. koto taka bank a gase and koto taka cash paice.. koto taka expanse a gase.. ki ki expanse gase... scratch card koto takar sell.. sim koita and koto takar sell... mane sob kicur report dite hoi"*
+
+`/stock/day-report` — one day, in the order somebody reads it at closing: **what sold** (every product, SIMs and cards with their counts), **money in** (cash, bank, and who deposited it), **expenses** (every item, and whether it left the drawer or the account), and **the drawer** — `cash in − cash spent`, `bank in − bank spent` — which is the figure somebody counts against. On the seeded 14 September: ৳1,479,176 sold · ৳834,766 cash · ৳388,336 bank · ৳3,906 spent · SIM 439 pcs ৳91,650 · scratch card 592 pcs ৳38,980.
+
+**Sold and collected are shown side by side and never netted.** Somebody sells on Monday and deposits on Tuesday; netting the two would print a shortfall for every day a deposit ran late.
+
+**Copy summary** produces the plain-text version for a message — the way this report actually leaves the building — and deliberately leaves out what the company charged us, because that text gets forwarded. **Export Excel** includes it, because the file only reaches Accounts, IT and Admin. A day with nothing recorded says so and exports nothing (204), rather than a page of ৳0 that reads as "the day happened and nothing sold".
+
+### Exports on every stock screen
+
+Dues, one person's stock, margin, expenses, SIM check and the daily report — one route, six files, each carrying **the scope of the page it belongs to, resolved from the session, never the URL**. A supervisor's dues file is their team; an RSO's is one row; an RSO asking for another RSO's stock file gets a 401. Every file reads through the same function its page renders from, so the two cannot disagree — the probe opens each workbook and checks it against the screen to the paisa.
+
+The first version of that probe reported a leak: an RSO downloading "another RSO's" stock file. It was the probe — it chose the stranger as "the first RSO not named RSO 1", and the RSO login *is* RSO 10. The stranger is now chosen by id against the login's own record, and both directions are checked.
+
+### Accounts finally lands on its own job
+
+The Accounts home showed feed freshness and nothing else, so the person who enters every RSO's money opened the app onto a page that did not mention money. It now leads with outstanding due, how many people were entered today, iTopup out, the largest five dues, and the four screens of the day.
+
+The phone's bottom bar was **Overview · Live GA · Operations · Search** — not one screen Accounts opens twenty times a day — and **Daily Entry had no menu entry at all**; it was reachable only through a button on the Stock & Cash page. The bar is now **Overview · Entry · Stock · Report · More**.
+
+That moves Live GA out of Accounts' bar and into More — a deliberate trade for this one role. It is still in every role's menu, which is the ruling from v164. `tests/live-ga.smoke.test.ts` checked it with a 260-character window after the home entry, which had quietly turned "every role has Live GA" into "every role has Live GA second"; it now reads each role's whole menu.
+
+### Three more places a zero meant "unknown"
+
+A hunt through v192–v194 specifically for the defect class this project keeps finding, checked against data before anything was touched. One candidate was cleared (SIM check date bounds — all 77,084 activation dates are stored at UTC midnight like every other GA query). Three were real:
+
+- **Godown value.** iTopup has no lifting cost, so its godown line was valued at **৳0** — 3,978,393 Taka of balance printed as worth nothing. v194 taught the *margin* that no cost is not a cost of zero; the godown value had not learned it.
+- **"Out with people"** on the Lifting page dropped that same ৳39.8 lakh from its total.
+- **SIM check.** Three RSOs activated **1,524 SIMs** in the period but had never been handed one through the ledger, so their gap printed **"Worth ৳0"** and the strip total quietly excluded them.
+
+Unknown now shows as "no cost yet" or "no price", is named on the screen, and exports as a **blank cell** — a blank is a question, a 0 is an answer and would be the wrong one. The SIM price falls back to the RSO's own all-time price before giving up; only someone the ledger has never handed a SIM gets "no price".
+
+The first sort for unpriced gaps used `worth ?? −1`, which put a 526-SIM gap **below** a person with no gap at all. The test written for the fix caught it; the sort is now tiered — priced gaps by money, then unpriced gaps by count, then nobody.
+
+And one fix that did not land: a replace on the godown table matched nothing because prettier had reflowed the line, and nothing said so. **The test caught that the fix was not in the file.** Every edit in this version was then re-verified by reading the file back.
+
+### Gates
+
+- **`.scratch/exportprobe.ts`**: every file downloaded, opened and compared with its screen — dues ৳12,872,675, margin ৳3,083,405, SIM check 68,452 unreported, the daily report line by line — plus **25 role-and-file combinations** each allowed or refused exactly as the pages are. **0 failed.**
+- v192's, v193's and v194's audits, the write probes and the price-lock probe re-run: **0 failed**.
+- **1,191 unit tests across 79 files**, 19 new.
+- Stock read pass across all seven roles and the whole-app sweep at 390 (touch) and 1440: **0 problems**.
+- Build clean; eslint **0 errors, 0 new warnings**; prettier clean. No schema change in this version. Production `APP_DATABASE_URL` never touched.
+
+## v196 — one click, one lit menu item; and the Products page gets a door
+
+Two reports from the owner, both the menu saying something untrue.
+
+### "akta click korle 2ta menu select hoye thake"
+
+On `/stock/daily`, **Stock & Cash** and **Daily Entry** were both highlighted. The menu decided "active" by URL prefix — `/stock/daily` starts with `/stock/` — and never asked whether a more specific item existed. The stock module made it impossible to miss, with eight entries under one prefix, but it was older than that: **Operations** and **SC & Targets** had lit together since v144, and **Sim Support** and **Support Codes** since v190.
+
+The rule now is **the most specific matching item wins**: an item is active only if no other item in the same menu matches the page more closely. A page with no entry of its own still lights its parent — a ledger at `/stock/RSO/…` lights Stock & Cash. It lives once, as `activeAmong` in `lib/bottom-nav.ts`, and the sidebar, the phone's bottom bar, the More sheet and the admin groups all take that one function, so they cannot disagree about where you are.
+
+### "product add korar kono option nai"
+
+The Products page has existed since v192. It never had a menu entry, so from Accounts' side there was no way to add a product at all. **Opening Balance** had the same gap, and Daily Entry did until v195. Both are now in the Accounts menu, on the Accounts home as tiles, and Products sits beside Daily entry on the Stock & Cash page.
+
+`tests/nav-active.smoke.test.ts` now fails if any `/stock` page Accounts may open has no Accounts menu entry, so the next new page cannot ship without a way in.
+
+### Gates
+
+- **`.scratch/navprobe.ts`**, in a real browser at 1440 and 390 touch, by clicking the menu rather than typing URLs: Products is in the menu and opens; **a product added through the form saves with the price typed** and appears; six stock and operations pages each light **exactly one** item, and on `/stock/daily` that item is Daily Entry. **0 failed.**
+- The whole-app sweep now counts lit items in the real DOM on every page, for every role, at both widths.
+- **1,199 unit tests across 80 files**, 8 new. `tests/app-shell.smoke.test.ts` pinned the old function's name; its intent — the bar's contents come only from `bottomSlots` — is unchanged and it now checks the new rule.
+- No schema change.
+
+## v197 — Accounts is stock and money; and a form that remembered the wrong person
+
+> *"Operation, opportunity, SC & Targets, Campaign — aigula remove korte hobe... file ja upload korbe IT, Account ar kaj holo stock updated kora.. sob thik moto hoce naki check kora and taka management thik moto rakha... lifting, stock & cash ai gula fully updated and functional koro.. and daily rso der je product dite hoi oitar menu ta add kore dio"*
+
+### Before anything: the screenshot was v194
+
+The Accounts menu in the owner's screenshot has no Daily Entry, Daily Report, Products or Opening — all of which arrived in v195 and v196. The live site was still on v194. **The "menu for giving RSOs their products" he asked for is Daily Entry, added in v195**; this version moves it to the top and makes it work with the godown.
+
+### Removed from Accounts — at every layer
+
+**Operations, Opportunity, SC & Targets and Campaigns** are gone from the role, and not only from the menu: a hidden menu over an open endpoint is an upload button with the label peeled off.
+
+- **Menu** — the four entries removed; Daily Entry now sits directly under Overview.
+- **Pages** — `/accounts/operations` (and its GA, C2C, C2S, OB and Targets wrappers) and `/accounts/attention` deleted; they now 404.
+- **APIs** — `ACCOUNTS` removed from the role list of every upload, summary, sample-file and targets endpoint, so a custom permission row cannot reopen them.
+- **Permissions** — the role's defaults no longer include ga, c2c, c2s, ob, targets, attention or campaigns. `bp` went too: nothing Accounts can open checks it, and its only justification ("reached inside the Operations workspace") left with Operations — `tests/reachable-modules` said so the moment the exemption became false.
+- **Campaigns** — Accounts removed from both campaign pages.
+- **The Accounts home** — the feed-freshness cards and the five import tiles are gone. In their place: **the godown**, product by product, with any product showing more given out than lifted in red and counted in the heading — the "check that everything is right" the owner described.
+
+IT keeps every one of those screens and APIs unchanged, and the probe checks that too.
+
+### Daily Entry and the godown now work as one
+
+The **Give** tab has a **Godown after** column: what each product will leave in the godown once this entry is saved, moving as the numbers are typed. Give more than the godown holds and the figure goes red with a warning naming the product and what the godown actually has — a warning, not a block, because the lifting that covers it may simply not be entered yet. A product that has never been lifted shows "—", not "0 left": nobody has recorded buying it, so there is nothing to check against. Returns count back into the column.
+
+### The defect the Accounts-day walk found
+
+The owner asked for Lifting and Stock & Cash to be "fully functional", so this version walked a whole Accounts day **through the real forms** — never the API: buy 100 SIMs at ৳120 on Lifting; in Daily Entry give an RSO 30, record 20 sold, 5 returned, ৳2,000 cash and ৳1,000 bank; add a ৳200 expense. Then every screen had to agree: godown 75 on the home page and the Lifting page, 5 in hand on the ledger, the due up by exactly ৳750, and the daily report showing 20 pcs / ৳3,000 sold, ৳1,800 net cash.
+
+One check failed: **the Return tab's price box was empty.** The money was still right — the server fell back to the day's price — but that is the silent default v193 forbade. The cause was worse than the symptom:
+
+**The Daily Entry form kept its state when the person or the date changed.** The page reloaded the new person's data; React kept the old form. Measured before fixing: open RSO 48's saved day (37 SIMs given), switch to RSO 47 with the picker — and the box still said **37**. Save would have charged RSO 47 for 37 SIMs they never received. It had been true since v192.
+
+The form is now keyed by person and date, so a different person or day is a fresh form built from *their* saved day. Opening Balance had the same shape and got the same fix. Re-measured: switching to RSO 47 shows their own empty day, and the Accounts-day walk passes end to end.
+
+### Gates
+
+- **`.scratch/accountsday.ts`** — a whole day through the forms, 34 checks, **0 failed**, and it leaves the RSO's due exactly where it found it.
+- **`.scratch/stalestate.ts`** — the wrong-person carry-over, reproduced before the fix and gone after.
+- **`.scratch/accountsscope.ts`** — the menu, the phone bar (**Overview · Entry · Stock · Report · More**), every removed page 404, every upload/targets API 401 for Accounts, and IT still reaching all of them. **0 failed.**
+- v192–v196 probes re-run: audits, write probes, price-lock, exports, nav, stock read — **0 failed / 0 problems**.
+- **1,212 unit tests across 81 files**; the new `tests/accounts-scope.smoke.test.ts` guards the removal at all three layers, the two form keys, and the godown wiring.
+- No schema change.
+
+## v198 — The Accounts home shows what moved; Sim Support runs two ladders
+
+> *"Accounts ar dashboard ta o onk ta clean rakho... Sim Company theke koto gula lifting hoice and Rso der kache koto gula dia hoice and RSO sell koto gula dekhaice and tara active koto gula korce... normal sim, swap sim ar jono alada... card ar jono company lifting, rso lifting and rso sell... monthly and yesterday... Tar por niche RSO, bp and supervisor onu jai kar koto gula stock ace"*
+>
+> *"Amader 2type ar sim 170 and 300... 2type ar support hoi... oita sundor kore update kore dio"*
+
+### The Accounts home, rebuilt around the two things the owner listed
+
+- **One switch — This month / Yesterday — drives the whole page**, so the product rows and the people below them always describe the same days.
+- **Per product, shelf by shelf** (Normal SIM · Swap SIM · Scratch cards · iTopup · Routers & handsets): **Company lifting** (purchases only — an opening count is not a lifting), **Given out**, **Reported sold**, and for SIMs **Activated** from the company's GA feed. Each product is its own row, so 150 and 300 SIMs, and 29 / 39 / 49 cards, sit directly above one another. When supervisors or BPs took or sold some, the row names the split (RSO · Supervisor · BP). The godown count sits on the product's own row, red when negative.
+- **Sold beside activated.** A SIM that activated but was never reported sold is money somebody has to ask about; the row says how many and links to SIM check. When two products share one activation kind (two swap SIMs), the row says "shared with …" instead of inventing a per-product gap.
+- **The feed lag is said out loud.** Activations are uploaded a day late; when the feed stops before the period ends, an amber line says up to which day it runs, instead of printing 0 activated.
+- **Who is holding stock**: tabs for **RSOs, Supervisors and BPs**, search, and "only with stock or a due". Each row shows SIMs / cards / devices / iTopup in hand, what they took and reported sold in the chosen period, and their due; open it for the product-by-product table and a link to the ledger. Supervisors are first-class holders here, as the owner asked.
+- Gone, as asked: the tile grid, the largest-dues card, the separate godown list and the reference tiles — all already in the menu, and their figures now live on the rows above. The four money figures (Outstanding, With a due, Entered today, iTopup out) stay at the top, with Daily Entry and Daily Report as the two header buttons.
+
+**Products → "Activates as".** A SIM product now says which company activations it shows up as — GA 170, GA 300 or SIM swap — so "activated" is a link somebody set, never a guess. The migration fills it once from the product's name (swap/EV → swap, then 300, then 150/170) and it can be changed on the Products page; an unlinked SIM shows "not linked", not 0. The catalogue seed gains the 29 and 49 Tk cards.
+
+### Sim Support: a 300৳ ladder and a 170৳ ladder
+
+- An offer can now carry **two ladders, one per SIM type**, each with its own taka-per-SIM at each GA step — exactly the owner's "300৳ SIM Bonus / 170৳ SIM Bonus" message. It is the default for a new offer; the single ladder is one tap away, and **every offer saved before v198 pays exactly what it paid** (its slabs became tier ALL).
+- **Which count picks the step** is chosen per offer, because the two readings pay different money: *Total GA picks the step* (the day's 170 + 300 together decide the step, each SIM paid at its own ladder's rate — the default, matching one target over two rate columns) or *Each SIM type climbs its own ladder*.
+- **Today's target** ("আজকের টার্গেট: 25+ GA") is stored and shown: on the offer, on the offers list, and as a progress bar on the RSO's own card.
+- **The WhatsApp message is generated** from the saved numbers in the owner's own layout — heading, date, target, 300 block, 170 block, SSO line, closing lines — with a Copy button. Edit the offer and the message changes with it.
+- **A rate that drops at a higher step is flagged before saving.** The owner's message had "25 GA ➜ ৳10" after "20 GA ➜ ৳70"; because a step reprices the whole day, that would cut an RSO's money for selling more. The form warns and still allows it, in case it is meant.
+- The RSO's card shows each ladder's step and money, and nudges per ladder (or for the shared next step, repricing the SIMs already done). The office table shows 300/170 counts and each ladder's step.
+- New offers **start from the last offer saved** (the day is left blank), so tomorrow's offer is today's with one rate changed rather than ten steps retyped.
+
+### Checked
+
+- `.scratch/audit198.ts` against independent SQL, over 1–15 Sep: every product's lifted/given/sold/returned for the month and for yesterday; GA 170 / GA 300 / swap activations (44,943 / 22,455 / 7,466); four RSOs, four supervisors and four BPs' in-hand and due equal to their own ledger; and the split Sim Support for 50 people under both step rules equal to hand arithmetic over raw product-code counts — **all pass**.
+- `.scratch/probe198.ts` in a real browser at 1440 and 390 touch: no horizontal overflow on the home, the support day or the form; period and holder tabs, search and opening a holder; tap targets; an offer created through the form (the ৳10 drop flagged, fixed, saved as 4 × 300 and 6 × 170 with target 25), then read back on the day by IT and on the RSO's phone — **all pass**, run three times.
+- One React #418 (hydration) was seen once during the first probe run and never again — not in two full reruns nor in 216 targeted page loads. The same intermittent error was noted on /admin/attention in v191.
+- **1,235 unit tests across 82 files**, including 12 new split-ladder tests and the new `tests/accounts-home.smoke.test.ts`; build clean; eslint at the 27-warning baseline.
+- Two migrations, both additive: `20260923100000_support_split_ladders` and `20260923120000_product_activation_type`.
+
+## v199 — The card layout stays; ten defects found by review, fixed; a to-do list for Accounts
+
+> *"Desktop ar home screen aita sundor basi...aitai rakho.. And sob code, function and logic check kore dekho thik ace naki... Accounts a ar ki ki add korle valo hobe check kore oi gula update koro...jate sob kicu smooth vabe chole"*
+
+### The home page the owner picked
+
+The product **cards** from v198's first cut are back on desktop, three across, as in the owner's screenshot. The fault that cut had (four figures in a third of the page broke numbers mid-digit, "6,82 / 1", "44,9 / 43") is fixed in the cell rather than by changing the layout: a figure never wraps, each cell is a size container and the number scales to fit, the split line under it says "RSO · Sup · BP", and the iTopup card lays its money two across. The browser probe checks every figure on the page is on one line and inside its cell, at 1440 and at 390.
+
+### Every Accounts calculation reviewed — what was wrong
+
+A separate read-only review of the whole stock-and-money module, then each finding reproduced through the real API before it was fixed (`.scratch/probe199.ts`, all pass):
+
+1. **A price change broke the value of stock still held — and the return credit.** A sale is priced by the day it is reported, and that price was taken out of the carrying value: 10 SIMs given at ৳100, price drops to ৳50, 9 sold → the last SIM was "carried" at ৳550 and returning it cleared ৳550 of the due instead of ৳100 (with a price rise, it went negative). Stock in hand is now a moving weighted average of what the person was **charged**, in date order; the return defaults to exactly ৳100. Stock sold in January no longer blends into a February lot. The return default on a corrected day now uses only the days before it.
+2. **People who left vanished while still owing.** Every list was built from active people only; an RSO deactivated with ৳85,000 due disappeared from Stock & Cash, the home's Outstanding total and the dues export — and a link to their ledger opened Daily Entry on somebody else. Anyone with a line in the books now stays listed, marked "no longer active", and a link to someone not in the list says so instead of silently opening another person.
+3. **A ranged margin only knew costs lifted inside the range.** A SIM lifted in September and sold in October showed "no cost yet". The average cost now uses every lifting up to the end of the range.
+4. **Re-saving a day re-priced it.** Re-opening 10 Sep to add a bank reference, after a price was back-dated, quietly raised the due. A saved line now keeps its price; only a new line takes the day's price — the promise the Products page already made. The running due on the screen uses the saved prices too.
+5. **"Out with people" counted stock long since sold** (1,000 given, 900 sold showed 1,000). It is now openings + given − sold − returned.
+6. **Retired products**: their saved lines were invisible on Daily Entry (so "Due after saving" was short) and **deleted** by the next Opening save. They now stay on both forms, marked retired.
+7. **A return price had no ceiling.** ৳2,000 typed for ৳200 is now refused if it is more than 1.5× anything the product has ever cost.
+8. **Opening godown stock counted as a purchase** in the daily report and the ranged "lifted" figure. Purchases only now; the godown still counts openings.
+9. **Opening form double-counted** stock when switching from "total" to "stock plus extra". Switching now keeps the total.
+10. **Smaller**: 2.5 units was saved as 3 while the screen valued 2.5 — quantities are whole numbers everywhere, and the form says so before saving; "2026-02-31" became 3 March and "2026-13-01" a server error — dates are checked as real days on every write route; an enormous quantity overflowed into a 500 — capped; "Liftings recorded" stopped at 60 — it is the real count; Admin and IT were shown a Remove button the server refused, silently — it shows only to Accounts, and a failure is said; the home listed every holder twice per load — once now.
+
+### Added for Accounts
+
+- **Needs attention**, at the top of the home, as a to-do list that links to where each thing is fixed: dues with **no money in 7+ days** (or ever), people who **left while still holding stock or money**, **more sold than given** (an entry error), **godown below zero** (a lifting not entered), products with **no price today**, and SIMs **not linked to activations**. Open on desktop; folded on a phone with each kind and its count in the summary. When there is nothing, it says so in green.
+- **Last money**: every person's row shows when money last came in, amber once it is a week or more with a due.
+- **Supervisor team totals**: a supervisor's row shows their team — people, SIMs in hand, and the team's due — keyed by supervisor id, never name.
+
+### Checked
+
+- `.scratch/probe199.ts` — 42 checks through the real API and browser, all pass; every earlier probe re-run (v192–v198 audits, write probes, price-lock, exports, nav, stock read, the Accounts-day walk, stale state) — **0 failed**.
+- **1,252 unit tests across 82 files**, including behavioural tests for each finding; build clean; eslint at the 27-warning baseline.
+- No schema change.

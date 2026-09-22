@@ -21,10 +21,7 @@ import { CampaignCard } from "../components/CampaignViews";
 export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {
-  const user = await requirePagePermission(
-    ["ADMIN", "IT", "MANAGER", "SUPERVISOR", "ACCOUNTS", "RSO", "BP"],
-    "campaigns",
-  );
+  const user = await requirePagePermission(["ADMIN", "IT", "MANAGER", "SUPERVISOR", "RSO", "BP"], "campaigns");
   const scope = await viewerScope(user);
   const today = dhakaTodayYmd();
 

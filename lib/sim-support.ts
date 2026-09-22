@@ -53,10 +53,53 @@
  * server and the same functions run on both sides of the RSC boundary.
  */
 
+/**
+ * Which SIMs a slab is for.
+ *
+ * `ALL` is the original single ladder: every standard SIM counts toward it and
+ * is paid at its rate. `GA_170` and `GA_300` are the two ladders the owner runs
+ * most days — "300৳ SIM Bonus" and "170৳ SIM Bonus" — each paying its own rate
+ * on its own SIMs. A scheme is one or the other, never both: see `isSplit`.
+ */
+export type SupportTier = "ALL" | "GA_170" | "GA_300";
+
+/** The two SIM ladders, in the order the owner's offer message lists them. */
+export const SPLIT_TIERS = ["GA_300", "GA_170"] as const;
+export type SplitTier = (typeof SPLIT_TIERS)[number];
+
+export const SUPPORT_TIER_LABEL: Record<SupportTier, string> = {
+  ALL: "Every SIM",
+  GA_170: "170৳ SIM",
+  GA_300: "300৳ SIM",
+};
+
+/**
+ * On a split scheme, which count picks the step.
+ *
+ * `TOTAL`: the day's GA — both SIM types together — decides which step you are
+ * on, and each SIM is paid at its own ladder's rate for that step. That is how
+ * the owner's offer reads: one target ("আজকের টার্গেট: 25+ GA") and two rate
+ * columns under it.
+ *
+ * `OWN`: each ladder is climbed on its own SIM type's count — 7 300৳ SIMs put
+ * the 300 ladder on its 7 step whatever the 170s did.
+ *
+ * Both are real ways the company words an offer, and they pay different money,
+ * so the office picks per offer rather than the code guessing.
+ */
+export type SlabBasis = "TOTAL" | "OWN";
+
+export const SLAB_BASIS_LABEL: Record<SlabBasis, string> = {
+  TOTAL: "Total GA picks the step",
+  OWN: "Each SIM type climbs its own ladder",
+};
+
 /** One step of a scheme. `minSims` is inclusive: "from N SIMs". */
 export type SupportSlabRule = {
   minSims: number;
   ratePerSim: number;
+  /** Absent means `ALL` — every scheme saved before the split. */
+  tier?: SupportTier;
 };
 
 export type SupportSchemeRule = {
@@ -69,7 +112,27 @@ export type SupportSchemeRule = {
    * itself". 1 (the default) means the only condition is completing SSO.
    */
   ssoMinSimsSameDay?: number | null;
+  /** Split schemes only. Absent means `TOTAL`. */
+  basis?: SlabBasis | null;
+  /** "আজকের টার্গেট: 25+ GA". Shown, never paid on its own. */
+  dailyTarget?: number | null;
 };
+
+/** Does this scheme run the two SIM ladders rather than one? */
+export function isSplit(scheme: SupportSchemeRule) {
+  return scheme.slabs.some((s) => s.tier === "GA_170" || s.tier === "GA_300");
+}
+
+/**
+ * One ladder of a scheme, as a scheme of its own.
+ *
+ * Every single-ladder function below (`slabFor`, `slabAmount`, `nextStep`) takes
+ * the result, so the arithmetic that was pinned before the split is the same
+ * arithmetic now — a ladder is just a narrower list of slabs.
+ */
+export function ladder(scheme: SupportSchemeRule, tier: SupportTier): SupportSchemeRule {
+  return { ...scheme, slabs: scheme.slabs.filter((s) => (s.tier ?? "ALL") === tier) };
+}
 
 /** A scheme with no slab and no SSO rate pays nothing and should say so. */
 export function schemeIsEmpty(scheme: SupportSchemeRule) {
@@ -165,32 +228,161 @@ export function ssoBonusFor(scheme: SupportSchemeRule, simsToday: number) {
 }
 
 /**
+ * The SIMs a person is paid on, by type.
+ *
+ * `total` is carried rather than derived so a caller that only knows the total
+ * (a single-ladder day, or an old test) can pass a bare number: see `counts`.
+ */
+export type SimCounts = { total: number; ga170: number; ga300: number };
+
+export function counts(value: number | SimCounts): SimCounts {
+  return typeof value === "number" ? { total: value, ga170: 0, ga300: 0 } : value;
+}
+
+/** One ladder's share of a person's day. */
+export type LadderEarning = {
+  tier: SupportTier;
+  /** The SIMs this ladder pays on. */
+  sims: number;
+  /** The count that picked the step — the day's total on a `TOTAL` split. */
+  stepCount: number;
+  slab: SupportSlabRule | null;
+  amount: number;
+};
+
+/**
  * One person's support for one day.
  *
- * `eligibleSims` is already narrowed to the codes that earn support — see the
- * note at the top of this file. `ssoBonus` is the sum over that person's
- * outlets that completed SSO today; it is passed in rather than computed here
- * because deciding which outlets completed needs the database.
+ * `eligible` is already narrowed to the codes that earn support — see the note
+ * at the top of this file. `ssoBonus` is the sum over that person's outlets
+ * that completed SSO today; it is passed in rather than computed here because
+ * deciding which outlets completed needs the database.
+ *
+ * `slab`, `slabAmount` and `next` keep their single-ladder meaning. On a split
+ * day `slab` is null (there is no one slab) and `ladders` says what each SIM
+ * type earned; `slabAmount` is still the sum, so every total on every screen
+ * is computed the same way whichever kind of day it is.
  */
 export type SupportEarning = {
   sims: number;
+  ga170: number;
+  ga300: number;
+  split: boolean;
+  basis: SlabBasis;
+  ladders: LadderEarning[];
   slab: SupportSlabRule | null;
   slabAmount: number;
   ssoBonus: number;
   total: number;
   next: SupportNextStep | null;
+  /** Split days: the next step on each ladder, or the next shared step. */
+  nextSplit: SplitNextStep[];
 };
 
-export function supportEarning(scheme: SupportSchemeRule, eligibleSims: number, ssoBonus = 0): SupportEarning {
-  const slab = slabFor(scheme, eligibleSims);
-  const base = slabAmount(scheme, eligibleSims);
+/**
+ * The next step on a split day.
+ *
+ * On a `TOTAL` day the step is shared, so there is one of these and `tier` is
+ * null: the SIMs still needed can be of either type, so `amount` reprices only
+ * the SIMs ALREADY done — what the extra ones earn depends on which type they
+ * turn out to be, and a figure that guessed would be a figure nobody set.
+ *
+ * On an `OWN` day each ladder has its own next step and the extra SIMs are of
+ * that ladder's type, so `amount` includes them.
+ */
+export type SplitNextStep = {
+  tier: SplitTier | null;
+  atSims: number;
+  moreSims: number;
+  rates: Partial<Record<SplitTier, number>>;
+  amount: number;
+  gain: number;
+};
+
+function splitAmount(scheme: SupportSchemeRule, c: SimCounts, basis: SlabBasis, stepAt?: number) {
+  const out: LadderEarning[] = [];
+  for (const tier of SPLIT_TIERS) {
+    const rule = ladder(scheme, tier);
+    if (!rule.slabs.length) continue;
+    const sims = tier === "GA_170" ? c.ga170 : c.ga300;
+    const stepCount = stepAt ?? (basis === "TOTAL" ? c.ga170 + c.ga300 : sims);
+    const slab = slabFor(rule, stepCount);
+    out.push({ tier, sims, stepCount, slab, amount: slab && sims > 0 ? sims * slab.ratePerSim : 0 });
+  }
+  return out;
+}
+
+function splitNext(scheme: SupportSchemeRule, c: SimCounts, basis: SlabBasis, current: number): SplitNextStep[] {
+  if (basis === "TOTAL") {
+    const total = c.ga170 + c.ga300;
+    const at = [...new Set(scheme.slabs.filter((s) => s.tier && s.tier !== "ALL").map((s) => s.minSims))]
+      .filter((n) => n > total)
+      .sort((a, b) => a - b)[0];
+    if (at === undefined) return [];
+    const rates: Partial<Record<SplitTier, number>> = {};
+    for (const tier of SPLIT_TIERS) {
+      const slab = slabFor(ladder(scheme, tier), at);
+      if (slab) rates[tier] = slab.ratePerSim;
+    }
+    const amount = splitAmount(scheme, c, basis, at).reduce((a, l) => a + l.amount, 0);
+    return [{ tier: null, atSims: at, moreSims: at - total, rates, amount, gain: amount - current }];
+  }
+  const steps: SplitNextStep[] = [];
+  for (const tier of SPLIT_TIERS) {
+    const rule = ladder(scheme, tier);
+    const sims = tier === "GA_170" ? c.ga170 : c.ga300;
+    const step = nextStep(rule, sims);
+    if (!step) continue;
+    const now = slabAmount(rule, sims);
+    steps.push({
+      tier,
+      atSims: step.atSims,
+      moreSims: step.moreSims,
+      rates: { [tier]: step.ratePerSim },
+      amount: step.amount,
+      gain: step.amount - now,
+    });
+  }
+  return steps;
+}
+
+export function supportEarning(scheme: SupportSchemeRule, eligible: number | SimCounts, ssoBonus = 0): SupportEarning {
+  const c = counts(eligible);
+  const basis: SlabBasis = scheme.basis === "OWN" ? "OWN" : "TOTAL";
+  if (isSplit(scheme)) {
+    const ladders = splitAmount(scheme, c, basis);
+    const base = ladders.reduce((a, l) => a + l.amount, 0);
+    return {
+      sims: c.total,
+      ga170: c.ga170,
+      ga300: c.ga300,
+      split: true,
+      basis,
+      ladders,
+      slab: null,
+      slabAmount: base,
+      ssoBonus,
+      total: base + ssoBonus,
+      next: null,
+      nextSplit: splitNext(scheme, c, basis, base),
+    };
+  }
+  const single = ladder(scheme, "ALL");
+  const slab = slabFor(single, c.total);
+  const base = slabAmount(single, c.total);
   return {
-    sims: eligibleSims,
+    sims: c.total,
+    ga170: c.ga170,
+    ga300: c.ga300,
+    split: false,
+    basis,
+    ladders: single.slabs.length ? [{ tier: "ALL", sims: c.total, stepCount: c.total, slab, amount: base }] : [],
     slab,
     slabAmount: base,
     ssoBonus,
     total: base + ssoBonus,
-    next: nextStep(scheme, eligibleSims),
+    next: nextStep(single, c.total),
+    nextSplit: [],
   };
 }
 
@@ -219,4 +411,109 @@ export function supportNudge(earning: SupportEarning): string | null {
   if (gain <= 0) return null;
   const total = earning.next.amount + earning.ssoBonus;
   return `${moreSims.toLocaleString("en-US")} more SIM${moreSims === 1 ? "" : "s"} on your picked codes — ${atSims.toLocaleString("en-US")} in total — takes today's support to ৳${total.toLocaleString("en-US")}, which is ৳${gain.toLocaleString("en-US")} more.`;
+}
+
+const n = (v: number) => v.toLocaleString("en-US");
+
+/**
+ * Every sentence the RSO's screen should show under the figure.
+ *
+ * A single-ladder day has at most one (`supportNudge`). A split `OWN` day can
+ * have one per SIM type; a split `TOTAL` day has one shared step. The same rule
+ * as `supportNudge` holds for all of them: the total named includes the SSO
+ * bonus, and the gain is what the extra SIMs are actually worth.
+ */
+export function supportNudges(earning: SupportEarning): string[] {
+  if (!earning.split) {
+    const one = supportNudge(earning);
+    return one ? [one] : [];
+  }
+  const out: string[] = [];
+  for (const step of earning.nextSplit) {
+    if (step.gain <= 0 && step.tier !== null) continue;
+    const total = step.amount + earning.ssoBonus;
+    if (step.tier === null) {
+      const rates = SPLIT_TIERS.filter((t) => step.rates[t] !== undefined)
+        .map((t) => `${SUPPORT_TIER_LABEL[t]} ৳${n(step.rates[t]!)}`)
+        .join(", ");
+      const done = earning.ga170 + earning.ga300;
+      out.push(
+        `${n(step.moreSims)} more GA — ${n(step.atSims)} in total — reaches the ${n(step.atSims)} GA step (${rates} each).` +
+          (done > 0 && step.gain > 0
+            ? ` The ${n(done)} SIM${done === 1 ? "" : "s"} already done then pay ৳${n(total)}, ৳${n(step.gain)} more — before the new SIMs' own support.`
+            : ""),
+      );
+    } else {
+      out.push(
+        `${n(step.moreSims)} more ${SUPPORT_TIER_LABEL[step.tier]}${step.moreSims === 1 ? "" : "s"} — ${n(step.atSims)} in total — takes your ${SUPPORT_TIER_LABEL[step.tier]} support to ৳${n(step.amount)}, ৳${n(step.gain)} more.`,
+      );
+    }
+  }
+  return out;
+}
+
+/** The slabs of one ladder, lowest first. */
+export function ladderSlabs(scheme: SupportSchemeRule, tier: SupportTier) {
+  return sortedSlabs(ladder(scheme, tier));
+}
+
+/**
+ * Steps where a HIGHER count pays a LOWER rate than the step before it.
+ *
+ * Not an error — the company could mean it — but it is exactly what a typo
+ * looks like ("25 GA ➜ ৳10" after "20 GA ➜ ৳70"), and on a scheme that
+ * reprices the whole day it would cut an RSO's money for selling more. The form
+ * shows these before saving; nothing refuses them.
+ */
+export function rateDrops(scheme: SupportSchemeRule) {
+  const out: { tier: SupportTier; minSims: number; rate: number; previousRate: number }[] = [];
+  for (const tier of ["ALL", ...SPLIT_TIERS] as SupportTier[]) {
+    const slabs = ladderSlabs(scheme, tier);
+    for (let i = 1; i < slabs.length; i++)
+      if (slabs[i].ratePerSim < slabs[i - 1].ratePerSim)
+        out.push({ tier, minSims: slabs[i].minSims, rate: slabs[i].ratePerSim, previousRate: slabs[i - 1].ratePerSim });
+  }
+  return out;
+}
+
+/**
+ * The offer as the owner posts it to the field's group.
+ *
+ * His own layout, from his own message — the heading, the date as dd/mm/yy,
+ * the target, then one block per SIM type, 300 first. Built from the saved
+ * scheme so the text the office pastes and the money the app pays cannot
+ * disagree: edit the offer and the message changes with it.
+ */
+export function offerMessage(
+  scheme: SupportSchemeRule,
+  opts: { dateYmd: string; name?: string | null; note?: string | null },
+): string {
+  const lines: string[] = [];
+  lines.push(`🔥🚨 ${(opts.name || "BP & RSO WARRIORS").toUpperCase()} 🚨🔥`);
+  // No day picked yet (the form, before the date is typed): no date line.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(opts.dateYmd)) {
+    const [y, m, d] = opts.dateYmd.split("-");
+    lines.push(`${d}/${m}/${y.slice(2)}`);
+  }
+  const target = Number(scheme.dailyTarget) || 0;
+  if (target > 0) lines.push(`🎯 আজকের টার্গেট: ${n(target)}+ GA 💪`);
+  const block = (tier: SupportTier, heading: string) => {
+    const slabs = ladderSlabs(scheme, tier);
+    if (!slabs.length) return;
+    lines.push(heading);
+    for (const s of slabs) lines.push(`• ${n(s.minSims)} GA ➜ ৳${n(s.ratePerSim)}/SIM`);
+  };
+  if (isSplit(scheme)) {
+    block("GA_300", "💸 300৳ SIM Bonus");
+    block("GA_170", "💸 170৳ SIM Bonus");
+    if (scheme.basis === "OWN") lines.push("(প্রতিটি SIM-এর GA আলাদা ভাবে গণনা হবে)");
+  } else {
+    block("ALL", "💸 SIM Bonus");
+  }
+  const sso = Number(scheme.ssoRatePerSim) || 0;
+  if (sso > 0) lines.push(`🎁 SSO Offer: নতুন SSO complete হলে ৳${n(sso)}/SIM`);
+  if (opts.note) lines.push(opts.note);
+  lines.push(target > 0 ? `🚀 ${n(target)}+ GA করুন, Bonus জিতুন!` : "🚀 GA করুন, Bonus জিতুন!");
+  lines.push("🏆 No Excuses, Only Results!");
+  return lines.join("\n");
 }

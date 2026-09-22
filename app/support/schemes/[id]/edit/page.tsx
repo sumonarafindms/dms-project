@@ -1,30 +1,19 @@
 import { notFound } from "next/navigation";
 import { requirePagePermission } from "../../../../../lib/auth";
 import { prisma } from "../../../../../lib/prisma";
+import { SCHEME_SELECT } from "../../../../../lib/sim-support-data";
 import { AppLink as Link } from "../../../../components/AppLink";
 import { PageHeader } from "../../../../components/Kit";
 import { Icon } from "../../../../components/icons";
 import { SupportSchemeForm } from "../../../../components/SupportSchemeForm";
-import { dayLabel } from "../../../../components/SupportViews";
+import { dayLabel, schemeFormValues } from "../../../../components/SupportViews";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditSupportScheme({ params }: { params: Promise<{ id: string }> }) {
   await requirePagePermission(["ADMIN", "IT", "MANAGER"], "support", "edit");
   const { id } = await params;
-  const row = await prisma.supportScheme.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      date: true,
-      name: true,
-      note: true,
-      ssoRatePerSim: true,
-      ssoMinSimsSameDay: true,
-      active: true,
-      slabs: { select: { minSims: true, ratePerSim: true }, orderBy: { minSims: "asc" } },
-    },
-  });
+  const row = await prisma.supportScheme.findUnique({ where: { id }, select: SCHEME_SELECT });
   if (!row) notFound();
   const ymd = row.date.toISOString().slice(0, 10);
 
@@ -37,20 +26,9 @@ export default async function EditSupportScheme({ params }: { params: Promise<{ 
           say which record was opened. */}
       <PageHeader
         title={`Support offer · ${dayLabel(ymd)}`}
-        subtitle={row.name || "Slabs for this day, and the SSO offer if it is running."}
+        subtitle={row.name || "The day's target, the SIM bonus, and the SSO offer if it is running."}
       />
-      <SupportSchemeForm
-        initial={{
-          id: row.id,
-          date: ymd,
-          name: row.name,
-          note: row.note,
-          ssoRatePerSim: row.ssoRatePerSim === null ? "" : String(Number(row.ssoRatePerSim)),
-          ssoMinSimsSameDay: row.ssoMinSimsSameDay,
-          active: row.active,
-          slabs: row.slabs.map((s) => ({ minSims: s.minSims, ratePerSim: String(Number(s.ratePerSim)) })),
-        }}
-      />
+      <SupportSchemeForm key={row.id} initial={schemeFormValues(row)} />
     </main>
   );
 }

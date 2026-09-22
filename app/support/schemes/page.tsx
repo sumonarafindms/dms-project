@@ -9,8 +9,8 @@
 import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { dhakaTodayYmd } from "../../../lib/business-time";
-import { schemeRule } from "../../../lib/sim-support-data";
-import { schemeIsEmpty, sortedSlabs } from "../../../lib/sim-support";
+import { SCHEME_SELECT, schemeRule } from "../../../lib/sim-support-data";
+import { SPLIT_TIERS, SUPPORT_TIER_LABEL, isSplit, ladderSlabs, schemeIsEmpty } from "../../../lib/sim-support";
 import { AppLink as Link } from "../../components/AppLink";
 import { Badge, Card, EmptyState, PageHeader, LinkBtn } from "../../components/Kit";
 import { Icon } from "../../components/icons";
@@ -22,15 +22,7 @@ export default async function SupportSchemes() {
   await requirePagePermission(["ADMIN", "IT", "MANAGER"], "support");
   const today = dhakaTodayYmd();
   const rows = await prisma.supportScheme.findMany({
-    select: {
-      id: true,
-      date: true,
-      name: true,
-      active: true,
-      ssoRatePerSim: true,
-      ssoMinSimsSameDay: true,
-      slabs: { select: { minSims: true, ratePerSim: true }, orderBy: { minSims: "asc" } },
-    },
+    select: SCHEME_SELECT,
     orderBy: { date: "desc" },
     take: 120,
   });
@@ -63,7 +55,8 @@ export default async function SupportSchemes() {
           {rows.map((r) => {
             const ymd = r.date.toISOString().slice(0, 10);
             const rule = schemeRule(r);
-            const slabs = sortedSlabs(rule);
+            const split = isSplit(rule);
+            const target = Number(r.dailyTarget) || 0;
             const sso = Number(r.ssoRatePerSim) || 0;
             return (
               <Link key={r.id} href={`/support/schemes/${r.id}/edit`} className="kit-card is-clickable cmp-card">
@@ -81,16 +74,31 @@ export default async function SupportSchemes() {
                     <Badge tone="neutral">{ymd > today ? "Upcoming" : "Past"}</Badge>
                   )}
                 </div>
-                <ul className="sup-slabs is-compact">
-                  {slabs.map((s) => (
-                    <li key={s.minSims}>
-                      <span>
-                        From {s.minSims.toLocaleString("en-US")} — ৳{s.ratePerSim.toLocaleString("en-US")} each
-                      </span>
-                    </li>
-                  ))}
-                  {!slabs.length ? <li className="is-muted">No slabs</li> : null}
-                </ul>
+                {target > 0 ? (
+                  <span className="sup-target is-sm">
+                    <Icon name="target" /> Target {target.toLocaleString("en-US")}+ GA
+                  </span>
+                ) : null}
+                <div className={`sup-mini-ladders${split ? " is-split" : ""}`}>
+                  {(split ? [...SPLIT_TIERS] : (["ALL"] as const)).map((tier) => {
+                    const slabs = ladderSlabs(rule, tier);
+                    return (
+                      <div key={tier}>
+                        {split ? <strong>{SUPPORT_TIER_LABEL[tier]}</strong> : null}
+                        <ul className="sup-slabs is-compact">
+                          {slabs.map((s) => (
+                            <li key={s.minSims}>
+                              <span>
+                                {s.minSims.toLocaleString("en-US")} GA ➜ ৳{s.ratePerSim.toLocaleString("en-US")}
+                              </span>
+                            </li>
+                          ))}
+                          {!slabs.length ? <li className="is-muted">No steps</li> : null}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
                 <div className="cmp-card-foot">
                   <span>
                     {sso > 0

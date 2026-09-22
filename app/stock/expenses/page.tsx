@@ -13,7 +13,7 @@ import { BOOKS_WRITE_ROLES, expensesIn } from "../../../lib/lifting-data";
 import { expenseTotals } from "../../../lib/lifting";
 import { fmtMoney } from "../../../lib/format";
 import { Card, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
-import { ReportDateBar } from "../../components/ReportShell";
+import { ReportActionBar, ReportDateBar } from "../../components/ReportShell";
 import { ExpenseByCategory, ExpenseEntryForm, ExpenseList } from "../../components/ExpenseViews";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +42,10 @@ export default async function ExpensesPage({
     <main className="page">
       <PageHeader title="Expenses" subtitle="What it costs to run the place, day by day." />
       <ReportDateBar range={range} nowIso={nowIso} />
+      <ReportActionBar
+        exportHref={`/api/stock/export?report=expenses&from=${range.from}&to=${range.to}`}
+        rowCount={rows.length}
+      />
 
       <SummaryStrip
         items={[

@@ -251,11 +251,10 @@ describe("every retailer page pages its list", () => {
     "app/rso/retailers/page.tsx",
     "app/supervisor/retailers/page.tsx",
     "app/admin/attention/page.tsx",
-    "app/accounts/attention/page.tsx",
     "app/admin/performance/retailers/page.tsx",
   ];
 
-  it("routes all seven through retailerListPage", () => {
+  it("routes all six through retailerListPage", () => {
     for (const file of PAGES) expect(stripComments(read(file)), file).toMatch(/retailerListPage\(/);
   });
 

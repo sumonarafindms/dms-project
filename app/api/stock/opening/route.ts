@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_LINE_QTY, isYmd } from "../../../../lib/business-time";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   const holderId = String(b.holderId || "");
   const asOfDate = String(b.asOfDate || "");
   if (!isHolderType(holderType) || !holderId) return NextResponse.json({ error: "Which person?" }, { status: 400 });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) return NextResponse.json({ error: "As of which date?" }, { status: 400 });
+  if (!isYmd(asOfDate)) return NextResponse.json({ error: "As of which date?" }, { status: 400 });
 
   const holder = await findHolder(holderType, holderId);
   if (!holder) return NextResponse.json({ error: "That person no longer exists." }, { status: 404 });
@@ -93,8 +94,10 @@ export async function POST(req: Request) {
   let counted = 0;
   for (const line of lines) {
     const productId = String(line.productId || "");
-    const qty = Math.round(Number(line.qty) || 0);
+    const qty = Number(line.qty) || 0;
     if (!productId || qty <= 0) continue;
+    if (!Number.isInteger(qty) || qty > MAX_LINE_QTY)
+      return NextResponse.json({ error: "A quantity is a whole number of units." }, { status: 400 });
     const unitPrice = onDate.get(productId) ?? null;
     if (unitPrice === null || !(unitPrice > 0))
       return NextResponse.json(

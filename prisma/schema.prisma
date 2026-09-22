@@ -546,37 +546,56 @@ model CampaignTarget {
  * margin, is in lib/sim-support.ts.
  */
 model SupportScheme {
-  id                String        @id @default(cuid())
-  date              DateTime      @db.Date
+  id                String           @id @default(cuid())
+  date              DateTime         @db.Date
   name              String?
   note              String?
   /// Per-SIM rate for an outlet that completes SSO on this day. Null: no SSO offer.
-  ssoRatePerSim     Decimal?      @db.Decimal(10, 2)
+  ssoRatePerSim     Decimal?         @db.Decimal(10, 2)
   /// The stricter form of the SSO offer. 1 (or null) means completing SSO is the only condition.
   ssoMinSimsSameDay Int?
-  active            Boolean       @default(true)
+  /// Split schemes: does the day's total GA pick the step, or each SIM type its own? (v198)
+  slabBasis         SupportSlabBasis @default(TOTAL)
+  /// "আজকের টার্গেট: 25+ GA". Shown to the field; pays nothing on its own. (v198)
+  dailyTarget       Int?
+  active            Boolean          @default(true)
   createdById       String?
-  createdBy         User?         @relation("SupportSchemeAuthor", fields: [createdById], references: [id])
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdBy         User?            @relation("SupportSchemeAuthor", fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   slabs             SupportSlab[]
 
   @@unique([date])
   @@index([active])
 }
 
+enum SupportTier {
+  ALL
+  GA_170
+  GA_300
+}
+
+enum SupportSlabBasis {
+  TOTAL
+  OWN
+}
+
 /**
  * "From N SIMs, ৳R each". `minSims` is inclusive.
+ * `tier` (v198) says which SIMs the slab is for. ALL is the original single
+ * ladder; GA_170 and GA_300 are the two ladders of a split offer. A scheme uses
+ * one shape or the other — the API refuses a mix.
  */
 model SupportSlab {
   id         String        @id @default(cuid())
   schemeId   String
   scheme     SupportScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  tier       SupportTier   @default(ALL)
   minSims    Int
   ratePerSim Decimal       @db.Decimal(10, 2)
   createdAt  DateTime      @default(now())
 
-  @@unique([schemeId, minSims])
+  @@unique([schemeId, tier, minSims])
   @@index([schemeId])
 }
 
@@ -659,19 +678,29 @@ enum StockMoveKind {
  * carries its own copy on the movement. So this row is free to change — retire
  * it, rename it, correct a typo — and nothing already recorded can move.
  */
+/// Which GA feed category a SIM product activates as (v198).
+enum SimActivationType {
+  GA_170
+  GA_300
+  SIM_SWAP
+}
+
 model Product {
-  id          String          @id @default(cuid())
-  category    ProductCategory
-  subType     String
+  id             String             @id @default(cuid())
+  category       ProductCategory
+  subType        String
   /// What one unit is called on screen: "pc", "card", "Tk". Display only.
-  unitLabel   String?
-  status      ProductStatus   @default(ACTIVE)
-  createdById String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  prices      ProductPrice[]
-  movements   StockMovement[]
-  liftings    Lifting[]
+  unitLabel      String?
+  /// SIMs only (v198): which company activations this SIM shows up as, so the
+  /// Accounts home can put "activated" beside "sold". Null: not linked.
+  activationType SimActivationType?
+  status         ProductStatus      @default(ACTIVE)
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  prices         ProductPrice[]
+  movements      StockMovement[]
+  liftings       Lifting[]
 
   @@index([status, category])
 }

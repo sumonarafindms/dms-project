@@ -11,7 +11,7 @@ function pagination(req: Request) {
 }
 
 export async function GET(req: Request) {
-  if (!(await apiUser(["ADMIN", "IT", "ACCOUNTS"])))
+  if (!(await apiUser(["ADMIN", "IT"])))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await apiPermission("ob", "view"))) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {

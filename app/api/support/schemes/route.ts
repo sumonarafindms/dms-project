@@ -33,20 +33,37 @@ function parseMoney(value: unknown): number | null {
  * honestly — `slabFor` would have to pick one and the reader could not tell
  * which — so it is refused rather than silently deduplicated.
  */
+const TIERS = ["ALL", "GA_170", "GA_300"] as const;
+type Tier = (typeof TIERS)[number];
+const TIER_WORD: Record<Tier, string> = { ALL: "", GA_170: "170৳ SIM ", GA_300: "300৳ SIM " };
+
+/*
+ * v198: a slab names its ladder. A row with no tier is the original single
+ * ladder (`ALL`), so a client that predates the split still saves what it
+ * always saved. The two shapes are never mixed in one offer: a SIM paid on
+ * the ALL ladder AND its own type's ladder would be paid twice.
+ */
 function parseSlabs(raw: unknown) {
   if (!Array.isArray(raw)) return { error: "Add at least one slab, or an SSO rate." };
-  const slabs: { minSims: number; ratePerSim: number }[] = [];
+  const slabs: { minSims: number; ratePerSim: number; tier: Tier }[] = [];
   for (const row of raw) {
     const minSims = Number((row as { minSims?: unknown })?.minSims);
     const ratePerSim = parseMoney((row as { ratePerSim?: unknown })?.ratePerSim);
+    const rawTier = (row as { tier?: unknown })?.tier;
+    const tier = (rawTier === undefined || rawTier === null || rawTier === "" ? "ALL" : String(rawTier)) as Tier;
+    if (!TIERS.includes(tier)) return { error: "A slab is for every SIM, 170৳ SIMs or 300৳ SIMs." };
     // A blank pair is an empty row in the form, not an error.
     if (!Number.isFinite(minSims) && ratePerSim === null) continue;
-    if (!Number.isFinite(minSims) || minSims < 1) return { error: "Every slab needs a SIM count of 1 or more." };
+    if (!Number.isFinite(minSims) || minSims < 1) return { error: "Every slab needs a GA count of 1 or more." };
     if (ratePerSim === null || ratePerSim <= 0) return { error: "Every slab needs a rate above zero." };
-    if (slabs.some((s) => s.minSims === Math.trunc(minSims)))
-      return { error: `Two slabs both start at ${Math.trunc(minSims)} SIMs. Each slab needs its own count.` };
-    slabs.push({ minSims: Math.trunc(minSims), ratePerSim });
+    if (slabs.some((s) => s.tier === tier && s.minSims === Math.trunc(minSims)))
+      return {
+        error: `Two ${TIER_WORD[tier]}slabs both start at ${Math.trunc(minSims)} GA. Each slab needs its own count.`,
+      };
+    slabs.push({ minSims: Math.trunc(minSims), ratePerSim, tier });
   }
+  if (slabs.some((s) => s.tier === "ALL") && slabs.some((s) => s.tier !== "ALL"))
+    return { error: "Use one ladder for every SIM, or separate 170 and 300 ladders — not both in one offer." };
   return { slabs };
 }
 
@@ -78,6 +95,8 @@ type Body = {
   note?: unknown;
   ssoRatePerSim?: unknown;
   ssoMinSimsSameDay?: unknown;
+  slabBasis?: unknown;
+  dailyTarget?: unknown;
   slabs?: unknown;
   active?: unknown;
 };
@@ -101,12 +120,20 @@ export async function POST(req: Request) {
     );
 
   const minSameDay = Number(b.ssoMinSimsSameDay);
+  const basis = b.slabBasis === undefined || b.slabBasis === null || b.slabBasis === "" ? "TOTAL" : String(b.slabBasis);
+  if (basis !== "TOTAL" && basis !== "OWN")
+    return NextResponse.json({ error: "Does the total GA pick the step, or each SIM type?" }, { status: 400 });
+  const target = String(b.dailyTarget ?? "").trim() === "" ? null : Number(b.dailyTarget);
+  if (target !== null && (!Number.isFinite(target) || target < 1 || target > 100000))
+    return NextResponse.json({ error: "The day's target is a GA count of 1 or more, or blank." }, { status: 400 });
   const data = {
     date,
     name: String(b.name || "").trim() || null,
     note: String(b.note || "").trim() || null,
     ssoRatePerSim,
     ssoMinSimsSameDay: Number.isFinite(minSameDay) && minSameDay > 1 ? Math.trunc(minSameDay) : null,
+    slabBasis: basis as "TOTAL" | "OWN",
+    dailyTarget: target === null ? null : Math.trunc(target),
   };
 
   /*
@@ -132,7 +159,14 @@ export async function POST(req: Request) {
     targetType: "SupportScheme",
     targetId: scheme.id,
     targetName: scheme.name || String(b.date),
-    metadata: { slabs: slabs.length, ssoRatePerSim, date: String(b.date) },
+    metadata: {
+      slabs: slabs.length,
+      split: slabs.some((s) => s.tier !== "ALL"),
+      slabBasis: data.slabBasis,
+      dailyTarget: data.dailyTarget,
+      ssoRatePerSim,
+      date: String(b.date),
+    },
   });
   return NextResponse.json({ ok: true, id: scheme.id });
 }

@@ -12,7 +12,13 @@ import {
   ssoQualifies,
   supportEarning,
   supportNudge,
+  isSplit,
+  ladder,
+  offerMessage,
+  rateDrops,
+  supportNudges,
   type SupportSchemeRule,
+  type SupportSlabRule,
 } from "../lib/sim-support";
 import { SSO_MIN_MONTHLY_STANDARD_GA } from "../lib/business-rules";
 
@@ -348,5 +354,119 @@ describe("the two payments count different outlets", () => {
     const api = fs.readFileSync(path.join(__dirname, "..", "app", "api", "support", "codes", "route.ts"), "utf8");
     const apiCode = api.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
     expect(apiCode, "the owner's ruling: the number must not live in the code").not.toMatch(/retailerIds\.length > /);
+  });
+});
+
+/**
+ * v198 — the two SIM ladders, from the owner's own offer message:
+ *
+ *     💸 300৳ SIM Bonus            💸 170৳ SIM Bonus
+ *     • 5 GA ➜ ৳50/SIM             • 5 GA ➜ ৳20
+ *     • 7 GA ➜ ৳65/SIM             • 7 GA ➜ ৳30
+ *     • 10 GA ➜ ৳75/SIM            • 10 GA ➜ ৳40
+ *     • 15 GA ➜ ৳100/SIM           • 15 GA ➜ ৳50
+ *                                  • 20 GA ➜ ৳70
+ *                                  • 25 GA ➜ ৳10   (as sent — see rateDrops)
+ */
+const L300: SupportSlabRule[] = [
+  { tier: "GA_300", minSims: 5, ratePerSim: 50 },
+  { tier: "GA_300", minSims: 7, ratePerSim: 65 },
+  { tier: "GA_300", minSims: 10, ratePerSim: 75 },
+  { tier: "GA_300", minSims: 15, ratePerSim: 100 },
+];
+const L170: SupportSlabRule[] = [
+  { tier: "GA_170", minSims: 5, ratePerSim: 20 },
+  { tier: "GA_170", minSims: 7, ratePerSim: 30 },
+  { tier: "GA_170", minSims: 10, ratePerSim: 40 },
+  { tier: "GA_170", minSims: 15, ratePerSim: 50 },
+  { tier: "GA_170", minSims: 20, ratePerSim: 70 },
+  { tier: "GA_170", minSims: 25, ratePerSim: 10 },
+];
+const WARRIORS: SupportSchemeRule = { slabs: [...L300, ...L170], dailyTarget: 25, basis: "TOTAL" };
+const OWN: SupportSchemeRule = { ...WARRIORS, basis: "OWN" };
+const c = (ga300: number, ga170: number) => ({ total: ga300 + ga170, ga300, ga170 });
+
+describe("v198: two SIM ladders", () => {
+  it("knows a split scheme from a single ladder", () => {
+    expect(isSplit(WARRIORS)).toBe(true);
+    expect(isSplit(OWNER)).toBe(false);
+    expect(ladder(WARRIORS, "GA_300").slabs).toHaveLength(4);
+    expect(ladder(WARRIORS, "GA_170").slabs).toHaveLength(6);
+  });
+
+  it("TOTAL: the day's GA picks the step, each SIM paid at its own ladder's rate", () => {
+    // 6 × 300 + 4 × 170 = 10 GA → the 10 step: 6 × ৳75 + 4 × ৳40
+    const e = supportEarning(WARRIORS, c(6, 4));
+    expect(e.split).toBe(true);
+    expect(e.slabAmount).toBe(6 * 75 + 4 * 40);
+    expect(e.ladders.map((l) => l.stepCount)).toEqual([10, 10]);
+  });
+
+  it("TOTAL: the 300 ladder stays on its top step past 15, the 170 ladder keeps climbing", () => {
+    const e = supportEarning(WARRIORS, c(12, 8)); // 20 GA
+    expect(e.slabAmount).toBe(12 * 100 + 8 * 70);
+  });
+
+  it("OWN: each SIM type climbs its own ladder on its own count", () => {
+    // 6 × 300 → the 5 step at ৳50; 4 × 170 is below the 170 ladder's first step
+    const e = supportEarning(OWN, c(6, 4));
+    expect(e.slabAmount).toBe(6 * 50);
+    expect(e.ladders.find((l) => l.tier === "GA_170")!.slab).toBeNull();
+  });
+
+  it("the SSO bonus is added on top, as on a single-ladder day", () => {
+    const e = supportEarning(WARRIORS, c(6, 4), 300);
+    expect(e.total).toBe(6 * 75 + 4 * 40 + 300);
+  });
+
+  it("a single-ladder scheme still pays exactly what it paid before the split", () => {
+    expect(supportEarning(OWNER, c(10, 4)).slabAmount).toBe(slabAmount(OWNER, 14));
+    expect(supportEarning(OWNER, 14).slabAmount).toBe(700);
+  });
+
+  it("TOTAL nudge: the next shared step reprices the SIMs already done", () => {
+    // 5 + 3 = 8 GA on the 7 step (5×65 + 3×30 = 415). The 10 step: 5×75 + 3×40 = 495.
+    const e = supportEarning(WARRIORS, c(5, 3));
+    expect(e.slabAmount).toBe(415);
+    expect(e.nextSplit).toHaveLength(1);
+    expect(e.nextSplit[0]).toMatchObject({ tier: null, atSims: 10, moreSims: 2, amount: 495, gain: 80 });
+    const [text] = supportNudges(e);
+    expect(text).toContain("2 more GA");
+    expect(text).toContain("৳80 more");
+  });
+
+  it("OWN nudge: one sentence per ladder, each counting its own SIMs", () => {
+    const e = supportEarning(OWN, c(6, 4));
+    const texts = supportNudges(e);
+    expect(texts).toHaveLength(2);
+    expect(texts[0]).toContain("1 more 300৳ SIM");
+    expect(texts[1]).toContain("1 more 170৳ SIM");
+  });
+
+  it("flags a step that pays LESS for more GA — the owner's '25 GA ➜ ৳10'", () => {
+    expect(rateDrops(WARRIORS)).toEqual([{ tier: "GA_170", minSims: 25, rate: 10, previousRate: 70 }]);
+    expect(rateDrops({ slabs: L300 })).toEqual([]);
+  });
+
+  it("writes the owner's message from the saved numbers, 300 first", () => {
+    const text = offerMessage(WARRIORS, { dateYmd: "2026-09-23" });
+    expect(text).toContain("🔥🚨 BP & RSO WARRIORS 🚨🔥");
+    expect(text).toContain("23/09/26");
+    expect(text).toContain("🎯 আজকের টার্গেট: 25+ GA 💪");
+    expect(text).toContain("• 5 GA ➜ ৳50/SIM");
+    expect(text).toContain("• 20 GA ➜ ৳70/SIM");
+    expect(text.indexOf("300৳ SIM Bonus")).toBeLessThan(text.indexOf("170৳ SIM Bonus"));
+    expect(text).toContain("🚀 25+ GA করুন, Bonus জিতুন!");
+  });
+
+  it("the API refuses an offer that mixes one ladder with the split ladders", () => {
+    const api = fs.readFileSync(path.join(__dirname, "..", "app", "api", "support", "schemes", "route.ts"), "utf8");
+    expect(api).toMatch(/not both in one offer/);
+  });
+
+  it("counts today's SIMs by type with the same tier filters as every GA screen", () => {
+    const data = fs.readFileSync(path.join(__dirname, "..", "lib", "sim-support-data.ts"), "utf8");
+    expect(data).toMatch(/withGa170\(tariff/);
+    expect(data).toMatch(/withGa300\(tariff/);
   });
 });

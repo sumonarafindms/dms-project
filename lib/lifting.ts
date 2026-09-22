@@ -114,6 +114,8 @@ export function costBasis(lifts: readonly LiftRow[]) {
 /** What a holder took, gave back and sold — summed across every holder. */
 export type IssuedRow = {
   productId: string;
+  /** Holders' opening stock. Optional so older callers and tests still type. */
+  openingQty?: number;
   givenQty: number;
   givenValue: number;
   returnedQty: number;
@@ -151,6 +153,14 @@ export type HouseLine = {
   /** lifted − given + returned. */
   inGodown: number;
   godownValue: number;
+  /**
+   * v199: what is physically in people's hands now — their openings plus what
+   * was given, less what they sold and handed back. `issuedQty` (given −
+   * returned) was labelled "Out with people" and counted stock long since sold:
+   * 1,000 given and 900 sold showed 1,000 out instead of 100.
+   */
+  withPeopleQty: number;
+  withPeopleCost: number;
 };
 
 /**
@@ -166,18 +176,27 @@ export function houseLines(
   products: readonly ProductRow[],
   lifts: readonly LiftRow[],
   issued: readonly IssuedRow[],
+  /**
+   * v199: the liftings the AVERAGE COST is taken from, when that is not the
+   * same set as `lifts`. A ranged margin needs every lifting up to the end of
+   * the range — a SIM lifted in September and sold in October still cost
+   * what September paid for it, and v194–v198 called it "no cost yet".
+   */
+  costLifts?: readonly LiftRow[],
 ): HouseLine[] {
-  const basis = costBasis(lifts);
+  const shown = costBasis(lifts);
+  const basis = costLifts ? costBasis(costLifts) : shown;
   const byId = new Map(products.map((p) => [p.id, p]));
   const issuedById = new Map(issued.map((i) => [i.productId, i]));
 
-  const ids = new Set<string>([...basis.keys(), ...issuedById.keys()]);
+  const ids = new Set<string>([...shown.keys(), ...issuedById.keys()]);
   const lines: HouseLine[] = [];
 
   for (const id of ids) {
     const product = byId.get(id);
     if (!product) continue;
-    const b = basis.get(id) || { liftedQty: 0, liftedCost: 0, avgCost: 0 };
+    const cost = basis.get(id) || { liftedQty: 0, liftedCost: 0, avgCost: 0 };
+    const b = { ...(shown.get(id) || { liftedQty: 0, liftedCost: 0 }), avgCost: cost.avgCost };
     const i =
       issuedById.get(id) ||
       ({ givenQty: 0, givenValue: 0, returnedQty: 0, returnedValue: 0, soldQty: 0, soldValue: 0 } as IssuedRow);
@@ -188,6 +207,7 @@ export function houseLines(
     const issuedCost = paisa(issuedQty * b.avgCost);
     const soldCost = paisa(i.soldQty * b.avgCost);
     const inGodown = b.liftedQty - i.givenQty + i.returnedQty;
+    const withPeopleQty = (i.openingQty || 0) + i.givenQty - i.returnedQty - i.soldQty;
 
     lines.push({
       product,
@@ -206,6 +226,8 @@ export function houseLines(
       marginSold: hasCost ? paisa(i.soldValue - soldCost) : 0,
       inGodown,
       godownValue: paisa(inGodown * b.avgCost),
+      withPeopleQty,
+      withPeopleCost: hasCost ? paisa(withPeopleQty * b.avgCost) : 0,
     });
   }
 
@@ -240,6 +262,17 @@ export type ProfitSummary = {
   uncostedIssuedValue: number;
   uncostedSoldValue: number;
   uncostedProducts: string[];
+  /**
+   * Products with stock in the godown or out with people that cannot be
+   * VALUED, because no lifting cost exists for them.
+   *
+   * v195, the second place the v194 rule applied. The margin had learned that
+   * no cost is not a cost of zero; the godown value and the "out with people"
+   * cost had not, so ৳39.8 lakh of iTopup balance was printed as worth ৳0.
+   * `godownValue` above is now the value of what CAN be valued, and these name
+   * what was left out.
+   */
+  unvaluedProducts: string[];
 };
 
 export function profitOf(lines: readonly HouseLine[], expenses: number): ProfitSummary {
@@ -252,9 +285,11 @@ export function profitOf(lines: readonly HouseLine[], expenses: number): ProfitS
     uncostedIssuedValue = 0,
     uncostedSoldValue = 0;
   const uncostedProducts: string[] = [];
+  const unvaluedProducts: string[] = [];
   for (const l of lines) {
     liftedCost += l.liftedCost;
-    godownValue += l.godownValue;
+    if (l.hasCost) godownValue += l.godownValue;
+    else if (l.inGodown || l.issuedQty) unvaluedProducts.push(l.product.subType);
     if (!l.hasCost) {
       // Outside every margin figure, and named so somebody can fix it.
       if (l.issuedValue || l.soldValue) uncostedProducts.push(l.product.subType);
@@ -289,6 +324,7 @@ export function profitOf(lines: readonly HouseLine[], expenses: number): ProfitS
     uncostedIssuedValue: paisa(uncostedIssuedValue),
     uncostedSoldValue: paisa(uncostedSoldValue),
     uncostedProducts,
+    unvaluedProducts,
   };
 }
 
@@ -344,8 +380,13 @@ export type SimCheckRow = {
   activated: number;
   /** SIMs they reported selling. */
   sold: number;
-  /** What one of their SIMs was worth, averaged over what they were given. */
-  avgPrice: number;
+  /**
+   * What one of their SIMs was worth, averaged over what they were given.
+   * NULL when this RSO has never been handed a SIM through the stock module:
+   * their activations came from somewhere the ledger has no record of, and
+   * pricing them would put a charge-shaped number on something unrecorded.
+   */
+  avgPrice: number | null;
 };
 
 export type SimCheck = SimCheckRow & {
@@ -354,8 +395,8 @@ export type SimCheck = SimCheckRow & {
    * a SIM a real customer is using, that the RSO has not told Accounts about.
    */
   unreported: number;
-  /** Money that gap is worth, at what those SIMs were handed over at. */
-  unreportedValue: number;
+  /** Money that gap is worth, at what those SIMs were handed over at. Null: no known price. */
+  unreportedValue: number | null;
   /** Handed out but not activated — still in a bag somewhere, or with a retailer. */
   notActivated: number;
 };
@@ -384,12 +425,33 @@ export function simCheck(row: SimCheckRow): SimCheck {
   return {
     ...row,
     unreported,
-    unreportedValue: paisa(unreported * row.avgPrice),
+    // Unknown stays unknown. v195: three RSOs with 1,524 activated SIMs and no
+    // recorded issue price were shown as "Worth ৳0".
+    unreportedValue: row.avgPrice === null ? null : paisa(unreported * row.avgPrice),
     notActivated: Math.max(0, row.given - row.activated),
   };
 }
 
 /** Worst first — the order somebody reading this screen actually wants. */
 export function bySuspicion(rows: readonly SimCheck[]) {
-  return [...rows].sort((a, b) => b.unreportedValue - a.unreportedValue || a.name.localeCompare(b.name));
+  /*
+   * Three tiers, in this order:
+   *
+   *   1. gaps with a known worth, most money first;
+   *   2. gaps with NO known price, largest count first;
+   *   3. everyone with no gap at all.
+   *
+   * The first version used `worth ?? -1` as one sort key, which put an
+   * unpriced gap of 526 SIMs BELOW a person with no gap at all (worth 0) —
+   * the "worthless" reading the null exists to prevent. The test that caught
+   * it is in tests/lifting.smoke.test.ts.
+   */
+  const tier = (r: SimCheck) => (r.unreported <= 0 ? 2 : r.unreportedValue === null ? 1 : 0);
+  return [...rows].sort(
+    (a, b) =>
+      tier(a) - tier(b) ||
+      (b.unreportedValue ?? 0) - (a.unreportedValue ?? 0) ||
+      b.unreported - a.unreported ||
+      a.name.localeCompare(b.name),
+  );
 }

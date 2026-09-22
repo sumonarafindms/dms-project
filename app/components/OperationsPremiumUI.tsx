@@ -3,14 +3,14 @@
 /**
  * The shared import-workspace shell — migrated to the role-UI kit.
  *
- * Behind /ga, /c2c, /c2s and /ob (and their /accounts/operations wrappers).
+ * Behind /ga, /c2c, /c2s and /ob. (Accounts had wrappers under
+ * /accounts/operations until v197; uploading is IT's job.)
  * Export names and prop shapes are unchanged on purpose: the four pages carry
  * dense operator tables whose cell markup is theirs, and rewriting those into
  * a column API would be a much larger change than restyling the shell.
  */
 
 import type { ReactNode } from "react";
-import { usePathname } from "next/navigation";
 import { AppLink as Link } from "./AppLink";
 import { TableScrollHint } from "./TableScrollHint";
 import { Icon } from "./icons";
@@ -36,9 +36,7 @@ export function OpsHeader({
   onTo?: (v: string) => void;
   badge: string;
 }) {
-  const path = usePathname(),
-    accounts = path.startsWith("/accounts/");
-  const back = accounts ? "/accounts/operations" : "/admin/upload";
+  const back = "/admin/upload";
   // A native date input reports "" both while a date is being typed by hand and
   // for any value a min/max attribute rejects. Passing that "" through wiped the
   // range and made the picker look dead, so empty values are ignored here and the
@@ -58,7 +56,7 @@ export function OpsHeader({
   return (
     <>
       <Link href={back} className="kit-detail-back">
-        <Icon name="arrow" /> {accounts ? "Operations" : "Upload Center"}
+        <Icon name="arrow" /> Upload Center
       </Link>
       <PageHeader title={title} subtitle={subtitle} action={<Badge tone="neutral">{badge}</Badge>} />
       {from && to && onFrom && onTo ? (

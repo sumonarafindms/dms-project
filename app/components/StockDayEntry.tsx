@@ -86,7 +86,7 @@ const TABS: { key: EntryTab; label: string; hint: string }[] = [
 ];
 
 /** A product with the price in force on the day being entered. Null: none yet. */
-export type EntryProduct = ProductRow & { price: number | null };
+export type EntryProduct = ProductRow & { price: number | null; retired?: boolean };
 
 export type StockDayEntryProps = {
   holders: { id: string; label: string; meta?: string }[];
@@ -98,6 +98,9 @@ export type StockDayEntryProps = {
     sold: Record<string, number>;
     returned: Record<string, number>;
     returnPrice: Record<string, number>;
+    /** v199: the price each saved GIVEN / SOLD line keeps on a re-save. */
+    givenPrice: Record<string, number>;
+    soldPrice: Record<string, number>;
     cash: number;
     bank: number;
     bankRef: string;
@@ -110,6 +113,11 @@ export type StockDayEntryProps = {
    * default a return credits at. Keyed by product id.
    */
   carryPrice: Record<string, number>;
+  /**
+   * What the godown holds before this person's entry for this day, by product.
+   * Absent for a product that has never been lifted — no figure, no warning.
+   */
+  godown: Record<string, number>;
   basePath: string;
 };
 
@@ -131,6 +139,7 @@ export function StockDayEntry({
   initial,
   dueBefore,
   carryPrice,
+  godown,
   basePath,
 }: StockDayEntryProps) {
   const router = useRouter();
@@ -171,8 +180,10 @@ export function StockDayEntry({
       // A product with no price on this date contributes nothing and the row
       // says why; the save refuses it rather than recording a free handout.
       const day = p.price ?? 0;
-      givenValue += lineValue(num(given[p.id]), day);
-      soldValue += lineValue(num(sold[p.id]), day);
+      // A line already saved keeps the price it was saved at — the server does
+      // the same (v199), so this running due is the one that will be stored.
+      givenValue += lineValue(num(given[p.id]), initial.givenPrice[p.id] ?? day);
+      soldValue += lineValue(num(sold[p.id]), initial.soldPrice[p.id] ?? day);
       returnedValue += lineValue(num(returned[p.id]), num(retPrice[p.id]) || day);
     }
     return {
@@ -180,11 +191,35 @@ export function StockDayEntry({
       soldValue: paisa(soldValue),
       returnedValue: paisa(returnedValue),
     };
-  }, [products, given, sold, returned, retPrice]);
+  }, [products, given, sold, returned, retPrice, initial.givenPrice, initial.soldPrice]);
 
-  /** Products typed into today that have no price for this date. */
+  /**
+   * What each product will leave in the godown after this entry: what was
+   * there, less what is being given, plus what is being handed back.
+   */
+  const leftInGodown = (id: string) => (id in godown ? godown[id] - num(given[id]) + num(returned[id]) : null);
+  /* Given beyond what the godown holds. A warning, never a block: the lifting
+     that covers it may simply not have been entered yet. */
+  const overGodown = products.filter((p) => {
+    const left = leftInGodown(p.id);
+    return left !== null && left < 0 && num(given[p.id]) > 0;
+  });
+
+  /** Products typed into today that have no price for this date (and no saved line to keep one). */
   const unpriced = products.filter(
-    (p) => p.price === null && (num(given[p.id]) || num(sold[p.id]) || num(returned[p.id])),
+    (p) =>
+      p.price === null &&
+      ((num(given[p.id]) && initial.givenPrice[p.id] === undefined) ||
+        (num(sold[p.id]) && initial.soldPrice[p.id] === undefined) ||
+        num(returned[p.id])),
+  );
+
+  /*
+   * v199: quantities are whole units. The server refuses anything else, so
+   * the screen says so first instead of valuing 2.5 in the running due.
+   */
+  const fractional = products.filter((p) =>
+    [given[p.id], sold[p.id], returned[p.id]].some((v) => v !== undefined && v !== "" && !Number.isInteger(Number(v))),
   );
 
   const after = dueOf({
@@ -333,6 +368,11 @@ export function StockDayEntry({
                   <th role="columnheader" scope="col" className="is-right">
                     Value
                   </th>
+                  {(tab === "GIVEN" || tab === "RETURNED") && (
+                    <th role="columnheader" scope="col" className="is-right">
+                      Godown after
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -341,20 +381,25 @@ export function StockDayEntry({
                   const qty = table[kind][0][p.id] ?? "";
                   const money = isMoneyProduct(p.category);
                   const isReturn = kind === "RETURNED";
-                  const dayPrice = p.price;
-                  const unit = isReturn ? num(retPrice[p.id]) || dayPrice || 0 : (dayPrice ?? 0);
+                  const savedPrice =
+                    kind === "GIVEN" ? initial.givenPrice[p.id] : kind === "SOLD" ? initial.soldPrice[p.id] : undefined;
+                  const dayPrice = savedPrice ?? p.price;
+                  const unit = isReturn ? num(retPrice[p.id]) || p.price || 0 : (dayPrice ?? 0);
                   const carrying = carryPrice[p.id] || 0;
                   /*
                    * The holder is carrying this product at a different price
                    * from today's. Worth saying on a RETURN row, because that
                    * is precisely when the two must not be confused.
                    */
-                  const lots = isReturn && carrying > 0 && dayPrice !== null && carrying !== dayPrice;
+                  const lots = isReturn && carrying > 0 && p.price !== null && carrying !== p.price;
                   return (
                     <tr role="row" key={p.id}>
                       <td role="cell" data-label="Product">
                         <strong>{p.subType}</strong>
-                        <span className="kit-cell-sub">{PRODUCT_CATEGORY_LABEL[p.category]}</span>
+                        <span className="kit-cell-sub">
+                          {PRODUCT_CATEGORY_LABEL[p.category]}
+                          {p.retired ? " · retired" : ""}
+                        </span>
                       </td>
                       <td role="cell" data-label={isReturn ? "Credit at" : "Price"} className="is-right">
                         {isReturn ? (
@@ -372,12 +417,18 @@ export function StockDayEntry({
                         ) : dayPrice === null ? (
                           <span className="kit-cell-unset">No price</span>
                         ) : (
-                          fmtMoney(dayPrice)
+                          <>
+                            {fmtMoney(dayPrice)}
+                            {savedPrice !== undefined && p.price !== null && savedPrice !== p.price && (
+                              <span className="kit-cell-sub">saved at this price</span>
+                            )}
+                          </>
                         )}
                       </td>
                       <td role="cell" data-label={MOVE_KIND_LABEL[tab as MoveKind]} className="is-right">
                         <NumberInput
                           min="0"
+                          step="1"
                           className="kit-input kit-input-qty"
                           aria-label={`${MOVE_KIND_LABEL[tab as MoveKind]} — ${p.subType}`}
                           value={qty}
@@ -388,6 +439,17 @@ export function StockDayEntry({
                       <td role="cell" data-label="Value" className="is-right">
                         {fmtMoney(lineValue(num(qty), unit))}
                       </td>
+                      {(kind === "GIVEN" || kind === "RETURNED") && (
+                        <td role="cell" data-label="Godown after" className="is-right">
+                          {(() => {
+                            const left = leftInGodown(p.id);
+                            // Never lifted: no figure to check against, so no false "0 left".
+                            if (left === null) return <span className="kit-cell-unset">—</span>;
+                            const text = money ? fmtMoney(left) : `${left.toLocaleString("en-US")}`;
+                            return left < 0 ? <span className="kit-due is-owing">{text}</span> : text;
+                          })()}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -430,6 +492,13 @@ export function StockDayEntry({
         </dl>
       </Card>
 
+      {overGodown.length > 0 && (
+        <p className="kit-note is-bad">
+          <Icon name="alert" /> More than the godown holds:{" "}
+          {overGodown.map((p) => `${p.subType} (${(godown[p.id] ?? 0).toLocaleString("en-US")} in godown)`).join(", ")}.
+          You can still save — but check whether a lifting is missing first.
+        </p>
+      )}
       {unpriced.length > 0 && (
         <p className="kit-note is-bad">
           <Icon name="alert" /> {unpriced.map((p) => p.subType).join(", ")} {unpriced.length === 1 ? "has" : "have"} no
@@ -437,7 +506,12 @@ export function StockDayEntry({
         </p>
       )}
       {message && <p className={ok ? "kit-note is-ok" : "kit-note is-bad"}>{message}</p>}
-      <Btn onClick={save} disabled={busy || unpriced.length > 0} block>
+      {fractional.length > 0 && (
+        <p className="kit-note is-bad">
+          <Icon name="alert" /> {fractional.map((p) => p.subType).join(", ")}: quantities are whole units.
+        </p>
+      )}
+      <Btn onClick={save} disabled={busy || unpriced.length > 0 || fractional.length > 0} block>
         {busy ? "Saving…" : "Save this day"}
       </Btn>
     </>

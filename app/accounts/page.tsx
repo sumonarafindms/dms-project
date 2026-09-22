@@ -1,171 +1,95 @@
 /**
- * Accounts home.
+ * Accounts home — what moved, and who is holding it.
  *
- * The six approved demos do not include an ACCOUNTS role, so this page is
- * assembled from their shared vocabulary rather than copied from one of them:
- * PageHeader, SummaryStrip, SectionHead and Tile, with the same spacing and
- * the same status colours. It reads as the same product as the other roles.
+ * v198, the owner's brief: *"Accounts ar dashboard ta o onk ta clean rakho...
+ * Ja ja thakbe.."* — and then exactly two things. Per product, for this month
+ * and for yesterday: the company lifting, what went out to the field, what
+ * they reported sold, and for SIMs what actually activated — normal and swap
+ * apart, each price apart, cards each apart. Then underneath: every RSO,
+ * supervisor and BP, and what is in their hands.
  *
- * Accounts is the data-entry role, so the page answers one question first —
- * "is today's data in yet?" — before offering the import workspaces.
- *
- * Every figure below is a real query. Where a feed has never been imported the
- * card says so rather than showing a zero, because a zero here would read as
- * "imported, and it was empty".
+ * So that is the page. v197's tile grid, largest-dues card, godown list and
+ * reference tiles are gone: every one of them is a menu item already, the
+ * godown figure now sits on each product's own card, and a person's due sits
+ * on their own row below. The one strip kept at the top is the four money
+ * figures Accounts is answerable for, because a stock page with no money on it
+ * would answer half the job.
  */
 
 import { requirePagePermission } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
-import { latestDailySnapshot } from "../../lib/intelligence";
-import { dailyFeedItems } from "../../lib/feed-day";
-import { fmtNumber } from "../../lib/format";
+import { fmtMoney } from "../../lib/format";
 import { dhakaTodayYmd } from "../../lib/business-time";
-import { Badge, Card, PageHeader, SectionHead, SummaryStrip, Tile } from "../components/Kit";
+import { stockScope } from "../../lib/stock-data";
+import { accountsOverview } from "../../lib/accounts-overview";
+import { paisa } from "../../lib/stock";
+import { LinkBtn, PageHeader, SummaryStrip } from "../components/Kit";
 import { Icon } from "../components/icons";
+import { AccountsOverview } from "../components/AccountsOverview";
 
 export const dynamic = "force-dynamic";
 
-const ymd = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
-
-/** A feed is "current" when its latest business date is today or yesterday. */
-function freshness(businessDate: Date | null | undefined) {
-  const date = ymd(businessDate);
-  // "pending", not "neutral": a feed that has never been imported counts
-  // against "Feeds Current" in the strip above, so its badge has to look like
-  // it does rather than reading as a calm no-op.
-  if (!date) return { tone: "pending" as const, label: "No import yet", date: "—" };
-  const today = dhakaTodayYmd();
-  const yesterday = ymd(new Date(new Date(`${today}T00:00:00Z`).getTime() - 86400000))!;
-  if (date === today) return { tone: "complete" as const, label: "Current", date };
-  if (date === yesterday) return { tone: "complete" as const, label: "Yesterday", date };
-  return { tone: "pending" as const, label: "Behind", date };
-}
-
 export default async function Accounts() {
   const u = await requirePagePermission(["ACCOUNTS"], "dashboard");
-  const [rsos, retailers, bps, daily, lastGa, lastC2c, lastC2s, lastOb] = await Promise.all([
-    prisma.employee.count({ where: { active: true } }),
-    prisma.retailer.count({ where: { active: true } }),
-    // A BP is a retailer holding a live BpAssignment — that assignment, not
-    // the BP login account, is what makes a retailer a BP. See the ownership note in lib/report-data.ts.
-    prisma.bpAssignment.count({ where: { active: true } }),
-    latestDailySnapshot(),
-    ...(["GA", "C2C", "C2S", "OB"] as const).map((type) =>
-      prisma.importBatch.findFirst({
-        where: { type },
-        orderBy: { uploadedAt: "desc" },
-        select: { businessDate: true, uploadedAt: true, status: true, fileName: true },
-      }),
-    ),
-  ]);
 
-  const feeds = [
-    { key: "GA Activation", href: "/accounts/operations/ga", batch: lastGa },
-    { key: "C2C Stock Lifting", href: "/accounts/operations/c2c", batch: lastC2c },
-    { key: "C2S Retail Sales", href: "/accounts/operations/c2s", batch: lastC2s },
-    { key: "Opening Balance", href: "/accounts/operations/ob", batch: lastOb },
-  ];
-  const behind = feeds.filter((f) => freshness(f.batch?.businessDate).tone !== "complete").length;
+  /*
+   * "Entered today" counts holders with ANY line for today, from the same two
+   * tables the entry screen writes. A count of people, not a percentage:
+   * nobody is required to move stock every day, so a percentage of all
+   * holders would read as a shortfall on every quiet day.
+   */
+  const today = dhakaTodayYmd();
+  const todayAt = new Date(`${today}T00:00:00.000Z`);
+  const [data, enteredMoves, enteredDeposits] = await Promise.all([
+    accountsOverview(await stockScope(u), today),
+    prisma.stockMovement.findMany({
+      where: { date: todayAt },
+      distinct: ["holderType", "holderId"],
+      select: { holderType: true, holderId: true },
+    }),
+    prisma.cashDeposit.findMany({ where: { date: todayAt }, select: { holderType: true, holderId: true } }),
+  ]);
+  const enteredToday = new Set([
+    ...enteredMoves.map((m) => `${m.holderType}:${m.holderId}`),
+    ...enteredDeposits.map((d) => `${d.holderType}:${d.holderId}`),
+  ]).size;
+  const owing = data.holders.filter((h) => h.due > 0);
+  const outstanding = paisa(owing.reduce((sum, h) => sum + h.due, 0));
+  const topupId = new Set(data.products.filter((p) => p.category === "ITOPUP").map((p) => p.id));
+  const topupOut = paisa(
+    data.holders.reduce(
+      (sum, h) => sum + h.lines.reduce((a, l) => a + (topupId.has(l.productId) ? Math.max(0, l.inHand) : 0), 0),
+      0,
+    ),
+  );
 
   return (
-    <main className="page">
-      <PageHeader title="Operations" subtitle={`${u.displayName} · Accounts`} />
+    <main className="page acc-home">
+      <PageHeader
+        title="Accounts"
+        subtitle={`${u.displayName} · Stock and money`}
+        action={
+          <span className="cmp-head-actions">
+            <LinkBtn href="/stock/daily">
+              <Icon name="upload" /> Daily Entry
+            </LinkBtn>
+            <LinkBtn href="/stock/day-report" variant="secondary">
+              <Icon name="file" /> Daily Report
+            </LinkBtn>
+          </span>
+        }
+      />
 
       <SummaryStrip
         items={[
-          {
-            label: "Feeds Current",
-            value: `${feeds.length - behind}/${feeds.length}`,
-            tone: behind ? "amber" : "brand",
-          },
-          ...dailyFeedItems(daily, ["ga"]),
-          { label: "Active Retailers", value: fmtNumber(retailers) },
-          { label: "RSO · BP", value: `${rsos} · ${bps}` },
+          { label: "Outstanding", value: fmtMoney(outstanding), tone: owing.length ? "brand" : undefined },
+          { label: "With a due", value: `${owing.length} of ${data.holders.length}` },
+          { label: "Entered today", value: String(enteredToday) },
+          { label: "iTopup out", value: fmtMoney(topupOut) },
         ]}
       />
 
-      <SectionHead
-        title="Data freshness"
-        sub="Checked against the latest import's business date, not its upload time."
-      />
-      <div className="kit-card-grid is-quad kit-mb-20">
-        {feeds.map((f) => {
-          const state = freshness(f.batch?.businessDate);
-          return (
-            <Card key={f.key} padded>
-              <div className="kit-feed-head">
-                <div className="kit-min0">
-                  <span className="kit-label">{f.key}</span>
-                  <strong className="kit-figure">{state.date}</strong>
-                </div>
-                <Badge tone={state.tone}>{state.label}</Badge>
-              </div>
-              <p className="kit-feed-file" title={f.batch?.fileName ?? ""}>
-                {f.batch?.fileName ?? "Nothing imported for this feed yet"}
-              </p>
-            </Card>
-          );
-        })}
-      </div>
-
-      <SectionHead title="Import workspaces" sub="Each feed validates before anything reaches the database." />
-      <div className="kit-card-grid kit-mb-20">
-        <Tile
-          href="/accounts/operations/ga"
-          icon={<Icon name="sim" />}
-          title="GA Activation"
-          sub="Activation details and daily GA"
-        />
-        <Tile
-          href="/accounts/operations/c2c"
-          icon={<Icon name="wallet" />}
-          title="C2C Stock Lifting"
-          sub="Retailer lifting and recharge"
-        />
-        <Tile
-          href="/accounts/operations/c2s"
-          icon={<Icon name="chart" />}
-          title="C2S Retail Sales"
-          sub="Retail sales and LSO progress"
-        />
-        <Tile
-          href="/accounts/operations/ob"
-          icon={<Icon name="balance" />}
-          title="Opening Balance"
-          sub="Latest retailer balance snapshot"
-        />
-        <Tile
-          href="/accounts/operations/targets"
-          icon={<Icon name="target" />}
-          title="SC & Targets"
-          sub="Monthly RSO and BP targets"
-        />
-      </div>
-
-      <SectionHead title="Reference" />
-      <div className="kit-card-grid">
-        <Tile
-          admin
-          href="/accounts/retailers"
-          icon={<Icon name="search" />}
-          title="Retailer Search"
-          sub={`${fmtNumber(retailers)} active outlets`}
-        />
-        <Tile
-          admin
-          href="/accounts/attention"
-          icon={<Icon name="target" />}
-          title="Opportunity"
-          sub="Unfinished SSO / LSO execution"
-        />
-        <Tile
-          admin
-          href="/accounts/people"
-          icon={<Icon name="users" />}
-          title="RSO & BP Reference"
-          sub={`${rsos} RSOs · ${bps} BP assignments`}
-        />
-      </div>
+      <AccountsOverview data={data} />
     </main>
   );
 }

@@ -132,6 +132,12 @@ export type MovementRow = {
   qty: number;
   /** What one unit was worth when this line was recorded. */
   unitPrice: number;
+  /**
+   * The day it moved, "YYYY-MM-DD". Optional, but when present the stock in
+   * hand is valued in date order — see `stockLines`. Without it every line is
+   * treated as one day: receipts first, then what went out.
+   */
+  date?: string;
 };
 
 /**
@@ -180,28 +186,91 @@ export function stockLines(movements: readonly MovementRow[], products: readonly
   const byId = new Map(products.map((p) => [p.id, p]));
   const acc = new Map<
     string,
-    { opening: number; given: number; sold: number; returned: number; ov: number; gv: number; sv: number; rv: number }
+    {
+      opening: number;
+      given: number;
+      sold: number;
+      returned: number;
+      ov: number;
+      gv: number;
+      sv: number;
+      rv: number;
+      /** The running lot: quantity held and what it is carried at (v199). */
+      q: number;
+      v: number;
+    }
   >();
 
-  for (const m of movements) {
+  /*
+   * v199 — the stock in hand is carried at what the holder was CHARGED for it,
+   * as a moving weighted average in date order.
+   *
+   * v193–v198 valued it as "everything in minus everything out, each at its own
+   * price", which put a SALE's price into the carrying value. A sale is priced
+   * by the day it is reported, so once the price moved the remainder was
+   * mis-valued: 10 SIMs given at ৳100, the price drops to ৳50, 9 reported sold
+   * → 1 SIM "carried" at ৳550, and returning it cleared ৳550 of a ৳1,000 due
+   * instead of ৳100. With the price rising instead, the remainder came out
+   * NEGATIVE. What goes out now leaves at the average of what is held, so the
+   * last SIM is carried at ৳100 — what that person was charged for it — and a
+   * return clears exactly that.
+   *
+   * Date order matters for the same reason: 10 at ৳100 given and sold in
+   * January, then 10 at ৳50 in February — the February ten are carried at ৳50,
+   * not at a ৳75 blend of stock that is long gone. Within one day, receipts
+   * come before what goes out, which is how a day's entry reads.
+   */
+  const rank = (k: MoveKind) => (k === "OPENING" ? 0 : k === "GIVEN" ? 1 : k === "SOLD" ? 2 : 3);
+  const ordered = [...movements].sort(
+    (a, b) => (a.date || "").localeCompare(b.date || "") || rank(a.kind) - rank(b.kind),
+  );
+
+  for (const m of ordered) {
     if (!byId.has(m.productId)) continue;
-    const row = acc.get(m.productId) || { opening: 0, given: 0, sold: 0, returned: 0, ov: 0, gv: 0, sv: 0, rv: 0 };
+    const row = acc.get(m.productId) || {
+      opening: 0,
+      given: 0,
+      sold: 0,
+      returned: 0,
+      ov: 0,
+      gv: 0,
+      sv: 0,
+      rv: 0,
+      q: 0,
+      v: 0,
+    };
     const qty = Number(m.qty) || 0;
-    // Valued from the line's OWN price, so two lots of the same product bought
-    // at different prices each keep what they were actually worth.
+    // Each line's own value, at its own snapshot price — what the due and the
+    // sales figures are made of. Only the CARRYING value below is averaged.
     const value = lineValue(qty, m.unitPrice);
-    if (m.kind === "OPENING") {
-      row.opening += qty;
-      row.ov += value;
-    } else if (m.kind === "GIVEN") {
-      row.given += qty;
-      row.gv += value;
-    } else if (m.kind === "SOLD") {
-      row.sold += qty;
-      row.sv += value;
-    } else if (m.kind === "RETURNED") {
-      row.returned += qty;
-      row.rv += value;
+    if (m.kind === "OPENING" || m.kind === "GIVEN") {
+      if (m.kind === "OPENING") {
+        row.opening += qty;
+        row.ov += value;
+      } else {
+        row.given += qty;
+        row.gv += value;
+      }
+      if (row.q >= 0) {
+        row.q += qty;
+        row.v += value;
+      } else {
+        // Stock arriving to cover an over-reported sale: only the part that is
+        // left over is held, at this lot's price.
+        row.q += qty;
+        row.v = row.q > 0 ? row.q * (Number(m.unitPrice) || 0) : 0;
+      }
+    } else {
+      if (m.kind === "SOLD") {
+        row.sold += qty;
+        row.sv += value;
+      } else if (m.kind === "RETURNED") {
+        row.returned += qty;
+        row.rv += value;
+      }
+      if (row.q > 0) row.v -= (row.v / row.q) * Math.min(qty, row.q);
+      row.q -= qty;
+      if (row.q <= 0) row.v = 0;
     }
     acc.set(m.productId, row);
   }
@@ -211,15 +280,13 @@ export function stockLines(movements: readonly MovementRow[], products: readonly
     const product = byId.get(productId)!;
     const inHand = row.opening + row.given - row.sold - row.returned;
     /*
-     * What the stock in hand is worth.
-     *
-     * Not `inHand × today's price` — that would be the one place a price
-     * change could still move a figure. It is what came in minus what went
-     * out, each at the price it moved at, which is what the holder is actually
-     * carrying. A holder who took ten cards at 39 and ten at 40 is carrying
-     * 790, not 800.
+     * What the stock in hand is worth: the running lot above. Never
+     * `inHand × today's price` — that would be the one place a price change
+     * could still move a figure — and never negative: a holder showing more
+     * sold than given holds nothing, and that shortfall is shown in red as a
+     * quantity, not hidden in a value.
      */
-    const inHandValue = paisa(row.ov + row.gv - row.sv - row.rv);
+    const inHandValue = inHand > 0 ? paisa(row.v) : 0;
     lines.push({
       product,
       opening: row.opening,

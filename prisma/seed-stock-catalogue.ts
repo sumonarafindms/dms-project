@@ -34,14 +34,29 @@ const CATALOGUE: {
   subType: string;
   unitLabel: string;
   prices: [string, number][];
+  /** SIMs: which company activations this SIM shows up as (v198). */
+  activationType?: "GA_170" | "GA_300" | "SIM_SWAP";
 }[] = [
   // SIMs — the owner's four, plus E-SIM arriving later.
-  { category: "SIM", subType: "Normal SIM 150", unitLabel: "pc", prices: [["2026-01-01", 150]] },
-  { category: "SIM", subType: "Normal SIM 300", unitLabel: "pc", prices: [["2026-01-01", 300]] },
+  {
+    category: "SIM",
+    subType: "Normal SIM 150",
+    unitLabel: "pc",
+    prices: [["2026-01-01", 150]],
+    activationType: "GA_170",
+  },
+  {
+    category: "SIM",
+    subType: "Normal SIM 300",
+    unitLabel: "pc",
+    prices: [["2026-01-01", 300]],
+    activationType: "GA_300",
+  },
   {
     category: "SIM",
     subType: "Swap SIM",
     unitLabel: "pc",
+    activationType: "SIM_SWAP",
     // Up, then down — the owner said "dam kome bare", both directions.
     prices: [
       ["2026-01-01", 142],
@@ -53,6 +68,7 @@ const CATALOGUE: {
     category: "SIM",
     subType: "EV SIM",
     unitLabel: "pc",
+    activationType: "SIM_SWAP",
     prices: [
       ["2026-01-01", 100],
       ["2026-08-01", 110],
@@ -62,6 +78,9 @@ const CATALOGUE: {
 
   // Scratch cards.
   { category: "CARD", subType: "Scratch card 20", unitLabel: "card", prices: [["2026-01-01", 20]] },
+  // v198: the owner's three everyday cards are 29, 39 and 49.
+  { category: "CARD", subType: "Scratch card 29", unitLabel: "card", prices: [["2026-01-01", 29]] },
+  { category: "CARD", subType: "Scratch card 49", unitLabel: "card", prices: [["2026-01-01", 49]] },
   {
     category: "CARD",
     subType: "Scratch card 39",
@@ -108,7 +127,12 @@ for (const item of CATALOGUE) {
     existing?.id ??
     (
       await prisma.product.create({
-        data: { category: item.category, subType: item.subType, unitLabel: item.unitLabel },
+        data: {
+          category: item.category,
+          subType: item.subType,
+          unitLabel: item.unitLabel,
+          activationType: item.activationType ?? null,
+        },
         select: { id: true },
       })
     ).id;

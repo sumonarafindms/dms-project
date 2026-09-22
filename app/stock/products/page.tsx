@@ -30,6 +30,7 @@ export default async function Products() {
     subType: p.subType,
     unitLabel: p.unitLabel ?? null,
     status: p.status,
+    activationType: p.activationType,
     movements: p.movements,
     prices: p.prices,
     current: p.current,

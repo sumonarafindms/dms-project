@@ -185,7 +185,7 @@ const definitions: Record<string, { name: string; sheet: string; rows: Record<st
 };
 
 export async function GET(_: Request, { params }: { params: Promise<{ type: string }> }) {
-  const actor = await apiUser(["ADMIN", "IT", "ACCOUNTS"]);
+  const actor = await apiUser(["ADMIN", "IT"]);
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // Each call builds a workbook in memory; the limit is generous enough that
   // a person clicking "Download Sample" will never see it.

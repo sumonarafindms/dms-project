@@ -195,7 +195,11 @@ describe("no screen says 'Latest GA' any more", () => {
   });
 
   it("builds its tiles from the shared helper", () => {
-    for (const p of ROLE_HOMES.filter((p) => p !== "app/bp/page.tsx")) {
+    /*
+     * Accounts is excluded since v197: its home no longer shows company feed
+     * tiles at all. Feeds are IT's; Accounts' home is stock and money.
+     */
+    for (const p of ROLE_HOMES.filter((p) => p !== "app/bp/page.tsx" && p !== "app/accounts/page.tsx")) {
       expect(code(p), `${p} hand-rolls its daily tiles`).toContain("dailyFeedItems(");
     }
   });

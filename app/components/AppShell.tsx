@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { PermissionProvider, type ClientPermissionMap } from "./PermissionContext";
 import { AccountMenu } from "./AccountMenu";
 import { NavMore } from "./NavMore";
-import { barLabel, bottomSlots } from "@/lib/bottom-nav";
+import { active, activeAmong, barLabel, bottomSlots } from "@/lib/bottom-nav";
 
 /**
  * `group` places the item in the collapsible admin sidebar. It exists because
@@ -137,6 +137,19 @@ const adminNav: NavItem[] = [
    */
   { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "wallet", module: "stock", group: "Stock & Cash" },
   /*
+   * v195. The evening report. First in the group after the landing page,
+   * because it is the one screen Accounts opens every single day.
+   */
+  {
+    href: "/stock/day-report",
+    label: "Daily Report",
+    short: "Report",
+    icon: "file",
+    module: "stock",
+    group: "Stock & Cash",
+    booksOnly: true,
+  },
+  /*
    * v194. The house's own books. `booksOnly` keeps them out of a manager's
    * menu: every role may VIEW the stock module, and the buying price is a
    * narrower question than that — the same shape as `writersOnly` in v190.
@@ -263,30 +276,36 @@ const configs: Record<string, RoleConfig> = {
   },
   accounts: {
     name: "Accounts",
-    title: "Data management",
+    title: "Stock & money",
     initials: "AC",
     home: "/accounts",
     nav: [
+      /*
+       * v197, the owner's ruling on what Accounts is for: *"Accounts ar kaj
+       * holo stock updated kora.. sob thik moto hoce naki check kora and taka
+       * management thik moto rakha"*. Files are uploaded by IT; targets and
+       * campaigns belong to other roles. So Operations, Opportunity, SC &
+       * Targets and Campaigns are gone from this menu — and from the APIs
+       * behind them, because a hidden menu over an open endpoint is a claim
+       * the app does not enforce.
+       *
+       * The first four are the phone's bottom bar (lib/bottom-nav.ts).
+       */
       { href: "/accounts", label: "Overview", icon: "home", module: "dashboard" },
-      { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
-      { href: "/accounts/operations", label: "Operations", icon: "upload", module: "ga" },
-      { href: "/accounts/retailers", label: "Retailer Search", short: "Search", icon: "search", module: "retailers" },
-      { href: "/accounts/attention", label: "Opportunity", icon: "target", module: "attention" },
-      { href: "/accounts/people", label: "RSO & BP", icon: "users", module: "employees" },
-      {
-        href: "/accounts/operations/targets",
-        label: "SC & Targets",
-        short: "Targets",
-        icon: "target",
-        module: "targets",
-      },
-      { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
-      { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
+      // The screen the owner called "oita onk important": giving RSOs their products.
+      { href: "/stock/daily", label: "Daily Entry", short: "Entry", icon: "upload", module: "stock" },
       { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
+      { href: "/stock/day-report", label: "Daily Report", short: "Report", icon: "file", module: "stock" },
       { href: "/stock/lifting", label: "Lifting", icon: "upload", module: "stock" },
       { href: "/stock/expenses", label: "Expenses", icon: "balance", module: "stock" },
       { href: "/stock/profit", label: "Profit & Loss", short: "Profit", icon: "chart", module: "stock" },
       { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock" },
+      { href: "/stock/products", label: "Products", icon: "shop", module: "stock" },
+      { href: "/stock/opening", label: "Opening Balance", short: "Opening", icon: "balance", module: "stock" },
+      { href: "/accounts/people", label: "RSO & BP", icon: "users", module: "employees" },
+      { href: "/accounts/retailers", label: "Retailer Search", short: "Search", icon: "search", module: "retailers" },
+      { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
+      { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
     ],
     bottom: [],
   },
@@ -380,11 +399,6 @@ function roleFor(path: string) {
   const first = path.split("/").filter(Boolean)[0] || "";
   return configs[first] || configs.admin;
 }
-function active(path: string, href: string) {
-  const homes = new Set(["/dashboard", "/manager", "/supervisor", "/accounts", "/rso", "/bp"]);
-  if (homes.has(href)) return path === href;
-  return path === href || (href !== "/" && path.startsWith(href + "/"));
-}
 /** The three roles that may create and edit campaigns and support offers. */
 const WRITER_ROLES = ["ADMIN", "IT", "MANAGER"];
 
@@ -402,8 +416,6 @@ function allowed(item: NavItem, permissions: ClientPermissionMap, admin: boolean
    */
   if (item.booksOnly && !BOOKS_ROLES.includes(role.toUpperCase())) return false;
   if (admin) return true;
-  if (item.href === "/accounts/operations")
-    return ["ga", "c2c", "c2s", "ob", "targets"].some((m) => permissions[m]?.view);
   return !item.module || Boolean(permissions[item.module]?.view);
 }
 export default function AppShell({
@@ -461,7 +473,8 @@ export default function AppShell({
    * Five cells at most. `lib/bottom-nav.ts` carries the measurement that
    * settled the number and the rule for what happens to the rest.
    */
-  const bar = bottomSlots(visibleBottom, path, active);
+  const isActive = activeAmong(visibleNav.map((i) => i.href));
+  const bar = bottomSlots(visibleBottom, path, isActive);
   return (
     <PermissionProvider permissions={permissions}>
       <div className={`app-root ${isAdmin ? "admin-app" : `${roleKey}-app`}`}>
@@ -471,9 +484,18 @@ export default function AppShell({
           </div>
           <div className="sidebar-section">{role.title}</div>
           {isAdmin ? (
-            <AdminNav nav={role.nav} path={path} permissions={permissions} onNavigate={setNavPending} role={roleName} />
+            <AdminNav
+              nav={role.nav}
+              path={path}
+              permissions={permissions}
+              onNavigate={setNavPending}
+              role={roleName}
+              isActive={isActive}
+            />
           ) : (
-            visibleNav.map((i) => <NavLink key={i.href} item={i} path={path} onNavigate={setNavPending} />)
+            visibleNav.map((i) => (
+              <NavLink key={i.href} item={i} path={path} onNavigate={setNavPending} isActive={isActive} />
+            ))
           )}
           <div className="sidebar-spacer" />
           {/* Sign out used to be a button of its own here and nowhere else —
@@ -543,7 +565,7 @@ export default function AppShell({
                   prefetch={true}
                   onPointerEnter={() => router.prefetch(i.href)}
                   onClick={() => setNavPending(i.href)}
-                  className={`bottom-link ${active(path, i.href) ? "active" : ""}${i.live ? " is-live" : ""}`}
+                  className={`bottom-link ${isActive(path, i.href) ? "active" : ""}${i.live ? " is-live" : ""}`}
                 >
                   <Icon name={i.icon} />
                   {/*
@@ -561,7 +583,7 @@ export default function AppShell({
                 <NavMore
                   items={visibleBottom}
                   path={path}
-                  isActive={active}
+                  isActive={isActive}
                   onNavigate={setNavPending}
                   /*
                    * `bar.overflow`, not "is the current page missing from the
@@ -570,7 +592,7 @@ export default function AppShell({
                    * it is meant for — a route with no bar entry of its own,
                    * such as a detail page opened from a list.
                    */
-                  highlight={!bar.shown.some((i) => active(path, i.href))}
+                  highlight={!bar.shown.some((i) => isActive(path, i.href))}
                 />
               )}
             </nav>
@@ -594,6 +616,7 @@ function AdminNav({
   permissions,
   onNavigate,
   role,
+  isActive,
 }: {
   nav: NavItem[];
   path: string;
@@ -601,6 +624,8 @@ function AdminNav({
   onNavigate: (href: string) => void;
   /** The signed-in role, for the entries that only writers may see. */
   role: string;
+  /** The shell's one answer to "which item is current" — see `activeAmong`. */
+  isActive: (path: string, href: string) => boolean;
 }) {
   const groups = NAV_GROUPS.map((g) => ({ ...g, items: nav.filter((i) => i.group === g.label) }));
   return (
@@ -608,7 +633,7 @@ function AdminNav({
       {groups.map((g) => {
         const items = g.items.filter((i) => allowed(i, permissions, true, role));
         if (!items.length) return null;
-        const groupActive = items.some((i) => active(path, i.href));
+        const groupActive = items.some((i) => isActive(path, i.href));
         return (
           <details
             className={`admin-nav-group ${groupActive ? "group-active" : ""}`}
@@ -632,7 +657,7 @@ function AdminNav({
             </summary>
             <div className="admin-nav-items">
               {items.map((i) => (
-                <NavLink key={i.href} item={i} path={path} onNavigate={onNavigate} />
+                <NavLink key={i.href} item={i} path={path} onNavigate={onNavigate} isActive={isActive} />
               ))}
             </div>
           </details>
@@ -657,9 +682,19 @@ function Brand({ href }: { href: string }) {
     </Link>
   );
 }
-function NavLink({ item, path, onNavigate }: { item: NavItem; path: string; onNavigate: (href: string) => void }) {
+function NavLink({
+  item,
+  path,
+  onNavigate,
+  isActive: activeFn,
+}: {
+  item: NavItem;
+  path: string;
+  onNavigate: (href: string) => void;
+  isActive: (path: string, href: string) => boolean;
+}) {
   const router = useRouter();
-  const isActive = active(path, item.href);
+  const isActive = activeFn(path, item.href);
   return (
     <Link
       href={item.href}

@@ -99,13 +99,22 @@ export default async function SupportPage({ searchParams }: { searchParams: Prom
         <>
           <SupportMine row={mine} scheme={day.scheme} date={date} noCodes={noCodes} />
           <SectionHead title="Today's offer" sub="What the office set for this day." />
-          <SupportSchemeCard scheme={day.scheme} name={day.schemeName} note={day.schemeNote} />
+          <SupportSchemeCard scheme={day.scheme} name={day.schemeName} note={day.schemeNote} date={date} />
         </>
       ) : (
         <>
           <SectionHead title={`Offer for ${dayLabel(date)}`} />
-          <SupportSchemeCard scheme={day.scheme} name={day.schemeName} note={day.schemeNote} />
-          <SectionHead title="What it pays" sub="Support is counted on two codes per RSO, and a BP's own outlet." />
+          <SupportSchemeCard
+            scheme={day.scheme}
+            name={day.schemeName}
+            note={day.schemeNote}
+            date={date}
+            showMessage={scope.canWrite}
+          />
+          <SectionHead
+            title="What it pays"
+            sub="Support is counted on the picked codes per RSO, and a BP's own outlet."
+          />
           <SupportSummary day={day} />
           {scope.canWrite ? <SupportMissingCodes rows={day.rsosWithoutCodes} href="/support/codes" /> : null}
           {scope.employeeIds !== null && scope.employeeIds.length === 0 ? (

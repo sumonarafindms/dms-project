@@ -16,6 +16,7 @@ import { fmtMoney } from "../../lib/format";
 import { holderDues, stockScope } from "../../lib/stock-data";
 import { paisa } from "../../lib/stock";
 import { Card, EmptyState, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../components/Kit";
+import { ReportActionBar } from "../components/ReportShell";
 import { Icon } from "../components/icons";
 import { StockHolderTable } from "../components/StockViews";
 
@@ -57,9 +58,14 @@ export default async function StockHome() {
         subtitle="Stock handed out, money collected, and what is still owed."
         action={
           scope.canWrite ? (
-            <LinkBtn href="/stock/daily">
-              <Icon name="upload" /> Daily entry
-            </LinkBtn>
+            <span className="kit-rowacts">
+              <LinkBtn href="/stock/daily">
+                <Icon name="upload" /> Daily entry
+              </LinkBtn>
+              <LinkBtn href="/stock/products" variant="ghost">
+                <Icon name="shop" /> Products
+              </LinkBtn>
+            </span>
           ) : undefined
         }
       />
@@ -72,6 +78,8 @@ export default async function StockHome() {
           { label: "iTopup out", value: fmtMoney(topup) },
         ]}
       />
+
+      <ReportActionBar exportHref="/api/stock/export?report=dues" rowCount={rows.length} />
 
       <SectionHead
         title="Highest due first"

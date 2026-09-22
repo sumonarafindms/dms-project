@@ -35,3 +35,19 @@ export function businessDayBounds(ymd: string) {
   const start = new Date(`${ymd}T00:00:00.000Z`);
   return { start, end: new Date(start.getTime() + 86400000) };
 }
+
+/**
+ * A real calendar day as "YYYY-MM-DD" (v199).
+ *
+ * The shape test the write routes used let "2026-13-01" through to an Invalid
+ * Date and a 500, and "2026-02-31" through as 3 March. A day is real only if it
+ * survives the round trip.
+ */
+export function isYmd(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
+/** The largest quantity one line may carry — well inside a 32-bit column. */
+export const MAX_LINE_QTY = 100_000_000;

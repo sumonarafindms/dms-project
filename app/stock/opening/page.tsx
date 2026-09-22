@@ -9,6 +9,7 @@ import { holderKey, listHolders, parseHolderKey, pricedProducts, stockScope } fr
 import { HOLDER_TYPE_LABEL } from "../../../lib/stock";
 import { EmptyState, PageHeader } from "../../components/Kit";
 import { Icon } from "../../components/icons";
+import { AppLink } from "../../components/AppLink";
 import { StockOpeningForm } from "../../components/StockOpeningForm";
 
 export const dynamic = "force-dynamic";
@@ -43,9 +44,28 @@ export default async function Opening({ searchParams }: { searchParams: Promise<
    * October's prices.
    */
   const asOf = /^\d{4}-\d{2}-\d{2}$/.test(sp.as || "") ? sp.as! : dhakaTodayYmd();
-  const products = await pricedProducts(asOf);
   const parsed = parseHolderKey(sp.holder || "");
   const chosen = parsed && holders.find((h) => h.type === parsed.type && h.id === parsed.id);
+  /*
+   * v199: a person asked for by the link and not found is said so. Opening the
+   * first person in the list instead meant money meant for one person could
+   * be saved against another without anybody noticing the name had changed.
+   */
+  if (parsed && !chosen)
+    return (
+      <main className="page">
+        <PageHeader title="Opening positions" subtitle="Where each person stood when the ledger started." />
+        <EmptyState
+          title="That person is not in your list"
+          hint={
+            <>
+              They may have been removed. <AppLink href="/stock/opening">Choose someone from the list →</AppLink>
+            </>
+          }
+          icon={<Icon name="users" />}
+        />
+      </main>
+    );
   const holder = chosen || holders[0];
 
   const [existing, openingLines] = await Promise.all([
@@ -58,6 +78,8 @@ export default async function Opening({ searchParams }: { searchParams: Promise<
       select: { productId: true, qty: true },
     }),
   ]);
+  // Retired products this person opened with stay on the form, so saving does not delete them (v199).
+  const products = await pricedProducts(asOf, [...new Set(openingLines.map((l) => l.productId))]);
 
   return (
     <main className="page">
@@ -65,11 +87,16 @@ export default async function Opening({ searchParams }: { searchParams: Promise<
         title="Opening positions"
         subtitle="Set once per person: the stock they already hold and the amount they already owe."
       />
+      {/* Keyed for the same reason as the Daily Entry form: a different
+          person or date must never inherit the previous one's typed stock. */}
       <StockOpeningForm
+        key={`${holderKey(holder.type, holder.id)}|${asOf}`}
         holders={holders.map((h) => ({
           id: holderKey(h.type, h.id),
           label: h.name,
-          meta: [HOLDER_TYPE_LABEL[h.type], h.code, h.supervisorName].filter(Boolean).join(" · "),
+          meta: [HOLDER_TYPE_LABEL[h.type], h.code, h.supervisorName, h.inactive ? "no longer active" : null]
+            .filter(Boolean)
+            .join(" · "),
         }))}
         holderKey={holderKey(holder.type, holder.id)}
         products={products}

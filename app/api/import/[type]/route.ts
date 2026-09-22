@@ -15,7 +15,7 @@ export const maxDuration = 60;
 const allowed = new Set(["GA", "C2C", "C2S", "OB"]);
 
 export async function POST(req: NextRequest, context: { params: Promise<{ type: string }> }) {
-  const actor = await apiUser(["ADMIN", "IT", "ACCOUNTS"]);
+  const actor = await apiUser(["ADMIN", "IT"]);
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // Counted per user, after authentication: an anonymous limiter here would
   // just be a way for one caller to lock everyone else out.

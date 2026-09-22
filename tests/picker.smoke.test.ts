@@ -119,6 +119,7 @@ describe("no long list is left in a native menu", () => {
     },
     [path.join("app", "components", "ProductMaster.tsx")]: {
       PRODUCT_CATEGORIES: "the five product kinds, fixed in code — an enum, not a list of people or outlets",
+      ACTIVATION_OPTIONS: "the three activation kinds and 'not linked', fixed in code — an enum (v198)",
     },
     [path.join("app", "components", "ExpenseViews.tsx")]: {
       EXPENSE_CATEGORIES: "the eight expense kinds, fixed in code — an enum, not a list of people or outlets",

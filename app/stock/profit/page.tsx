@@ -27,7 +27,7 @@ import { marginPercent } from "../../../lib/lifting";
 import { fmtMoney, fmtNumber } from "../../../lib/format";
 import { isMoneyProduct } from "../../../lib/stock";
 import { Card, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
-import { ReportDateBar } from "../../components/ReportShell";
+import { ReportActionBar, ReportDateBar } from "../../components/ReportShell";
 import { Icon } from "../../components/icons";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,9 @@ export default async function ProfitPage({ searchParams }: { searchParams: Promi
   const range = resolveRange(sp.from, sp.to);
   const [books, allTime] = await Promise.all([houseBooks(range), godown()]);
   const { profit } = books;
-  const godownValue = allTime.reduce((s, l) => s + l.godownValue, 0);
+  // Valued stock only — see the note on ProfitSummary.unvaluedProducts.
+  const godownValue = allTime.filter((l) => l.hasCost).reduce((s, l) => s + l.godownValue, 0);
+  const unvalued = allTime.filter((l) => !l.hasCost && (l.inGodown || l.issuedQty));
 
   const nowIso = new Date().toISOString();
 
@@ -64,13 +66,17 @@ export default async function ProfitPage({ searchParams }: { searchParams: Promi
         }
       />
       <ReportDateBar range={range} nowIso={nowIso} />
+      <ReportActionBar
+        exportHref={`/api/stock/export?report=margin&from=${range.from}&to=${range.to}`}
+        rowCount={books.lines.filter((l) => l.liftedQty || l.issuedQty || l.soldQty).length}
+      />
 
       <SummaryStrip
         items={[
           { label: "Margin on sold", value: fmtMoney(profit.marginSold), tone: "brand" },
           { label: "Expenses", value: fmtMoney(profit.expenses) },
           { label: "Net", value: fmtMoney(profit.net) },
-          { label: "In godown now", value: fmtMoney(godownValue) },
+          { label: unvalued.length ? "In godown, valued" : "In godown now", value: fmtMoney(godownValue) },
         ]}
       />
 

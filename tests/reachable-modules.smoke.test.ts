@@ -47,14 +47,13 @@ const NO_MENU_ENTRY: Record<string, Partial<Record<PermissionModule, string>>> =
     employees: "reached as My RSOs",
     performance: "My RSOs IS the performance list; each row opens that RSO's figures",
   },
+  /*
+   * v197: the Operations workspace is gone — uploading is IT's job — and with
+   * it every exemption that pointed there. Accounts no longer holds those
+   * modules, and this test's own check below would call the old lines dead.
+   */
   ACCOUNTS: {
-    employees: "reached as People",
-    targets: "reached inside the Operations workspace",
-    ga: "reached inside the Operations workspace",
-    c2c: "reached inside the Operations workspace",
-    c2s: "reached inside the Operations workspace",
-    ob: "reached inside the Operations workspace",
-    bp: "reached inside the Operations workspace",
+    employees: "reached as RSO & BP",
   },
   RSO: { bp: "reached as My BP" },
   BP: {

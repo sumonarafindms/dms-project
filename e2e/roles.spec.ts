@@ -42,7 +42,7 @@ const ROLES: Role[] = [
   {
     key: "ACCOUNTS",
     home: "/accounts",
-    routes: ["/accounts", "/accounts/retailers", "/accounts/people", "/accounts/operations", "/accounts/attention"],
+    routes: ["/accounts", "/accounts/retailers", "/accounts/people", "/stock", "/stock/daily"],
   },
   {
     key: "ADMIN",

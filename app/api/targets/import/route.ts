@@ -31,7 +31,7 @@ type TargetState = {
 };
 
 export async function POST(req: Request) {
-  const actor = await apiUser(["ADMIN", "IT", "ACCOUNTS"]);
+  const actor = await apiUser(["ADMIN", "IT"]);
   if (actor) {
     const limit = await consumeRateLimit(RATE_LIMITS.upload, actor.id);
     if (!limit.allowed) {

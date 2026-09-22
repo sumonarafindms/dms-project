@@ -29,10 +29,7 @@ import { CampaignLevels } from "../../components/CampaignLevels";
 export const dynamic = "force-dynamic";
 
 export default async function CampaignDetail({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requirePagePermission(
-    ["ADMIN", "IT", "MANAGER", "SUPERVISOR", "ACCOUNTS", "RSO", "BP"],
-    "campaigns",
-  );
+  const user = await requirePagePermission(["ADMIN", "IT", "MANAGER", "SUPERVISOR", "RSO", "BP"], "campaigns");
   const { id } = await params;
   const row = await prisma.campaign.findUnique({
     where: { id },

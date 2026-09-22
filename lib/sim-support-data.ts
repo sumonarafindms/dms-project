@@ -48,36 +48,61 @@
  */
 
 import { prisma } from "./prisma";
-import { SSO_MIN_MONTHLY_STANDARD_GA, isSimSellerRetailer, withStandardGa } from "./business-rules";
-import { ssoBonusFor, ssoQualifies, supportEarning, type SupportEarning, type SupportSchemeRule } from "./sim-support";
+import {
+  SSO_MIN_MONTHLY_STANDARD_GA,
+  isSimSellerRetailer,
+  withGa170,
+  withGa300,
+  withStandardGa,
+} from "./business-rules";
+import { currentGa170Tariff } from "./ga-tariff";
+import {
+  ssoBonusFor,
+  ssoQualifies,
+  supportEarning,
+  type SlabBasis,
+  type SupportEarning,
+  type SupportSchemeRule,
+  type SupportTier,
+} from "./sim-support";
 
 /** A scheme row with its slabs, as the rules want it. */
 export function schemeRule(row: {
   ssoRatePerSim: unknown;
   ssoMinSimsSameDay: number | null;
-  slabs: { minSims: number; ratePerSim: unknown }[];
+  slabBasis?: SlabBasis | null;
+  dailyTarget?: number | null;
+  slabs: { minSims: number; ratePerSim: unknown; tier?: SupportTier | null }[];
 }): SupportSchemeRule {
   return {
-    slabs: row.slabs.map((s) => ({ minSims: s.minSims, ratePerSim: Number(s.ratePerSim) })),
+    slabs: row.slabs.map((s) => ({ minSims: s.minSims, ratePerSim: Number(s.ratePerSim), tier: s.tier ?? "ALL" })),
     ssoRatePerSim: row.ssoRatePerSim === null || row.ssoRatePerSim === undefined ? null : Number(row.ssoRatePerSim),
     ssoMinSimsSameDay: row.ssoMinSimsSameDay,
+    basis: row.slabBasis ?? "TOTAL",
+    dailyTarget: row.dailyTarget ?? null,
   };
 }
 
+/** The select every scheme reader uses, so a new column cannot be missed in one of them. */
+export const SCHEME_SELECT = {
+  id: true,
+  date: true,
+  name: true,
+  note: true,
+  active: true,
+  ssoRatePerSim: true,
+  ssoMinSimsSameDay: true,
+  slabBasis: true,
+  dailyTarget: true,
+  slabs: {
+    select: { id: true, tier: true, minSims: true, ratePerSim: true },
+    orderBy: [{ tier: "asc" as const }, { minSims: "asc" as const }],
+  },
+};
+
 export async function schemeForDate(dateYmd: string) {
   const date = new Date(`${dateYmd}T00:00:00.000Z`);
-  return prisma.supportScheme.findFirst({
-    where: { date, active: true },
-    select: {
-      id: true,
-      date: true,
-      name: true,
-      note: true,
-      ssoRatePerSim: true,
-      ssoMinSimsSameDay: true,
-      slabs: { select: { id: true, minSims: true, ratePerSim: true }, orderBy: { minSims: "asc" } },
-    },
-  });
+  return prisma.supportScheme.findFirst({ where: { date, active: true }, select: SCHEME_SELECT });
 }
 
 export type SupportOutletRow = {
@@ -86,6 +111,9 @@ export type SupportOutletRow = {
   retailerName: string | null;
   /** Standard GA on this outlet on this day. */
   sims: number;
+  /** The same SIMs by type — the two ladders of a split offer pay on these. */
+  ga170: number;
+  ga300: number;
 };
 
 /** An outlet that completed SSO on this day, and what that is worth. */
@@ -134,7 +162,8 @@ export async function supportDay(dateYmd: string, scopeTo?: (employeeId: string)
   const scheme = schemeRow ? schemeRule(schemeRow) : null;
   const ssoRunning = !!scheme && (Number(scheme.ssoRatePerSim) || 0) > 0;
 
-  const [retailers, employees, bpAssignments, todayGroups, monthGroups] = await Promise.all([
+  const tariff = await currentGa170Tariff();
+  const [retailers, employees, bpAssignments, today170, today300, monthGroups] = await Promise.all([
     /*
      * EVERY outlet with an RSO, not only the marked ones.
      *
@@ -176,9 +205,19 @@ export async function supportDay(dateYmd: string, scopeTo?: (employeeId: string)
         },
       },
     }),
+    /*
+     * Today's SIMs, by type. The two tiers partition standard GA exactly (see
+     * `gaTierFilters`), so their sum is the day's standard GA and the SSO rule
+     * — which counts every standard SIM — reads the sum.
+     */
     prisma.gaActivation.groupBy({
       by: ["retailerId"],
-      where: withStandardGa({ activationDate: { gte: dayStart, lt: dayEnd } }),
+      where: withGa170(tariff, { activationDate: { gte: dayStart, lt: dayEnd } }),
+      _count: { _all: true },
+    }),
+    prisma.gaActivation.groupBy({
+      by: ["retailerId"],
+      where: withGa300(tariff, { activationDate: { gte: dayStart, lt: dayEnd } }),
       _count: { _all: true },
     }),
     /*
@@ -194,9 +233,23 @@ export async function supportDay(dateYmd: string, scopeTo?: (employeeId: string)
     }),
   ]);
 
-  const today = new Map(todayGroups.map((g) => [g.retailerId, g._count._all]));
+  const t170 = new Map(today170.map((g) => [g.retailerId, g._count._all]));
+  const t300 = new Map(today300.map((g) => [g.retailerId, g._count._all]));
   const before = new Map(monthGroups.map((g) => [g.retailerId, g._count._all]));
-  const simsOn = (retailerId: string) => today.get(retailerId) || 0;
+  const g170On = (retailerId: string) => t170.get(retailerId) || 0;
+  const g300On = (retailerId: string) => t300.get(retailerId) || 0;
+  const simsOn = (retailerId: string) => g170On(retailerId) + g300On(retailerId);
+  /** An outlet's counted SIMs, as the rules want them. */
+  const outletSims = (retailerId: string) => ({
+    sims: simsOn(retailerId),
+    ga170: g170On(retailerId),
+    ga300: g300On(retailerId),
+  });
+  const sumOf = (rows: SupportOutletRow[]) => ({
+    total: rows.reduce((a, o) => a + o.sims, 0),
+    ga170: rows.reduce((a, o) => a + o.ga170, 0),
+    ga300: rows.reduce((a, o) => a + o.ga300, 0),
+  });
 
   /*
    * Outlets held as a BP today. The holder is paid for them, so the owner is
@@ -237,19 +290,19 @@ export async function supportDay(dateYmd: string, scopeTo?: (employeeId: string)
         retailerId: r.id,
         retailerCode: r.retailerCode,
         retailerName: r.retailerName,
-        sims: simsOn(r.id),
+        ...outletSims(r.id),
       }));
 
     const ssoOutlets: SupportSsoRow[] = mine.filter(completedSsoToday).map((r) => ({
       retailerId: r.id,
       retailerCode: r.retailerCode,
       retailerName: r.retailerName,
-      sims: simsOn(r.id),
+      ...outletSims(r.id),
       beforeToday: before.get(r.id) || 0,
       bonus: ssoBonusFor(scheme!, simsOn(r.id)),
     }));
 
-    const sims = slabOutlets.reduce((a, o) => a + o.sims, 0);
+    const sims = sumOf(slabOutlets);
     const bonus = ssoOutlets.reduce((a, o) => a + o.bonus, 0);
     people.push({
       key: employeeId,
@@ -267,7 +320,8 @@ export async function supportDay(dateYmd: string, scopeTo?: (employeeId: string)
   /* ---------------- BPs ---------------- */
   for (const a of bpAssignments) {
     if (!inScope(a.employeeId)) continue;
-    const sims = simsOn(a.retailerId);
+    const counted = outletSims(a.retailerId);
+    const sims = { total: counted.sims, ga170: counted.ga170, ga300: counted.ga300 };
     people.push({
       key: a.retailerId,
       kind: "BP",
@@ -280,7 +334,7 @@ export async function supportDay(dateYmd: string, scopeTo?: (employeeId: string)
           retailerId: a.retailer.id,
           retailerCode: a.retailer.retailerCode,
           retailerName: a.retailer.bpName || a.retailer.retailerName,
-          sims,
+          ...counted,
         },
       ],
       // The SSO offer is for RSOs. A BP earns its slab and nothing else here.

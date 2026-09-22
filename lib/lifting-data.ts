@@ -113,12 +113,25 @@ export type HouseBooks = {
 export async function houseBooks(range?: { from: string; to: string }): Promise<HouseBooks> {
   const dateFilter = range ? { gte: at(range.from), lte: at(range.to) } : undefined;
 
-  const [products, liftRows, issuedRows, expenseRows] = await Promise.all([
+  const [products, liftRows, costRows, issuedRows, expenseRows] = await Promise.all([
     prisma.product.findMany({ select: { id: true, category: true, subType: true, unitLabel: true } }),
+    /*
+     * v199: for a RANGE, "lifted" means bought from the company in it —
+     * PURCHASE only. An opening count is where the godown started, not a
+     * purchase, and counting it put the whole opening stock into go-live day's
+     * "lifted". All time, the openings stay in: the godown count needs them.
+     */
     prisma.lifting.findMany({
-      where: dateFilter ? { date: dateFilter } : undefined,
+      where: dateFilter ? { date: dateFilter, kind: "PURCHASE" } : undefined,
       select: { productId: true, qty: true, unitCost: true },
     }),
+    // What the average cost is taken from: every lifting up to the end of the range.
+    range
+      ? prisma.lifting.findMany({
+          where: { date: { lte: at(range.to) } },
+          select: { productId: true, qty: true, unitCost: true },
+        })
+      : Promise.resolve(null),
     /*
      * One shape of the query, with the range as a parameter. Two literal
      * queries diverge the first time somebody edits one of them.
@@ -132,6 +145,7 @@ export async function houseBooks(range?: { from: string; to: string }): Promise<
         returnedValue: string;
         soldQty: string;
         soldValue: string;
+        openingQty: string;
       }[]
     >`
       SELECT m."productId" AS "productId",
@@ -140,7 +154,8 @@ export async function houseBooks(range?: { from: string; to: string }): Promise<
              COALESCE(SUM(CASE WHEN m."kind"='RETURNED' THEN m."qty" END),0)::text AS "returnedQty",
              COALESCE(SUM(CASE WHEN m."kind"='RETURNED' THEN m."qty"*m."unitPrice" END),0)::text AS "returnedValue",
              COALESCE(SUM(CASE WHEN m."kind"='SOLD'     THEN m."qty" END),0)::text AS "soldQty",
-             COALESCE(SUM(CASE WHEN m."kind"='SOLD'     THEN m."qty"*m."unitPrice" END),0)::text AS "soldValue"
+             COALESCE(SUM(CASE WHEN m."kind"='SOLD'     THEN m."qty"*m."unitPrice" END),0)::text AS "soldValue",
+             COALESCE(SUM(CASE WHEN m."kind"='OPENING'  THEN m."qty" END),0)::text AS "openingQty"
         FROM "StockMovement" m
        WHERE (${range ? at(range.from) : null}::date IS NULL OR m."date" >= ${range ? at(range.from) : null}::date)
          AND (${range ? at(range.to) : null}::date IS NULL OR m."date" <= ${range ? at(range.to) : null}::date)
@@ -164,9 +179,15 @@ export async function houseBooks(range?: { from: string; to: string }): Promise<
     returnedValue: Number(r.returnedValue),
     soldQty: Number(r.soldQty),
     soldValue: Number(r.soldValue),
+    openingQty: Number(r.openingQty),
   }));
 
-  const lines = houseLines(products as ProductRow[], lifts, issued);
+  const lines = houseLines(
+    products as ProductRow[],
+    lifts,
+    issued,
+    costRows?.map((l) => ({ productId: l.productId, qty: l.qty, unitCost: Number(l.unitCost) })),
+  );
   const expenses = expenseTotals(
     expenseRows.map((e) => ({
       category: e.category as ExpenseCategory,
@@ -292,7 +313,7 @@ export async function simCheckRows(scope: SimCheckScope, range: { from: string; 
   if (!employees.length) return [];
   const ids = employees.map((e) => e.id);
 
-  const [stock, activations] = await Promise.all([
+  const [stock, activations, allTime] = await Promise.all([
     /* SIM-category movements only. A scratch card has no activation to check. */
     prisma.$queryRaw<{ holderId: string; given: string; returned: string; sold: string; givenValue: string }[]>`
       SELECT m."holderId" AS "holderId",
@@ -315,15 +336,40 @@ export async function simCheckRows(scope: SimCheckScope, range: { from: string; 
          AND g."activationDate" >= ${at(range.from)}
          AND g."activationDate" < ${at(range.to)}::date + INTERVAL '1 day'
        GROUP BY 1`,
+    /*
+     * The price fallback. An RSO handed no SIMs THIS period still has a known
+     * price if they were handed SIMs at any time — the period is the question
+     * being asked, not a reason to forget what their SIMs cost.
+     */
+    prisma.$queryRaw<{ holderId: string; qty: string; value: string }[]>`
+      SELECT m."holderId" AS "holderId", SUM(m."qty")::text AS qty,
+             SUM(m."qty" * m."unitPrice")::text AS value
+        FROM "StockMovement" m
+        JOIN "Product" p ON p."id" = m."productId"
+       WHERE m."holderType" = 'RSO' AND m."kind" = 'GIVEN'
+         AND m."holderId" = ANY(${ids})
+         AND p."category" = ${CHECKED_CATEGORY}::"ProductCategory"
+       GROUP BY 1`,
   ]);
 
   const byStock = new Map(stock.map((s) => [s.holderId, s]));
   const byActivation = new Map(activations.map((a) => [a.employeeId, Number(a.n)]));
+  const byAllTime = new Map(
+    allTime.map((a) => [a.holderId, Number(a.qty) > 0 ? paisa(Number(a.value) / Number(a.qty)) : null]),
+  );
 
   const rows = employees.map((e) => {
     const s = byStock.get(e.id);
     const given = s ? Number(s.given) - Number(s.returned) : 0;
+    const grossGiven = s ? Number(s.given) : 0;
     const givenValue = s ? Number(s.givenValue) : 0;
+    /*
+     * The period's own price where there is one — over what was GIVEN, not the
+     * net after returns: somebody who returned everything still has a known
+     * price. Then their all-time price. Then nothing, which is the honest
+     * answer for an RSO the ledger never handed a SIM to.
+     */
+    const avgPrice = grossGiven > 0 ? paisa(givenValue / grossGiven) : (byAllTime.get(e.id) ?? null);
     return simCheck({
       employeeId: e.id,
       name: e.name,
@@ -332,8 +378,7 @@ export async function simCheckRows(scope: SimCheckScope, range: { from: string; 
       given,
       activated: byActivation.get(e.id) || 0,
       sold: s ? Number(s.sold) : 0,
-      // What one of their SIMs was worth, over what they were actually given.
-      avgPrice: given > 0 ? paisa(givenValue / (s ? Number(s.given) : 1)) : 0,
+      avgPrice,
     });
   });
 

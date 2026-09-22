@@ -241,11 +241,73 @@ describe("a price change cannot reach a figure already recorded", () => {
     expect(lines[0].carryPrice).toBe(39.5);
   });
 
-  it("stock in hand is valued at what moved, never at a current price", () => {
+  it("stock in hand is valued at what the holder was charged, never at a current price", () => {
     const src = read("lib/stock.ts");
-    expect(src).toContain("const inHandValue = paisa(row.ov + row.gv - row.sv - row.rv);");
+    expect(src).toContain("const inHandValue = inHand > 0 ? paisa(row.v) : 0;");
     // The only price a StockLine exposes is the one derived from movements.
     expect(src).toContain("carryPrice: inHand > 0 ? paisa(inHandValue / inHand) : 0,");
+  });
+
+  /*
+   * v199, found by review: a SALE is priced by the day it is reported, and
+   * v193–v198 took that price out of the carrying value. Each case below gave
+   * the wrong return credit before the fix.
+   */
+  const SIM = [{ id: "s", category: "SIM" as const, subType: "SIM" }];
+  const mv = (date: string, kind: "OPENING" | "GIVEN" | "SOLD" | "RETURNED", qty: number, unitPrice: number) => ({
+    date,
+    kind,
+    productId: "s",
+    qty,
+    unitPrice,
+  });
+
+  it("a price DROP after giving does not cheapen what is still held", () => {
+    // 10 given at ৳100; the price falls to ৳50; 9 reported sold at ৳50.
+    const [l] = stockLines([mv("2026-09-01", "GIVEN", 10, 100), mv("2026-09-05", "SOLD", 9, 50)], SIM);
+    expect(l.inHand).toBe(1);
+    expect(l.carryPrice).toBe(100); // was ৳550
+    expect(l.inHandValue).toBe(100);
+  });
+
+  it("a price RISE after giving never makes the remainder negative", () => {
+    const [l] = stockLines([mv("2026-09-01", "GIVEN", 10, 100), mv("2026-09-05", "SOLD", 9, 150)], SIM);
+    expect(l.inHandValue).toBe(100); // was −৳350
+    expect(l.carryPrice).toBe(100);
+  });
+
+  it("stock long sold does not blend into a later lot", () => {
+    const [l] = stockLines(
+      [mv("2026-01-10", "GIVEN", 10, 100), mv("2026-01-20", "SOLD", 10, 100), mv("2026-02-01", "GIVEN", 10, 50)],
+      SIM,
+    );
+    expect(l.carryPrice).toBe(50); // not a ৳75 blend
+  });
+
+  it("two lots still held are carried at their blend", () => {
+    const [l] = stockLines([mv("2026-09-01", "GIVEN", 10, 39), mv("2026-09-02", "GIVEN", 10, 40)], SIM);
+    expect(l.inHandValue).toBe(790);
+    expect(l.carryPrice).toBe(39.5);
+  });
+
+  it("more reported sold than given holds nothing, and the next lot is carried at its own price", () => {
+    const over = stockLines([mv("2026-09-01", "GIVEN", 5, 100), mv("2026-09-02", "SOLD", 8, 100)], SIM)[0];
+    expect(over.inHand).toBe(-3);
+    expect(over.inHandValue).toBe(0);
+    const covered = stockLines(
+      [mv("2026-09-01", "GIVEN", 5, 100), mv("2026-09-02", "SOLD", 8, 100), mv("2026-09-03", "GIVEN", 10, 90)],
+      SIM,
+    )[0];
+    expect(covered.inHand).toBe(7);
+    expect(covered.carryPrice).toBe(90);
+  });
+
+  it("the due still uses each line's own price — only the carrying value is averaged", () => {
+    const lines = stockLines(
+      [mv("2026-09-01", "GIVEN", 10, 100), mv("2026-09-05", "SOLD", 9, 50), mv("2026-09-06", "RETURNED", 1, 100)],
+      SIM,
+    );
+    expect(movementValue(lines)).toEqual({ givenValue: 1000, returnedValue: 100, soldValue: 450 });
   });
 
   it("the type system removes the temptation", () => {
@@ -350,7 +412,31 @@ describe("a return credits what it was lifted at", () => {
      */
     const src = read("app/api/stock/day/route.ts");
     expect(src).toContain('if (kind === "RETURNED") {');
-    expect(src).toContain("unitPrice = onDate.get(productId) ?? null;");
+    // v199: an existing line keeps its snapshot; a new one takes the day's price. Never the client's.
+    expect(src).toContain("unitPrice = saved.get(`${productId}|${kind}`) ?? onDate.get(productId) ?? null;");
+  });
+
+  it("re-saving a day keeps each saved line's price (v199)", () => {
+    const src = read("app/api/stock/day/route.ts");
+    expect(src).toMatch(/const saved = new Map\(/);
+    expect(src).toMatch(/kind: \{ in: \["GIVEN", "SOLD"\] \}/);
+  });
+
+  it("a return price far above anything the product has cost is refused (v199)", () => {
+    expect(read("app/api/stock/day/route.ts")).toMatch(/unitPrice > ceiling \* 1\.5/);
+  });
+
+  it("quantities are whole units and dates are real days (v199)", () => {
+    for (const f of ["app/api/stock/day/route.ts", "app/api/stock/opening/route.ts", "app/api/stock/lifting/route.ts"])
+      expect(read(f), f).toMatch(/Number\.isInteger/);
+    for (const f of [
+      "app/api/stock/day/route.ts",
+      "app/api/stock/opening/route.ts",
+      "app/api/stock/lifting/route.ts",
+      "app/api/stock/expenses/route.ts",
+      "app/api/stock/products/route.ts",
+    ])
+      expect(read(f), f).toContain("isYmd(");
   });
 
   it("a product with no price on the day is refused, never recorded at zero", () => {

@@ -62,18 +62,19 @@ export const roleDefaults: Record<
     support: { view: true, add: false, edit: false, update: false },
     stock: { view: true, add: false, edit: false, update: false },
   },
+  /*
+   * v197: Accounts is stock and money. The owner: "file ja upload korbe IT,
+   * Account ar kaj holo stock updated kora... taka management thik moto
+   * rakha". So no ga/c2c/c2s/ob uploads, no targets, no attention
+   * (Opportunity), no campaigns — and the APIs behind those refuse the role
+   * outright, so a custom permission row cannot bring them back.
+   */
   ACCOUNTS: {
     dashboard: { view: true, add: false, edit: false, update: false },
-    attention: { view: true, add: false, edit: false, update: false },
     employees: { view: true, add: false, edit: false, update: false },
     retailers: { view: true, add: true, edit: true, update: true },
-    targets: { view: true, add: true, edit: true, update: true },
-    ga: { view: true, add: true, edit: true, update: true },
-    c2c: { view: true, add: true, edit: true, update: true },
-    c2s: { view: true, add: true, edit: true, update: true },
-    ob: { view: true, add: true, edit: true, update: true },
-    bp: { view: true, add: true, edit: true, update: true },
-    campaigns: { view: true, add: false, edit: false, update: false },
+    // No `bp`: nothing Accounts can open checks it. Its only justification was
+    // the Operations workspace, removed above.
     support: { view: true, add: false, edit: false, update: false },
     // The only role that enters stock and cash.
     stock: { view: true, add: true, edit: true, update: true },

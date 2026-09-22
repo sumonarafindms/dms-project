@@ -22,7 +22,7 @@ import { resolveRange } from "../../../lib/report-range";
 import { simCheckRows, simCheckScope } from "../../../lib/lifting-data";
 import { fmtMoney, fmtNumber } from "../../../lib/format";
 import { EmptyState, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
-import { ReportDateBar } from "../../components/ReportShell";
+import { ReportActionBar, ReportDateBar } from "../../components/ReportShell";
 import { Icon } from "../../components/icons";
 
 export const dynamic = "force-dynamic";
@@ -50,19 +50,28 @@ export default async function SimCheckPage({
 
   const withGap = rows.filter((r) => r.unreported > 0);
   const totalUnreported = withGap.reduce((s, r) => s + r.unreported, 0);
-  const totalValue = withGap.reduce((s, r) => s + r.unreportedValue, 0);
+  const totalValue = withGap.reduce((s, r) => s + (r.unreportedValue ?? 0), 0);
+  /* Gaps that could not be priced, counted rather than silently added as zero. */
+  const unpriced = withGap.filter((r) => r.unreportedValue === null);
   const active = rows.filter((r) => r.given || r.activated || r.sold);
 
   return (
     <main className="page">
       <PageHeader title="SIM check" subtitle="Given, activated and reported sold — and the gap between them." />
       <ReportDateBar range={range} nowIso={nowIso} />
+      <ReportActionBar
+        exportHref={`/api/stock/export?report=simcheck&from=${range.from}&to=${range.to}`}
+        rowCount={active.length}
+      />
 
       <SummaryStrip
         items={[
           { label: "People", value: String(active.length) },
           { label: "Activated not reported", value: fmtNumber(totalUnreported), tone: "brand" },
-          { label: "That gap is worth", value: fmtMoney(totalValue) },
+          {
+            label: unpriced.length ? "Worth, where priced" : "That gap is worth",
+            value: fmtMoney(totalValue),
+          },
           { label: "People with a gap", value: `${withGap.length} of ${active.length}` },
         ]}
       />
@@ -130,7 +139,9 @@ export default async function SimCheckPage({
                       )}
                     </td>
                     <td role="cell" data-label="Worth" className="is-right">
-                      {r.unreportedValue > 0 ? (
+                      {r.unreportedValue === null && r.unreported > 0 ? (
+                        <span className="kit-cell-unset">no price</span>
+                      ) : r.unreportedValue ? (
                         <span className="kit-due is-owing">{fmtMoney(r.unreportedValue)}</span>
                       ) : (
                         <span className="kit-cell-unset">—</span>
@@ -150,6 +161,14 @@ export default async function SimCheckPage({
             </table>
           </div>
         </>
+      )}
+
+      {unpriced.length > 0 && (
+        <p className="kit-note">
+          <Icon name="info" /> {unpriced.length} {unpriced.length === 1 ? "person has" : "people have"} activated SIMs
+          but {unpriced.length === 1 ? "was" : "were"} never handed one through this ledger, so there is no price to
+          value the gap at: {unpriced.map((r) => r.name).join(", ")}. They are counted above, not valued.
+        </p>
       )}
 
       <p className="kit-note">

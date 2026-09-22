@@ -66,6 +66,7 @@ export function StockHolderTable({ rows }: { rows: HolderDue[] }) {
                   {r.name}
                 </Link>
                 {r.code && <span className="kit-cell-sub">{r.code}</span>}
+                {r.inactive && <span className="kit-cell-sub">No longer active — still in the books</span>}
               </td>
               <td role="cell" data-label="Role">
                 {HOLDER_TYPE_LABEL[r.type]}
@@ -94,10 +95,12 @@ export function StockHolderTable({ rows }: { rows: HolderDue[] }) {
 /**
  * What one holder is carrying, product by product.
  *
- * A version of a product that was superseded still appears on its own line
- * while any of it is in hand — the spec is explicit that an old-price card and
- * a new-price card are different products and must not be merged, and that is
- * why the price sits in the row rather than in a heading over several.
+ * ONE line per product, however many prices it has moved at. v192 made each
+ * price a separate product, so a card lifted at ৳39 and at ৳40 was two lines;
+ * since v193 it is one product with a dated price list, and each lot keeps the
+ * price it moved at on its own movement row. "Carried at" is the blend of what
+ * the holder still holds — ten at 39 and ten at 40 carry at 39.50 — which is
+ * the figure a return credits at by default.
  */
 export function StockLineTable({ lines }: { lines: StockLine[] }) {
   const held = lines.filter((l) => l.opening || l.given || l.sold || l.returned);

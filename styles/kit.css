@@ -4438,3 +4438,527 @@
   text-align: left;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------------------ *
+ * Accounts home (v198) — product flow cards and the holder list.
+ *
+ * Built from the kit's own surfaces: a card is a card, a chip is a pill, the
+ * tabs are `.ops-level-tab`. What is new is the arrangement — four figures
+ * side by side per product, which on a phone become a 2 × 2 grid so a figure
+ * is never squeezed below reading size.
+ * ------------------------------------------------------------------ */
+@layer components {
+  .acc-period {
+    display: inline-flex;
+    gap: 0.25rem;
+    margin: 0.25rem 0 1rem;
+    padding: 0.25rem;
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-pill);
+    background: var(--surface-card, #fff);
+    box-shadow: var(--shadow-card);
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* The page's two switches are used with a thumb: full touch height. */
+  .acc-period .ops-level-tab,
+  .acc-holder-tools .ops-level-tab,
+  .sup-ladders-card .ops-level-tab {
+    min-height: 2.75rem;
+  }
+
+  .acc-shelf,
+  .acc-holders {
+    margin-bottom: 1.5rem;
+  }
+  .acc-shelf-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-bottom: 0.625rem;
+  }
+  .acc-shelf-head h2 {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-neutral-900);
+  }
+  .acc-shelf-head h2 > svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    color: var(--color-brand-700);
+  }
+  .acc-shelf-totals {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.875rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .acc-shelf-totals b {
+    color: var(--color-neutral-900);
+    font-variant-numeric: tabular-nums;
+  }
+  .acc-feed-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin: 0 0 0.625rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-control);
+    background: var(--color-amber-50);
+    border: 1px solid var(--color-amber-200);
+    font-size: 0.75rem;
+    color: var(--color-amber-700);
+  }
+  .acc-feed-note > svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+  }
+
+  /*
+   * One card per product, in a grid — the layout the owner picked on desktop
+   * (v199: "Desktop ar home screen aita sundor basi...aitai rakho"). v198's
+   * first cut had it and broke numbers mid-digit ("6,82 / 1", "44,9 / 43")
+   * because four figures did not fit a third of the page. Now a figure never
+   * wraps: each cell is a size container and the number scales to its cell,
+   * and the two money cards (iTopup) lay their figures out two across.
+   */
+  .acc-flow-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 720px) {
+    .acc-flow-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1280px) {
+    .acc-flow-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .acc-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    min-width: 0;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border-hairline);
+    background: var(--surface-card, #fff);
+    box-shadow: var(--shadow-card);
+  }
+  .acc-flow-head {
+    text-align: left;
+    justify-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .acc-flow-head strong {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-neutral-900);
+    overflow-wrap: anywhere;
+  }
+  .acc-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-700);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .acc-chip.is-bad {
+    background: var(--color-rose-50);
+    color: var(--color-rose-700);
+  }
+  .acc-chip.is-muted {
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .acc-metrics {
+    display: grid;
+    gap: 0.375rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .acc-metrics.is-four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (min-width: 420px) {
+    .acc-metrics.is-four {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  .acc-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+    padding: 0.5rem 0.45rem;
+    border-radius: var(--radius-control);
+    background: var(--color-neutral-50);
+    container-type: inline-size;
+  }
+  .acc-metrics.is-money {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .acc-metric-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    line-height: 1.25;
+  }
+  .acc-metric-value {
+    /* Scales to its own cell, so "44,943" fits a quarter of a card. */
+    font-size: clamp(0.85rem, 26cqi, 1.15rem);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-neutral-900);
+    font-variant-numeric: tabular-nums;
+    /* Digits never break mid-number: "44,9 / 43" is a wrong number printed
+       confidently (v183). A long iTopup figure shrinks its cell instead. */
+    white-space: nowrap;
+  }
+  .acc-metric-sub {
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .acc-metric.is-muted .acc-metric-value {
+    color: var(--text-muted);
+  }
+  .acc-metric.is-good {
+    background: var(--color-success-50);
+  }
+  .acc-metric.is-good .acc-metric-value {
+    color: var(--color-success-800);
+  }
+  .acc-flow-note {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+  }
+  .acc-flow-note > svg {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+  .acc-flow-note.is-warn {
+    color: var(--color-amber-700);
+  }
+  .acc-flow-note a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-weight: 650;
+    color: var(--color-brand-700);
+  }
+
+  .acc-holder-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .acc-holder-tools .ops-level-tabs {
+    margin-bottom: 0;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .acc-holder-search {
+    flex: 1 1 12rem;
+    min-width: 0;
+    max-width: 22rem;
+  }
+  .acc-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.75rem;
+    font-size: 0.8rem;
+    color: var(--color-neutral-700);
+    cursor: pointer;
+  }
+  .acc-toggle > input {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--color-brand-700);
+  }
+
+  .acc-holder-list {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border-hairline);
+    background: var(--surface-card, #fff);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+  .acc-holder + .acc-holder {
+    border-top: 1px solid var(--color-neutral-100);
+  }
+  .acc-holder > summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.375rem;
+    padding: 0.75rem 1rem;
+    min-height: 2.75rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  .acc-holder > summary::-webkit-details-marker {
+    display: none;
+  }
+  .acc-holder > summary:hover {
+    background: var(--color-neutral-50);
+  }
+  .acc-holder[open] > summary {
+    background: var(--color-brand-50);
+  }
+  @media (min-width: 900px) {
+    .acc-holder > summary {
+      grid-template-columns: minmax(10rem, 1.2fr) minmax(0, 1.6fr) auto;
+      align-items: center;
+      gap: 1rem;
+    }
+  }
+  .acc-holder-who {
+    min-width: 0;
+  }
+  .acc-holder-who strong {
+    display: block;
+    font-size: 0.88rem;
+    color: var(--color-neutral-900);
+    overflow-wrap: anywhere;
+  }
+  .acc-holder-who em {
+    display: block;
+    font-size: 0.72rem;
+    font-style: normal;
+    color: var(--text-muted);
+  }
+  .acc-holder-hand {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  .acc-holder-figs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.875rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .acc-holder-figs b {
+    color: var(--color-neutral-900);
+    font-variant-numeric: tabular-nums;
+  }
+  .acc-holder-figs .is-owing b {
+    color: var(--color-rose-700);
+  }
+  .acc-holder-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.25rem 1rem 0.875rem;
+    background: var(--color-brand-50);
+  }
+  .acc-holder-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    background: var(--surface-card, #fff);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+  }
+  .acc-holder-table th,
+  .acc-holder-table td {
+    padding: 0.45rem 0.625rem;
+    border-bottom: 1px solid var(--color-neutral-100);
+    text-align: left;
+  }
+  .acc-holder-table thead th {
+    font-size: 0.7rem;
+    font-weight: 650;
+    color: var(--text-muted);
+  }
+  .acc-holder-table tbody th {
+    font-weight: 600;
+    color: var(--color-neutral-800);
+  }
+  .acc-holder-table .is-right {
+    text-align: right;
+  }
+  .acc-holder-table .is-bad {
+    color: var(--color-rose-700);
+  }
+  .acc-holder-link {
+    align-self: flex-start;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-brand-700);
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* ---------- v199: needs attention, last money, team ---------- */
+  .acc-attn {
+    margin: 0 0 1rem;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-amber-200);
+    background: var(--color-amber-50);
+    box-shadow: var(--shadow-card);
+  }
+  .acc-attn > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-amber-700);
+    cursor: pointer;
+    list-style: none;
+  }
+  .acc-attn > summary::-webkit-details-marker {
+    display: none;
+  }
+  .acc-attn > summary > svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+  .acc-attn > summary {
+    flex-wrap: wrap;
+  }
+  .acc-attn-kinds {
+    flex-basis: 100%;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--color-amber-700);
+  }
+  .acc-attn > summary em,
+  .acc-attn-group h3 em {
+    font-style: normal;
+    padding: 0.05rem 0.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-amber-100);
+    font-size: 0.75rem;
+  }
+  .acc-attn-grid {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0 1rem 1rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 720px) {
+    .acc-attn-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1280px) {
+    .acc-attn-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .acc-attn-group {
+    min-width: 0;
+    padding: 0.75rem;
+    border-radius: var(--radius-control);
+    background: var(--surface-card, #fff);
+    border: 1px solid var(--border-hairline);
+  }
+  .acc-attn-group h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-neutral-900);
+  }
+  .acc-attn-group ul {
+    list-style: none;
+    margin: 0.375rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  .acc-attn-group li {
+    font-size: 0.78rem;
+    color: var(--color-neutral-700);
+    overflow-wrap: anywhere;
+  }
+  .acc-attn-group li a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+    font-weight: 650;
+    color: var(--color-brand-700);
+  }
+  .acc-attn-more > summary {
+    min-height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .acc-attn-clear {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--radius-control);
+    background: var(--color-success-50);
+    border: 1px solid var(--color-success-200);
+    font-size: 0.8rem;
+    color: var(--color-success-800);
+  }
+  .acc-attn-clear > svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+  }
+  .acc-holder-figs .is-quiet b {
+    color: var(--color-amber-700);
+  }
+  .acc-holder-team {
+    grid-column: 1 / -1;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+  }
+  .acc-holder-team b {
+    color: var(--color-neutral-900);
+    font-variant-numeric: tabular-nums;
+  }
+}

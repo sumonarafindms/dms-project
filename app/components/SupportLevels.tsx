@@ -12,6 +12,16 @@ import { useMemo, useState } from "react";
 import { Card, EmptyState } from "./Kit";
 import { OpsTable } from "./OperationsPremiumUI";
 import type { SupportPersonRow } from "../../lib/sim-support-data";
+import type { SupportEarning } from "../../lib/sim-support";
+
+/** The step a person is on — one slab, or one per SIM type on a split day. */
+function stepText(e: SupportEarning) {
+  if (!e.split) return e.slab ? `From ${num(e.slab.minSims)}` : "—";
+  const parts = e.ladders
+    .filter((l) => l.slab)
+    .map((l) => `${l.tier === "GA_300" ? "300" : "170"}: ${num(l.slab!.minSims)}+ @ ${money(l.slab!.ratePerSim)}`);
+  return parts.length ? parts.join(" · ") : "—";
+}
 
 const num = (n: number) => n.toLocaleString("en-US");
 const money = (n: number) => `৳${Math.round(n).toLocaleString("en-US")}`;
@@ -95,7 +105,7 @@ export function SupportPeopleRows({ rows }: { rows: SupportPersonRow[] }) {
             SIMs
           </th>
           <th role="columnheader" scope="col">
-            Slab
+            Step
           </th>
           <th role="columnheader" scope="col" className="is-right">
             Slab pay
@@ -126,9 +136,15 @@ export function SupportPeopleRows({ rows }: { rows: SupportPersonRow[] }) {
             </td>
             <td role="cell" data-label="SIMs" className="is-right">
               {num(p.earning.sims)}
+              {p.earning.split && p.earning.sims ? (
+                <span className="kit-hint is-xs">
+                  {" "}
+                  300·{num(p.earning.ga300)} 170·{num(p.earning.ga170)}
+                </span>
+              ) : null}
             </td>
-            <td role="cell" data-label="Slab">
-              {p.earning.slab ? `From ${num(p.earning.slab.minSims)}` : "—"}
+            <td role="cell" data-label="Step">
+              {stepText(p.earning)}
             </td>
             <td role="cell" data-label="Slab pay" className="is-right">
               {p.earning.slabAmount ? money(p.earning.slabAmount) : "—"}

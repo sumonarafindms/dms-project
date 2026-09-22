@@ -145,14 +145,22 @@ export function LiftingEntryForm({
   );
 }
 
-export function LiftingList({ rows }: { rows: LiftingEntry[] }) {
+export function LiftingList({ rows, canWrite }: { rows: LiftingEntry[]; canWrite: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
+  /*
+   * v199: only Accounts writes, so only Accounts sees Remove — Admin and IT
+   * were shown a button the server refused, and the refusal was swallowed.
+   * A failure is now said out loud.
+   */
   async function remove(id: string) {
     setBusy(id);
-    await apiSend("/api/stock/lifting", "DELETE", { id });
+    setError("");
+    const r = await apiSend("/api/stock/lifting", "DELETE", { id });
     setBusy(null);
+    if (!r.ok) return setError(r.message);
     router.refresh();
   }
 
@@ -167,6 +175,7 @@ export function LiftingList({ rows }: { rows: LiftingEntry[] }) {
 
   return (
     <div className="kit-table-wrap">
+      {error && <p className="kit-note is-bad">{error}</p>}
       <table className="kit-report-table" role="table">
         <thead>
           <tr role="row">
@@ -185,9 +194,11 @@ export function LiftingList({ rows }: { rows: LiftingEntry[] }) {
             <th role="columnheader" scope="col" className="is-right">
               Value
             </th>
-            <th role="columnheader" scope="col" className="is-right">
-              Action
-            </th>
+            {canWrite && (
+              <th role="columnheader" scope="col" className="is-right">
+                Action
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -210,11 +221,13 @@ export function LiftingList({ rows }: { rows: LiftingEntry[] }) {
               <td role="cell" data-label="Value" className="is-right">
                 {fmtMoney(r.value)}
               </td>
-              <td role="cell" data-label="Action" className="is-right">
-                <Btn size="sm" variant="ghost" disabled={busy === r.id} onClick={() => remove(r.id)}>
-                  Remove
-                </Btn>
-              </td>
+              {canWrite && (
+                <td role="cell" data-label="Action" className="is-right">
+                  <Btn size="sm" variant="ghost" disabled={busy === r.id} onClick={() => remove(r.id)}>
+                    Remove
+                  </Btn>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -233,7 +246,7 @@ export function LiftingList({ rows }: { rows: LiftingEntry[] }) {
  * the screen.
  */
 export function GodownTable({ lines }: { lines: HouseLine[] }) {
-  const held = lines.filter((l) => l.liftedQty || l.issuedQty || l.inGodown);
+  const held = lines.filter((l) => l.liftedQty || l.withPeopleQty || l.inGodown);
   if (!held.length)
     return (
       <EmptyState
@@ -281,7 +294,7 @@ export function GodownTable({ lines }: { lines: HouseLine[] }) {
                   {qty(l.liftedQty)}
                 </td>
                 <td role="cell" data-label="Out with people" className="is-right">
-                  {qty(l.issuedQty)}
+                  {qty(l.withPeopleQty)}
                 </td>
                 <td role="cell" data-label="In godown" className="is-right">
                   {l.inGodown < 0 ? <span className="kit-due is-owing">{qty(l.inGodown)}</span> : qty(l.inGodown)}
@@ -289,8 +302,9 @@ export function GodownTable({ lines }: { lines: HouseLine[] }) {
                 <td role="cell" data-label="Avg cost" className="is-right">
                   {l.avgCost > 0 ? fmtMoney(l.avgCost) : <span className="kit-cell-unset">—</span>}
                 </td>
+                {/* v195: a product with no lifting cost has no value to print — never ৳0. */}
                 <td role="cell" data-label="Godown value" className="is-right">
-                  {fmtMoney(l.godownValue)}
+                  {l.hasCost ? fmtMoney(l.godownValue) : <span className="kit-cell-unset">no cost yet</span>}
                 </td>
               </tr>
             );

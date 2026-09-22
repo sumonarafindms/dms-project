@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_LINE_QTY, isYmd } from "../../../../lib/business-time";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
@@ -27,7 +28,8 @@ import { paisa, priceOn, type HolderType, type MoveKind } from "../../../../lib/
  *
  * Written into the row, here, once. Never looked up again.
  *
- *   GIVEN and SOLD  the price in force ON THE DATE BEING ENTERED. Not today's
+ *   GIVEN and SOLD  a NEW line: the price in force ON THE DATE BEING ENTERED;
+ *                   a line already saved keeps its own (v199). Not today's
  *                   — correcting a day from before a price change must use the
  *                   price that applied then, which is the whole point.
  *   RETURNED        what the CALLER sends, because a return clears stock at the
@@ -47,8 +49,13 @@ const isHolderType = (v: string): v is HolderType => v === "RSO" || v === "SUPER
 function quantity(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === "") return 0;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n);
+  /*
+   * v199: whole numbers only. 2.5 used to be rounded to 3 here while the
+   * screen's "Due after saving" had valued 2.5 — two different figures for
+   * one entry, and the saved one nobody had seen.
+   */
+  if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n) || n > MAX_LINE_QTY) return null;
+  return n;
 }
 
 function money(raw: unknown): number | null {
@@ -72,7 +79,7 @@ export async function POST(req: Request) {
   const holderId = String(b.holderId || "");
   const date = String(b.date || "");
   if (!isHolderType(holderType) || !holderId) return NextResponse.json({ error: "Which person?" }, { status: 400 });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: "Which date?" }, { status: 400 });
+  if (!isYmd(date)) return NextResponse.json({ error: "Which date?" }, { status: 400 });
 
   const holder = await findHolder(holderType, holderId);
   if (!holder) return NextResponse.json({ error: "That person no longer exists." }, { status: 404 });
@@ -111,6 +118,28 @@ export async function POST(req: Request) {
       ),
     );
   const nameOf = new Map(known.map((p) => [p.id, p.subType]));
+  /** The highest price each product has ever had — the ceiling a return price is checked against. */
+  const highest = new Map(known.map((p) => [p.id, Math.max(0, ...p.prices.map((x) => Number(x.price)))]));
+
+  /*
+   * v199: what is ALREADY saved for this day keeps its price.
+   *
+   * The form sends every line on every save, and this route used to re-price
+   * each one at the price in force on the date. So re-opening 10 Sep just to
+   * add a bank reference, after a price had been back-dated to 1 Sep, quietly
+   * raised the due by the difference on every line — the very thing the
+   * Products page promises cannot happen. A line that exists keeps its
+   * snapshot; only a NEW line takes the day's price. To re-price a day on
+   * purpose, clear the line, save, and enter it again.
+   */
+  const saved = new Map(
+    (
+      await prisma.stockMovement.findMany({
+        where: { holderType, holderId, date: at, kind: { in: ["GIVEN", "SOLD"] } },
+        select: { productId: true, kind: true, unitPrice: true },
+      })
+    ).map((m) => [`${m.productId}|${m.kind}`, Number(m.unitPrice)]),
+  );
 
   const writes: ReturnType<typeof prisma.stockMovement.upsert>[] = [];
   const deletes: ReturnType<typeof prisma.stockMovement.deleteMany>[] = [];
@@ -121,7 +150,8 @@ export async function POST(req: Request) {
     const kind = String(line.kind || "") as MoveKind;
     if (!productId || !KINDS.includes(kind)) return NextResponse.json({ error: "Unknown line." }, { status: 400 });
     const qty = quantity(line.qty);
-    if (qty === null) return NextResponse.json({ error: "A quantity cannot be negative." }, { status: 400 });
+    if (qty === null)
+      return NextResponse.json({ error: "A quantity is a whole number, zero or more." }, { status: 400 });
 
     const where = {
       holderType_holderId_date_productId_kind: { holderType, holderId, date: at, productId, kind },
@@ -141,8 +171,22 @@ export async function POST(req: Request) {
       const sent = money(line.unitPrice);
       if (sent === null) return NextResponse.json({ error: "A return price cannot be negative." }, { status: 400 });
       unitPrice = line.unitPrice === undefined || line.unitPrice === "" ? (onDate.get(productId) ?? null) : sent;
+      /*
+       * v199: the sanity check the comment above always promised. A return
+       * credited at more than one and a half times anything the product has
+       * EVER cost is a typo — ৳2,000 for ৳200 — and would wipe out ten times
+       * the stock's value from the due.
+       */
+      const ceiling = highest.get(productId) || 0;
+      if (unitPrice !== null && ceiling > 0 && unitPrice > ceiling * 1.5)
+        return NextResponse.json(
+          {
+            error: `The return price for ${nameOf.get(productId) || "that product"} (৳${unitPrice}) is far above anything it has ever cost (৳${ceiling}). Check the figure.`,
+          },
+          { status: 400 },
+        );
     } else {
-      unitPrice = onDate.get(productId) ?? null;
+      unitPrice = saved.get(`${productId}|${kind}`) ?? onDate.get(productId) ?? null;
     }
     if (unitPrice === null || !(unitPrice > 0))
       return NextResponse.json(

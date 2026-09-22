@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isYmd } from "../../../../lib/business-time";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
@@ -28,6 +29,18 @@ import { PRODUCT_CATEGORIES, paisa, type ProductCategory } from "../../../../lib
  */
 
 const isCategory = (v: string): v is ProductCategory => (PRODUCT_CATEGORIES as readonly string[]).includes(v);
+
+/*
+ * v198: which company activations a SIM shows up as. Blank is a real answer —
+ * "not linked" — and the Accounts home says so rather than showing 0.
+ */
+const ACTIVATION_TYPES = ["GA_170", "GA_300", "SIM_SWAP"] as const;
+type ActivationType = (typeof ACTIVATION_TYPES)[number];
+function parseActivation(raw: unknown): ActivationType | null | "bad" {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const v = String(raw);
+  return (ACTIVATION_TYPES as readonly string[]).includes(v) ? (v as ActivationType) : "bad";
+}
 
 function validPrice(raw: unknown): number | null {
   const n = Number(raw);
@@ -62,15 +75,18 @@ export async function POST(req: Request) {
 
   if (!isCategory(category)) return NextResponse.json({ error: "Which kind of product?" }, { status: 400 });
   if (!subType) return NextResponse.json({ error: "Give the product a name." }, { status: 400 });
+  const activationType = category === "SIM" ? parseActivation(b.activationType) : null;
+  if (activationType === "bad")
+    return NextResponse.json({ error: "A SIM activates as GA 170, GA 300 or a SIM swap." }, { status: 400 });
   if (price === null) return NextResponse.json({ error: "A price must be more than zero." }, { status: 400 });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom))
-    return NextResponse.json({ error: "When does this price start?" }, { status: 400 });
+  if (!isYmd(effectiveFrom)) return NextResponse.json({ error: "When does this price start?" }, { status: 400 });
 
   const product = await prisma.product.create({
     data: {
       category,
       subType,
       unitLabel: unitLabel || null,
+      activationType,
       createdById: me.id,
       prices: {
         create: { price, effectiveFrom: new Date(`${effectiveFrom}T00:00:00.000Z`), createdById: me.id },
@@ -104,9 +120,24 @@ export async function PATCH(req: Request) {
 
   const current = await prisma.product.findUnique({
     where: { id },
-    select: { id: true, subType: true, unitLabel: true, status: true },
+    select: { id: true, subType: true, unitLabel: true, status: true, category: true },
   });
   if (!current) return NextResponse.json({ error: "That product no longer exists." }, { status: 404 });
+
+  /* Which activations a SIM shows up as. A label for a report; no money reads it. */
+  if (b.activationType !== undefined) {
+    const activationType = parseActivation(b.activationType);
+    if (activationType === "bad" || (current.category !== "SIM" && activationType !== null))
+      return NextResponse.json({ error: "Only a SIM activates, as GA 170, GA 300 or a SIM swap." }, { status: 400 });
+    await prisma.product.update({ where: { id }, data: { activationType } });
+    await audit(me, "SET_PRODUCT_ACTIVATION", "stock", {
+      targetType: "Product",
+      targetId: id,
+      targetName: current.subType,
+      metadata: { activationType },
+    });
+    return NextResponse.json({ ok: true, id });
+  }
 
   /* Retiring changes nothing historical — the movements keep their own prices. */
   if (b.status !== undefined) {
@@ -128,8 +159,7 @@ export async function PATCH(req: Request) {
     const price = validPrice(b.price);
     if (price === null) return NextResponse.json({ error: "A price must be more than zero." }, { status: 400 });
     const effectiveFrom = String(b.effectiveFrom || "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom))
-      return NextResponse.json({ error: "When does the new price start?" }, { status: 400 });
+    if (!isYmd(effectiveFrom)) return NextResponse.json({ error: "When does the new price start?" }, { status: 400 });
     const from = new Date(`${effectiveFrom}T00:00:00.000Z`);
 
     /*
@@ -179,8 +209,7 @@ export async function DELETE(req: Request) {
   const b = (await req.json()) as Record<string, unknown>;
   const productId = String(b.productId || "");
   const effectiveFrom = String(b.effectiveFrom || "");
-  if (!productId || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom))
-    return NextResponse.json({ error: "Which price?" }, { status: 400 });
+  if (!productId || !isYmd(effectiveFrom)) return NextResponse.json({ error: "Which price?" }, { status: 400 });
 
   const from = new Date(`${effectiveFrom}T00:00:00.000Z`);
   const count = await prisma.productPrice.count({ where: { productId } });

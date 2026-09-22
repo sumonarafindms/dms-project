@@ -181,7 +181,9 @@ describe("the nav's own columns are equal", () => {
        */
       expect(SHELL_CODE).not.toMatch(/bottom = configs\[key\]\.nav\.slice\(/);
       expect(SHELL_CODE, "the bar's contents come from bottomSlots, nowhere else").toMatch(
-        /const bar = bottomSlots\(visibleBottom, path, active\)/,
+        // `isActive` since v196: the one "most specific item wins" rule the
+        // sidebar and More sheet also use — see activeAmong in lib/bottom-nav.ts.
+        /const bar = bottomSlots\(visibleBottom, path, isActive\)/,
       );
     });
   });

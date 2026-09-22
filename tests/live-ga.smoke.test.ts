@@ -211,10 +211,19 @@ describe("the menu entry", () => {
      */
     const entries = [...shell.matchAll(/href: "\/live-ga"/g)].length;
     expect(entries, `only ${entries} role menus have Live GA`).toBeGreaterThanOrEqual(6);
+    /*
+     * Each role's WHOLE menu, from its home entry to the end of its nav list —
+     * not a fixed window after the home entry. The window was 260 characters
+     * until v195, which quietly turned "every role has Live GA" into "every
+     * role has Live GA second": Accounts' menu grew its stock entries ahead of
+     * it (they are now most of that role's day), and the rule the owner set —
+     * present in every role's menu — still holds.
+     */
     for (const anchor of ['"/manager"', '"/supervisor"', '"/accounts"', '"/rso"', '"/bp"']) {
       const i = shell.indexOf(`href: ${anchor},`);
       expect(i, `no nav block found for ${anchor}`).toBeGreaterThan(0);
-      expect(shell.slice(i, i + 260), `${anchor}'s menu has no Live GA`).toMatch(/live-ga/);
+      const end = shell.indexOf("\n    ],", i);
+      expect(shell.slice(i, end), `${anchor}'s menu has no Live GA`).toMatch(/live-ga/);
     }
   });
 

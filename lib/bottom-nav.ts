@@ -69,3 +69,31 @@ export function bottomSlots<T extends BottomItem>(
   const inBar = new Set(shown.map((i) => i.href));
   return { shown, overflow: items.filter((i) => !inBar.has(i.href)), hasMore: true };
 }
+
+export function active(path: string, href: string) {
+  const homes = new Set(["/dashboard", "/manager", "/supervisor", "/accounts", "/rso", "/bp"]);
+  if (homes.has(href)) return path === href;
+  return path === href || (href !== "/" && path.startsWith(href + "/"));
+}
+/**
+ * "Is this the item for the page I am on", asked of a whole menu at once.
+ *
+ * `active` alone matches by prefix, so on /stock/daily BOTH "Stock & Cash"
+ * (/stock) and "Daily Entry" (/stock/daily) matched and both lit up — the
+ * owner's report, *"akta click korle 2ta menu select hoye thake"*. The same
+ * had been true of Operations and SC & Targets since v144, and of Sim Support
+ * and Support Codes since v190; the stock module just made it impossible to
+ * miss, with eight entries under one prefix.
+ *
+ * The rule: an item is active only if no OTHER item in the same menu matches
+ * the page more specifically. A prefix still counts when nothing more specific
+ * exists — a ledger at /stock/RSO/… has no entry of its own, so Stock & Cash
+ * stays lit, which is the parent a person expects.
+ *
+ * Every consumer — sidebar, bottom bar, More sheet, admin groups — takes this
+ * one function, so they cannot disagree about which item is current.
+ */
+export function activeAmong(hrefs: readonly string[]) {
+  return (path: string, href: string) =>
+    active(path, href) && !hrefs.some((h) => h.length > href.length && active(path, h));
+}

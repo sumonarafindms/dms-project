@@ -16,6 +16,7 @@ import { fmtMoney } from "../../../../lib/format";
 import { findHolder, holderHistory, holderPosition, mayOpen, stockScope } from "../../../../lib/stock-data";
 import { HOLDER_TYPE_LABEL, dueTone, type HolderType } from "../../../../lib/stock";
 import { Card, LinkBtn, PageHeader, SectionHead, SummaryStrip } from "../../../components/Kit";
+import { ReportActionBar } from "../../../components/ReportShell";
 import { Icon } from "../../../components/icons";
 import { DueBadge, StockHistoryTable, StockLineTable } from "../../../components/StockViews";
 
@@ -104,9 +105,18 @@ export default async function HolderLedger({ params }: { params: Promise<{ type:
         </dl>
       </Card>
 
+      <ReportActionBar
+        exportHref={`/api/stock/export?report=stock&type=${holder.type}&id=${holder.id}`}
+        rowCount={position.lines.length}
+      />
+      {/*
+       * v195: this line used to say "each price version is its own line", which
+       * was v192's model and has been false since v193 — one product, one line,
+       * each lot valued at the price it came at.
+       */}
       <SectionHead
         title="Stock"
-        sub="Each price version is its own line — an old-price card is not a new-price card."
+        sub="One line per product. Carried at is what they hold it at — each lot at the price it came to them."
       />
       <div className="kit-mb-20">
         <StockLineTable lines={position.lines} />
