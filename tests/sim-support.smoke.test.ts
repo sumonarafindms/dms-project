@@ -394,17 +394,35 @@ describe("v198: two SIM ladders", () => {
     expect(ladder(WARRIORS, "GA_170").slabs).toHaveLength(6);
   });
 
-  it("TOTAL: the day's GA picks the step, each SIM paid at its own ladder's rate", () => {
-    // 6 × 300 + 4 × 170 = 10 GA → the 10 step: 6 × ৳75 + 4 × ৳40
-    const e = supportEarning(WARRIORS, c(6, 4));
-    expect(e.split).toBe(true);
-    expect(e.slabAmount).toBe(6 * 75 + 4 * 40);
-    expect(e.ladders.map((l) => l.stepCount)).toEqual([10, 10]);
+  /*
+   * v203 — the owner's ruling: "150 takar sim korce 4ta and 300 takar sim korce
+   * 5 ta tahole sudu 300 takar sim ar offer pabe .. 5ta sim ar jono 250 taka".
+   * The day's total never picks a step; each ladder reads its own SIMs. A
+   * scheme saved as TOTAL is read the same way.
+   */
+  it("v203: the owner's example — 4 × 170 and 5 × 300 pays the 300 offer only: ৳250", () => {
+    const offer: SupportSchemeRule = {
+      slabs: [
+        { tier: "GA_170", minSims: 5, ratePerSim: 20 },
+        { tier: "GA_300", minSims: 5, ratePerSim: 50 },
+      ],
+    };
+    const e = supportEarning(offer, c(5, 4));
+    expect(e.slabAmount).toBe(250);
+    expect(e.ladders.find((l) => l.tier === "GA_170")!.amount).toBe(0);
+    // …and so does an offer saved as TOTAL before v203.
+    expect(supportEarning({ ...offer, basis: "TOTAL" }, c(5, 4)).slabAmount).toBe(250);
   });
 
-  it("TOTAL: the 300 ladder stays on its top step past 15, the 170 ladder keeps climbing", () => {
-    const e = supportEarning(WARRIORS, c(12, 8)); // 20 GA
-    expect(e.slabAmount).toBe(12 * 100 + 8 * 70);
+  it("v203: the screenshot — 3 × 300 and 4 × 170 on '7+' steps earns nothing (it was paid ৳315)", () => {
+    const e = supportEarning(WARRIORS, c(3, 4));
+    expect(e.slabAmount).toBe(0);
+    expect(e.ladders.map((l) => l.stepCount)).toEqual([3, 4]);
+  });
+
+  it("the 300 ladder stops at its top step, the 170 ladder climbs on its own count", () => {
+    const e = supportEarning(WARRIORS, c(16, 20));
+    expect(e.slabAmount).toBe(16 * 100 + 20 * 70);
   });
 
   it("OWN: each SIM type climbs its own ladder on its own count", () => {
@@ -416,7 +434,7 @@ describe("v198: two SIM ladders", () => {
 
   it("the SSO bonus is added on top, as on a single-ladder day", () => {
     const e = supportEarning(WARRIORS, c(6, 4), 300);
-    expect(e.total).toBe(6 * 75 + 4 * 40 + 300);
+    expect(e.total).toBe(6 * 50 + 300);
   });
 
   it("a single-ladder scheme still pays exactly what it paid before the split", () => {
@@ -424,15 +442,26 @@ describe("v198: two SIM ladders", () => {
     expect(supportEarning(OWNER, 14).slabAmount).toBe(700);
   });
 
-  it("TOTAL nudge: the next shared step reprices the SIMs already done", () => {
-    // 5 + 3 = 8 GA on the 7 step (5×65 + 3×30 = 415). The 10 step: 5×75 + 3×40 = 495.
+  it("each ladder has its own next step, counted on its own SIMs", () => {
+    // 5 × 300 on the 5 step (৳250); 3 × 170 below its first step.
     const e = supportEarning(WARRIORS, c(5, 3));
-    expect(e.slabAmount).toBe(415);
-    expect(e.nextSplit).toHaveLength(1);
-    expect(e.nextSplit[0]).toMatchObject({ tier: null, atSims: 10, moreSims: 2, amount: 495, gain: 80 });
-    const [text] = supportNudges(e);
-    expect(text).toContain("2 more GA");
-    expect(text).toContain("৳80 more");
+    expect(e.slabAmount).toBe(250);
+    expect(e.nextSplit.map((s) => [s.tier, s.atSims, s.moreSims])).toEqual([
+      ["GA_300", 7, 2],
+      ["GA_170", 5, 2],
+    ]);
+  });
+
+  it("the form offers no 'total GA' choice any more, and the API stores OWN", () => {
+    const form = fs.readFileSync(path.join(__dirname, "..", "app", "components", "SupportSchemeForm.tsx"), "utf8");
+    expect(form).not.toContain('name="slabBasis"');
+    const api = fs.readFileSync(path.join(__dirname, "..", "app", "api", "support", "schemes", "route.ts"), "utf8");
+    expect(api).toContain('const basis = "OWN";');
+    const sql = fs.readFileSync(
+      path.join(__dirname, "..", "prisma", "migrations", "20260926100000_support_ladders_own_count", "migration.sql"),
+      "utf8",
+    );
+    expect(sql).toContain(`UPDATE "SupportScheme" SET "slabBasis" = 'OWN'`);
   });
 
   it("OWN nudge: one sentence per ladder, each counting its own SIMs", () => {
@@ -468,5 +497,30 @@ describe("v198: two SIM ladders", () => {
     const data = fs.readFileSync(path.join(__dirname, "..", "lib", "sim-support-data.ts"), "utf8");
     expect(data).toMatch(/withGa170\(tariff/);
     expect(data).toMatch(/withGa300\(tariff/);
+  });
+});
+
+describe("v200 review fixes", () => {
+  it("a ladder's nudge names its own support only — never the SSO bonus", () => {
+    const scheme: SupportSchemeRule = {
+      slabs: [
+        { tier: "GA_300", minSims: 5, ratePerSim: 50 },
+        { tier: "GA_170", minSims: 5, ratePerSim: 20 },
+      ],
+    };
+    // 3 × 300: two more reach the 5 step — 5 × ৳50 = ৳250, with ৳200 of SSO kept out of it.
+    const texts = supportNudges(supportEarning(scheme, { total: 7, ga300: 3, ga170: 4 }, 200));
+    expect(texts[0]).toContain("2 more 300৳ SIMs — 5 in total — takes your 300৳ SIM support to ৳250");
+    expect(texts.join(" ")).not.toContain("৳450");
+  });
+
+  it("a BP outlet held by two RSOs is paid its slab once", () => {
+    const DATA = fs.readFileSync(path.join(__dirname, "..", "lib", "sim-support-data.ts"), "utf8");
+    expect(DATA).toMatch(/if \(bpPaid\.has\(a\.retailerId\)\) continue;/);
+  });
+
+  it("an offer's day cannot be moved by editing it", () => {
+    const api = fs.readFileSync(path.join(__dirname, "..", "app", "api", "support", "schemes", "route.ts"), "utf8");
+    expect(api).toContain("An offer's day cannot be changed");
   });
 });

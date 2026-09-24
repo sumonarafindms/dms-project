@@ -203,7 +203,14 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
   if (viewer.role === "BP") {
     if (!viewer.bpRetailerId) return { ...base, total: noTiers(), scope: "Your activations", sections: [] };
     const rows = await bpRows(ymd, { retailerId: viewer.bpRetailerId });
-    return { ...base, total: sumRows(rows), scope: "Your activations", sections: [] };
+    /*
+     * v200: one outlet, however many RSOs hold it. There is a row per
+     * ASSIGNMENT, each counting the same outlet's SIMs, so adding them showed
+     * a BP held by two RSOs twice its activations. The outlet's count is the
+     * largest of them (they differ only if one assignment began mid-window).
+     */
+    const total = rows.reduce<GaTiers>((best, r) => (r.count.total > best.total ? r.count : best), noTiers());
+    return { ...base, total, scope: "Your activations", sections: [] };
   }
 
   /* --------------------------------------------------------------- RSO */
@@ -261,8 +268,13 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
       : { active: true };
 
   if (supervisorFocus) {
+    /*
+     * v200: by ID. Linking by name opened the first of two supervisors who
+     * share one — the v181 class of defect. An old name link still works when
+     * the name is unique.
+     */
     const supervisor = await prisma.supervisor.findFirst({
-      where: { ...supervisorWhere, name: supervisorFocus },
+      where: { ...supervisorWhere, OR: [{ id: supervisorFocus }, { name: supervisorFocus }] },
       select: { id: true, name: true },
     });
     if (supervisor)
@@ -308,7 +320,7 @@ export async function buildLiveGa(viewer: LiveViewer, ymd: string, supervisorFoc
         (acc, e) => addTiers(acc, totalFor(counts, byEmployee.get(e.id) ?? [])),
         noTiers(),
       ),
-      href: `/live-ga?supervisor=${encodeURIComponent(s.name)}`,
+      href: `/live-ga?supervisor=${encodeURIComponent(s.id)}`,
     }))
     .sort((x, y) => y.count.total - x.count.total || x.name.localeCompare(y.name));
 

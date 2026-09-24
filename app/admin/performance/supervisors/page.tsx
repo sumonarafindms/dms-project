@@ -83,14 +83,29 @@ export default async function Page({
    */
   const totals = groupTotals(rows, (r) => r.supervisorId);
   const sizes = groupSizes(rows, (r) => r.supervisorId);
-  for (const [supervisorId, raw] of totals) {
+  for (const [key, raw] of totals) {
+    // v200: RSOs with no (active) supervisor get their own row instead of
+    // vanishing from a page whose strip still counts them.
+    const supervisorId = key ?? "unassigned";
+    if (!map.has(supervisorId) && key === null)
+      map.set(supervisorId, {
+        id: supervisorId,
+        name: "Unassigned",
+        rsos: 0,
+        bps: new Set(),
+        target: 0,
+        achieved: 0,
+        gaT: 0,
+        gaA: 0,
+        retailers: 0,
+      });
     const x = map.get(supervisorId);
     if (!x) continue;
     // v181: achievement from the territory, target from the supervisor's own
     // row. "Total Target" in the strip below is therefore the sum of the
     // targets somebody chose, not of the RSOs' underneath them.
-    const t = withSupervisorTarget(raw, targetFor(supTargets, supervisorId));
-    x.rsos = sizes.get(supervisorId) ?? 0;
+    const t = withSupervisorTarget(raw, targetFor(supTargets, key));
+    x.rsos = sizes.get(key) ?? 0;
     x.retailers = t.retailerCount;
     x.target = t.totalRechargeTarget;
     x.achieved = t.totalRechargeAchieved;

@@ -23,7 +23,6 @@ import { Icon } from "./icons";
 import { SupportOfferMessage } from "./SupportOfferMessage";
 import { apiSend } from "@/lib/api-client";
 import {
-  SLAB_BASIS_LABEL,
   SPLIT_TIERS,
   SUPPORT_TIER_LABEL,
   ladderSlabs,
@@ -89,7 +88,6 @@ export function SupportSchemeForm({
   const [target, setTarget] = useState(start?.dailyTarget ? String(start.dailyTarget) : "");
   const [ssoRate, setSsoRate] = useState(start?.ssoRatePerSim || "");
   const [ssoMin, setSsoMin] = useState(start?.ssoMinSimsSameDay ? String(start.ssoMinSimsSameDay) : "");
-  const [basis, setBasis] = useState<SlabBasis>(start?.slabBasis || "TOTAL");
   const first = useMemo(() => laddersFrom(start), [start]);
   /*
    * A NEW offer opens on the two ladders — the owner's usual shape — even when
@@ -110,10 +108,10 @@ export function SupportSchemeForm({
       slabs: tiers.flatMap((t) => realSlabs(ladders[t], t)),
       ssoRatePerSim: Number(ssoRate) || null,
       ssoMinSimsSameDay: Number(ssoMin) || null,
-      basis,
+      basis: "OWN",
       dailyTarget: Number(target) || null,
     }),
-    [ladders, tiers, ssoRate, ssoMin, basis, target],
+    [ladders, tiers, ssoRate, ssoMin, target],
   );
 
   const drops = useMemo(() => rateDrops(scheme), [scheme]);
@@ -173,11 +171,13 @@ export function SupportSchemeForm({
       ladders[t].filter((s) => s.minSims.trim() !== "" || s.ratePerSim.trim() !== "").map((s) => ({ ...s, tier: t })),
     );
     const r = await apiSend<{ id?: string }>("/api/support/schemes", "POST", {
+      id: initial?.id,
       date,
       name,
       note,
       dailyTarget: target,
-      slabBasis: basis,
+      // v203: always — each SIM type climbs its own ladder (lib/sim-support.ts SlabBasis).
+      slabBasis: "OWN",
       ssoRatePerSim: ssoRate,
       ssoMinSimsSameDay: ssoMin,
       slabs,
@@ -214,9 +214,21 @@ export function SupportSchemeForm({
         <div className="kit-form-grid">
           <Field
             label="Day"
-            hint={edit ? "one offer per day" : "one offer per day — saving replaces any offer already set"}
+            hint={
+              edit
+                ? "fixed — to move it, create an offer for the new day"
+                : "one offer per day — saving replaces any offer already set"
+            }
           >
-            <input className="kit-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+            <input
+              className="kit-input"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              readOnly={edit}
+              aria-readonly={edit}
+            />
           </Field>
           <Field label="Today's target" hint="GA — shown to the field, pays nothing on its own">
             <NumberInput min={1} value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g. 25" />
@@ -259,22 +271,14 @@ export function SupportSchemeForm({
         </div>
 
         {mode === "SPLIT" ? (
-          <fieldset className="sup-basis">
-            <legend className="kit-label">Which GA count picks the step?</legend>
-            {(["TOTAL", "OWN"] as SlabBasis[]).map((b) => (
-              <label key={b} className={`sup-basis-opt${basis === b ? " is-on" : ""}`}>
-                <input type="radio" name="slabBasis" checked={basis === b} onChange={() => setBasis(b)} />
-                <span>
-                  <strong>{SLAB_BASIS_LABEL[b]}</strong>
-                  <em>
-                    {b === "TOTAL"
-                      ? "8 GA on the day (say 5 of 300 and 3 of 170) puts BOTH ladders on their 7 GA step."
-                      : "5 of 300 and 3 of 170 puts the 300 ladder on its 5 step; the 170 ladder is below its first."}
-                  </em>
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          /*
+           * v203: not a choice any more. The owner: "jokhon 150 takar sorto
+           * milbe tokhon 150 takar offer pabe ... aita alada hobe".
+           */
+          <p className="kit-hint is-xs sup-basis-note">
+            <b>Each SIM type counts on its own.</b> 5 of 300৳ and 4 of 170৳ puts the 300 ladder on its 5 step; the 170
+            ladder earns only when the 170৳ SIMs alone reach one of its steps.
+          </p>
         ) : null}
 
         <div className={`sup-ladders${mode === "SPLIT" ? " is-split" : ""}`}>

@@ -1,7 +1,8 @@
+import { currentGa170Tariff } from "./ga-tariff";
 import { prisma } from "./prisma";
 import { monthBounds } from "./month";
 import { parseYmd, monthStartsInRange, monthStartUtc } from "./date-range";
-import { dhakaMonth } from "./business-time";
+import { dhakaMonth, isYm } from "./business-time";
 import {
   GA_CLASSIFICATION_SELECT,
   addGaActivation,
@@ -14,7 +15,8 @@ import {
 
 export function normalizeMonth(value?: string) {
   const v = (value || dhakaMonth()).slice(0, 7);
-  return /^\d{4}-\d{2}$/.test(v) ? v : dhakaMonth();
+  // v202: isYm, not a shape check — "2026-13" passed the old regex and crashed the page.
+  return isYm(v) ? v : dhakaMonth();
 }
 export async function retailerMonthDetail(retailerId: string, month: string, fromInput?: string, toInput?: string) {
   const { start, end } = monthBounds(`${normalizeMonth(fromInput?.slice(0, 7) || month)}-01`),
@@ -63,7 +65,8 @@ export async function retailerMonthDetail(retailerId: string, month: string, fro
   if (!retailer) return null;
   // Total GA = MMSTC + MMST/MMSTS only. SIMWAP / EV-SWAP are reported separately.
   const breakdown = emptyGaBreakdown();
-  for (const x of ga) addGaActivation(breakdown, x);
+  const tariff = await currentGa170Tariff();
+  for (const x of ga) addGaActivation(breakdown, x, 1, tariff);
   const gaTotal = breakdown.total,
     ga170 = breakdown.ga170,
     ga300 = breakdown.ga300,
@@ -80,7 +83,7 @@ export async function retailerMonthDetail(retailerId: string, month: string, fro
   }
   const ssoComplete = [...gaByMonth.values()].some((n) => isSsoComplete(retailer.simSeller, n));
   const lsoComplete = c2sMonthly.some((x) => isLsoComplete(x.totalAmount, x.transactionCount));
-  const gaRows = ga.map((x) => ({ ...x, category: classifyGaActivation(x) }));
+  const gaRows = ga.map((x) => ({ ...x, category: classifyGaActivation(x, tariff) }));
   return {
     retailer,
     ga: gaRows,

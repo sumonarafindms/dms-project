@@ -408,14 +408,21 @@ describe("grouping into teams", () => {
     expect(teamTotals(rows).gaAchieved).toBe(10 + 8 + 12);
   });
 
-  it("skips rows with no group and counts the rest", () => {
+  it("puts rows with no group in their own 'unassigned' group (v200), never drops them", () => {
+    /*
+     * v200: they used to be skipped, so an RSO with no supervisor was in the
+     * company strip and in no supervisor row — the strip was 300 GA bigger
+     * than the rows under it.
+     */
     const rows = [
       { ...row({ gaAchieved: 5 }), team: "north" },
       { ...row({ gaAchieved: 7 }), team: null },
     ];
     const totals = groupTotals(rows, (r) => r.team);
-    expect([...totals.keys()]).toEqual(["north"]);
+    expect([...totals.keys()].sort()).toEqual(["north", null].sort());
+    expect(totals.get(null)!.gaAchieved).toBe(7);
     expect(groupSizes(rows, (r) => r.team).get("north")).toBe(1);
+    expect(groupSizes(rows, (r) => r.team).get(null)).toBe(1);
   });
 
   it("counts people separately from outlets", () => {

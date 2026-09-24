@@ -259,8 +259,21 @@ export async function campaignReport(
     campaign.scope === "DISTRIBUTION"
       ? progressOf(campaign.totalTarget, companyTotal)
       : (() => {
-          const total = groupTotal(employeeRows);
-          return progressOf(total.withTarget ? total.target : null, companyTotal);
+          /*
+           * v200: the WHOLE distribution's target against the whole
+           * distribution's SIMs. Summing only the rows this viewer may see put
+           * a supervisor's 10 × 25 = 250 over the company's 3,000 — "3,000 of
+           * 250 · complete". Both sides of the fraction are now company-wide.
+           */
+          let target = 0;
+          let withTarget = 0;
+          for (const e of employees) {
+            const t = targetFor(campaign, e.id, overrides);
+            if (t === null) continue;
+            target += t;
+            withTarget += 1;
+          }
+          return progressOf(withTarget ? target : null, companyTotal);
         })();
 
   return {
@@ -282,4 +295,36 @@ export async function campaignReport(
  */
 export function campaignLineFor(report: CampaignReport, employeeId: string): CampaignEmployeeRow | null {
   return report.employees.find((e) => e.employeeId === employeeId) ?? null;
+}
+
+/**
+ * A BP's own line (v200).
+ *
+ * A BP is an outlet, not an employee, so `campaignLineFor` never found one: the
+ * BP's page said the campaign "has no number for you" and its list card led
+ * with the holder RSO's target against the distribution total. The outlet's
+ * figure is already in the report — each holder carries the WHOLE outlet in
+ * `bpByRetailer` — so it is read from there once (max, not sum: two holders
+ * carry the same SIMs). A campaign's targets are per RSO, so the BP has none.
+ */
+export function campaignOutletLine(report: CampaignReport, retailerId: string): CampaignEmployeeRow | null {
+  let achieved: number | null = null;
+  for (const e of report.employees) {
+    const v = e.bpByRetailer[retailerId];
+    if (v !== undefined) achieved = Math.max(achieved ?? 0, v);
+  }
+  if (achieved === null) return null;
+  return {
+    employeeId: retailerId,
+    employeeCode: null,
+    name: "Your outlet",
+    supervisorId: null,
+    supervisor: "",
+    own: achieved,
+    bpHeld: 0,
+    bpByRetailer: {},
+    achieved,
+    target: null,
+    progress: progressOf(null, achieved),
+  };
 }

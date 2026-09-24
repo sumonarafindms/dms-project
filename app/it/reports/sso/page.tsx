@@ -57,7 +57,7 @@ export default async function SsoPending({
       paging={{
         page: sp.page,
         noun: "retailer",
-        hrefFor: (p) => reportPageHref("/it/reports/sso", { from: range.from, to: range.to }, p),
+        hrefFor: (p) => reportPageHref("/it/reports/sso", { from: range.from, to: range.to, q: sp.q }, p),
       }}
       summaryItems={[
         { label: "SIM Seller Outlets", value: sellers.toLocaleString("en-US") },

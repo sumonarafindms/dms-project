@@ -147,7 +147,7 @@ describe("the route behind it", () => {
     const limit = code.indexOf("consumeRateLimit");
     expect(limit).toBeGreaterThan(-1);
     expect(code).toMatch(/RATE_LIMITS\.credential/);
-    expect(limit, "the body is parsed before the limit is checked").toBeLessThan(code.indexOf("req.json()"));
+    expect(limit, "the body is parsed before the limit is checked").toBeLessThan(code.indexOf("readJson(req)"));
   });
 
   it("writes an audit entry that does not contain a credential", () => {

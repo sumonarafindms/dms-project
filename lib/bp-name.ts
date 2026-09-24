@@ -64,4 +64,5 @@ export const hasBpName = (source: BpNameSource) => clean(source.bpName).length >
  * operator who wanted the master file's name back had no way to ask for it.
  * Null restores the fallback, which is what an empty box should mean.
  */
-export const bpNameToStore = (input: string | null | undefined) => clean(input) || null;
+// v202: only a string is a name — `true` or `{}` from a hand-made request crashed the save.
+export const bpNameToStore = (input: unknown) => (typeof input === "string" ? clean(input).slice(0, 120) : "") || null;

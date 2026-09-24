@@ -26,6 +26,7 @@ export default async function Page() {
           meta: `${x.employeeCode || x.rsoMsisdn} · ${x.supervisor?.name || "No supervisor"}`,
           detail: `${x._count.retailers} retailers · ${x.user?.mobileNumber ? "Login active" : "No login"}`,
           editHref: `/admin/employees/rsos/${x.id}`,
+          keywords: x.rsoMsisdn,
         }))}
       />
     </main>

@@ -4,6 +4,7 @@ import { getCurrentUser } from "../../../../../lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../../lib/rate-limit";
 import { permissionModules, roleDefaults } from "../../../../../lib/permissions";
 import { audit } from "../../../../../lib/audit";
+import { readJson } from "@/lib/request-body";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await getCurrentUser();
@@ -40,13 +41,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   if (["ADMIN", "IT"].includes(user.role) || user.role === "IT")
     return NextResponse.json({ error: "Admin and IT always have full access." }, { status: 400 });
-  const body = await req.json(),
+  const body = await readJson(req),
     rows = Array.isArray(body.permissions) ? body.permissions : [];
   // Set<string>, so the guard below reads as the runtime check it is
   // rather than needing an `as any` to satisfy the narrower key union.
   const allowed = new Set<string>(permissionModules.map((m) => m.key));
   await prisma.$transaction(async (tx) => {
     for (const row of rows) {
+      if (!row || typeof row !== "object") continue; // v202: a null row crashed the save
       // Named moduleKey, not `module`: assigning to `module` inside a bundled
       // file is flagged by Next.js as able to break the build.
       const moduleKey = String(row.module || "");
@@ -80,11 +82,13 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   }
   const { id } = await params;
   const target = await prisma.user.findUnique({ where: { id }, select: { displayName: true } });
+  // v202: resetting somebody who does not exist said "ok" and wrote an audit line about them.
+  if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
   await prisma.userPermission.deleteMany({ where: { userId: id } });
   await audit(me, "RESET_PERMISSIONS", "permissions", {
     targetType: "User",
     targetId: id,
-    targetName: target?.displayName || "User",
+    targetName: target.displayName || "User",
     detail: "Reset to role defaults",
   });
   return NextResponse.json({ ok: true });

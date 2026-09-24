@@ -12,18 +12,19 @@
  */
 
 import { requireUser } from "../../../lib/auth";
-import { dhakaTodayYmd } from "../../../lib/business-time";
+import { dhakaTodayYmd, isYmd } from "../../../lib/business-time";
 import {
   allProducts,
   dayEntry,
   holderKey,
+  holderOption,
   listHolders,
   parseHolderKey,
   pricedProducts,
   stockScope,
 } from "../../../lib/stock-data";
 import { prisma } from "../../../lib/prisma";
-import { HOLDER_TYPE_LABEL, dueOf, movementValue, paisa, stockLines } from "../../../lib/stock";
+import { dueOf, movementValue, paisa, stockLines } from "../../../lib/stock";
 import { EmptyState, LinkBtn, PageHeader } from "../../components/Kit";
 import { Icon } from "../../components/icons";
 import { AppLink } from "../../components/AppLink";
@@ -60,7 +61,7 @@ export default async function DailyEntry({
       </main>
     );
 
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date || "") ? sp.date! : dhakaTodayYmd();
+  const date = isYmd(sp.date) ? sp.date : dhakaTodayYmd();
   /*
    * Priced AS AT THE DATE BEING ENTERED, not today. Correcting a day from
    * before a price change must use the price that applied then — v192 used
@@ -92,10 +93,6 @@ export default async function DailyEntry({
   const key = holderKey(holder.type, holder.id);
 
   const entry = await dayEntry(holder.type, holder.id, date);
-  // Retired products this day already has lines for stay on the form (v199).
-  const products = await pricedProducts(date, [
-    ...new Set([...Object.keys(entry.given), ...Object.keys(entry.sold), ...Object.keys(entry.returned)]),
-  ]);
 
   /*
    * The due with THIS DAY taken out of it.
@@ -130,7 +127,23 @@ export default async function DailyEntry({
     date: m.date.toISOString().slice(0, 10),
   }));
   // Every OTHER day, before and after — the running due is all-time.
-  const before = movementValue(stockLines(rows, everyProduct));
+  const otherDays = stockLines(rows, everyProduct);
+  const before = movementValue(otherDays);
+
+  /*
+   * Retired products stay on the form when this day already has lines for
+   * them (v199) — and, v200, when this person still HOLDS some. Retiring a
+   * product never checked who had it, so 50 cards of a retired ৳20 product
+   * sat on a ledger at ৳1,000 with no row anywhere to hand them back on.
+   */
+  const products = await pricedProducts(date, [
+    ...new Set([
+      ...Object.keys(entry.given),
+      ...Object.keys(entry.sold),
+      ...Object.keys(entry.returned),
+      ...otherDays.filter((l) => l.inHand !== 0).map((l) => l.product.id),
+    ]),
+  ]);
 
   /*
    * What this holder is carrying each product at on the morning of this day.
@@ -194,13 +207,7 @@ export default async function DailyEntry({
        */}
       <StockDayEntry
         key={`${key}|${date}`}
-        holders={holders.map((h) => ({
-          id: holderKey(h.type, h.id),
-          label: h.name,
-          meta: [HOLDER_TYPE_LABEL[h.type], h.code, h.supervisorName, h.inactive ? "no longer active" : null]
-            .filter(Boolean)
-            .join(" · "),
-        }))}
+        holders={holders.map(holderOption)}
         holderKey={key}
         date={date}
         products={products}
@@ -209,6 +216,12 @@ export default async function DailyEntry({
         carryPrice={carryPrice}
         godown={godownBefore}
         basePath="/stock/daily"
+        person={{
+          name: holder.name,
+          code: holder.code,
+          // v203: the receipt goes to the number they sign in with, else any number on file.
+          phone: holder.loginPhone ?? holder.phones?.[0] ?? null,
+        }}
       />
     </main>
   );

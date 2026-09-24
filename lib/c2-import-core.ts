@@ -20,6 +20,7 @@
  * once the plan runs — this is what "no stale rows" means in practice.
  */
 
+import { foldDigits } from "@/lib/format";
 import * as XLSX from "xlsx";
 import { assertRowLimit, looksLikeWorkbook } from "./upload-safety";
 import crypto from "crypto";
@@ -86,7 +87,8 @@ export function header(value: Cell) {
 
 export function numberValue(value: Cell): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  const cleaned = text(value).replace(/,/g, "");
+  // v200: Bengali digits (১২০) read as the number they are.
+  const cleaned = foldDigits(text(value)).replace(/,/g, "");
   if (!cleaned) return 0;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
@@ -117,7 +119,13 @@ const MONTHS: Record<string, number> = {
 
 export function parseHeaderDate(value: Cell): Date | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return utcDate(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+    /*
+     * v200: LOCAL getters. SheetJS builds a date cell as local midnight, so on
+     * a server running in Dhaka time the UTC getters read the day before —
+     * 01-Sep became 31 Aug and a month-to-date file was refused for spanning
+     * two months. On a UTC server the two agree, which is why it went unseen.
+     */
+    return utcDate(value.getFullYear(), value.getMonth(), value.getDate());
   }
   if (typeof value === "number" && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value);

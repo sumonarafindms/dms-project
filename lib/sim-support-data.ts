@@ -78,7 +78,8 @@ export function schemeRule(row: {
     slabs: row.slabs.map((s) => ({ minSims: s.minSims, ratePerSim: Number(s.ratePerSim), tier: s.tier ?? "ALL" })),
     ssoRatePerSim: row.ssoRatePerSim === null || row.ssoRatePerSim === undefined ? null : Number(row.ssoRatePerSim),
     ssoMinSimsSameDay: row.ssoMinSimsSameDay,
-    basis: row.slabBasis ?? "TOTAL",
+    // v203: read as OWN whatever an old row says (lib/sim-support.ts SlabBasis).
+    basis: "OWN",
     dailyTarget: row.dailyTarget ?? null,
   };
 }
@@ -318,8 +319,18 @@ export async function supportDay(dateYmd: string, scopeTo?: (employeeId: string)
   }
 
   /* ---------------- BPs ---------------- */
+  /*
+   * v200: ONE row per outlet. A BP can be held by two RSOs at once (v142), and
+   * a hand-over from one RSO to another puts both assignments on the same day
+   * (the old one ends that day, the new one starts it). One row per
+   * ASSIGNMENT paid the outlet's slab twice. The BP is the outlet; it is paid
+   * once, shown under the first holder the viewer may see.
+   */
+  const bpPaid = new Set<string>();
   for (const a of bpAssignments) {
     if (!inScope(a.employeeId)) continue;
+    if (bpPaid.has(a.retailerId)) continue;
+    bpPaid.add(a.retailerId);
     const counted = outletSims(a.retailerId);
     const sims = { total: counted.sims, ga170: counted.ga170, ga300: counted.ga300 };
     people.push({

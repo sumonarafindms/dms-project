@@ -18,6 +18,8 @@ type Holder = {
   supervisorName: string | null;
   supervisorId?: string | null;
   inactive?: boolean;
+  /** v201: every number this person is known by, for the search. */
+  phones?: string[];
 };
 
 export type ActivationType = "GA_170" | "GA_300" | "SIM_SWAP";
@@ -27,6 +29,8 @@ export type OverviewProduct = {
   id: string;
   category: ProductCategory;
   subType: string;
+  /** v201: the owner's own kind name, for category OTHER ("Smart watch"). */
+  kindName?: string | null;
   activationType: ActivationType | null;
   active: boolean;
 };
@@ -55,7 +59,7 @@ export type OverviewPeriod = {
 };
 
 /** The five shelves the page is laid out in, in the owner's order. */
-export type ShelfKey = "SIM_NORMAL" | "SIM_SWAP" | "CARD" | "ITOPUP" | "DEVICE";
+export type ShelfKey = "SIM_NORMAL" | "SIM_SWAP" | "CARD" | "ITOPUP" | "DEVICE" | "OTHER";
 
 export const SHELF_LABEL: Record<ShelfKey, string> = {
   SIM_NORMAL: "Normal SIM",
@@ -63,6 +67,8 @@ export const SHELF_LABEL: Record<ShelfKey, string> = {
   CARD: "Scratch cards",
   ITOPUP: "iTopup",
   DEVICE: "Routers & handsets",
+  // v201: the owner's own kinds — each card names its kind.
+  OTHER: "Other products",
 };
 
 /**
@@ -80,6 +86,7 @@ export function shelfOf(p: Pick<OverviewProduct, "category" | "subType" | "activ
   }
   if (p.category === "CARD") return "CARD";
   if (p.category === "ITOPUP") return "ITOPUP";
+  if (p.category === "OTHER") return "OTHER";
   return "DEVICE";
 }
 

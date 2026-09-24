@@ -36,6 +36,13 @@ export function businessDayBounds(ymd: string) {
   return { start, end: new Date(start.getTime() + 86400000) };
 }
 
+/*
+ * v202: years are 1900–2999. "9999-12" is a real-looking month whose END is
+ * the year 10000, which the database driver cannot even express — every page
+ * given it answered with the error screen.
+ */
+const YEAR = "(19|2\\d)\\d{2}";
+
 /**
  * A real calendar day as "YYYY-MM-DD" (v199).
  *
@@ -44,10 +51,22 @@ export function businessDayBounds(ymd: string) {
  * survives the round trip.
  */
 export function isYmd(value: unknown): value is string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  if (typeof value !== "string" || !new RegExp(`^${YEAR}-\\d{2}-\\d{2}$`).test(value)) return false;
   const d = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
 
 /** The largest quantity one line may carry — well inside a 32-bit column. */
 export const MAX_LINE_QTY = 100_000_000;
+
+/**
+ * v202: the largest amount of money one field may carry — ৳1 lakh crore, far
+ * past any real figure and well inside the Decimal(18,2) columns. Past this the
+ * database refused the value and the route answered with a 500.
+ */
+export const MAX_MONEY = 1_000_000_000_000;
+
+/** A real month as "YYYY-MM" (v200) — "2026-13" is not one. */
+export function isYm(value: unknown): value is string {
+  return typeof value === "string" && new RegExp(`^${YEAR}-(0[1-9]|1[0-2])$`).test(value);
+}

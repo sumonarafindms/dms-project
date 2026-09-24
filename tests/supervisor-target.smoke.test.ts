@@ -317,8 +317,9 @@ describe("the Target page can set one", () => {
      * target set" into "a target of zero" for all of them, silently, and
      * destroying the one distinction this whole feature rests on.
      */
-    const post = API.slice(API.indexOf("if (Array.isArray(body.supRows))"));
-    expect(post.slice(0, post.indexOf("bpRows"))).toMatch(/row\.set !== true\) continue/);
+    // v202: the rows are read through objects(), so the block starts at `if (supRows.length)`.
+    const post = API.slice(API.indexOf("if (supRows.length)"));
+    expect(post.slice(0, post.indexOf("for (const row of bpRows)"))).toMatch(/row\.set !== true\) continue/);
   });
 });
 

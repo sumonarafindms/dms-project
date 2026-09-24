@@ -2,6 +2,7 @@ import "./globals.css";
 import AppShell from "./components/AppShell";
 import { getCurrentUser } from "../lib/auth";
 import { permissionsFor } from "../lib/permissions";
+import { noticesFor } from "../lib/notices";
 import { ServiceWorker } from "./components/ServiceWorker";
 
 export const metadata = {
@@ -41,11 +42,22 @@ export const viewport = {
 };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
-  const permissions = user ? await permissionsFor(user.id, user.role) : {};
+  const [permissions, notices] = user
+    ? await Promise.all([
+        permissionsFor(user.id, user.role),
+        // v203: today's notices for the home screen. A failure here must never
+        // take the whole app down with it, so it degrades to "no notices".
+        noticesFor(user).catch(() => []),
+      ])
+    : [{}, []];
   return (
     <html lang="en">
       <body>
-        <AppShell user={user ? { displayName: user.displayName, role: user.role } : null} permissions={permissions}>
+        <AppShell
+          user={user ? { displayName: user.displayName, role: user.role } : null}
+          permissions={permissions}
+          notices={notices}
+        >
           {children}
         </AppShell>
         <ServiceWorker />

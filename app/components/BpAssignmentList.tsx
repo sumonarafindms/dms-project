@@ -36,6 +36,8 @@ export type BpListRow = {
   bpName?: string | null;
   rsoName: string;
   supervisorName: string;
+  /** v201: the outlet's iTopUp and transaction numbers and the BP's login number. Searched, not shown. */
+  phones?: string;
 };
 
 // One rule for what a BP is called, shared with every other screen.
@@ -94,7 +96,7 @@ export function BpAssignmentList({
   const shown = useMemo(
     () =>
       applySort(
-        rows.filter((b) => matchesTokens(haystack(b), deferredQuery)),
+        rows.filter((b) => matchesTokens(haystack(b), deferredQuery, b.phones || "")),
         SORTS,
         sort,
       ),
@@ -106,7 +108,7 @@ export function BpAssignmentList({
       <ListControls
         query={query}
         onQuery={setQuery}
-        placeholder="Search BP code, BP name or RSO"
+        placeholder="Search BP code, name, RSO or phone"
         sort={sortOptions(SORTS)}
         sortValue={sort}
         onSort={setSort}

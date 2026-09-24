@@ -555,7 +555,8 @@ model SupportScheme {
   /// The stricter form of the SSO offer. 1 (or null) means completing SSO is the only condition.
   ssoMinSimsSameDay Int?
   /// Split schemes: does the day's total GA pick the step, or each SIM type its own? (v198)
-  slabBasis         SupportSlabBasis @default(TOTAL)
+  /// v203: always OWN — each SIM type climbs its own ladder. TOTAL is kept only as an enum value.
+  slabBasis         SupportSlabBasis @default(OWN)
   /// "আজকের টার্গেট: 25+ GA". Shown to the field; pays nothing on its own. (v198)
   dailyTarget       Int?
   active            Boolean          @default(true)
@@ -623,6 +624,8 @@ enum ProductCategory {
   HANDSET
   /// The recharge float. See the note on Product.unitLabel.
   ITOPUP
+  /// v201: a kind the owner names himself — "Smart watch". The name is Product.kindName.
+  OTHER
 }
 
 enum ProductStatus {
@@ -691,6 +694,8 @@ model Product {
   subType        String
   /// What one unit is called on screen: "pc", "card", "Tk". Display only.
   unitLabel      String?
+  /// v201: the kind's own name when category is OTHER ("Smart watch"). Null otherwise.
+  kindName       String?
   /// SIMs only (v198): which company activations this SIM shows up as, so the
   /// Accounts home can put "activated" beside "sold". Null: not linked.
   activationType SimActivationType?
@@ -891,6 +896,8 @@ model Expense {
   id          String          @id @default(cuid())
   date        DateTime        @db.Date
   category    ExpenseCategory
+  /// v201: the owner's own expense type when category is OTHER ("Internet", "Rent").
+  label       String?
   amount      Decimal         @db.Decimal(18, 2)
   paidFrom    PaidFrom        @default(CASH)
   payee       String?
@@ -901,4 +908,30 @@ model Expense {
 
   @@index([date])
   @@index([category, date])
+}
+
+/**
+ * v203 — a notice on the board: an offer, a meeting, a rule, posted by Admin,
+ * IT, a Manager or Accounts and shown at the top of each reader's home screen
+ * until its last day or until it is taken down.
+ * `audience` is the roles it is for. `supervisorIds` narrows it to teams: a
+ * Manager's notice carries their supervisors at the moment of posting and is
+ * seen by those teams only; empty means the whole company.
+ */
+model Notice {
+  id            String    @id @default(cuid())
+  title         String
+  body          String
+  audience      String[]
+  supervisorIds String[]
+  urgent        Boolean   @default(false)
+  /// The last day it is shown. Null: until taken down.
+  expiresOn     DateTime? @db.Date
+  active        Boolean   @default(true)
+  createdById   String
+  createdByName String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([active, expiresOn])
 }

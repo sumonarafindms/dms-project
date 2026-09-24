@@ -1,8 +1,11 @@
+import { isYmd } from "@/lib/business-time";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
+import { hasPermission } from "../../../../lib/permissions";
 import { audit } from "../../../../lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
+import { readJson } from "@/lib/request-body";
 
 /**
  * A day's Sim Support offer: create, replace, archive.
@@ -15,7 +18,7 @@ const CAN_WRITE = ["ADMIN", "IT", "MANAGER"];
 
 function parseDay(value: unknown) {
   const s = String(value || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  if (!isYmd(s)) return null;
   const d = new Date(`${s}T00:00:00.000Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -23,7 +26,8 @@ function parseDay(value: unknown) {
 function parseMoney(value: unknown): number | null {
   if (value === null || value === undefined || String(value).trim() === "") return null;
   const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+  // v200: inside Decimal(10,2); a larger rate was a database overflow and a 500.
+  return Number.isFinite(n) && n >= 0 && n < 1_000_000 ? Math.round(n * 100) / 100 : null;
 }
 
 /**
@@ -54,7 +58,8 @@ function parseSlabs(raw: unknown) {
     if (!TIERS.includes(tier)) return { error: "A slab is for every SIM, 170৳ SIMs or 300৳ SIMs." };
     // A blank pair is an empty row in the form, not an error.
     if (!Number.isFinite(minSims) && ratePerSim === null) continue;
-    if (!Number.isFinite(minSims) || minSims < 1) return { error: "Every slab needs a GA count of 1 or more." };
+    if (!Number.isFinite(minSims) || minSims < 1 || minSims > 100_000)
+      return { error: "Every slab needs a GA count of 1 or more." };
     if (ratePerSim === null || ratePerSim <= 0) return { error: "Every slab needs a rate above zero." };
     if (slabs.some((s) => s.tier === tier && s.minSims === Math.trunc(minSims)))
       return {
@@ -76,9 +81,21 @@ function parseSlabs(raw: unknown) {
  * body, so a limiter one call deeper would leave that guard unable to see it.
  * A security control a test cannot find is one nobody notices losing.
  */
-async function writer() {
+async function writer(action: "add" | "edit" | "either") {
   const me = await getCurrentUser();
-  return me && CAN_WRITE.includes(me.role) ? me : null;
+  if (!me || !CAN_WRITE.includes(me.role)) return null;
+  /*
+   * v200: the role AND the person's own permission. The pages check
+   * requirePagePermission(..., "support", action); the API checked only the role,
+   * so a manager whose add/edit was switched off in Permissions could still
+   * post straight to this route.
+   */
+  if (action === "either")
+    return (await hasPermission(me.id, me.role, "support", "add")) ||
+      (await hasPermission(me.id, me.role, "support", "edit"))
+      ? me
+      : null;
+  return (await hasPermission(me.id, me.role, "support", action)) ? me : null;
 }
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -102,11 +119,13 @@ type Body = {
 };
 
 export async function POST(req: Request) {
-  const me = await writer();
+  // A POST creates a day's offer or replaces it; which permission it needs is
+  // decided below, once the day is known (v200).
+  const me = await writer("either");
   if (!me) return unauthorized();
   const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
   if (!rl.allowed) return tooMany(rl.retryAfterSeconds);
-  const b = (await req.json()) as Body;
+  const b = (await readJson(req)) as Body;
   const date = parseDay(b.date);
   if (!date) return NextResponse.json({ error: "Which day is this offer for?" }, { status: 400 });
   const parsed = parseSlabs(b.slabs);
@@ -120,18 +139,20 @@ export async function POST(req: Request) {
     );
 
   const minSameDay = Number(b.ssoMinSimsSameDay);
-  const basis = b.slabBasis === undefined || b.slabBasis === null || b.slabBasis === "" ? "TOTAL" : String(b.slabBasis);
-  if (basis !== "TOTAL" && basis !== "OWN")
-    return NextResponse.json({ error: "Does the total GA pick the step, or each SIM type?" }, { status: 400 });
+  /*
+   * v203: every offer is stored as OWN — each SIM type climbs its own ladder.
+   * The owner ruled the day's total never picks a step; see lib/sim-support.ts.
+   */
+  const basis = "OWN";
   const target = String(b.dailyTarget ?? "").trim() === "" ? null : Number(b.dailyTarget);
-  if (target !== null && (!Number.isFinite(target) || target < 1 || target > 100000))
+  if (target !== null && (!Number.isFinite(target) || target < 1 || target > 100_000))
     return NextResponse.json({ error: "The day's target is a GA count of 1 or more, or blank." }, { status: 400 });
   const data = {
     date,
     name: String(b.name || "").trim() || null,
     note: String(b.note || "").trim() || null,
     ssoRatePerSim,
-    ssoMinSimsSameDay: Number.isFinite(minSameDay) && minSameDay > 1 ? Math.trunc(minSameDay) : null,
+    ssoMinSimsSameDay: Number.isFinite(minSameDay) && minSameDay > 1 ? Math.min(100_000, Math.trunc(minSameDay)) : null,
     slabBasis: basis as "TOTAL" | "OWN",
     dailyTarget: target === null ? null : Math.trunc(target),
   };
@@ -145,15 +166,48 @@ export async function POST(req: Request) {
    * rather than merged: a slab removed from the form must disappear, and an
    * upsert per row would silently keep it.
    */
-  const scheme = await prisma.$transaction(async (tx) => {
-    const existing = await tx.supportScheme.findUnique({ where: { date }, select: { id: true } });
-    const row = existing
-      ? await tx.supportScheme.update({ where: { id: existing.id }, data: { ...data, active: true } })
-      : await tx.supportScheme.create({ data: { ...data, createdById: me.id } });
-    await tx.supportSlab.deleteMany({ where: { schemeId: row.id } });
-    if (slabs.length) await tx.supportSlab.createMany({ data: slabs.map((s) => ({ ...s, schemeId: row.id })) });
-    return row;
-  });
+  /*
+   * v200: an edit stays on its own day. The edit form's date was editable and
+   * this route upserts by DATE, so moving the 22 Sep offer to the 23rd left
+   * the 22nd live and paying, and silently replaced whatever the 23rd had.
+   */
+  const editingId = typeof b.id === "string" && b.id ? b.id : null;
+  if (editingId) {
+    const own = await prisma.supportScheme.findUnique({ where: { id: editingId }, select: { date: true } });
+    if (!own) return NextResponse.json({ error: "That offer no longer exists." }, { status: 404 });
+    if (own.date.getTime() !== date.getTime())
+      return NextResponse.json(
+        { error: "An offer's day cannot be changed. Create a new offer for the other day instead." },
+        { status: 400 },
+      );
+  }
+  const dayTaken = await prisma.supportScheme.findUnique({ where: { date }, select: { id: true } });
+  if (!(await hasPermission(me.id, me.role, "support", dayTaken ? "edit" : "add"))) return unauthorized();
+
+  /*
+   * v202: two first saves for the same day at the same moment both saw no
+   * offer, both created one, and the second hit the one-offer-per-day rule as
+   * a 500. The loser now gets a plain "saved a moment ago" and can re-open it.
+   */
+  let scheme;
+  try {
+    scheme = await prisma.$transaction(async (tx) => {
+      const existing = await tx.supportScheme.findUnique({ where: { date }, select: { id: true } });
+      const row = existing
+        ? await tx.supportScheme.update({ where: { id: existing.id }, data: { ...data, active: true } })
+        : await tx.supportScheme.create({ data: { ...data, createdById: me.id } });
+      await tx.supportSlab.deleteMany({ where: { schemeId: row.id } });
+      if (slabs.length) await tx.supportSlab.createMany({ data: slabs.map((s) => ({ ...s, schemeId: row.id })) });
+      return row;
+    });
+  } catch (e) {
+    if ((e as { code?: string })?.code === "P2002")
+      return NextResponse.json(
+        { error: "Someone saved an offer for this day a moment ago. Open it again to see theirs." },
+        { status: 409 },
+      );
+    throw e;
+  }
 
   await audit(me, "SET_SUPPORT_SCHEME", "support", {
     targetType: "SupportScheme",
@@ -172,11 +226,11 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const me = await writer();
+  const me = await writer("edit");
   if (!me) return unauthorized();
   const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
   if (!rl.allowed) return tooMany(rl.retryAfterSeconds);
-  const b = (await req.json()) as Body;
+  const b = (await readJson(req)) as Body;
   const id = String(b.id || "");
   if (!id || typeof b.active !== "boolean")
     return NextResponse.json({ error: "Which offer, and on or off?" }, { status: 400 });

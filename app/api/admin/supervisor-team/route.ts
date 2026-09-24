@@ -3,6 +3,7 @@ import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { recordAssignmentChanges, type AssignmentChange } from "../../../../lib/assignment-history";
+import { readJson } from "@/lib/request-body";
 
 export async function PATCH(req: Request) {
   const me = await getCurrentUser();
@@ -12,7 +13,7 @@ export async function PATCH(req: Request) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = await req.json(),
+  const b = await readJson(req),
     supervisorId = String(b.supervisorId || ""),
     rsoIds = Array.isArray(b.rsoIds) ? b.rsoIds.map(String) : [];
   const sup = await prisma.supervisor.findUnique({ where: { id: supervisorId } });

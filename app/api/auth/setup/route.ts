@@ -3,9 +3,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../../lib/prisma";
 import { createSession, hashCredential } from "../../../../lib/auth";
 import { validatePassword } from "../../../../lib/credential-policy";
+import { readJson } from "@/lib/request-body";
 export async function POST(req: Request) {
   try {
-    const b = await req.json(),
+    const b = await readJson(req),
       displayName = String(b.displayName || "").trim(),
       username = String(b.username || "").trim(),
       password = String(b.password || "");

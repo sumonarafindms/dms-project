@@ -23,11 +23,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Btn, Card, EmptyState, Field, NumberInput, SectionHead } from "./Kit";
-import { Picker } from "./Picker";
+import { Picker, type PickerOption } from "./Picker";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
 import { fmtMoney } from "@/lib/format";
-import { PRODUCT_CATEGORY_LABEL, isMoneyProduct, lineValue, paisa, type ProductRow } from "@/lib/stock";
+import { isMoneyProduct, kindLabel, lineValue, paisa, type ProductRow } from "@/lib/stock";
 
 /** A product with the price in force on the opening date. Null: none yet. */
 export type OpeningProduct = ProductRow & { price: number | null };
@@ -40,7 +40,7 @@ export function StockOpeningForm({
   initial,
   basePath,
 }: {
-  holders: { id: string; label: string; meta?: string }[];
+  holders: PickerOption[];
   holderKey: string;
   products: OpeningProduct[];
   today: string;
@@ -106,7 +106,7 @@ export function StockOpeningForm({
               options={holders}
               value={holderKey}
               onChange={(id) => id && go(id)}
-              placeholder="Type a name or code"
+              placeholder="Type a name, code or phone"
             />
           </Field>
           <Field label="As of" hint="The day the ledger starts — prices below are as at this date">
@@ -158,7 +158,7 @@ export function StockOpeningForm({
                   <tr role="row" key={p.id}>
                     <td role="cell" data-label="Product">
                       <strong>{p.subType}</strong>
-                      <span className="kit-cell-sub">{PRODUCT_CATEGORY_LABEL[p.category]}</span>
+                      <span className="kit-cell-sub">{kindLabel(p)}</span>
                     </td>
                     <td role="cell" data-label="Price" className="is-right">
                       {fmtMoney(p.price)}
@@ -203,7 +203,21 @@ export function StockOpeningForm({
                  */
                 const build = e.target.value === "build";
                 if (build === useStockValue) return;
-                setExtra(String(build ? Math.max(0, paisa(openingDue - stockValue)) || "" : openingDue || ""));
+                /*
+                 * v200: a total BELOW the stock's value cannot be written as
+                 * "stock plus extra" without changing it (the extra would have
+                 * to be negative). Refused with a word, rather than silently
+                 * raising ৳15,000 to the ৳20,000 of stock.
+                 */
+                if (build && openingDue < stockValue) {
+                  setOk(false);
+                  setMessage(
+                    `The total (${fmtMoney(openingDue)}) is less than the stock above (${fmtMoney(stockValue)}) — keep typing the total.`,
+                  );
+                  return;
+                }
+                setMessage("");
+                setExtra(String(build ? paisa(openingDue - stockValue) || "" : openingDue || ""));
                 setUseStockValue(build);
               }}
             >

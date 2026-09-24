@@ -408,7 +408,8 @@ export async function buildDaily(
           : { RSO: blankIfDash(r.supervisor) }),
       "GA (period)": r.standardGa,
       "GA (MTD)": r.mtdGa,
-      "Monthly GA Target": r.gaTarget,
+      // v200: a blank cell for a target nobody set, as the screen shows "—".
+      "Monthly GA Target": r.gaTarget || "",
       "MTD Achievement %": r.gaTarget ? r.achievement : "",
       ...(r.hasValue ? { C2C: round(r.c2cAmount), C2S: round(r.c2sAmount) } : {}),
     })),
@@ -486,7 +487,8 @@ export const PERFORMANCE_KINDS = {
 } as const;
 export type PerformanceKind = keyof typeof PERFORMANCE_KINDS;
 
-export const isPerformanceKind = (v: string): v is PerformanceKind => v in PERFORMANCE_KINDS;
+// v202: own keys only — `"constructor" in PERFORMANCE_KINDS` is true, and the page then crashed.
+export const isPerformanceKind = (v: string): v is PerformanceKind => Object.hasOwn(PERFORMANCE_KINDS, v);
 
 export type PerformanceRow = {
   id: string;
@@ -591,7 +593,7 @@ export async function buildPerformance(
       ...r.identity,
       GA: r.achieved,
       ...(hasTargets
-        ? { "GA Target": r.target, "Achievement %": r.target ? targetPercent(r.achieved, r.target) : "" }
+        ? { "GA Target": r.target || "", "Achievement %": r.target ? targetPercent(r.achieved, r.target) : "" }
         : {
             C2C: round(r.c2c ?? 0),
             C2S: round(r.c2s ?? 0),
@@ -827,8 +829,8 @@ export async function buildLso(
       ...retailerIdentity(r),
       "C2S Value": round(r.c2s),
       "C2S Trx": r.c2sTransactions,
-      "Needs Amount": Math.max(LSO_MIN_MONTHLY_AMOUNT - r.c2s, 0),
-      "Needs Trx": Math.max(LSO_MIN_MONTHLY_TRANSACTIONS - r.c2sTransactions, 0),
+      "Needs Amount": Math.max(LSO_MIN_MONTHLY_AMOUNT - r.lsoMonthAmount, 0),
+      "Needs Trx": Math.max(LSO_MIN_MONTHLY_TRANSACTIONS - r.lsoMonthTrx, 0),
       LSO: doneOrPending(r.lsoComplete),
     })),
   };
@@ -1068,9 +1070,18 @@ export const REPORTS: Record<string, Entry> = {
 
 export type ReportKey = keyof typeof REPORTS;
 
+/**
+ * v202: a URL key names a report only if it is one of OURS. `REPORTS["constructor"]`
+ * is Object's constructor, so `?report=constructor` got past the "unknown
+ * report" check and the export answered with a 500 instead of a 404.
+ */
+function reportEntry(key: string) {
+  return Object.hasOwn(REPORTS, key) ? REPORTS[key] : undefined;
+}
+
 /** The download's filename, without extension. Mirrors what the pages used. */
 export function exportFilename(key: string, q: ExportQuery, range: ReportRange) {
-  const entry = REPORTS[key];
+  const entry = reportEntry(key);
   const suffix = q.kind ?? q.group ?? q.level ?? q.view ?? "";
   const stem = entry ? entry.stem : key;
   const middle = suffix && suffix !== "all" ? `-${suffix}` : "";
@@ -1079,7 +1090,7 @@ export function exportFilename(key: string, q: ExportQuery, range: ReportRange) 
 
 /** Build one report's spreadsheet rows from URL parameters alone. */
 export async function buildExport(key: string, q: ExportQuery) {
-  const entry = REPORTS[key];
+  const entry = reportEntry(key);
   if (!entry) return null;
   const range = resolveRange(q.from, q.to);
   const { exportRows } = await entry.build(q, range);

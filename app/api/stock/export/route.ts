@@ -21,13 +21,14 @@ import { apiUser } from "@/lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { reportWorkbook } from "@/lib/report-workbook";
 import { resolveRange } from "@/lib/report-range";
-import { dhakaTodayYmd } from "@/lib/business-time";
+import { dhakaMonth, dhakaTodayYmd, isYm, isYmd } from "@/lib/business-time";
 import { mayOpen, stockScope } from "@/lib/stock-data";
 import { BOOKS_READ_ROLES, SIM_CHECK_ROLES, simCheckScope } from "@/lib/lifting-data";
 import {
   dailyReportExport,
   expenseExport,
   holderLedgerExport,
+  holderStatementExport,
   holderStockExport,
   marginExport,
   simCheckExport,
@@ -66,6 +67,18 @@ export async function GET(req: Request) {
     const scope = await stockScope(actor);
     if (!mayOpen(scope, type, id)) return deny();
     built = await holderStockExport(scope, type, id);
+  } else if (report === "statement") {
+    // v203: one person's month — the same scope as their ledger.
+    const type = String(p("type") || "").toUpperCase();
+    const id = String(p("id") || "");
+    if (type !== "RSO" && type !== "SUPERVISOR" && type !== "BP") return deny();
+    const scope = await stockScope(actor);
+    if (!mayOpen(scope, type, id)) return deny();
+    const thisMonth = dhakaMonth();
+    const month = isYm(p("month")) && p("month")! <= thisMonth ? p("month")! : thisMonth;
+    const [y, m] = month.split("-").map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    built = await holderStatementExport(type, id, `${month}-01`, month === thisMonth ? dhakaTodayYmd() : last);
   } else if (report === "simcheck") {
     if (!SIM_CHECK_ROLES.includes(actor.role)) return deny();
     built = await simCheckExport(await simCheckScope(actor), resolveRange(p("from"), p("to")));
@@ -77,7 +90,7 @@ export async function GET(req: Request) {
     built = await expenseExport(resolveRange(p("from"), p("to")));
   } else if (report === "daily") {
     if (!books) return deny();
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(p("date") || "") ? p("date")! : dhakaTodayYmd();
+    const date = isYmd(p("date")) ? p("date")! : dhakaTodayYmd();
     built = await dailyReportExport(date);
   } else {
     return NextResponse.json({ error: "Unknown report" }, { status: 404 });

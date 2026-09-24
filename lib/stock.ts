@@ -85,8 +85,15 @@ export const MOVE_KIND_LABEL: Record<MoveKind, string> = {
   OPENING: "Opening",
 };
 
-export type ProductCategory = "SIM" | "CARD" | "ROUTER" | "HANDSET" | "ITOPUP";
-export const PRODUCT_CATEGORIES: readonly ProductCategory[] = ["SIM", "CARD", "ROUTER", "HANDSET", "ITOPUP"] as const;
+export type ProductCategory = "SIM" | "CARD" | "ROUTER" | "HANDSET" | "ITOPUP" | "OTHER";
+export const PRODUCT_CATEGORIES: readonly ProductCategory[] = [
+  "SIM",
+  "CARD",
+  "ROUTER",
+  "HANDSET",
+  "ITOPUP",
+  "OTHER",
+] as const;
 
 export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   SIM: "SIM",
@@ -94,7 +101,22 @@ export const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   ROUTER: "Router",
   HANDSET: "Handset",
   ITOPUP: "iTopup balance",
+  OTHER: "Other",
 };
+
+/**
+ * What kind of product this is, in words (v201).
+ *
+ * The five built-in kinds have fixed names. A kind the owner adds himself —
+ * *"jamon smart watch"* — is stored as OTHER with its own name, so a new line
+ * of business needs no code change: it is typed once on the Products page and
+ * every screen, report and export names it from here.
+ */
+export function kindLabel(p: { category: ProductCategory; kindName?: string | null }) {
+  return p.category === "OTHER"
+    ? p.kindName?.trim() || PRODUCT_CATEGORY_LABEL.OTHER
+    : PRODUCT_CATEGORY_LABEL[p.category];
+}
 
 /** The category whose unit is money rather than pieces. */
 export const MONEY_CATEGORY: ProductCategory = "ITOPUP";
@@ -150,6 +172,8 @@ export type ProductRow = {
   category: ProductCategory;
   subType: string;
   unitLabel?: string | null;
+  /** v201: the owner's own kind name, for category OTHER. See `kindLabel`. */
+  kindName?: string | null;
 };
 
 /** A product plus the price in force for the day being worked on. */
@@ -217,13 +241,23 @@ export function stockLines(movements: readonly MovementRow[], products: readonly
    *
    * Date order matters for the same reason: 10 at ৳100 given and sold in
    * January, then 10 at ৳50 in February — the February ten are carried at ৳50,
-   * not at a ৳75 blend of stock that is long gone. Within one day, receipts
-   * come before what goes out, which is how a day's entry reads.
+   * not at a ৳75 blend of stock that is long gone. Within one day, see below.
    */
-  const rank = (k: MoveKind) => (k === "OPENING" ? 0 : k === "GIVEN" ? 1 : k === "SOLD" ? 2 : 3);
-  const ordered = [...movements].sort(
-    (a, b) => (a.date || "").localeCompare(b.date || "") || rank(a.kind) - rank(b.kind),
-  );
+  /*
+   * v200, two ordering rules found by review:
+   *
+   *  - A person's OPENING comes first, whatever date it carries. An opening
+   *    dated today on someone with earlier entries is still where their ledger
+   *    starts; sorted by date it landed after them and skewed the carry.
+   *  - Within a day, a RETURN comes before that day's delivery. The return
+   *    price is proposed from what the person held BEFORE the day, so the
+   *    ledger must take the return out of that same stock — otherwise 10 held
+   *    at ৳100, 10 more given at ৳120 and 10 returned at the proposed ৳100
+   *    left the ledger carrying ৳1,100 against a ৳1,200 due.
+   */
+  const rank = (k: MoveKind) => (k === "OPENING" ? 0 : k === "RETURNED" ? 1 : k === "GIVEN" ? 2 : 3);
+  const dayOf = (m: MovementRow) => (m.kind === "OPENING" ? "" : m.date || "");
+  const ordered = [...movements].sort((a, b) => dayOf(a).localeCompare(dayOf(b)) || rank(a.kind) - rank(b.kind));
 
   for (const m of ordered) {
     if (!byId.has(m.productId)) continue;

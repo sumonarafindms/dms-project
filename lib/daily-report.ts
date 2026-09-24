@@ -27,8 +27,8 @@
  */
 
 import { prisma } from "./prisma";
-import { paisa, PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABEL, isMoneyProduct, type ProductCategory } from "./stock";
-import { EXPENSE_CATEGORY_LABEL, PAID_FROM_LABEL, type ExpenseCategory, type PaidFrom } from "./lifting";
+import { paisa, PRODUCT_CATEGORIES, isMoneyProduct, kindLabel, type ProductCategory } from "./stock";
+import { PAID_FROM_LABEL, expenseLabel, type ExpenseCategory, type PaidFrom } from "./lifting";
 import { fmtMoney, fmtNumber } from "./format";
 
 export type DaySalesLine = {
@@ -69,35 +69,48 @@ export type DailyReport = {
 
 const at = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
-function byCategory(rows: { category: string; qty: number; value: number }[]): DaySalesLine[] {
-  const acc = new Map<ProductCategory, { qty: number; value: number }>();
+function byCategory(rows: { category: string; kindName: string | null; qty: number; value: number }[]): DaySalesLine[] {
+  /*
+   * v201: grouped by the kind's NAME, so each of the owner's own kinds ("Smart
+   * watch", "Power bank") is its own line rather than one lump called "Other".
+   */
+  const acc = new Map<string, { category: ProductCategory; qty: number; value: number }>();
   for (const r of rows) {
     const c = r.category as ProductCategory;
-    const x = acc.get(c) || { qty: 0, value: 0 };
+    const label = kindLabel({ category: c, kindName: r.kindName });
+    const x = acc.get(label) || { category: c, qty: 0, value: 0 };
     x.qty += r.qty;
     x.value += r.value;
-    acc.set(c, x);
+    acc.set(label, x);
   }
-  return PRODUCT_CATEGORIES.filter((c) => acc.has(c)).map((c) => ({
-    category: c,
-    label: PRODUCT_CATEGORY_LABEL[c],
-    qty: acc.get(c)!.qty,
-    value: paisa(acc.get(c)!.value),
-    money: isMoneyProduct(c),
-  }));
+  return [...acc.entries()]
+    .sort(
+      ([la, a], [lb, b]) =>
+        PRODUCT_CATEGORIES.indexOf(a.category) - PRODUCT_CATEGORIES.indexOf(b.category) || la.localeCompare(lb),
+    )
+    .map(([label, x]) => ({
+      category: x.category,
+      label,
+      qty: x.qty,
+      value: paisa(x.value),
+      money: isMoneyProduct(x.category),
+    }));
 }
 
 export async function dailyReport(date: string): Promise<DailyReport> {
   const day = at(date);
 
   const [moves, deposits, expenses, lifts] = await Promise.all([
-    prisma.$queryRaw<{ kind: string; category: string; subType: string; qty: string; value: string }[]>`
-      SELECT m."kind"::text AS kind, p."category"::text AS category, p."subType" AS "subType",
+    prisma.$queryRaw<
+      { kind: string; category: string; kindName: string | null; subType: string; qty: string; value: string }[]
+    >`
+      SELECT m."kind"::text AS kind, p."category"::text AS category, p."kindName" AS "kindName",
+             p."subType" AS "subType",
              SUM(m."qty")::text AS qty,
              ROUND(SUM(m."qty" * m."unitPrice"), 2)::text AS value
         FROM "StockMovement" m JOIN "Product" p ON p."id" = m."productId"
        WHERE m."date" = ${day}::date AND m."kind" IN ('GIVEN', 'SOLD', 'RETURNED')
-       GROUP BY 1, 2, 3`,
+       GROUP BY 1, 2, 3, 4`,
     prisma.cashDeposit.findMany({
       where: { date: day },
       select: { holderType: true, holderId: true, cash: true, bank: true },
@@ -105,7 +118,7 @@ export async function dailyReport(date: string): Promise<DailyReport> {
     prisma.expense.findMany({
       where: { date: day },
       orderBy: [{ category: "asc" }, { createdAt: "asc" }],
-      select: { category: true, amount: true, paidFrom: true, payee: true, note: true },
+      select: { category: true, label: true, amount: true, paidFrom: true, payee: true, note: true },
     }),
     // v199: purchases only. An opening count is where the godown started, not
     // something bought that day — go-live day read as one enormous lifting.
@@ -118,7 +131,13 @@ export async function dailyReport(date: string): Promise<DailyReport> {
   const rowsOf = (kind: string) =>
     moves
       .filter((m) => m.kind === kind)
-      .map((m) => ({ category: m.category, subType: m.subType, qty: Number(m.qty), value: Number(m.value) }));
+      .map((m) => ({
+        category: m.category,
+        kindName: m.kindName,
+        subType: m.subType,
+        qty: Number(m.qty),
+        value: Number(m.value),
+      }));
 
   const soldRows = rowsOf("SOLD");
   const givenRows = rowsOf("GIVEN");
@@ -155,7 +174,7 @@ export async function dailyReport(date: string): Promise<DailyReport> {
 
   const items: DayExpense[] = expenses.map((e) => ({
     category: e.category as ExpenseCategory,
-    label: EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory],
+    label: expenseLabel({ category: e.category as ExpenseCategory, label: e.label }),
     amount: paisa(Number(e.amount)),
     paidFrom: e.paidFrom as PaidFrom,
     payee: e.payee,
@@ -172,7 +191,7 @@ export async function dailyReport(date: string): Promise<DailyReport> {
     .map((r) => ({
       product: r.subType,
       category: r.category as ProductCategory,
-      label: PRODUCT_CATEGORY_LABEL[r.category as ProductCategory],
+      label: kindLabel({ category: r.category as ProductCategory, kindName: r.kindName }),
       qty: r.qty,
       value: paisa(r.value),
       money: isMoneyProduct(r.category as ProductCategory),

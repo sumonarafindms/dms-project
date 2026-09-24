@@ -4,6 +4,7 @@ import { getCurrentUser, hashCredential } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
 import { validatePin } from "../../../../lib/credential-policy";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { readJson } from "@/lib/request-body";
 const roles = ["IT", "MANAGER", "SUPERVISOR", "ACCOUNTS", "RSO", "BP"] as const;
 export async function POST(req: Request) {
   const me = await getCurrentUser();
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = await req.json();
+  const b = await readJson(req);
   const role = String(b.role || "") as (typeof roles)[number];
   if (!roles.includes(role)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   const displayName = String(b.displayName || "").trim(),
@@ -89,12 +90,21 @@ export async function PATCH(req: Request) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = await req.json();
+  const b = await readJson(req);
   const id = String(b.id || "");
   if (!id) return NextResponse.json({ error: "User is required" }, { status: 400 });
 
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "Account not found." }, { status: 404 });
+  /*
+   * v200: the administrator's account is not edited from here. POST already
+   * refused to create one; PATCH never checked, so IT could set the admin's
+   * password to a six-digit PIN (skipping the 8-character password rule) and
+   * then sign in at /sacool as ADMIN — or switch the only admin off. The admin
+   * changes their own password from their own account.
+   */
+  if (existing.role === "ADMIN")
+    return NextResponse.json({ error: "The administrator account cannot be changed here." }, { status: 403 });
 
   const data: any = {};
   if (typeof b.active === "boolean") data.active = b.active;

@@ -8,7 +8,7 @@
  */
 
 import { requirePagePermission } from "../../lib/auth";
-import { dhakaTodayYmd, dhakaYesterdayYmd } from "../../lib/business-time";
+import { dhakaTodayYmd, dhakaYesterdayYmd, isYmd } from "../../lib/business-time";
 import { supportDay } from "../../lib/sim-support-data";
 import { scopeFilter, viewerScope } from "../../lib/feature-scope";
 import { prisma } from "../../lib/prisma";
@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 
 /** `?date=` is untrusted. Anything that is not a date is today. */
 function parseDate(value: string | undefined, fallback: string) {
-  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
+  return isYmd(value) ? value : fallback;
 }
 
 export default async function SupportPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {

@@ -80,7 +80,7 @@ export async function ValueReport({
         page,
         noun: group === "retailer" ? "retailer" : "row",
         hrefFor: (p) =>
-          reportPageHref(`/it/reports/${metric}`, { from: range.from, to: range.to, group: groupParam }, p),
+          reportPageHref(`/it/reports/${metric}`, { from: range.from, to: range.to, q: q, group: groupParam }, p),
       }}
       summaryItems={[
         { label: `Total ${label}`, value: money(total), tone: "brand" },

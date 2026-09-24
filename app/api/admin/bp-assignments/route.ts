@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import { audit } from "@/lib/audit";
 import { bpNameToStore } from "@/lib/bp-name";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
-import { dhakaTodayYmd } from "../../../../lib/business-time";
+import { dhakaTodayYmd, isYmd } from "../../../../lib/business-time";
+import { readJson } from "@/lib/request-body";
 function parseDay(value: unknown) {
   const s = String(value || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  if (!isYmd(s)) return null;
   const d = new Date(`${s}T00:00:00.000Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -18,11 +20,11 @@ export async function POST(req: Request) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = await req.json();
+  const b = await readJson(req);
   const employeeId = String(b.employeeId || ""),
     retailerId = String(b.retailerId || ""),
     startDate = parseDay(b.startDate),
-    gaTarget = Math.max(0, Math.trunc(Number(b.gaTarget) || 0)),
+    gaTarget = Math.min(1_000_000, Math.max(0, Math.trunc(Number(b.gaTarget) || 0))),
     /*
      * The third door onto a BP, and until v181 the only one with no name
      * field at all — so a BP created here had nothing but the master file's
@@ -77,14 +79,22 @@ export async function POST(req: Request) {
       if (bpName) await tx.retailer.update({ where: { id: retailerId }, data: { bpName } });
       return { assignment, updated: false };
     });
+    await audit(me, result.updated ? "EDIT_BP_ASSIGNMENT" : "CREATE_BP_ASSIGNMENT", "bp", {
+      targetType: "BpAssignment",
+      targetId: result.assignment.id,
+      targetName: retailer.retailerCode,
+      metadata: { retailerId, employeeId, gaTarget },
+    });
     return NextResponse.json({
       ok: true,
       id: result.assignment.id,
       code: retailer.retailerCode,
       updated: result.updated,
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Could not assign BP." }, { status: 400 });
+  } catch (e: unknown) {
+    // v200: never the raw database message — it names tables and columns.
+    console.error(e);
+    return NextResponse.json({ error: "Could not assign BP. Check the target and try again." }, { status: 400 });
   }
 }
 export async function PATCH(req: Request) {
@@ -95,7 +105,7 @@ export async function PATCH(req: Request) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = await req.json();
+  const b = await readJson(req);
   const id = String(b.id || "");
   if (!id) return NextResponse.json({ error: "Assignment is required" }, { status: 400 });
   const a = await prisma.bpAssignment.findUnique({ where: { id } });
@@ -116,6 +126,13 @@ export async function PATCH(req: Request) {
     const stillActive = await tx.bpAssignment.count({ where: { retailerId: a.retailerId, active: true } });
     if (stillActive === 0)
       await tx.user.updateMany({ where: { role: "BP", bpRetailerId: a.retailerId }, data: { bpRetailerId: null } });
+  });
+  // v200: ending an assignment moves a BP's GA to nobody — it is recorded.
+  await audit(me, "END_BP_ASSIGNMENT", "bp", {
+    targetType: "BpAssignment",
+    targetId: id,
+    detail: endDate.toISOString().slice(0, 10),
+    metadata: { retailerId: a.retailerId, employeeId: a.employeeId },
   });
   return NextResponse.json({ ok: true });
 }

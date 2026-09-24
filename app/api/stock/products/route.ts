@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { isYmd } from "../../../../lib/business-time";
+import { MAX_MONEY, isYmd } from "../../../../lib/business-time";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { STOCK_WRITE_ROLES } from "../../../../lib/stock-data";
 import { PRODUCT_CATEGORIES, paisa, type ProductCategory } from "../../../../lib/stock";
+import { readJson } from "@/lib/request-body";
 
 /**
  * The product master, and its price list.
@@ -44,8 +45,11 @@ function parseActivation(raw: unknown): ActivationType | null | "bad" {
 
 function validPrice(raw: unknown): number | null {
   const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return paisa(n);
+  if (!Number.isFinite(n)) return null;
+  // v202: judged AFTER rounding to paisa — 0.004 passed "> 0", rounded to 0 and
+  // saved a ৳0 price that Daily entry then called "no price".
+  const p = paisa(n);
+  return p > 0 && p <= MAX_MONEY ? p : null;
 }
 
 /*
@@ -66,7 +70,7 @@ export async function POST(req: Request) {
     return NextResponse.json(r.body, r.init);
   }
 
-  const b = (await req.json()) as Record<string, unknown>;
+  const b = (await readJson(req)) as Record<string, unknown>;
   const category = String(b.category || "");
   const subType = String(b.subType || "").trim();
   const unitLabel = String(b.unitLabel || "").trim();
@@ -75,6 +79,24 @@ export async function POST(req: Request) {
 
   if (!isCategory(category)) return NextResponse.json({ error: "Which kind of product?" }, { status: 400 });
   if (!subType) return NextResponse.json({ error: "Give the product a name." }, { status: 400 });
+  /*
+   * v201: a kind the owner names himself ("Smart watch") is OTHER plus its
+   * name. The name is tidied to one spelling per kind — an existing kind typed
+   * in a different case joins it rather than starting a second group.
+   */
+  let kindName: string | null = null;
+  if (category === "OTHER") {
+    const typed = String(b.kindName || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 40);
+    if (!typed) return NextResponse.json({ error: "Name the new kind — e.g. Smart watch." }, { status: 400 });
+    const same = await prisma.product.findFirst({
+      where: { category: "OTHER", kindName: { equals: typed, mode: "insensitive" } },
+      select: { kindName: true },
+    });
+    kindName = same?.kindName ?? typed;
+  }
   const activationType = category === "SIM" ? parseActivation(b.activationType) : null;
   if (activationType === "bad")
     return NextResponse.json({ error: "A SIM activates as GA 170, GA 300 or a SIM swap." }, { status: 400 });
@@ -86,6 +108,7 @@ export async function POST(req: Request) {
       category,
       subType,
       unitLabel: unitLabel || null,
+      kindName,
       activationType,
       createdById: me.id,
       prices: {
@@ -99,7 +122,7 @@ export async function POST(req: Request) {
     targetType: "Product",
     targetId: product.id,
     targetName: product.subType,
-    metadata: { category, price, from: effectiveFrom },
+    metadata: { category, kindName, price, from: effectiveFrom },
   });
   return NextResponse.json({ ok: true, id: product.id });
 }
@@ -114,7 +137,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json(r.body, r.init);
   }
 
-  const b = (await req.json()) as Record<string, unknown>;
+  const b = (await readJson(req)) as Record<string, unknown>;
   const id = String(b.id || "");
   if (!id) return NextResponse.json({ error: "Which product?" }, { status: 400 });
 
@@ -206,7 +229,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json(r.body, r.init);
   }
 
-  const b = (await req.json()) as Record<string, unknown>;
+  const b = (await readJson(req)) as Record<string, unknown>;
   const productId = String(b.productId || "");
   const effectiveFrom = String(b.effectiveFrom || "");
   if (!productId || !isYmd(effectiveFrom)) return NextResponse.json({ error: "Which price?" }, { status: 400 });

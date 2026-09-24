@@ -11,6 +11,7 @@ import { dhakaTodayYmd } from "../../../lib/business-time";
 import { resolveRange } from "../../../lib/report-range";
 import { BOOKS_WRITE_ROLES, expensesIn } from "../../../lib/lifting-data";
 import { expenseTotals } from "../../../lib/lifting";
+import { prisma } from "../../../lib/prisma";
 import { fmtMoney } from "../../../lib/format";
 import { Card, PageHeader, SectionHead, SummaryStrip } from "../../components/Kit";
 import { ReportActionBar, ReportDateBar } from "../../components/ReportShell";
@@ -32,7 +33,17 @@ export default async function ExpensesPage({
 
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const rows = await expensesIn(range);
+  const [rows, kindRows] = await Promise.all([
+    expensesIn(range),
+    // v201: the owner's own kinds used so far, offered again in the menu.
+    prisma.expense.findMany({
+      where: { category: "OTHER", label: { not: null } },
+      distinct: ["label"],
+      select: { label: true },
+      orderBy: { label: "asc" },
+    }),
+  ]);
+  const kinds = kindRows.map((k) => k.label!).filter(Boolean);
   const totals = expenseTotals(rows);
 
   // One instant for both renders — see ReportDateBar's nowIso.
@@ -56,7 +67,9 @@ export default async function ExpensesPage({
         ]}
       />
 
-      {canWrite && <ExpenseEntryForm today={dhakaTodayYmd()} />}
+      {canWrite && (
+        <ExpenseEntryForm today={dhakaTodayYmd()} kinds={kinds} shown={{ from: range.from, to: range.to }} />
+      )}
 
       {totals.byCategory.length > 0 && (
         <Card className="kit-card-p kit-mb-20">

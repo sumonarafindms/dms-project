@@ -5,19 +5,19 @@ import { monthBounds } from "@/lib/month";
 import { audit } from "@/lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { bpDisplayName } from "@/lib/bp-name";
+import { MAX_MONEY, isYm } from "@/lib/business-time";
+import { readJson } from "@/lib/request-body";
 
 function monthFromParam(value: string | null) {
   const fallback = new Date();
-  const text =
-    value && /^\d{4}-\d{2}$/.test(value)
-      ? `${value}-01T00:00:00.000Z`
-      : `${fallback.getUTCFullYear()}-${String(fallback.getUTCMonth() + 1).padStart(2, "0")}-01T00:00:00.000Z`;
+  const text = isYm(value)
+    ? `${value}-01T00:00:00.000Z`
+    : `${fallback.getUTCFullYear()}-${String(fallback.getUTCMonth() + 1).padStart(2, "0")}-01T00:00:00.000Z`;
   return monthBounds(text).start;
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await apiUser(["ADMIN", "IT"])))
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await apiUser(["ADMIN", "IT"]))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await apiPermission("targets", "view"))) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   const month = monthFromParam(request.nextUrl.searchParams.get("month"));
 
@@ -115,6 +115,24 @@ export async function GET(request: NextRequest) {
   });
 }
 
+/** v202: the list items of a body field that are objects; anything else is skipped. */
+const objects = (v: unknown) =>
+  (Array.isArray(v) ? v : []).filter(
+    (r): r is Record<string, unknown> => !!r && typeof r === "object" && !Array.isArray(r),
+  );
+/** Counts are Int columns; money is Decimal(18,2). */
+const MAX_COUNT = 1_000_000_000;
+const COUNT_FIELDS = new Set(["gaTarget", "ssoTarget", "lsoTarget"]);
+const TARGET_FIELDS = [
+  "gaTarget",
+  "c2cTarget",
+  "scTarget",
+  "totalRechargeTarget",
+  "ssoTarget",
+  "lsoTarget",
+  "scAchieved",
+];
+
 export async function POST(request: NextRequest) {
   const actor = await apiUser(["ADMIN", "IT"]);
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -125,20 +143,37 @@ export async function POST(request: NextRequest) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const body = await request.json();
-  if (!body?.month || !/^\d{4}-\d{2}$/.test(body.month) || !Array.isArray(body.rows)) {
+  const body = await readJson(request);
+  if (!isYm(body?.month) || !Array.isArray(body.rows)) {
     return NextResponse.json({ error: "Invalid month or rows" }, { status: 400 });
   }
 
   const month = monthBounds(`${body.month}-01T00:00:00.000Z`).start;
-  const employeeIds = body.rows.map((row: any) => String(row.employeeId ?? "")).filter(Boolean);
+  /*
+   * v202: rows are read defensively. A `null` in a list, or a target of 1e20,
+   * crashed the save with a 500 (the columns hold Int and Decimal(18,2)). A
+   * list item that is not an object is skipped; a figure past the column is
+   * refused by name, before anything is written.
+   */
+  const rows = objects(body.rows);
+  const supRows = objects(body.supRows);
+  const bpRows = objects(body.bpRows);
+  const tooBig = [...rows, ...supRows, ...bpRows].some((row) =>
+    TARGET_FIELDS.some((f) => {
+      const n = Number(row[f]);
+      return Number.isFinite(n) && Math.abs(n) > (COUNT_FIELDS.has(f) ? MAX_COUNT : MAX_MONEY);
+    }),
+  );
+  if (tooBig) return NextResponse.json({ error: "A target is too large. Check the figures." }, { status: 400 });
+
+  const employeeIds = rows.map((row) => String(row.employeeId ?? "")).filter(Boolean);
   const validEmployees = await prisma.employee.findMany({ where: { id: { in: employeeIds } }, select: { id: true } });
   const validIds = new Set(validEmployees.map((employee) => employee.id));
 
   let saved = 0;
   let supervisorsSaved = 0;
   await prisma.$transaction(async (tx) => {
-    for (const row of body.rows) {
+    for (const row of rows) {
       const employeeId = String(row.employeeId ?? "");
       if (!validIds.has(employeeId)) continue;
 
@@ -171,12 +206,12 @@ export async function POST(request: NextRequest) {
      * the RSO rows and then failed on the supervisors would leave the two
      * halves of one month disagreeing with each other.
      */
-    if (Array.isArray(body.supRows)) {
-      const ids = body.supRows.map((row: { supervisorId?: unknown }) => String(row.supervisorId ?? "")).filter(Boolean);
+    if (supRows.length) {
+      const ids = supRows.map((row) => String(row.supervisorId ?? "")).filter(Boolean);
       const valid = new Set(
         (await tx.supervisor.findMany({ where: { id: { in: ids } }, select: { id: true } })).map((x) => x.id),
       );
-      for (const row of body.supRows as Record<string, unknown>[]) {
+      for (const row of supRows) {
         const supervisorId = String(row.supervisorId ?? "");
         if (!valid.has(supervisorId)) continue;
         /*
@@ -203,18 +238,16 @@ export async function POST(request: NextRequest) {
         supervisorsSaved += 1;
       }
     }
-    if (Array.isArray(body.bpRows)) {
-      for (const row of body.bpRows) {
-        const assignmentId = String(row.assignmentId || "");
-        if (!assignmentId) continue;
-        const exists = await tx.bpAssignment.findUnique({ where: { id: assignmentId }, select: { id: true } });
-        if (!exists) continue;
-        await tx.bpMonthlyTarget.upsert({
-          where: { assignmentId_month: { assignmentId, month } },
-          update: { gaTarget: Math.max(0, Math.trunc(Number(row.gaTarget) || 0)) },
-          create: { assignmentId, month, gaTarget: Math.max(0, Math.trunc(Number(row.gaTarget) || 0)) },
-        });
-      }
+    for (const row of bpRows) {
+      const assignmentId = typeof row.assignmentId === "string" ? row.assignmentId : "";
+      if (!assignmentId) continue;
+      const exists = await tx.bpAssignment.findUnique({ where: { id: assignmentId }, select: { id: true } });
+      if (!exists) continue;
+      await tx.bpMonthlyTarget.upsert({
+        where: { assignmentId_month: { assignmentId, month } },
+        update: { gaTarget: Math.max(0, Math.trunc(Number(row.gaTarget) || 0)) },
+        create: { assignmentId, month, gaTarget: Math.max(0, Math.trunc(Number(row.gaTarget) || 0)) },
+      });
     }
   });
 

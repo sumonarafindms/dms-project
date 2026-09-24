@@ -80,6 +80,17 @@ export const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
   OTHER: "Other",
 };
 
+/**
+ * What an expense was for, in words (v201).
+ *
+ * The seven built-in kinds have fixed names. The owner's own kinds —
+ * "Internet", "Rent", whatever the business spends on — are stored as OTHER
+ * with their own label, so a new kind of expense needs no code change.
+ */
+export function expenseLabel(e: { category: ExpenseCategory; label?: string | null }) {
+  return e.category === "OTHER" && e.label?.trim() ? e.label.trim() : EXPENSE_CATEGORY_LABEL[e.category];
+}
+
 export type PaidFrom = "CASH" | "BANK";
 export const PAID_FROM_LABEL: Record<PaidFrom, string> = { CASH: "Cash", BANK: "Bank" };
 
@@ -338,27 +349,35 @@ export function marginPercent(margin: number, value: number): number | null {
  * Expenses
  * ------------------------------------------------------------------ */
 
-export type ExpenseRow = { category: ExpenseCategory; amount: number; paidFrom: PaidFrom };
+export type ExpenseRow = { category: ExpenseCategory; label?: string | null; amount: number; paidFrom: PaidFrom };
 
 export function expenseTotals(rows: readonly ExpenseRow[]) {
   let total = 0,
     cash = 0,
     bank = 0;
-  const byCategory = new Map<ExpenseCategory, number>();
+  // v201: grouped by what it is CALLED, so each of the owner's own kinds is its own line.
+  const byLabel = new Map<string, { category: ExpenseCategory; amount: number }>();
   for (const r of rows) {
     const amount = paisa(r.amount);
     total += amount;
     if (r.paidFrom === "BANK") bank += amount;
     else cash += amount;
-    byCategory.set(r.category, paisa((byCategory.get(r.category) || 0) + amount));
+    const label = expenseLabel(r);
+    const cur = byLabel.get(label) || { category: r.category, amount: 0 };
+    cur.amount = paisa(cur.amount + amount);
+    byLabel.set(label, cur);
   }
   return {
     total: paisa(total),
     cash: paisa(cash),
     bank: paisa(bank),
-    byCategory: EXPENSE_CATEGORIES.map((c) => ({ category: c, amount: byCategory.get(c) || 0 })).filter(
-      (x) => x.amount > 0,
-    ),
+    byCategory: [...byLabel.entries()]
+      .filter(([, x]) => x.amount > 0)
+      .sort(
+        ([la, a], [lb, b]) =>
+          EXPENSE_CATEGORIES.indexOf(a.category) - EXPENSE_CATEGORIES.indexOf(b.category) || la.localeCompare(lb),
+      )
+      .map(([label, x]) => ({ category: x.category, label, amount: x.amount })),
   };
 }
 

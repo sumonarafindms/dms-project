@@ -12,7 +12,7 @@ import { requirePagePermission } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { dhakaTodayYmd } from "../../lib/business-time";
 import { campaignRuleOrder } from "../../lib/campaign-list";
-import { campaignLineFor, campaignReport } from "../../lib/campaign-data";
+import { campaignLineFor, campaignOutletLine, campaignReport } from "../../lib/campaign-data";
 import { viewerScope, scopeFilter } from "../../lib/feature-scope";
 import { Card, EmptyState, PageHeader, SectionHead, LinkBtn } from "../components/Kit";
 import { Icon } from "../components/icons";
@@ -60,7 +60,12 @@ export default async function CampaignsPage() {
    */
   const isField = user.role === "RSO" || user.role === "BP";
   const mineOf = (r: (typeof reports)[number]) =>
-    isField && scope.selfEmployeeId ? (campaignLineFor(r, scope.selfEmployeeId)?.progress ?? null) : undefined;
+    isField && scope.selfEmployeeId
+      ? (campaignLineFor(r, scope.selfEmployeeId)?.progress ?? null)
+      : // v200: a BP leads with its own outlet's figure, not a holder RSO's target.
+        user.role === "BP" && scope.selfRetailerId
+        ? (campaignOutletLine(r, scope.selfRetailerId)?.progress ?? null)
+        : undefined;
 
   const running = ordered.filter((r) => r.phase === "RUNNING");
   const upcoming = ordered.filter((r) => r.phase === "UPCOMING");

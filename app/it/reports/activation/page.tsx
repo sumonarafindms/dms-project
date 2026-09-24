@@ -108,7 +108,7 @@ export default async function ActivationReport({
           page: sp.page,
           noun: group === "bp" ? "BP" : group,
           hrefFor: (p) =>
-            reportPageHref("/it/reports/activation", { from: range.from, to: range.to, group: groupParam }, p),
+            reportPageHref("/it/reports/activation", { from: range.from, to: range.to, q: sp.q, group: groupParam }, p),
         }}
         emptyTitle="No activation for this period"
         emptyHint="Check Data Readiness on the Reporting Center — the GA feed may not be imported for these dates."

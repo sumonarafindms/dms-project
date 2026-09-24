@@ -18,7 +18,7 @@ import { Picker } from "./Picker";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
 import { fmtMoney, fmtNumber } from "@/lib/format";
-import { isMoneyProduct, type ProductRow } from "@/lib/stock";
+import { isMoneyProduct, type ProductRow, kindLabel } from "@/lib/stock";
 import { LIFTING_KIND_LABEL, type HouseLine, type LiftingKind } from "@/lib/lifting";
 import type { LiftingEntry } from "@/lib/lifting-data";
 
@@ -90,7 +90,8 @@ export function LiftingEntryForm({
         <Field label="Product">
           <Picker
             name="productId"
-            options={products.map((p) => ({ id: p.id, label: p.subType }))}
+            // v201: the kind under each name, so "Smart watch" and a same-named SIM are told apart.
+            options={products.map((p) => ({ id: p.id, label: p.subType, meta: kindLabel(p) }))}
             value={form.productId}
             onChange={(id) =>
               setForm({ ...form, productId: id, unitCost: suggested[id] ? String(suggested[id]) : form.unitCost })

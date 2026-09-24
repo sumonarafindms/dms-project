@@ -4,6 +4,7 @@ import { getCurrentUser } from "../../../../../lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../../lib/rate-limit";
 import { permissionModules, presetPermissions } from "../../../../../lib/permissions";
 import { audit } from "../../../../../lib/audit";
+import { readJson } from "@/lib/request-body";
 
 async function admin() {
   const u = await getCurrentUser();
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = await req.json(),
+  const b = await readJson(req),
     mode = String(b.mode || "");
   if (mode === "preset") {
     const userIds = Array.isArray(b.userIds) ? b.userIds.map(String) : [],

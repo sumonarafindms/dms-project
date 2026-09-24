@@ -30,7 +30,7 @@ export default async function EditCampaign({ params }: { params: Promise<{ id: s
     }),
     prisma.employee.findMany({
       where: { active: true },
-      select: { id: true, name: true, employeeCode: true, supervisor: { select: { name: true } } },
+      select: { id: true, name: true, employeeCode: true, rsoMsisdn: true, supervisor: { select: { name: true } } },
       orderBy: [{ supervisor: { name: "asc" } }, { name: "asc" }],
     }),
   ]);
@@ -41,6 +41,7 @@ export default async function EditCampaign({ params }: { params: Promise<{ id: s
     id: e.id,
     name: e.name,
     code: e.employeeCode,
+    wallet: e.rsoMsisdn,
     supervisor: e.supervisor?.name || "Unassigned",
     // "" is "no exception"; "0" is an exception that says zero.
     override: stored.has(e.id) ? String(stored.get(e.id)) : "",

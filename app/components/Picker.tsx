@@ -48,23 +48,27 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { foldDigits } from "../../lib/format";
+import { matchesTokens } from "../../lib/text-search";
 
-export type PickerOption = { id: string; label: string; meta?: string };
+/**
+ * v201: `phone` is shown after the meta line; `keywords` is never shown. Both
+ * are numbers to find the option by, searched only by a typed number of four
+ * or more digits — see `matchesTokens`.
+ */
+export type PickerOption = { id: string; label: string; meta?: string; phone?: string; keywords?: string };
 
 /** Rendered at once. Enough to browse, small enough to stay instant. */
 export const PICKER_LIMIT = 50;
 
 export function matchOptions(options: PickerOption[], query: string) {
-  const needle = foldDigits(query.trim().toLowerCase());
+  const needle = query.trim().toLowerCase();
   if (!needle) return options;
   // Every word has to appear somewhere, in any order: "kamal 017" finds
-  // "KAMAL TELECOM · 01700000001" the way a person expects it to.
-  const words = needle.split(/\s+/);
-  return options.filter((o) => {
-    const hay = foldDigits(`${o.label} ${o.meta ?? ""}`.toLowerCase());
-    return words.every((w) => hay.includes(w));
-  });
+  // "KAMAL TELECOM · 01700000001" the way a person expects it to. A phone
+  // number matches however it is typed — +880, 880, 0 or none (v201).
+  return options.filter((o) =>
+    matchesTokens(`${o.label} ${o.meta ?? ""}`.toLowerCase(), needle, `${o.phone ?? ""} ${o.keywords ?? ""}`),
+  );
 }
 
 export function Picker({
@@ -223,7 +227,7 @@ export function Picker({
               onMouseEnter={() => setActive(i)}
             >
               <strong>{o.label}</strong>
-              {o.meta ? <small>{o.meta}</small> : null}
+              {o.meta || o.phone ? <small>{[o.meta, o.phone].filter(Boolean).join(" · ")}</small> : null}
             </li>
           ))}
           {matches.length > PICKER_LIMIT && (

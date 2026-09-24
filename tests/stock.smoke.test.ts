@@ -302,6 +302,27 @@ describe("a price change cannot reach a figure already recorded", () => {
     expect(covered.carryPrice).toBe(90);
   });
 
+  it("a return on the day of a new delivery comes out of what was held BEFORE it (v200)", () => {
+    // 10 held at ৳100; on 10 Sep 10 more at ৳120 and 10 handed back at the proposed ৳100.
+    const [l] = stockLines(
+      [mv("2026-09-01", "GIVEN", 10, 100), mv("2026-09-10", "GIVEN", 10, 120), mv("2026-09-10", "RETURNED", 10, 100)],
+      SIM,
+    );
+    expect(l.inHand).toBe(10);
+    expect(l.carryPrice).toBe(120);
+    expect(l.inHandValue).toBe(1200); // equals the ৳1,200 still owed on them
+  });
+
+  it("an opening is where the ledger starts, whatever date it carries (v200)", () => {
+    const [l] = stockLines(
+      [mv("2026-09-01", "GIVEN", 10, 120), mv("2026-09-05", "SOLD", 15, 120), mv("2026-09-20", "OPENING", 10, 100)],
+      SIM,
+    );
+    expect(l.inHand).toBe(5);
+    // 10 @ 100 + 10 @ 120 = ৳2,200 over 20; 15 out at the average ৳110 leaves 5 carried at ৳110.
+    expect(l.carryPrice).toBe(110);
+  });
+
   it("the due still uses each line's own price — only the carrying value is averaged", () => {
     const lines = stockLines(
       [mv("2026-09-01", "GIVEN", 10, 100), mv("2026-09-05", "SOLD", 9, 50), mv("2026-09-06", "RETURNED", 1, 100)],
@@ -419,7 +440,7 @@ describe("a return credits what it was lifted at", () => {
   it("re-saving a day keeps each saved line's price (v199)", () => {
     const src = read("app/api/stock/day/route.ts");
     expect(src).toMatch(/const saved = new Map\(/);
-    expect(src).toMatch(/kind: \{ in: \["GIVEN", "SOLD"\] \}/);
+    expect(src).toMatch(/kind: \{ in: \["GIVEN", "SOLD", "RETURNED"\] \}/);
   });
 
   it("a return price far above anything the product has cost is refused (v199)", () => {

@@ -9,8 +9,11 @@
 import { prisma } from "./prisma";
 import { managerScope } from "./manager-scope";
 import { bpDisplayName } from "./bp-name";
+import { buildStatement } from "./statement";
 import {
   dueOf,
+  HOLDER_TYPE_LABEL,
+  isMoneyProduct,
   movementValue,
   paisa,
   priceOn,
@@ -38,6 +41,14 @@ export type Holder = {
    * or money in this ledger, so still listed. See `listHolders`.
    */
   inactive?: boolean;
+  /**
+   * v201: every mobile number this holder is known by — an RSO's wallet
+   * (rsoMsisdn), a BP outlet's iTopUp and transaction numbers, and the number
+   * the person logs in with. Search only; the first one is shown.
+   */
+  phones?: string[];
+  /** v203: the number this person signs in with — the one a WhatsApp receipt goes to first. */
+  loginPhone?: string;
 };
 
 /** A holder identified the way a URL and a form carry one. */
@@ -216,7 +227,7 @@ export async function listHolders(scope: StockScope): Promise<Holder[]> {
   if (scope.holders === null) {
     const listed = new Set(out.map((h) => holderKey(h.type, h.id)));
     const inBooks = await prisma.$queryRaw<{ holderType: HolderType; holderId: string }[]>`
-      SELECT DISTINCT "holderType"::text AS "holderType", "holderId" FROM (
+      SELECT "holderType"::text AS "holderType", "holderId" FROM (
         SELECT "holderType", "holderId" FROM "StockMovement"
         UNION SELECT "holderType", "holderId" FROM "CashDeposit"
         UNION SELECT "holderType", "holderId" FROM "StockOpening"
@@ -228,7 +239,14 @@ export async function listHolders(scope: StockScope): Promise<Holder[]> {
         prisma.supervisor.findMany({ where: { id: { in: ids("SUPERVISOR") } }, select: { id: true, name: true } }),
         prisma.employee.findMany({
           where: { id: { in: ids("RSO") } },
-          select: { id: true, name: true, employeeCode: true, rsoMsisdn: true, supervisor: { select: { name: true } } },
+          select: {
+            id: true,
+            name: true,
+            employeeCode: true,
+            rsoMsisdn: true,
+            supervisorId: true,
+            supervisor: { select: { name: true } },
+          },
         }),
         prisma.retailer.findMany({
           where: { id: { in: ids("BP") } },
@@ -244,6 +262,7 @@ export async function listHolders(scope: StockScope): Promise<Holder[]> {
           name: x.name,
           code: x.employeeCode || x.rsoMsisdn,
           supervisorName: x.supervisor?.name ?? null,
+          supervisorId: x.supervisorId ?? null,
           inactive: true,
         });
       for (const x of outlets)
@@ -259,11 +278,106 @@ export async function listHolders(scope: StockScope): Promise<Holder[]> {
   }
 
   const visible = scope.holders === null ? out : out.filter((h) => scope.holders!.has(holderKey(h.type, h.id)));
+  await attachPhones(visible);
   visible.sort(
     (a, b) =>
       a.type.localeCompare(b.type) || Number(!!a.inactive) - Number(!!b.inactive) || a.name.localeCompare(b.name),
   );
   return visible;
+}
+
+/**
+ * v201 — the owner: "RSO wallet ... jaita mobile number ace oita diye search
+ * ar option rakho ... bp der account a jai phone number ace oita diye search".
+ *
+ * Numbers live in three places: the RSO's wallet on Employee, the outlet's
+ * iTopUp / transaction numbers on Retailer, and the login number on User. All
+ * of them go on the holder, deduplicated by their last ten digits, wallet or
+ * outlet number first because that is the one people read off a phone.
+ */
+async function attachPhones(holders: Holder[]) {
+  if (!holders.length) return;
+  const ids = (t: HolderType) => holders.filter((h) => h.type === t).map((h) => h.id);
+  const [rsoIds, supIds, bpIds] = [ids("RSO"), ids("SUPERVISOR"), ids("BP")];
+  const [emps, outlets, users] = await Promise.all([
+    rsoIds.length
+      ? prisma.employee.findMany({ where: { id: { in: rsoIds } }, select: { id: true, rsoMsisdn: true } })
+      : [],
+    bpIds.length
+      ? prisma.retailer.findMany({
+          where: { id: { in: bpIds } },
+          select: { id: true, iTopUpNumber: true, tranMobileNo: true },
+        })
+      : [],
+    prisma.user.findMany({
+      where: {
+        mobileNumber: { not: null },
+        OR: [
+          ...(rsoIds.length ? [{ employeeId: { in: rsoIds } }] : []),
+          ...(supIds.length ? [{ supervisorId: { in: supIds } }] : []),
+          ...(bpIds.length ? [{ bpRetailerId: { in: bpIds } }] : []),
+        ],
+      },
+      select: { mobileNumber: true, employeeId: true, supervisorId: true, bpRetailerId: true },
+    }),
+  ]);
+
+  const byKey = new Map<string, string[]>();
+  const add = (type: HolderType, id: string | null | undefined, phone: string | null | undefined) => {
+    const p = String(phone ?? "").trim();
+    if (!id || !/\d{6,}/.test(p.replace(/\D/g, ""))) return;
+    const k = holderKey(type, id);
+    const list = byKey.get(k) ?? [];
+    const tail = p.replace(/\D/g, "").slice(-10);
+    if (!list.some((x) => x.replace(/\D/g, "").slice(-10) === tail)) list.push(p);
+    byKey.set(k, list);
+  };
+  for (const e of emps) add("RSO", e.id, e.rsoMsisdn);
+  for (const o of outlets) {
+    add("BP", o.id, o.iTopUpNumber);
+    add("BP", o.id, o.tranMobileNo);
+  }
+  for (const u of users) {
+    add("RSO", u.employeeId, u.mobileNumber);
+    add("SUPERVISOR", u.supervisorId, u.mobileNumber);
+    add("BP", u.bpRetailerId, u.mobileNumber);
+  }
+  const login = new Map<string, string>();
+  for (const u of users) {
+    if (!u.mobileNumber) continue;
+    if (u.employeeId) login.set(holderKey("RSO", u.employeeId), u.mobileNumber);
+    if (u.supervisorId) login.set(holderKey("SUPERVISOR", u.supervisorId), u.mobileNumber);
+    if (u.bpRetailerId) login.set(holderKey("BP", u.bpRetailerId), u.mobileNumber);
+  }
+  for (const h of holders) {
+    const phones = byKey.get(holderKey(h.type, h.id));
+    if (phones?.length) h.phones = phones;
+    const own = login.get(holderKey(h.type, h.id));
+    if (own) h.loginPhone = own;
+  }
+}
+
+/**
+ * One holder as a picker row: name, then kind · code · team · phone. The first
+ * phone is shown when the code is not already that number; all of them are
+ * searchable, however they are typed (see Picker's matchOptions).
+ */
+export function holderOption(h: Holder) {
+  const digits = (v: string | null | undefined) =>
+    String(v ?? "")
+      .replace(/\D/g, "")
+      .slice(-10);
+  const phones = h.phones ?? [];
+  const shown = phones.find((p) => digits(p) !== digits(h.code));
+  return {
+    id: holderKey(h.type, h.id),
+    label: h.name,
+    meta: [HOLDER_TYPE_LABEL[h.type], h.code, h.supervisorName, h.inactive ? "no longer active" : null]
+      .filter(Boolean)
+      .join(" · "),
+    phone: shown,
+    keywords: phones.join(" "),
+  };
 }
 
 export async function findHolder(type: HolderType, id: string): Promise<Holder | null> {
@@ -302,18 +416,28 @@ export async function findHolder(type: HolderType, id: string): Promise<Holder |
  * entry screen, which has to propose one — `pricedProducts` asks for the DATE
  * it is needed for and answers with the price in force on that day. */
 
-const toProduct = (p: { id: string; category: string; subType: string; unitLabel: string | null }): ProductRow => ({
+const toProduct = (p: {
+  id: string;
+  category: string;
+  subType: string;
+  unitLabel: string | null;
+  kindName?: string | null;
+}): ProductRow => ({
   id: p.id,
   category: p.category as ProductRow["category"],
   subType: p.subType,
   unitLabel: p.unitLabel,
+  kindName: p.kindName ?? null,
 });
+
+/** The identity fields every product reader selects — one place, so a new field cannot be missed (v201). */
+export const PRODUCT_ROW_SELECT = { id: true, category: true, subType: true, unitLabel: true, kindName: true } as const;
 
 export async function activeProducts(): Promise<ProductRow[]> {
   const rows = await prisma.product.findMany({
     where: { status: "ACTIVE" },
     orderBy: [{ category: "asc" }, { subType: "asc" }],
-    select: { id: true, category: true, subType: true, unitLabel: true },
+    select: PRODUCT_ROW_SELECT,
   });
   return rows.map(toProduct);
 }
@@ -321,7 +445,7 @@ export async function activeProducts(): Promise<ProductRow[]> {
 export async function allProducts(): Promise<ProductRow[]> {
   const rows = await prisma.product.findMany({
     orderBy: [{ category: "asc" }, { subType: "asc" }],
-    select: { id: true, category: true, subType: true, unitLabel: true },
+    select: PRODUCT_ROW_SELECT,
   });
   return rows.map(toProduct);
 }
@@ -348,10 +472,7 @@ export async function pricedProducts(date: string, alsoIds: string[] = []): Prom
     where: alsoIds.length ? { OR: [{ status: "ACTIVE" }, { id: { in: alsoIds } }] } : { status: "ACTIVE" },
     orderBy: [{ category: "asc" }, { subType: "asc" }],
     select: {
-      id: true,
-      category: true,
-      subType: true,
-      unitLabel: true,
+      ...PRODUCT_ROW_SELECT,
       status: true,
       prices: { select: { price: true, effectiveFrom: true } },
     },
@@ -380,10 +501,7 @@ export async function productCatalogue(today: string): Promise<ProductWithPrices
   const rows = await prisma.product.findMany({
     orderBy: [{ status: "asc" }, { category: "asc" }, { subType: "asc" }],
     select: {
-      id: true,
-      category: true,
-      subType: true,
-      unitLabel: true,
+      ...PRODUCT_ROW_SELECT,
       status: true,
       activationType: true,
       prices: { orderBy: { effectiveFrom: "desc" }, select: { price: true, effectiveFrom: true } },
@@ -690,4 +808,57 @@ export async function holderHistory(type: HolderType, id: string, days = 30): Pr
     cash: paisa(Number(r.cash)),
     bank: paisa(Number(r.bank)),
   }));
+}
+
+/* ------------------------------------------------------------------ *
+ * v203: one person's statement for a period
+ * ------------------------------------------------------------------ */
+
+/**
+ * The statement: every movement and deposit this person has, folded by
+ * `buildStatement` into brought forward, the period's days, and carried
+ * forward. All of their history is read because the figure brought forward is
+ * the running due on the first morning — a statement that started from zero
+ * would print a due nobody owes.
+ */
+export async function holderStatement(holder: Holder, from: string, to: string) {
+  const where = { holderType: holder.type, holderId: holder.id } as const;
+  const [movements, deposits, opening, products] = await Promise.all([
+    prisma.stockMovement.findMany({
+      where,
+      select: { kind: true, productId: true, qty: true, unitPrice: true, date: true },
+    }),
+    prisma.cashDeposit.findMany({ where, select: { date: true, cash: true, bank: true, bankRef: true } }),
+    prisma.stockOpening.findUnique({
+      where: { holderType_holderId: { holderType: holder.type, holderId: holder.id } },
+      select: { openingDue: true },
+    }),
+    allProducts(),
+  ]);
+  return buildStatement({
+    from,
+    to,
+    openingDue: Number(opening?.openingDue || 0),
+    movements: movements.map((m) => ({
+      kind: m.kind as MovementRow["kind"],
+      productId: m.productId,
+      qty: m.qty,
+      unitPrice: Number(m.unitPrice),
+      date: m.date.toISOString().slice(0, 10),
+    })),
+    deposits: deposits.map((d) => ({
+      date: d.date.toISOString().slice(0, 10),
+      cash: Number(d.cash),
+      bank: Number(d.bank),
+      bankRef: d.bankRef,
+    })),
+    products: products.map((p) => ({ id: p.id, name: p.subType, money: isMoneyProduct(p.category) })),
+  });
+}
+
+/** The number to send a holder something on: the one they sign in with, else any on file (v203). */
+export async function holderPhone(holder: Holder) {
+  const one = [{ ...holder }];
+  await attachPhones(one);
+  return one[0].loginPhone ?? one[0].phones?.[0] ?? null;
 }

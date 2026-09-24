@@ -195,7 +195,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ type: stri
     return NextResponse.json(r.body, r.init);
   }
   const { type } = await params,
-    d = definitions[type.toLowerCase()];
+    // v202: own keys only — "constructor" is on every object and crashed the sheet builder.
+    d = Object.hasOwn(definitions, type.toLowerCase()) ? definitions[type.toLowerCase()] : undefined;
   if (!d) return NextResponse.json({ error: "Unsupported sample type" }, { status: 404 });
   const wb = XLSX.utils.book_new(),
     ws = XLSX.utils.json_to_sheet(d.rows);

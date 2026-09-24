@@ -120,3 +120,31 @@ describe("GA workbook parsing at whatever the swap costs", () => {
     expect(out.parsedRows[0].productCode).toBe("SIMWAP");
   });
 });
+
+describe("v200: GA dates read day-first however the file was saved", () => {
+  const HEADERS = ["RETAILER_CODE", "SIM_NO", "PRODUCT_CODE", "SELLING_PRICE", "ACTIVATION_DATE", "ACTIVATION_TIME"];
+  const ROWS = [["R000001", "8801700000001", "MMSTC", "170", "05/09/2026", "10:15:00"]];
+  const day = (bytes: Buffer) => {
+    const out = parseGaWorkbook(bytes);
+    expect(out.preErrors).toEqual([]);
+    return out.parsedRows[0].activationDate.toISOString().slice(0, 10);
+  };
+
+  it("a text (TSV) export gives 5 September, not 9 May", () => {
+    const tsv = [HEADERS, ...ROWS].map((r) => r.join("\t")).join("\n");
+    expect(day(Buffer.from(tsv, "utf8"))).toBe("2026-09-05");
+  });
+
+  it("the same text in an .xlsx cell gives the same day", () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([HEADERS, ...ROWS]), "Sheet1");
+    expect(day(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer)).toBe("2026-09-05");
+  });
+
+  it("a date with a time on it keeps its day-first reading", () => {
+    const rows = [["R000001", "8801700000001", "MMSTC", "170", "01/09/2026 10:00", "10:00:00"]];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([HEADERS, ...rows]), "Sheet1");
+    expect(day(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer)).toBe("2026-09-01");
+  });
+});

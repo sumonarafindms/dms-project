@@ -1161,6 +1161,30 @@
     .kit-report-table tbody tr:hover td {
       background: none;
     }
+    /*
+     * v203: when the class is on the <table> itself (every Stock & Cash
+     * table), the table kept its own table box and grew to the widest
+     * unwrapped line — a statement day's "Sold: …" list pushed the cards to
+     * 929px on a 390px phone. The table is a plain block here like its rows,
+     * a value may wrap, and a cell's sub-line sits under its value.
+     */
+    table.kit-report-table {
+      display: block;
+      width: 100%;
+    }
+    .kit-report-table tbody td {
+      flex-wrap: wrap;
+      row-gap: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    /* Tucked under its own value, with the space AFTER it, so it reads as
+       belonging to the line above rather than the one below. */
+    .kit-report-table tbody td > .kit-cell-sub {
+      flex-basis: 100%;
+      margin: 0 0 0.375rem;
+      text-align: right;
+    }
   }
   .kit-report-table table {
     width: 100%;
@@ -2403,6 +2427,18 @@
     .kit-table-cards {
       display: none;
     }
+  }
+  /*
+   * v203: a wrap holding a REPORT table is always shown. `.kit-report-table`
+   * turns its own rows into cards below 768px (data-label per cell), so it has
+   * no separate card list to swap to — and the rule above hid it outright on
+   * every phone. That was every table in Stock & Cash: the Daily entry product
+   * rows, Expenses, Lifting, Products, the ledger and the day report were
+   * blank on a phone below 640px. Found by the v203 probe filling Daily entry
+   * at 390px.
+   */
+  .kit-table-wrap:has(> .kit-report-table) {
+    display: block;
   }
   .kit-table {
     width: 100%;
@@ -4572,6 +4608,13 @@
     color: var(--color-neutral-900);
     overflow-wrap: anywhere;
   }
+  .acc-flow-kind {
+    display: block;
+    font-size: 0.72rem;
+    font-style: normal;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
   .acc-chip {
     display: inline-flex;
     align-items: center;
@@ -4960,5 +5003,327 @@
   .acc-holder-team b {
     color: var(--color-neutral-900);
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* v203: the month statement. */
+@layer components {
+  .stmt-months {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .stmt-months strong {
+    font-size: 0.95rem;
+    color: var(--color-neutral-800);
+    text-align: center;
+  }
+  .stmt-bf td {
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .stmt-sign {
+    display: none;
+  }
+}
+@media print {
+  .stmt-sign {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    margin-top: 3rem;
+  }
+  .stmt-sign span {
+    flex: 1;
+    border-top: 1px solid var(--color-neutral-400);
+    padding-top: 0.375rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* v203: Quick search — the box in the sidebar, the icon in the phone's top bar, and the dialog. */
+@layer components {
+  .qs-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.5rem;
+    margin: -0.25rem 0 0.875rem;
+    padding: 0 0.625rem;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: var(--radius-control);
+    background: rgb(255 255 255 / 0.08);
+    color: rgb(255 255 255 / 0.86);
+    font: inherit;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .qs-trigger:hover {
+    background: rgb(255 255 255 / 0.14);
+  }
+  .qs-trigger svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+  }
+  .qs-trigger span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .qs-trigger kbd {
+    font: inherit;
+    font-size: 0.66rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.3rem;
+    background: rgb(255 255 255 / 0.14);
+  }
+  .mobile-top-acts {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .mobile-topbar .qs-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    color: white;
+  }
+  .mobile-topbar .qs-icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+  .qs {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .qs-input {
+    font-size: 1rem;
+  }
+  .qs-list li {
+    min-width: 0;
+  }
+  .qs-list {
+    grid-template-columns: minmax(0, 1fr);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.25rem;
+    max-height: min(60vh, 28rem);
+    overflow-y: auto;
+  }
+  .qs-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background: none;
+    font: inherit;
+    text-align: left;
+    color: var(--color-neutral-800);
+    cursor: pointer;
+  }
+  .qs-row.is-active {
+    border-color: var(--color-brand-500);
+    background: var(--surface-brand-tint, var(--color-brand-50));
+  }
+  .qs-row > svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
+  .qs-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .qs-text strong,
+  .qs-text em {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .qs-text strong {
+    font-size: 0.9rem;
+  }
+  .qs-text em {
+    font-style: normal;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .qs-kind {
+    flex-shrink: 0;
+    min-width: 4.75rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-700);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .qs-kind.is-page {
+    background: var(--surface-brand-tint, var(--color-brand-50));
+    color: var(--color-brand-700);
+  }
+}
+
+/* v203: the notice board. */
+@layer components {
+  .notice-home {
+    padding: 1rem clamp(1rem, 2.5vw, 2.5rem) 0;
+    max-width: 1440px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .notice-strip,
+  .notice-list {
+    display: grid;
+    gap: 0.625rem;
+  }
+  .notice {
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--color-brand-200, var(--color-neutral-200));
+    border-left: 4px solid var(--color-brand-500);
+    border-radius: var(--radius-control);
+    background: var(--surface-card, white);
+  }
+  .notice.is-urgent {
+    border-color: var(--color-rose-200);
+    border-left-color: var(--color-rose-700);
+    background: var(--color-rose-50);
+  }
+  .notice header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .notice header > svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    color: var(--color-brand-700);
+  }
+  .notice.is-urgent header > svg {
+    color: var(--color-rose-700);
+  }
+  .notice header strong {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.92rem;
+    color: var(--color-neutral-800);
+  }
+  .notice p {
+    margin: 0.375rem 0 0.5rem;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    font-size: 0.86rem;
+    color: var(--color-neutral-700);
+  }
+  .notice footer {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .notice-hide {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: -0.5rem -0.5rem 0 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .notice-hide svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  .notice-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    justify-self: end;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-brand-700);
+  }
+  .notice-all svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+  .notice-managed {
+    display: grid;
+    gap: 0.375rem;
+  }
+  .notice-managed.is-off .notice {
+    opacity: 0.6;
+  }
+  .notice-managed-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .notice-managed-foot > span:first-child {
+    flex: 1;
+    min-width: 10rem;
+  }
+  .notice-body-input {
+    min-height: 6rem;
+    resize: vertical;
+    font: inherit;
+  }
+  .notice-aud {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .notice-aud legend {
+    padding: 0;
+    margin-bottom: 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-neutral-700);
+  }
+  .notice-aud > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .notice-aud-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.5rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-neutral-200);
+    border-radius: 999px;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  .notice-aud-opt.is-on {
+    border-color: var(--color-brand-500);
+    background: var(--surface-brand-tint, var(--color-brand-50));
+  }
+  .notice-urgent {
+    align-self: end;
   }
 }

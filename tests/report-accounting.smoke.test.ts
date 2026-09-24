@@ -255,8 +255,10 @@ describe("a report's total strip is the company, not the sum of what is shown", 
      */
     const perf = stripComments(read("app/it/reports/performance/[kind]/page.tsx"));
     expect(perf, "the retailer and BP groupings must still sum their rows").toMatch(
-      /rows\.reduce\(\(a, r\) => a \+ r\.achieved, 0\)/,
+      /rows\.reduce\(\(a, r\) => a \+ pick\(r\), 0\)/,
     );
+    // v200: a BP outlet held by two RSOs has a row per holder — counted once.
+    expect(perf).toMatch(/seen\.set\(k, Math\.max\(seen\.get\(k\) \?\? 0, pick\(r\)\)\)/);
     // The builder decides: null totals for a BP or retailer grouping.
     const B = stripComments(read("lib/report-builders.ts"));
     expect(B).toMatch(/let company: CompanyTotals \| null = null;/);

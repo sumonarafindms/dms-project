@@ -97,7 +97,7 @@ export default async function CustomReport({
         hrefFor: (p) =>
           reportPageHref(
             "/it/reports/custom",
-            { from: range.from, to: range.to, level: levelParam, fields: fieldsParam },
+            { from: range.from, to: range.to, q: sp.q, level: levelParam, fields: fieldsParam },
             p,
           ),
       }}

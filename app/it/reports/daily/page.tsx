@@ -113,7 +113,13 @@ export default async function DailySummary({
             render: (r: Row) => r.mtdGa.toLocaleString("en-US"),
           },
         ]),
-    { key: "gaTarget", label: "Monthly GA Target", align: "right", render: (r) => r.gaTarget.toLocaleString("en-US") },
+    {
+      key: "gaTarget",
+      label: "Monthly GA Target",
+      align: "right",
+      // v200: unset is "—", not 0.
+      render: (r) => (r.gaTarget ? r.gaTarget.toLocaleString("en-US") : "—"),
+    },
     {
       key: "achievement",
       // Named for what it divides: month-to-date GA over the monthly target.
@@ -237,7 +243,7 @@ export default async function DailySummary({
         paging={{
           page: sp.page,
           noun: who === "BP" ? "BP" : who.toLowerCase(),
-          hrefFor: (p) => reportPageHref("/it/reports/daily", pageParams, p),
+          hrefFor: (p) => reportPageHref("/it/reports/daily", { ...pageParams, q: sp.q }, p),
         }}
         emptyTitle={`No ${who} activity for this period`}
         emptyHint="Check Data Readiness on the Reporting Center — a feed may not be imported for these dates."

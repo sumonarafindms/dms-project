@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
 import { monthStartsInRange, monthStartUtc } from "@/lib/date-range";
-import { dhakaMonth } from "@/lib/business-time";
+import { dhakaMonth, isYmd } from "@/lib/business-time";
 import { apiError } from "@/lib/http-errors";
 import {
   GA_CLASSIFICATION_SELECT,
@@ -20,7 +20,7 @@ import { currentGa170Tariff } from "@/lib/ga-tariff";
 export const dynamic = "force-dynamic";
 
 function dateOnly(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  if (!isYmd(value)) return null;
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
   if (Number.isNaN(date.getTime())) return null;
@@ -28,8 +28,7 @@ function dateOnly(value: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await apiUser(["ADMIN", "IT"])))
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await apiUser(["ADMIN", "IT"]))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await apiPermission("ga", "view"))) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {
     const month = req.nextUrl.searchParams.get("month") || dhakaMonth() + "-01";

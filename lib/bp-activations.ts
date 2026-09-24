@@ -34,6 +34,10 @@ export type BpAssignmentListRow = {
     retailerName: string | null;
     /** The BP's own display name, if one was given. See lib/bp-name.ts. */
     bpName: string | null;
+    /** v201: the outlet's numbers and the BP's login number, so the list can be searched by phone. */
+    iTopUpNumber?: string | null;
+    tranMobileNo?: string | null;
+    bpUser?: { mobileNumber: string | null } | null;
   };
   employee: {
     name: string;
@@ -141,7 +145,16 @@ export async function listBpAssignments(
       AND: [{ startDate: { lt: rangeEnd } }, { OR: [{ endDate: null }, { endDate: { gte: rangeStart } }] }],
     },
     include: {
-      retailer: { select: { retailerCode: true, retailerName: true, bpName: true } },
+      retailer: {
+        select: {
+          retailerCode: true,
+          retailerName: true,
+          bpName: true,
+          iTopUpNumber: true,
+          tranMobileNo: true,
+          bpUser: { select: { mobileNumber: true } },
+        },
+      },
       employee: { select: { name: true, employeeCode: true, supervisor: { select: { name: true } } } },
       monthlyTargets: true,
     },

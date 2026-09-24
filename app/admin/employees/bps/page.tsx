@@ -27,6 +27,7 @@ export default async function Page() {
           meta: `${x.retailer.retailerCode} · RSO ${x.employee.name}`,
           detail: `${x.employee.supervisor?.name || "No supervisor"} · GA target ${x.gaTarget}`,
           editHref: `/admin/employees/bps/${x.id}`,
+          keywords: [x.retailer.iTopUpNumber, x.retailer.tranMobileNo].filter(Boolean).join(" "),
         }))}
       />
     </main>

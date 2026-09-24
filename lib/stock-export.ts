@@ -20,10 +20,10 @@
  * scope it was handed rather than one it resolved.
  */
 
-import { EXPENSE_CATEGORY_LABEL, PAID_FROM_LABEL, marginPercent } from "./lifting";
+import { PAID_FROM_LABEL, expenseLabel, marginPercent } from "./lifting";
 import { HOLDER_TYPE_LABEL, dueTone, isMoneyProduct } from "./stock";
-import { expensesIn, houseBooks, simCheckRows, type SimCheckScope } from "./lifting-data";
-import { holderDues, holderPosition, findHolder, type StockScope } from "./stock-data";
+import { expensesIn, godown, houseBooks, simCheckRows, type SimCheckScope } from "./lifting-data";
+import { holderDues, holderPosition, holderStatement, findHolder, type StockScope } from "./stock-data";
 import type { ExportRow } from "./report-builders";
 import type { ReportRange } from "./report-range";
 
@@ -96,6 +96,66 @@ export async function holderStockExport(
   };
 }
 
+/**
+ * v203: one person's statement for a period — brought forward, a row per day,
+ * carried forward. The same figures as /stock/[type]/[id]/statement.
+ */
+export async function holderStatementExport(
+  type: "RSO" | "SUPERVISOR" | "BP",
+  id: string,
+  from: string,
+  to: string,
+): Promise<StockExport | null> {
+  const holder = await findHolder(type, id);
+  if (!holder) return null;
+  const s = await holderStatement(holder, from, to);
+  const list = (items: { name: string; qty: number; money: boolean }[]) =>
+    items.map((i) => (i.money ? `${i.name} ৳${i.qty}` : `${i.name} x ${i.qty}`)).join("; ");
+  const rows: ExportRow[] = [
+    {
+      Date: `Brought forward (${from})`,
+      Given: "",
+      "Given items": "",
+      Returned: "",
+      "Returned items": "",
+      Sold: "",
+      Cash: "",
+      Bank: "",
+      "Bank ref": "",
+      "Due after": s.broughtForward,
+    },
+    ...s.days.map((d) => ({
+      Date: d.date,
+      Given: d.givenValue,
+      "Given items": list(d.given),
+      Returned: d.returnedValue,
+      "Returned items": list(d.returned),
+      Sold: d.soldValue,
+      Cash: d.cash,
+      Bank: d.bank,
+      "Bank ref": d.bankRef ?? "",
+      "Due after": d.due,
+    })),
+    {
+      Date: `Carried forward (${to})`,
+      Given: s.totals.given,
+      "Given items": "",
+      Returned: s.totals.returned,
+      "Returned items": "",
+      Sold: s.totals.sold,
+      Cash: s.totals.cash,
+      Bank: s.totals.bank,
+      "Bank ref": "",
+      "Due after": s.carriedForward,
+    },
+  ];
+  return {
+    sheet: "Statement",
+    filename: `statement-${holder.name.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()}-${from}-to-${to}`,
+    rows: s.days.length ? rows : [],
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * The house's books
  * ------------------------------------------------------------------ */
@@ -112,7 +172,14 @@ export async function holderStockExport(
  * a question; a 0 is an answer, and it would be the wrong one.
  */
 export async function marginExport(range: ReportRange): Promise<StockExport> {
-  const books = await houseBooks(range);
+  /*
+   * v200: the godown columns are ALL-TIME, as the screen shows them. The
+   * ranged books' "in godown" is lifted-in-range less given-in-range — a
+   * figure with no meaning — and an October with no purchases exported
+   * "In godown −500, Godown value −৳90,000".
+   */
+  const [books, all] = await Promise.all([houseBooks(range), godown()]);
+  const now = new Map(all.map((l) => [l.product.id, l]));
   return {
     sheet: "Margin",
     filename: `stock-margin${stamp(range)}`,
@@ -130,8 +197,10 @@ export async function marginExport(range: ReportRange): Promise<StockExport> {
         "Sold value": l.soldValue,
         "Margin sold": l.hasCost ? l.marginSold : "",
         "Margin %": l.hasCost ? (marginPercent(l.marginSold, l.soldValue) ?? "") : "",
-        "In godown": l.inGodown,
-        "Godown value": l.hasCost ? l.godownValue : "",
+        ...(() => {
+          const g = now.get(l.product.id) ?? l;
+          return { "In godown now": g.inGodown, "Godown value now": g.hasCost ? g.godownValue : "" };
+        })(),
       })),
   };
 }
@@ -143,7 +212,7 @@ export async function expenseExport(range: ReportRange): Promise<StockExport> {
     filename: `expenses${stamp(range)}`,
     rows: rows.map((r) => ({
       Date: r.date,
-      "What for": EXPENSE_CATEGORY_LABEL[r.category],
+      "What for": expenseLabel(r),
       "Paid from": PAID_FROM_LABEL[r.paidFrom],
       "Paid to": r.payee ?? "",
       Note: r.note ?? "",

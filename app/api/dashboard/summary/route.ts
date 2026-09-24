@@ -3,15 +3,17 @@ import { apiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
 import {
+  SSO_MIN_MONTHLY_STANDARD_GA,
   classifyGaActivation,
-  isSsoComplete,
+  isSimSellerRetailer,
   lsoCompleteMonthlySummaryWhere,
   withStandardGa,
 } from "@/lib/business-rules";
+import { ssoCompletion, type SsoDay } from "@/lib/sso-credit";
 import { addTier, noTiers, type GaTiers } from "@/lib/ga-category";
 import { currentGa170Tariff } from "@/lib/ga-tariff";
 import { apiError } from "@/lib/http-errors";
-import { dhakaMonth } from "@/lib/business-time";
+import { dhakaMonth, isYm } from "@/lib/business-time";
 import { bpLedger } from "@/lib/bp-ledger";
 import { supervisorTargets } from "@/lib/supervisor-target-query";
 import type { BpPortion } from "@/lib/bp-rollup";
@@ -21,7 +23,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 function selectedMonth(value: string | null) {
-  const text = value && /^\d{4}-\d{2}$/.test(value) ? value : dhakaMonth();
+  const text = isYm(value) ? value : dhakaMonth();
   return monthBounds(`${text}-01T00:00:00.000Z`);
 }
 
@@ -137,40 +139,53 @@ export async function GET(req: NextRequest) {
      * sides: from the learned tariff, never from a hardcoded price.
      */
     const tariff = await currentGa170Tariff();
-    // SSO counts retailer-MONTHS that reached the threshold, and the window
-    // here is exactly one month — so the per-retailer totals are accumulated
-    // first, split RSO-side from BP-side, and only then tested.
-    const perRetailer = new Map<string, { rso: GaTiers; bp: GaTiers }>();
+    /*
+     * v200: GA on a BP-held day is credited to that DAY's holders, and SSO is
+     * decided on the retailer's WHOLE month and credited once, to whoever sold
+     * the SIM that completed it (lib/sso-credit.ts).
+     *
+     * This used to add up each retailer's BP-side GA and credit it to whoever
+     * held the BP on the 1st of the month ("any day picks the same holders",
+     * which is false for an assignment that starts on the 12th — the owner was
+     * credited instead of the holder), and to test SSO on the RSO part and the
+     * BP part separately, so one outlet could count as SSO twice or not at all.
+     */
+    const ssoDays = new Map<string, SsoDay[]>();
     for (const group of gaGroups) {
-      const bucket = perRetailer.get(group.retailerId) ?? { rso: noTiers(), bp: noTiers() };
-      const side = ledger.ownsDay(group.retailerId, group.activationDate.getTime()) ? bucket.bp : bucket.rso;
-      addTier(side, classifyGaActivation(group, tariff), group._count._all);
-      perRetailer.set(group.retailerId, bucket);
+      const retailer = retailerMap.get(group.retailerId);
+      const employeeId = retailer?.employeeId;
+      if (!employeeId) continue;
+      const category = classifyGaActivation(group, tariff);
+      if (category !== "GA_170" && category !== "GA_300") continue;
+      const count = group._count._all;
+      const dayMs = group.activationDate.getTime();
+      const bp = ledger.ownsDay(group.retailerId, dayMs);
+      const days = ssoDays.get(group.retailerId) ?? [];
+      days.push({ dayMs, count, bp });
+      ssoDays.set(group.retailerId, days);
+      if (bp) {
+        ledger.credit(group.retailerId, dayMs, employeeId, (f) => {
+          f.gaAchieved += count;
+          if (category === "GA_170") f.ga170 += count;
+          else f.ga300 += count;
+        });
+        continue;
+      }
+      const mine = gaByEmployee.get(employeeId) ?? noTiers();
+      addTier(mine, category, count);
+      gaByEmployee.set(employeeId, mine);
     }
-    for (const [retailerId, counts] of perRetailer) {
+    for (const [retailerId, days] of ssoDays) {
       const retailer = retailerMap.get(retailerId);
       const employeeId = retailer?.employeeId;
       if (!employeeId) continue;
-      if (counts.rso.total > 0) {
-        const mine = gaByEmployee.get(employeeId) ?? noTiers();
-        mine.total += counts.rso.total;
-        mine.ga170 += counts.rso.ga170;
-        mine.ga300 += counts.rso.ga300;
-        gaByEmployee.set(employeeId, mine);
-        if (isSsoComplete(retailer.simSeller, counts.rso.total))
-          ssoByEmployee.set(employeeId, (ssoByEmployee.get(employeeId) || 0) + 1);
-      }
-      if (counts.bp.total > 0) {
-        // The window here is exactly one month, so any day inside it picks the
-        // same holders; `start` is the cheapest one to hand.
-        const sso = isSsoComplete(retailer.simSeller, counts.bp.total);
-        ledger.credit(retailerId, start.getTime(), employeeId, (f) => {
-          f.gaAchieved += counts.bp.total;
-          f.ga170 += counts.bp.ga170;
-          f.ga300 += counts.bp.ga300;
-          if (sso) f.ssoAchieved += 1;
+      const done = ssoCompletion(days, isSimSellerRetailer(retailer.simSeller), SSO_MIN_MONTHLY_STANDARD_GA);
+      if (!done) continue;
+      if (done.bp)
+        ledger.credit(retailerId, done.dayMs, employeeId, (f) => {
+          f.ssoAchieved += 1;
         });
-      }
+      else ssoByEmployee.set(employeeId, (ssoByEmployee.get(employeeId) || 0) + 1);
     }
 
     const c2cByEmployee = new Map<string, number>();

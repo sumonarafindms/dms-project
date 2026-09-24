@@ -92,7 +92,9 @@ export async function GET(req: Request) {
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${built.filename}.xlsx"`,
+      // v200: only safe characters reach the header — a non-ASCII or CR/LF
+      // `kind` in the query made the header invalid and the route a 500.
+      "Content-Disposition": `attachment; filename="${built.filename.replace(/[^A-Za-z0-9._-]+/g, "-")}.xlsx"`,
       "Cache-Control": "no-store",
     },
   });

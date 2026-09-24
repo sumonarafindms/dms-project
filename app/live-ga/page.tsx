@@ -1,3 +1,4 @@
+import { isYmd } from "@/lib/business-time";
 import { AppLink as Link } from "../components/AppLink";
 import { requireUser } from "../../lib/auth";
 import { buildLiveGa, dhakaToday, type LiveRow, type LiveSection } from "../../lib/live-ga";
@@ -125,7 +126,7 @@ export default async function Page({
    * work as though it were today's.
    */
   const today = dhakaToday();
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date || "") ? sp.date! : today;
+  const date = isYmd(sp.date) ? sp.date : today;
 
   const live = await buildLiveGa(
     {

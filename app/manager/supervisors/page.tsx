@@ -54,6 +54,7 @@ export default async function Page({
   const totals = groupTotals(rows, (r) => r.supervisorId);
   const sizes = groupSizes(rows, (r) => r.supervisorId);
   for (const [supervisorId, raw] of totals) {
+    if (supervisorId === null) continue; // a manager's RSOs all sit under their supervisors
     // Achievement from the territory; target from the supervisor's own row.
     // v181: a supervisor is no longer measured against their RSOs' targets
     // added up. See lib/supervisor-target.ts.

@@ -39,13 +39,14 @@ export default async function LsoPending({
       key: "needAmount",
       label: "Needs Amount",
       align: "right",
-      render: (r) => money(Math.max(LSO_MIN_MONTHLY_AMOUNT - r.c2s, 0)),
+      // v200: from the month's own C2S, the same basis as "Needs Trx".
+      render: (r) => money(Math.max(LSO_MIN_MONTHLY_AMOUNT - r.lsoMonthAmount, 0)),
     },
     {
       key: "needTrx",
       label: "Needs Trx",
       align: "right",
-      render: (r) => Math.max(LSO_MIN_MONTHLY_TRANSACTIONS - r.c2sTransactions, 0),
+      render: (r) => Math.max(LSO_MIN_MONTHLY_TRANSACTIONS - r.lsoMonthTrx, 0),
     },
   ];
 
@@ -66,7 +67,7 @@ export default async function LsoPending({
       paging={{
         page: sp.page,
         noun: "retailer",
-        hrefFor: (p) => reportPageHref("/it/reports/lso", { from: range.from, to: range.to }, p),
+        hrefFor: (p) => reportPageHref("/it/reports/lso", { from: range.from, to: range.to, q: sp.q }, p),
       }}
       summaryItems={[
         { label: "Total Retailers", value: total.toLocaleString("en-US") },

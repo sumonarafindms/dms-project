@@ -46,8 +46,10 @@ export function defaultRange(): ReportRange {
  */
 export function resolveRange(from?: string | null, to?: string | null): ReportRange {
   const fallback = defaultRange();
-  const f = from && YMD.test(from) ? from : fallback.from;
-  const t = to && YMD.test(to) ? to : fallback.to;
+  // v200: shape AND a real day — "2026-02-31" passed the shape and threw later.
+  const real = (v?: string | null) => !!v && YMD.test(v) && parseYmdUtc(v) !== null;
+  const f = real(from) ? from! : fallback.from;
+  const t = real(to) ? to! : fallback.to;
   // A reversed range is a user slip, not an error: swap it.
   return f <= t ? { from: f, to: t } : { from: t, to: f };
 }

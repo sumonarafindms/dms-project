@@ -1,8 +1,10 @@
+import { foldDigits } from "@/lib/format";
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { apiUser, apiPermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
+import { MAX_MONEY, isYm } from "@/lib/business-time";
 import { audit } from "@/lib/audit";
 import { phoneKey } from "@/lib/phone";
 import { validateUploadFile, validateUploadContent, assertRowLimit } from "@/lib/upload-safety";
@@ -13,12 +15,19 @@ export const maxDuration = 60;
 
 const text = (v: unknown) => String(v ?? "").trim();
 const strictNum = (v: unknown) => {
-  const raw = text(v).replace(/,/g, "");
+  // v200: Bengali digits (১২০) read as the number they are.
+  const raw = foldDigits(text(v)).replace(/,/g, "");
   if (!raw) return null;
   const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  // v202: a figure past the columns (Int / Decimal(18,2)) is not a target; it crashed the save.
+  return Number.isFinite(n) && n >= 0 && n <= MAX_MONEY ? n : null;
 };
-const int = (v: number) => Math.max(0, Math.trunc(v));
+const int = (v: number) => {
+  const n = Math.max(0, Math.trunc(v));
+  // v202: GA/SSO/LSO are Int columns; a count past a billion is a typo, and it crashed the save.
+  if (n > 1_000_000_000) throw new Error("A count target is too large. Check the figure.");
+  return n;
+};
 const head = (v: unknown) => text(v).toUpperCase().replace(/\s+/g, "_");
 type TargetState = {
   gaTarget: number;
@@ -49,8 +58,7 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) return NextResponse.json({ error: "Target Excel file is required." }, { status: 400 });
     const fileError = validateUploadFile(file, [".xlsx", ".xls", ".xlsm"]);
     if (fileError) return NextResponse.json({ error: fileError }, { status: 400 });
-    if (!/^\d{4}-\d{2}$/.test(monthText))
-      return NextResponse.json({ error: "Select the target month first." }, { status: 400 });
+    if (!isYm(monthText)) return NextResponse.json({ error: "Select the target month first." }, { status: 400 });
     const { start: month, end: monthEnd } = monthBounds(`${monthText}-01T00:00:00.000Z`);
     const bytes = Buffer.from(await file.arrayBuffer());
     const contentError = validateUploadContent(file.name, bytes);

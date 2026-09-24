@@ -19,7 +19,8 @@ import { AppLink as Link } from "./AppLink";
 import { Card, EmptyState } from "./Kit";
 import { Icon } from "./icons";
 import { fmtDate, fmtMoney, fmtNumber } from "@/lib/format";
-import { HOLDER_TYPE_LABEL, type HolderType } from "@/lib/stock";
+import { HOLDER_TYPE_LABEL, kindLabel, type HolderType } from "@/lib/stock";
+import { matchesTokens } from "@/lib/text-search";
 import {
   QUIET_DAYS,
   SHELF_LABEL,
@@ -34,13 +35,14 @@ import {
   type ShelfKey,
 } from "@/lib/accounts-shelves";
 
-const SHELVES: ShelfKey[] = ["SIM_NORMAL", "SIM_SWAP", "CARD", "ITOPUP", "DEVICE"];
+const SHELVES: ShelfKey[] = ["SIM_NORMAL", "SIM_SWAP", "CARD", "ITOPUP", "DEVICE", "OTHER"];
 const SHELF_ICON: Record<ShelfKey, string> = {
   SIM_NORMAL: "sim",
   SIM_SWAP: "sim",
   CARD: "wallet",
   ITOPUP: "balance",
   DEVICE: "phone",
+  OTHER: "shop",
 };
 
 /** Units for everything, Taka for iTopup — whose unit IS the Taka. */
@@ -102,7 +104,10 @@ function ProductCard({
   return (
     <article className="acc-flow">
       <header className="acc-flow-head">
-        <strong>{product.subType}</strong>
+        <strong>
+          {product.subType}
+          {product.category === "OTHER" ? <em className="acc-flow-kind">{kindLabel(product)}</em> : null}
+        </strong>
         {godown !== undefined && godown !== 0 ? (
           <span className={`acc-chip${godown < 0 ? " is-bad" : ""}`} title="In the godown now">
             Godown {qty(product, godown)}
@@ -180,8 +185,8 @@ function HolderRow({
   period: PeriodKey;
   products: Map<string, OverviewProduct>;
   today: string;
-  /** Supervisors only: their RSOs and BPs, summed (v199). */
-  team?: { people: number; sims: number; due: number };
+  /** Supervisors only: how many people are in their team, and how many owe (v200). */
+  team?: { people: number; owing: number; quiet: number };
 }) {
   const shelfSum = (pred: (p: OverviewProduct) => boolean) =>
     holder.lines.reduce((a, l) => {
@@ -192,6 +197,7 @@ function HolderRow({
   const cards = shelfSum((p) => p.category === "CARD");
   const topup = shelfSum((p) => p.category === "ITOPUP");
   const devices = shelfSum((p) => p.category === "ROUTER" || p.category === "HANDSET");
+  const others = shelfSum((p) => p.category === "OTHER");
   const unitsTook = holder.lines.reduce(
     (a, l) => (products.get(l.productId)?.category === "ITOPUP" ? a : a + l.took[period]),
     0,
@@ -219,8 +225,11 @@ function HolderRow({
           {sims ? <span className="acc-chip">SIM {fmtNumber(sims)}</span> : null}
           {cards ? <span className="acc-chip">Card {fmtNumber(cards)}</span> : null}
           {devices ? <span className="acc-chip">Device {fmtNumber(devices)}</span> : null}
+          {others ? <span className="acc-chip">Other {fmtNumber(others)}</span> : null}
           {topup ? <span className="acc-chip">iTopup {fmtMoney(topup)}</span> : null}
-          {!sims && !cards && !devices && !topup ? <span className="acc-chip is-muted">Nothing in hand</span> : null}
+          {!sims && !cards && !devices && !others && !topup ? (
+            <span className="acc-chip is-muted">Nothing in hand</span>
+          ) : null}
         </span>
         <span className="acc-holder-figs">
           <span>
@@ -239,8 +248,14 @@ function HolderRow({
         </span>
         {team ? (
           <span className="acc-holder-team">
-            Team: <b>{fmtNumber(team.people)}</b> {team.people === 1 ? "person" : "people"} · SIM in hand{" "}
-            <b>{fmtNumber(team.sims)}</b> · team due <b>{fmtMoney(team.due)}</b>
+            Team: <b>{fmtNumber(team.people)}</b> {team.people === 1 ? "person" : "people"} ·{" "}
+            <b>{fmtNumber(team.owing)}</b> owing
+            {team.quiet ? (
+              <>
+                {" "}
+                · <b>{fmtNumber(team.quiet)}</b> with no money in {QUIET_DAYS}+ days
+              </>
+            ) : null}
           </span>
         ) : null}
       </summary>
@@ -469,32 +484,60 @@ export function AccountsOverview({ data }: { data: Overview }) {
   }, [data.holders]);
 
   /*
-   * v199: a supervisor's team, summed — "supervisors o products ar stock niye
-   * thake", and they answer for their RSOs' stock too. Keyed on the
-   * supervisor's ID, never the name (two supervisors can share one — v181).
+   * A supervisor's team, as COUNTS — never a sum of money or stock (v200).
+   * lib/stock.ts states the rule: "Nobody's stock is added to anybody else's.
+   * There is no team total ... a supervisor reading their team sees a LIST of
+   * people who each owe something, not a sum that belongs to no one." v199
+   * broke it, and also netted an overpaid person against an owing one.
+   * Keyed on the supervisor's ID, never the name (v181); people who left are
+   * counted under the supervisor they left from.
    */
   const teams = useMemo(() => {
-    const out = new Map<string, { people: number; sims: number; due: number }>();
+    const out = new Map<string, { people: number; owing: number; quiet: number }>();
     for (const h of data.holders) {
       if (h.type === "SUPERVISOR" || !h.supervisorId) continue;
-      const t = out.get(h.supervisorId) || { people: 0, sims: 0, due: 0 };
+      const t = out.get(h.supervisorId) || { people: 0, owing: 0, quiet: 0 };
       t.people += 1;
-      t.due += h.due;
-      for (const l of h.lines) if (products.get(l.productId)?.category === "SIM") t.sims += l.inHand;
+      if (h.due >= 1) {
+        t.owing += 1;
+        if (!h.lastDeposit || daysBetween(h.lastDeposit, data.today) >= QUIET_DAYS) t.quiet += 1;
+      }
       out.set(h.supervisorId, t);
     }
     return out;
-  }, [data.holders, products]);
+  }, [data.holders, data.today]);
 
-  const holders = useMemo(() => {
+  /*
+   * v201: the search reads phone numbers too — an RSO's wallet, a BP outlet's
+   * iTopUp and transaction numbers, and the number each person logs in with —
+   * however they are typed (+880, 880, 0 or none). It keeps the name, code and
+   * supervisor it always read.
+   */
+  const shownBy = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return data.holders.filter(
-      (h) =>
-        h.type === holderType &&
-        (!onlyHolding || h.lines.some((l) => l.inHand) || h.due !== 0) &&
-        (!q || `${h.name} ${h.code || ""} ${h.supervisorName || ""}`.toLowerCase().includes(q)),
-    );
-  }, [data.holders, holderType, search, onlyHolding]);
+    return (h: HolderStock) =>
+      (!onlyHolding || h.lines.some((l) => l.inHand) || h.due !== 0) &&
+      (!q ||
+        matchesTokens(
+          `${h.name} ${h.code || ""} ${h.supervisorName || ""}`.toLowerCase(),
+          q,
+          (h.phones ?? []).join(" "),
+        ));
+  }, [search, onlyHolding]);
+
+  const holders = useMemo(
+    () => data.holders.filter((h) => h.type === holderType && shownBy(h)),
+    [data.holders, holderType, shownBy],
+  );
+
+  // While searching, each tab says how many it found, so a number typed on the
+  // RSO tab that belongs to a BP is one tap away rather than "Nobody matches".
+  const found = useMemo(() => {
+    if (!search.trim()) return null;
+    const c: Record<HolderType, number> = { RSO: 0, SUPERVISOR: 0, BP: 0 };
+    for (const h of data.holders) if (shownBy(h)) c[h.type] += 1;
+    return c;
+  }, [data.holders, search, shownBy]);
 
   return (
     <>
@@ -529,7 +572,9 @@ export function AccountsOverview({ data }: { data: Overview }) {
               <h2>
                 <Icon name={SHELF_ICON[shelf]} /> {SHELF_LABEL[shelf]}
               </h2>
-              {rows.length > 1 && shelf !== "DEVICE" ? <ShelfTotals rows={rows} period={current} /> : null}
+              {rows.length > 1 && shelf !== "DEVICE" && shelf !== "OTHER" ? (
+                <ShelfTotals rows={rows} period={current} />
+              ) : null}
             </header>
             {shelf === shelves.find((s) => s.shelf.startsWith("SIM"))?.shelf &&
             data.activationsThrough !== null &&
@@ -580,7 +625,7 @@ export function AccountsOverview({ data }: { data: Overview }) {
                 onClick={() => setHolderType(t)}
               >
                 <span>{t === "SUPERVISOR" ? "Supervisors" : `${HOLDER_TYPE_LABEL[t]}s`}</span>
-                <em>{fmtNumber(counts[t])}</em>
+                <em>{fmtNumber(found ? found[t] : counts[t])}</em>
               </button>
             ))}
           </div>
@@ -589,7 +634,7 @@ export function AccountsOverview({ data }: { data: Overview }) {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Find a name or code"
+            placeholder="Find a name, code or phone"
             aria-label="Find a holder"
           />
           <label className="acc-toggle">
@@ -615,9 +660,14 @@ export function AccountsOverview({ data }: { data: Overview }) {
             <EmptyState
               title={search ? "Nobody matches" : "Nobody here is holding stock"}
               hint={
-                onlyHolding && !search
-                  ? "Untick “Only with stock or a due” to see everyone."
-                  : "Try a different name or code."
+                found && (["RSO", "SUPERVISOR", "BP"] as HolderType[]).some((t) => found[t])
+                  ? `Found in ${(["RSO", "SUPERVISOR", "BP"] as HolderType[])
+                      .filter((t) => found[t])
+                      .map((t) => (t === "SUPERVISOR" ? "Supervisors" : `${HOLDER_TYPE_LABEL[t]}s`))
+                      .join(" and ")} — tap that tab.`
+                  : onlyHolding
+                    ? "Untick “Only with stock or a due” to see everyone."
+                    : "Try a different name, code or phone number."
               }
               icon={<Icon name="users" />}
             />

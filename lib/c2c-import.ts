@@ -1,4 +1,5 @@
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
+import { priorImport } from "./import-batch";
 import { prisma } from "@/lib/prisma";
 import {
   computeImportHash,
@@ -17,7 +18,8 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
   const { month, firstDate, reportEndDate, sourceRows, preErrors } = parsed;
 
   const hash = computeImportHash(bytes);
-  const prior = await prisma.importBatch.findUnique({ where: { hash } });
+  // v200: a FAILED or abandoned batch does not block the same file again.
+  const prior = await priorImport(hash);
   if (prior) {
     return {
       duplicate: true,
@@ -51,6 +53,22 @@ export async function importC2cWorkbook(fileName: string, bytes: Buffer) {
    * at all. The report already names the outlet and its RSO, so it is created
    * here and the day's numbers go in. See lib/retailer-autocreate.ts.
    */
+  /*
+   * v200: a file that is going to be rejected creates nothing. The retailers
+   * below were created BEFORE the row errors were checked, so a file refused
+   * for one bad TOTAL_AMOUNT still left its unknown outlets — and their
+   * assignment history — behind in the master list.
+   */
+  if (preErrors.length) {
+    const preview = preErrors
+      .slice(0, 8)
+      .map((e) => `Row ${e.rowNumber}: ${e.message}`)
+      .join("; ");
+    throw new Error(
+      `C2C data validation failed: ${preErrors.length} invalid row(s). ${preview}${preErrors.length > 8 ? " …" : ""}`,
+    );
+  }
+
   const known = new Set(retailers.map((r) => r.retailerCode.toUpperCase()));
   const autoCreated = await createMissingRetailers(
     sourceRows.map((r) => ({

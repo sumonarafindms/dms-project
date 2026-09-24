@@ -2,6 +2,9 @@
 import { AppLink as Link } from "./AppLink";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./icons";
+import { QuickSearch } from "./QuickSearch";
+import { NoticeStrip } from "./NoticeViews";
+import type { NoticeView } from "@/lib/notice-rules";
 import { useEffect, useRef, useState } from "react";
 import { PermissionProvider, type ClientPermissionMap } from "./PermissionContext";
 import { AccountMenu } from "./AccountMenu";
@@ -394,6 +397,14 @@ const configs: Record<string, RoleConfig> = {
  * the grid was still sized for at most six columns, so the RSO's seventh item
  * wrapped onto a second row and ate the bottom of a 390px screen.
  */
+/*
+ * v203: the notice board, for every role — posters manage it there, everyone
+ * else reads it there (and sees what is new on their home screen). No module:
+ * a notice addressed to you is never behind a permission.
+ */
+const NOTICES: NavItem = { href: "/notices", label: "Notice Board", short: "Notices", icon: "info", group: "Overview" };
+for (const key of Object.keys(configs))
+  if (!configs[key].nav.some((i) => i.href === NOTICES.href)) configs[key].nav.push(NOTICES);
 for (const key of ["manager", "supervisor", "accounts", "rso", "bp"]) configs[key].bottom = configs[key].nav;
 function roleFor(path: string) {
   const first = path.split("/").filter(Boolean)[0] || "";
@@ -422,10 +433,13 @@ export default function AppShell({
   children,
   user,
   permissions,
+  notices = [],
 }: {
   children: React.ReactNode;
   user: { displayName: string; role: string } | null;
   permissions: ClientPermissionMap;
+  /** v203: today's notices for this person, shown on their home screen. */
+  notices?: NoticeView[];
 }) {
   const path = usePathname();
   const router = useRouter();
@@ -469,6 +483,7 @@ export default function AppShell({
     : path === "/dashboard" || path.startsWith("/admin/");
   const visibleNav = role.nav.filter((i) => allowed(i, permissions, isAdmin, roleName));
   const visibleBottom = role.bottom.filter((i) => allowed(i, permissions, isAdmin, roleName));
+  const searchPages = visibleNav.map((i) => ({ href: i.href, label: i.label, group: i.group }));
   /*
    * Five cells at most. `lib/bottom-nav.ts` carries the measurement that
    * settled the number and the rule for what happens to the rest.
@@ -482,6 +497,8 @@ export default function AppShell({
           <div className="sidebar-brand">
             <Brand href={role.home} />
           </div>
+          {/* v203: one box for any person, outlet or page — Ctrl K from anywhere. */}
+          {user ? <QuickSearch variant="sidebar" pages={searchPages} /> : null}
           <div className="sidebar-section">{role.title}</div>
           {isAdmin ? (
             <AdminNav
@@ -521,14 +538,22 @@ export default function AppShell({
               <Brand href={role.home} />
               <span>{currentLabel(path, visibleNav, role.home)}</span>
             </div>
-            <AccountMenu
-              variant="avatar"
-              name={profileName}
-              roleTitle={role.title}
-              role={user?.role || ""}
-              initials={role.initials}
-            />
+            <div className="mobile-top-acts">
+              {user ? <QuickSearch variant="icon" pages={searchPages} /> : null}
+              <AccountMenu
+                variant="avatar"
+                name={profileName}
+                roleTitle={role.title}
+                role={user?.role || ""}
+                initials={role.initials}
+              />
+            </div>
           </header>
+          {path === role.home && notices.length ? (
+            <div className="notice-home">
+              <NoticeStrip notices={notices} />
+            </div>
+          ) : null}
           {children}
           {visibleBottom.length > 0 && (
             /*

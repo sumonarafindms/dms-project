@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkRequestOrigin } from "./lib/csrf";
 import { contentSecurityPolicy, cspHeaderName, generateNonce } from "./lib/csp";
+import { dedupeQuery } from "./lib/query-dedupe";
 
 /**
  * Three jobs, in order of how badly each fails:
@@ -9,6 +10,7 @@ import { contentSecurityPolicy, cspHeaderName, generateNonce } from "./lib/csp";
  * 1. Reject cross-site state-changing requests before they reach a handler.
  * 2. Redirect the bare root to the login page (the original job).
  * 3. Attach a per-request CSP nonce and policy to HTML responses.
+ * 4. (v202) Give every page one value per query key — see lib/query-dedupe.
  */
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -41,6 +43,14 @@ export function middleware(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set(headerName, csp);
   requestHeaders.set("x-nonce", nonce);
+
+  // 4. A repeated query key reached pages as an array and crashed them.
+  const single = dedupeQuery(req.nextUrl.searchParams);
+  if (single) {
+    const url = req.nextUrl.clone();
+    url.search = single.toString();
+    return NextResponse.redirect(url);
+  }
 
   // 2. The original redirect.
   if (pathname === "/") {

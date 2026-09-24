@@ -38,8 +38,12 @@ export type MetricComparison = {
   comparison: Comparison;
 };
 
-const scope = (employeeIds?: string[]) =>
-  employeeIds && employeeIds.length ? { retailer: { employeeId: { in: employeeIds } } } : {};
+/*
+ * v200: `undefined` means everyone; an EMPTY list means no one. The two used
+ * to be the same branch, so a manager with no supervisors — or a new
+ * supervisor with no RSOs yet — was shown the whole company's comparison.
+ */
+const scope = (employeeIds?: string[]) => (employeeIds ? { retailer: { employeeId: { in: employeeIds } } } : {});
 
 /** Latest date that has a row for this scope, as YYYY-MM-DD, or null. */
 async function latestGaDate(employeeIds?: string[]) {

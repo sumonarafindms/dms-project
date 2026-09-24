@@ -16,7 +16,7 @@
  */
 
 import { requireUser } from "../../../lib/auth";
-import { dhakaTodayYmd, dhakaYesterdayYmd } from "../../../lib/business-time";
+import { dhakaTodayYmd, dhakaYesterdayYmd, isYmd } from "../../../lib/business-time";
 import { dailyReport, dailySummaryText } from "../../../lib/daily-report";
 import { PAID_FROM_LABEL } from "../../../lib/lifting";
 import { fmtMoney, fmtNumber } from "../../../lib/format";
@@ -36,7 +36,7 @@ export default async function DayReport({ searchParams }: { searchParams: Promis
 
   const sp = await searchParams;
   const today = dhakaTodayYmd();
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date || "") ? sp.date! : today;
+  const date = isYmd(sp.date) ? sp.date : today;
   const r = await dailyReport(date);
 
   const exportHref = `/api/stock/export?report=daily&date=${date}`;
@@ -104,7 +104,7 @@ export default async function DayReport({ searchParams }: { searchParams: Promis
                 <SectionHead title="By kind" />
                 <dl className="kit-daysum">
                   {r.sold.byCategory.map((c) => (
-                    <div key={c.category}>
+                    <div key={c.label}>
                       <dt>{c.label}</dt>
                       <dd>
                         {!c.money && <span className="kit-cell-sub">{fmtNumber(c.qty)} pcs</span>}
@@ -221,7 +221,7 @@ export default async function DayReport({ searchParams }: { searchParams: Promis
               <SectionHead title="Stock that moved" sub="Handed out, handed back, and bought from the company." />
               <dl className="kit-daysum">
                 {r.given.byCategory.map((c) => (
-                  <div key={c.category}>
+                  <div key={c.label}>
                     <dt>Given out — {c.label}</dt>
                     <dd>
                       {!c.money && <span className="kit-cell-sub">{fmtNumber(c.qty)} pcs</span>}

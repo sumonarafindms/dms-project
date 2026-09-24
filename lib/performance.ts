@@ -1,7 +1,14 @@
 import { prisma } from "./prisma";
 import { monthBounds } from "./month";
 import { parseYmd, monthStartUtc, monthStartsInRange, fullyCoveredMonths } from "./date-range";
-import { classifyGaActivation, isLsoComplete, isSsoComplete } from "./business-rules";
+import {
+  SSO_MIN_MONTHLY_STANDARD_GA,
+  classifyGaActivation,
+  isLsoComplete,
+  isSimSellerRetailer,
+} from "./business-rules";
+import { ssoCompletion, type SsoDay } from "./sso-credit";
+import { currentGa170Tariff } from "./ga-tariff";
 import { bpLedger } from "./bp-ledger";
 // BpPortion lives in the Prisma-free rollup module so client components can
 // name it without dragging this file (and Prisma) into the browser bundle.
@@ -84,6 +91,9 @@ const NO_BP_RETAILER: BpRetailerFigures = {
 };
 
 export async function employeePerformance(month: string, employeeIds?: string[], fromInput?: string, toInput?: string) {
+  // Started now, awaited where it is first needed — so it overlaps the queries
+  // below instead of adding a round trip of its own (tests/query-depth).
+  const tariffP = currentGa170Tariff();
   const { start, end } = monthBounds(month);
   const rangeStart = parseYmd(fromInput) || start,
     to = parseYmd(toInput),
@@ -275,21 +285,33 @@ export async function employeePerformance(month: string, employeeIds?: string[],
   const ownerOf = (retailerId: string) => retailerMap.get(retailerId)?.employeeId ?? null;
 
   const gaBy = new Map<string, { t: number; a170: number; a300: number }>(),
-    retailerGaMonth = new Map<string, { eid: string; count: number; simSeller: string | null }>(),
-    // Keyed by retailer-month, and it carries the retailer and a day inside
-    // that month: SSO is credited to whoever HELD the BP, which is no longer
-    // knowable from an employee id alone.
-    bpGaMonth = new Map<
-      string,
-      { retailerId: string; ownerId: string; month: Date; count: number; simSeller: string | null }
-    >();
+    /*
+     * v200: every standard-GA day of each retailer-month, BP-held or not, so
+     * SSO is decided on the WHOLE month and credited once — see lib/sso-credit.
+     */
+    ssoMonths = new Map<string, { retailerId: string; eid: string; simSeller: string | null; days: SsoDay[] }>();
+  const tariff = await tariffP;
+  const addSsoDay = (
+    retailerId: string,
+    eid: string,
+    simSeller: string | null,
+    day: Date,
+    count: number,
+    bp: boolean,
+  ) => {
+    const key = `${retailerId}|${day.toISOString().slice(0, 7)}`;
+    const m = ssoMonths.get(key) ?? { retailerId, eid, simSeller, days: [] };
+    m.days.push({ dayMs: day.getTime(), count, bp });
+    ssoMonths.set(key, m);
+  };
   for (const x of gaGroups) {
     const rr = retailerMap.get(x.retailerId),
       eid = rr?.employeeId;
     if (!eid) continue;
     const count = x._count._all;
     // Standard GA only. SIMWAP / EV-SWAP and unknown product codes never count.
-    const category = classifyGaActivation(x);
+    // v200: with the learned 170 tariff, as the dashboard and BP screens use.
+    const category = classifyGaActivation(x, tariff);
     if (category !== "GA_170" && category !== "GA_300") continue;
     if (ledger.ownsDay(x.retailerId, x.activationDate.getTime())) {
       // The BP sold this, not the RSO. It still belongs to the territory, so
@@ -313,16 +335,7 @@ export async function employeePerformance(month: string, employeeIds?: string[],
         if (category === "GA_170") f.ga170 += count;
         else f.ga300 += count;
       });
-      const bpKey = `${x.retailerId}|${x.activationDate.toISOString().slice(0, 7)}`,
-        br = bpGaMonth.get(bpKey) || {
-          retailerId: x.retailerId,
-          ownerId: eid,
-          month: x.activationDate,
-          count: 0,
-          simSeller: rr?.simSeller ?? null,
-        };
-      br.count += count;
-      bpGaMonth.set(bpKey, br);
+      addSsoDay(x.retailerId, eid, rr?.simSeller ?? null, x.activationDate, count, true);
       continue;
     }
     const g = gaBy.get(eid) || { t: 0, a170: 0, a300: 0 };
@@ -330,21 +343,20 @@ export async function employeePerformance(month: string, employeeIds?: string[],
     if (category === "GA_170") g.a170 += count;
     else g.a300 += count;
     gaBy.set(eid, g);
-    const key = `${x.retailerId}|${x.activationDate.toISOString().slice(0, 7)}`,
-      r = retailerGaMonth.get(key) || { eid, count: 0, simSeller: rr?.simSeller ?? null };
-    r.count += count;
-    retailerGaMonth.set(key, r);
+    addSsoDay(x.retailerId, eid, rr?.simSeller ?? null, x.activationDate, count, false);
   }
+  // SSO counts RETAILER-MONTHS, each once: tested on the whole month and
+  // credited to whoever sold the SIM that completed it (v200).
   const sso = new Map<string, number>();
-  for (const r of retailerGaMonth.values())
-    if (isSsoComplete(r.simSeller, r.count)) sso.set(r.eid, (sso.get(r.eid) || 0) + 1);
-  // SSO counts RETAILER-MONTHS, so a BP's months are tallied on the same rule
-  // against the BP side rather than being lost.
-  for (const r of bpGaMonth.values())
-    if (isSsoComplete(r.simSeller, r.count))
-      ledger.credit(r.retailerId, r.month.getTime(), r.ownerId, (f) => {
+  for (const m of ssoMonths.values()) {
+    const done = ssoCompletion(m.days, isSimSellerRetailer(m.simSeller), SSO_MIN_MONTHLY_STANDARD_GA);
+    if (!done) continue;
+    if (done.bp)
+      ledger.credit(m.retailerId, done.dayMs, m.eid, (f) => {
         f.ssoAchieved += 1;
       });
+    else sso.set(m.eid, (sso.get(m.eid) || 0) + 1);
+  }
 
   const c2cBy = new Map<string, number>();
   for (const x of c2cGroups) {

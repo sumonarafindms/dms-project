@@ -59,6 +59,9 @@ export async function BpActivationListView({
           bpName: a.retailer.bpName,
           rsoName: a.employee.name,
           supervisorName: a.employee.supervisor?.name || "",
+          phones: [a.retailer.iTopUpNumber, a.retailer.tranMobileNo, a.retailer.bpUser?.mobileNumber]
+            .filter(Boolean)
+            .join(" "),
         }))}
         basePath={basePath}
         range={range}

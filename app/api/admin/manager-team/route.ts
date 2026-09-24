@@ -3,6 +3,7 @@ import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { recordAssignmentChanges, type AssignmentChange } from "../../../../lib/assignment-history";
+import { readJson } from "@/lib/request-body";
 
 export async function PATCH(req: Request) {
   const me = await getCurrentUser();
@@ -12,11 +13,20 @@ export async function PATCH(req: Request) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = await req.json(),
+  const b = await readJson(req),
     managerId = String(b.managerId || ""),
-    supervisorIds = Array.isArray(b.supervisorIds) ? b.supervisorIds.map(String) : [];
+    supervisorIds = Array.isArray(b.supervisorIds)
+      ? [...new Set((b.supervisorIds as unknown[]).filter((x): x is string => typeof x === "string" && !!x))]
+      : [];
   const manager = await prisma.user.findUnique({ where: { id: managerId } });
   if (!manager || manager.role !== "MANAGER") return NextResponse.json({ error: "Manager not found" }, { status: 404 });
+  // v202: an id that is not a supervisor broke the save on the database's foreign key (a 500).
+  const known = await prisma.supervisor.count({ where: { id: { in: supervisorIds } } });
+  if (known !== supervisorIds.length)
+    return NextResponse.json(
+      { error: "One of those supervisors no longer exists. Reload and try again." },
+      { status: 400 },
+    );
 
   // Before the write, for the same reason as the supervisor team editor: this
   // both adds and removes, and the previous manager is gone afterwards.

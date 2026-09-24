@@ -19,10 +19,12 @@ import { Card, EmptyState, LinkBtn, PageHeader, SectionHead, SummaryStrip } from
 import { ReportActionBar } from "../components/ReportShell";
 import { Icon } from "../components/icons";
 import { StockHolderTable } from "../components/StockViews";
+import { ServerSearchBar } from "../components/ServerSearchBar";
+import { matchesTokens } from "../../lib/text-search";
 
 export const dynamic = "force-dynamic";
 
-export default async function StockHome() {
+export default async function StockHome({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const u = await requireUser();
   const scope = await stockScope(u);
 
@@ -30,6 +32,10 @@ export default async function StockHome() {
   if (scope.self && scope.holders && scope.holders.size === 1) redirect(`/stock/${scope.self.type}/${scope.self.id}`);
 
   const rows = await holderDues(scope);
+  const q = String((await searchParams).q ?? "")
+    .slice(0, 80)
+    .trim()
+    .toLowerCase();
 
   if (!rows.length)
     return (
@@ -47,6 +53,15 @@ export default async function StockHome() {
       </main>
     );
 
+  const shown = q
+    ? rows.filter((r) =>
+        matchesTokens(
+          `${r.name} ${r.code ?? ""} ${r.supervisorName ?? ""}`.toLowerCase(),
+          q,
+          (r.phones ?? []).join(" "),
+        ),
+      )
+    : rows;
   const owing = rows.filter((r) => r.due > 0);
   const totalDue = paisa(owing.reduce((s, r) => s + r.due, 0));
   const topup = paisa(rows.reduce((s, r) => s + Math.max(0, r.topupInHand), 0));
@@ -85,7 +100,25 @@ export default async function StockHome() {
         title="Highest due first"
         sub="Everyone who owes something, largest first. Each person's stock is their own."
       />
-      <StockHolderTable rows={rows} />
+      {/*
+        v201: find a person by name, code or phone — an RSO's wallet, a BP
+        outlet's numbers, the number they log in with. The totals above stay
+        everyone's; only the list narrows.
+      */}
+      <ServerSearchBar
+        placeholder="Find a name, code or phone"
+        resultCount={q ? shown.length : undefined}
+        resultNoun="row"
+      />
+      {shown.length ? (
+        <StockHolderTable rows={shown} />
+      ) : (
+        <EmptyState
+          title="Nobody matches"
+          hint="Try a different name, code or phone number."
+          icon={<Icon name="users" />}
+        />
+      )}
 
       {!owing.length && (
         <Card className="kit-card-p">

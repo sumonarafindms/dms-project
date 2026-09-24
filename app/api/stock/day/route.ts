@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { MAX_LINE_QTY, isYmd } from "../../../../lib/business-time";
+import { MAX_LINE_QTY, MAX_MONEY, isYmd } from "../../../../lib/business-time";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { STOCK_WRITE_ROLES, findHolder } from "../../../../lib/stock-data";
 import { paisa, priceOn, type HolderType, type MoveKind } from "../../../../lib/stock";
+import { readJson } from "@/lib/request-body";
 
 /**
  * One holder's whole day, saved in one request.
@@ -61,7 +62,7 @@ function quantity(raw: unknown): number | null {
 function money(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === "") return 0;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) return null;
+  if (!Number.isFinite(n) || n < 0 || n > MAX_MONEY) return null;
   return paisa(n);
 }
 
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
     return NextResponse.json(r.body, r.init);
   }
 
-  const b = (await req.json()) as Record<string, unknown>;
+  const b = (await readJson(req)) as Record<string, unknown>;
   const holderType = String(b.holderType || "");
   const holderId = String(b.holderId || "");
   const date = String(b.date || "");
@@ -92,7 +93,10 @@ export async function POST(req: Request) {
    * fail on the foreign key mid-transaction and lose the rest of the day with
    * a message nobody can act on.
    */
-  const lines = (Array.isArray(b.lines) ? b.lines : []) as {
+  // v202: a list item that is not an object (null, a number) is skipped — it crashed the save.
+  const lines = (Array.isArray(b.lines) ? b.lines : []).filter(
+    (l: unknown) => !!l && typeof l === "object" && !Array.isArray(l),
+  ) as {
     productId?: unknown;
     kind?: unknown;
     qty?: unknown;
@@ -132,14 +136,27 @@ export async function POST(req: Request) {
    * snapshot; only a NEW line takes the day's price. To re-price a day on
    * purpose, clear the line, save, and enter it again.
    */
-  const saved = new Map(
-    (
-      await prisma.stockMovement.findMany({
-        where: { holderType, holderId, date: at, kind: { in: ["GIVEN", "SOLD"] } },
-        select: { productId: true, kind: true, unitPrice: true },
-      })
-    ).map((m) => [`${m.productId}|${m.kind}`, Number(m.unitPrice)]),
-  );
+  const [savedRows, chargedRows] = await Promise.all([
+    prisma.stockMovement.findMany({
+      where: { holderType, holderId, date: at, kind: { in: ["GIVEN", "SOLD", "RETURNED"] } },
+      select: { productId: true, kind: true, unitPrice: true },
+    }),
+    /*
+     * v200: the highest price this person was ever CHARGED for each product.
+     * The return ceiling below used only the product's current price rows, so
+     * deleting a mistaken ৳300 price row blocked a return at the ৳300 the
+     * person had actually been given the stock at — and, because the form
+     * sends every line, blocked re-saving that whole day.
+     */
+    prisma.stockMovement.groupBy({
+      by: ["productId"],
+      where: { holderType, holderId, kind: { in: ["GIVEN", "OPENING"] } },
+      _max: { unitPrice: true },
+    }),
+  ]);
+  const saved = new Map(savedRows.map((m) => [`${m.productId}|${m.kind}`, Number(m.unitPrice)]));
+  for (const c of chargedRows)
+    highest.set(c.productId, Math.max(highest.get(c.productId) || 0, Number(c._max.unitPrice || 0)));
 
   const writes: ReturnType<typeof prisma.stockMovement.upsert>[] = [];
   const deletes: ReturnType<typeof prisma.stockMovement.deleteMany>[] = [];
@@ -178,7 +195,9 @@ export async function POST(req: Request) {
        * the stock's value from the due.
        */
       const ceiling = highest.get(productId) || 0;
-      if (unitPrice !== null && ceiling > 0 && unitPrice > ceiling * 1.5)
+      // A return already saved at this price is not re-judged on a re-save.
+      const unchanged = saved.get(`${productId}|RETURNED`) === unitPrice;
+      if (!unchanged && unitPrice !== null && ceiling > 0 && unitPrice > ceiling * 1.5)
         return NextResponse.json(
           {
             error: `The return price for ${nameOf.get(productId) || "that product"} (৳${unitPrice}) is far above anything it has ever cost (৳${ceiling}). Check the figure.`,

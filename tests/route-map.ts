@@ -129,6 +129,10 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
    */
   "/stock": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   "/stock/[type]/[id]": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  // v203: the month statement, scoped exactly as the ledger it hangs off.
+  "/stock/[type]/[id]/statement": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  // v203: every role reads the notice board; four post on it.
+  "/notices": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   "/stock/daily": ["ACCOUNTS"],
   "/stock/opening": ["ACCOUNTS"],
   "/stock/products": ["ACCOUNTS"],

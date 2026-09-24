@@ -178,10 +178,9 @@ export function SupportSchemeCard({
       )}
       {split ? (
         <p className="kit-hint is-xs">
-          <b>{SLAB_BASIS_LABEL[scheme.basis === "OWN" ? "OWN" : "TOTAL"]}.</b>{" "}
-          {scheme.basis === "OWN"
-            ? "Each SIM type climbs its own ladder on its own GA count."
-            : "The day's GA — 170 and 300 together — decides the step; each SIM is paid at its own ladder's rate."}
+          {/* v203: the only reading of a split offer (lib/sim-support.ts SlabBasis). */}
+          <b>{SLAB_BASIS_LABEL.OWN}.</b> The 300৳ SIMs alone decide the 300৳ bonus, and the 170৳ SIMs alone the 170৳
+          bonus — a ladder pays only when its own SIMs reach one of its steps.
         </p>
       ) : null}
       {ssoRate > 0 ? (

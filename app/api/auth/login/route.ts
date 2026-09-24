@@ -6,7 +6,8 @@ import { audit } from "../../../../lib/audit";
 import { phoneKey } from "../../../../lib/phone";
 import { apiError } from "../../../../lib/http-errors";
 import { activeLock, nextLoginFailure } from "../../../../lib/login-policy";
-import { nextAccountState } from "../../../../lib/credential-policy";
+import { MAX_FAILURES_BEFORE_LOCK, nextAccountState } from "../../../../lib/credential-policy";
+import { readJson } from "@/lib/request-body";
 
 function mobileVariants(identifier: string) {
   const raw = identifier.trim(),
@@ -37,6 +38,19 @@ const bucket = (scope: string, admin: boolean, normalized: string, client?: stri
 /** One source against one identifier. Catches a single noisy attacker fast. */
 const throttleKey = (normalized: string, admin: boolean, client: string) => bucket("src", admin, normalized, client);
 
+/**
+ * v200: one source against EVERY identifier.
+ *
+ * The bucket above is per identifier, so it never stopped what its own comment
+ * said it stopped: one address walking down the staff list, five wrong PINs
+ * each, locking every RSO and BP until an administrator unlocked them one by
+ * one. This one counts every failure from an address, whichever account it
+ * names; past the limit the address is refused before any account is touched.
+ * Generous enough for an office behind one connection with people mistyping.
+ */
+const SOURCE_WIDE_FAILURES = 25;
+const sourceWideKey = (admin: boolean, client: string) => bucket("ip", admin, "*", client);
+
 /*
  * The account-scoped THROTTLE bucket is gone, replaced by something stricter:
  * `User.failedLoginCount` and `User.lockedAt`. A throttle only ever slowed an
@@ -48,7 +62,7 @@ const throttleKey = (normalized: string, admin: boolean, client: string) => buck
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await readJson(req);
     const identifier = String(body.identifier || "").trim(),
       credential = String(body.credential || ""),
       admin = !!body.admin;
@@ -61,14 +75,20 @@ export async function POST(req: Request) {
     await prisma.loginThrottle
       .deleteMany({ where: { updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } } })
       .catch(() => {});
-    const throttle = await prisma.loginThrottle.findUnique({ where: { key } });
+    const wideKey = sourceWideKey(admin, clientHint(req));
+    const [throttle, wide] = await Promise.all([
+      prisma.loginThrottle.findUnique({ where: { key } }),
+      prisma.loginThrottle.findUnique({ where: { key: wideKey } }),
+    ]);
     // One source, hammering. Checked before the account is even looked up, so a
     // blocked attacker cannot keep adding failures to other people's accounts.
-    if (activeLock([throttle?.lockedUntil], now))
+    if (activeLock([throttle?.lockedUntil, wide?.lockedUntil], now))
       return NextResponse.json({ error: "Too many failed attempts. Try again later." }, { status: 429 });
     // An expired source lock is cleared so that address starts clean.
     if (throttle?.lockedUntil && throttle.lockedUntil <= now)
       await prisma.loginThrottle.delete({ where: { key } }).catch(() => {});
+    if (wide?.lockedUntil && wide.lockedUntil <= now)
+      await prisma.loginThrottle.delete({ where: { key: wideKey } }).catch(() => {});
 
     const user = await prisma.user.findFirst({
       where: admin
@@ -89,19 +109,61 @@ export async function POST(req: Request) {
         { status: 403 },
       );
 
+    /*
+     * v200: RESERVE the attempt before checking it.
+     *
+     * The counter used to be read, incremented in JavaScript and written back
+     * as a fixed value after the ~50ms credential check. Five hundred guesses
+     * sent at once all read 0, all passed the lock check, and all wrote 1 — so
+     * the five-strike lock allowed thousands of guesses. Now each attempt
+     * increments the row atomically first and reads what it got back: the
+     * sixth concurrent guess sees 6 and is refused without being checked at
+     * all. A correct PIN puts the counter back to zero below.
+     */
+    let reserved: { failedLoginCount: number; lockedAt: Date | null } | null = null;
+    if (user && roleAllowed) {
+      reserved = await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginCount: { increment: 1 } },
+        select: { failedLoginCount: true, lockedAt: true },
+      });
+      if (reserved.lockedAt || reserved.failedLoginCount > MAX_FAILURES_BEFORE_LOCK) {
+        await prisma.user.updateMany({ where: { id: user.id, lockedAt: null }, data: { lockedAt: now } });
+        return NextResponse.json(
+          { error: "This login is locked after too many failed attempts. Ask your administrator to unlock it." },
+          { status: 403 },
+        );
+      }
+    }
+
     const valid = Boolean(
       user && user.active && roleAllowed && (await verifyCredential(credential, user.credentialHash)),
     );
     if (!valid) {
       // The source bucket forgets: an office behind one address should not
       // inherit yesterday's mistakes once its lock has expired.
-      const expired = Boolean(throttle?.lockedUntil && throttle.lockedUntil <= now);
-      const src = nextLoginFailure(expired ? 0 : throttle?.failedCount || 0);
-      await prisma.loginThrottle.upsert({
+      // v200: incremented in the database, not read-add-write, for the same
+      // reason as the account counter above.
+      const counted = await prisma.loginThrottle.upsert({
         where: { key },
-        update: { failedCount: src.failedCount, lockedUntil: src.lockedUntil },
-        create: { key, failedCount: src.failedCount, lockedUntil: src.lockedUntil },
+        update: { failedCount: { increment: 1 } },
+        create: { key, failedCount: 1 },
+        select: { failedCount: true },
       });
+      const src = nextLoginFailure(counted.failedCount - 1);
+      if (src.lockedUntil)
+        await prisma.loginThrottle.update({ where: { key }, data: { lockedUntil: src.lockedUntil } });
+      const wideCount = await prisma.loginThrottle.upsert({
+        where: { key: wideKey },
+        update: { failedCount: { increment: 1 } },
+        create: { key: wideKey, failedCount: 1 },
+        select: { failedCount: true },
+      });
+      if (wideCount.failedCount >= SOURCE_WIDE_FAILURES)
+        await prisma.loginThrottle.update({
+          where: { key: wideKey },
+          data: { lockedUntil: new Date(now.getTime() + 15 * 60_000), failedCount: 0 },
+        });
 
       /*
        * The account's own counter, on the user row rather than in a throttle
@@ -113,19 +175,24 @@ export async function POST(req: Request) {
        * lock an account by guessing near-miss numbers.
        */
       let justLocked = false;
-      if (user && roleAllowed) {
-        const next = nextAccountState(user.failedLoginCount);
-        justLocked = Boolean(next.lockedAt);
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { failedLoginCount: next.failedLoginCount, lockedAt: next.lockedAt },
-        });
+      if (user && roleAllowed && reserved) {
+        // The attempt was already counted when it was reserved; this decides
+        // the lock from that same number (nextAccountState(before) === reserved).
+        const next = nextAccountState(reserved.failedLoginCount - 1);
+        if (next.lockedAt) {
+          // Only the request that actually sets the lock audits it.
+          const set = await prisma.user.updateMany({
+            where: { id: user.id, lockedAt: null },
+            data: { lockedAt: next.lockedAt },
+          });
+          justLocked = set.count > 0;
+        }
         if (justLocked)
           await audit(user, "ACCOUNT_LOCKED", "auth", {
             targetType: "User",
             targetId: user.id,
             targetName: user.displayName,
-            detail: `Locked after ${next.failedLoginCount} consecutive failed sign-ins`,
+            detail: `Locked after ${reserved.failedLoginCount} consecutive failed sign-ins`,
           });
       }
 
@@ -144,8 +211,20 @@ export async function POST(req: Request) {
     // Proving the account is theirs clears both the source penalty and the
     // account's failure history.
     await prisma.loginThrottle.deleteMany({ where: { key } });
-    if (user!.failedLoginCount > 0)
-      await prisma.user.update({ where: { id: user!.id }, data: { failedLoginCount: 0 } });
+    /*
+     * v200: the reset only lands on an account that is still unlocked. A
+     * concurrent wave of guesses may have locked it while this one was being
+     * checked; a correct guess inside that wave must not get a session.
+     */
+    const cleared = await prisma.user.updateMany({
+      where: { id: user!.id, lockedAt: null },
+      data: { failedLoginCount: 0 },
+    });
+    if (cleared.count === 0)
+      return NextResponse.json(
+        { error: "This login is locked after too many failed attempts. Ask your administrator to unlock it." },
+        { status: 403 },
+      );
     await createSession(user!.id);
     await audit(user!, "LOGIN", "auth", {
       targetType: "User",

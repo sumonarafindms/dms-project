@@ -3,22 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { monthBounds } from "@/lib/month";
 import { monthStartsInRange, monthStartUtc } from "@/lib/date-range";
-import { dhakaMonth } from "@/lib/business-time";
+import { dhakaMonth, isYmd } from "@/lib/business-time";
 import { apiError } from "@/lib/http-errors";
 import { lsoCompleteMonthlySummaryWhere } from "@/lib/business-rules";
 
 export const dynamic = "force-dynamic";
 
 function parseDate(value: string | null) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  if (!value || !isYmd(value)) return null;
   const [y, m, d] = value.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await apiUser(["ADMIN", "IT"])))
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await apiUser(["ADMIN", "IT"]))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await apiPermission("c2s", "view"))) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   try {
     const monthText = req.nextUrl.searchParams.get("month") || dhakaMonth() + "-01";

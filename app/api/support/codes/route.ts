@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
+import { hasPermission } from "../../../../lib/permissions";
+import { managerScope } from "../../../../lib/manager-scope";
 import { audit } from "../../../../lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
+import { readJson } from "@/lib/request-body";
 
 /**
  * Which of an RSO's outlets earn the Sim Support SLAB.
@@ -33,18 +36,24 @@ export const SUPPORT_CODES_USUAL = 2;
 export async function POST(req: Request) {
   const me = await getCurrentUser();
   if (!me || !CAN_WRITE.includes(me.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // v200: the person's own permission too, as the codes page checks it.
+  if (!(await hasPermission(me.id, me.role, "support", "edit")))
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
   if (!rl.allowed) {
     const r = rateLimitResponse(rl.retryAfterSeconds);
     return NextResponse.json(r.body, r.init);
   }
-  const b = (await req.json()) as { employeeId?: unknown; retailerIds?: unknown };
+  const b = (await readJson(req)) as { employeeId?: unknown; retailerIds?: unknown };
   const employeeId = String(b.employeeId || "");
   const retailerIds = Array.isArray(b.retailerIds) ? [...new Set(b.retailerIds.map((x) => String(x)))] : null;
   if (!employeeId || !retailerIds)
     return NextResponse.json({ error: "Which RSO, and which outlets?" }, { status: 400 });
   const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, name: true } });
   if (!employee) return NextResponse.json({ error: "That RSO no longer exists." }, { status: 404 });
+  // v200: a manager may set codes only for an RSO in their own team.
+  if (me.role === "MANAGER" && !(await managerScope(me.id)).employeeIds.includes(employeeId))
+    return NextResponse.json({ error: "That RSO is not in your team." }, { status: 403 });
 
   /*
    * Every id must be an outlet this RSO actually owns. Without the check a

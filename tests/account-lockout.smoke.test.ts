@@ -136,7 +136,26 @@ describe("the login route enforces the lock", () => {
      * near-miss numbers, and there would be no row to lock anyway.
      */
     expect(code).toMatch(/if \(user && roleAllowed\)/);
-    expect(code).toMatch(/nextAccountState\(user\.failedLoginCount\)/);
+    expect(code).toMatch(/nextAccountState\(reserved\.failedLoginCount - 1\)/);
+  });
+
+  it("reserves each attempt atomically, so parallel guesses cannot share one count (v200)", () => {
+    /*
+     * The count was read, incremented in JavaScript and written back after the
+     * credential check: 500 concurrent guesses all read 0 and all wrote 1.
+     * Now each attempt increments in the database BEFORE it is checked and is
+     * refused if it is past the limit; a success only resets an account that
+     * is still unlocked.
+     */
+    expect(code).toMatch(/failedLoginCount: \{ increment: 1 \}/);
+    expect(code.indexOf("increment: 1")).toBeLessThan(code.indexOf("verifyCredential("));
+    expect(code).toMatch(/reserved\.failedLoginCount > MAX_FAILURES_BEFORE_LOCK/);
+    expect(code).toMatch(/where: \{ id: user!\.id, lockedAt: null \},\s*data: \{ failedLoginCount: 0 \}/);
+  });
+
+  it("one address cannot lock the whole staff list (v200)", () => {
+    expect(code).toMatch(/sourceWideKey/);
+    expect(code).toMatch(/SOURCE_WIDE_FAILURES/);
   });
 
   it("clears the counter when someone proves the account is theirs", () => {

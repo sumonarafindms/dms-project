@@ -4,9 +4,15 @@
 
 import { requireUser } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
-import { dhakaTodayYmd } from "../../../lib/business-time";
-import { holderKey, listHolders, parseHolderKey, pricedProducts, stockScope } from "../../../lib/stock-data";
-import { HOLDER_TYPE_LABEL } from "../../../lib/stock";
+import { dhakaTodayYmd, isYmd } from "../../../lib/business-time";
+import {
+  holderKey,
+  holderOption,
+  listHolders,
+  parseHolderKey,
+  pricedProducts,
+  stockScope,
+} from "../../../lib/stock-data";
 import { EmptyState, PageHeader } from "../../components/Kit";
 import { Icon } from "../../components/icons";
 import { AppLink } from "../../components/AppLink";
@@ -43,7 +49,7 @@ export default async function Opening({ searchParams }: { searchParams: Promise<
    * date drives the form. A ledger that starts in August must not be opened at
    * October's prices.
    */
-  const asOf = /^\d{4}-\d{2}-\d{2}$/.test(sp.as || "") ? sp.as! : dhakaTodayYmd();
+  const asked = isYmd(sp.as) ? sp.as : null;
   const parsed = parseHolderKey(sp.holder || "");
   const chosen = parsed && holders.find((h) => h.type === parsed.type && h.id === parsed.id);
   /*
@@ -78,6 +84,13 @@ export default async function Opening({ searchParams }: { searchParams: Promise<
       select: { productId: true, qty: true },
     }),
   ]);
+  /*
+   * v200: the date the form will SAVE at is the date the products are priced
+   * at. Without `?as=` the form opens on the saved opening's date, but the
+   * prices were taken at today's — so 10 SIMs opened on 1 Aug at ৳100 showed
+   * as ৳1,200 on screen after a September price rise, and saved at ৳1,000.
+   */
+  const asOf = asked ?? (existing?.asOfDate ? existing.asOfDate.toISOString().slice(0, 10) : dhakaTodayYmd());
   // Retired products this person opened with stay on the form, so saving does not delete them (v199).
   const products = await pricedProducts(asOf, [...new Set(openingLines.map((l) => l.productId))]);
 
@@ -91,23 +104,12 @@ export default async function Opening({ searchParams }: { searchParams: Promise<
           person or date must never inherit the previous one's typed stock. */}
       <StockOpeningForm
         key={`${holderKey(holder.type, holder.id)}|${asOf}`}
-        holders={holders.map((h) => ({
-          id: holderKey(h.type, h.id),
-          label: h.name,
-          meta: [HOLDER_TYPE_LABEL[h.type], h.code, h.supervisorName, h.inactive ? "no longer active" : null]
-            .filter(Boolean)
-            .join(" · "),
-        }))}
+        holders={holders.map(holderOption)}
         holderKey={holderKey(holder.type, holder.id)}
         products={products}
         today={dhakaTodayYmd()}
         initial={{
-          asOfDate:
-            sp.as && /^\d{4}-\d{2}-\d{2}$/.test(sp.as)
-              ? sp.as
-              : existing?.asOfDate
-                ? existing.asOfDate.toISOString().slice(0, 10)
-                : dhakaTodayYmd(),
+          asOfDate: asOf,
           openingDue: Number(existing?.openingDue || 0),
           lines: Object.fromEntries(openingLines.map((l) => [l.productId, l.qty])),
           exists: Boolean(existing),

@@ -76,21 +76,26 @@ export const SUPPORT_TIER_LABEL: Record<SupportTier, string> = {
 /**
  * On a split scheme, which count picks the step.
  *
- * `TOTAL`: the day's GA — both SIM types together — decides which step you are
- * on, and each SIM is paid at its own ladder's rate for that step. That is how
- * the owner's offer reads: one target ("আজকের টার্গেট: 25+ GA") and two rate
- * columns under it.
+ * v203 — the owner's ruling, with a screenshot of a BP paid ৳315 for 3 × 300৳
+ * and 4 × 170৳ SIMs on a "7+" step: *"jokhon alada alada offer diya hobe ...
+ * jokhon 150 takar sorto milbe tokhon 150 takar offer pabe ... 150 takar sim
+ * korce 4ta and 300 takar sim korce 5 ta tahole sudu 300 takar sim ar offer
+ * pabe ... but tumi akhon total hisab kore tar por offer ar taka dou ..
+ * aita alada hobe"*.
  *
- * `OWN`: each ladder is climbed on its own SIM type's count — 7 300৳ SIMs put
- * the 300 ladder on its 7 step whatever the 170s did.
+ * So on a split day EACH SIM TYPE CLIMBS ITS OWN LADDER on its own count — 5
+ * 300৳ SIMs reach the 300 ladder's 5 step; 4 170৳ SIMs do not reach a 5 step
+ * on the 170 ladder and earn nothing, whatever the day's total. There is no
+ * other way to read a split offer any more.
  *
- * Both are real ways the company words an offer, and they pay different money,
- * so the office picks per offer rather than the code guessing.
+ * `TOTAL` remains only as a value an old row may carry in the database
+ * (SupportScheme.slabBasis); it is read as `OWN`. The v203 migration moved
+ * every saved offer to `OWN`.
  */
 export type SlabBasis = "TOTAL" | "OWN";
 
 export const SLAB_BASIS_LABEL: Record<SlabBasis, string> = {
-  TOTAL: "Total GA picks the step",
+  TOTAL: "Each SIM type climbs its own ladder",
   OWN: "Each SIM type climbs its own ladder",
 };
 
@@ -112,7 +117,7 @@ export type SupportSchemeRule = {
    * itself". 1 (the default) means the only condition is completing SSO.
    */
   ssoMinSimsSameDay?: number | null;
-  /** Split schemes only. Absent means `TOTAL`. */
+  /** Split schemes only. Always read as `OWN` since v203 — see `SlabBasis`. */
   basis?: SlabBasis | null;
   /** "আজকের টার্গেট: 25+ GA". Shown, never paid on its own. */
   dailyTarget?: number | null;
@@ -244,7 +249,7 @@ export type LadderEarning = {
   tier: SupportTier;
   /** The SIMs this ladder pays on. */
   sims: number;
-  /** The count that picked the step — the day's total on a `TOTAL` split. */
+  /** The count that picked the step — this ladder's own SIM count on a split day. */
   stepCount: number;
   slab: SupportSlabRule | null;
   amount: number;
@@ -275,23 +280,17 @@ export type SupportEarning = {
   ssoBonus: number;
   total: number;
   next: SupportNextStep | null;
-  /** Split days: the next step on each ladder, or the next shared step. */
+  /** Split days: the next step on each ladder, each on its own SIM count. */
   nextSplit: SplitNextStep[];
 };
 
 /**
- * The next step on a split day.
- *
- * On a `TOTAL` day the step is shared, so there is one of these and `tier` is
- * null: the SIMs still needed can be of either type, so `amount` reprices only
- * the SIMs ALREADY done — what the extra ones earn depends on which type they
- * turn out to be, and a figure that guessed would be a figure nobody set.
- *
- * On an `OWN` day each ladder has its own next step and the extra SIMs are of
- * that ladder's type, so `amount` includes them.
+ * The next step on a split day: one per ladder, each counting its own SIM
+ * type, so the extra SIMs are of that type and `amount` includes them.
+ * (`tier: null` was the shared step of the retired `TOTAL` reading.)
  */
 export type SplitNextStep = {
-  tier: SplitTier | null;
+  tier: SplitTier;
   atSims: number;
   moreSims: number;
   rates: Partial<Record<SplitTier, number>>;
@@ -299,34 +298,21 @@ export type SplitNextStep = {
   gain: number;
 };
 
-function splitAmount(scheme: SupportSchemeRule, c: SimCounts, basis: SlabBasis, stepAt?: number) {
+function splitAmount(scheme: SupportSchemeRule, c: SimCounts) {
   const out: LadderEarning[] = [];
   for (const tier of SPLIT_TIERS) {
     const rule = ladder(scheme, tier);
     if (!rule.slabs.length) continue;
     const sims = tier === "GA_170" ? c.ga170 : c.ga300;
-    const stepCount = stepAt ?? (basis === "TOTAL" ? c.ga170 + c.ga300 : sims);
+    // v203: each ladder on its OWN count — never the day's total.
+    const stepCount = sims;
     const slab = slabFor(rule, stepCount);
     out.push({ tier, sims, stepCount, slab, amount: slab && sims > 0 ? sims * slab.ratePerSim : 0 });
   }
   return out;
 }
 
-function splitNext(scheme: SupportSchemeRule, c: SimCounts, basis: SlabBasis, current: number): SplitNextStep[] {
-  if (basis === "TOTAL") {
-    const total = c.ga170 + c.ga300;
-    const at = [...new Set(scheme.slabs.filter((s) => s.tier && s.tier !== "ALL").map((s) => s.minSims))]
-      .filter((n) => n > total)
-      .sort((a, b) => a - b)[0];
-    if (at === undefined) return [];
-    const rates: Partial<Record<SplitTier, number>> = {};
-    for (const tier of SPLIT_TIERS) {
-      const slab = slabFor(ladder(scheme, tier), at);
-      if (slab) rates[tier] = slab.ratePerSim;
-    }
-    const amount = splitAmount(scheme, c, basis, at).reduce((a, l) => a + l.amount, 0);
-    return [{ tier: null, atSims: at, moreSims: at - total, rates, amount, gain: amount - current }];
-  }
+function splitNext(scheme: SupportSchemeRule, c: SimCounts): SplitNextStep[] {
   const steps: SplitNextStep[] = [];
   for (const tier of SPLIT_TIERS) {
     const rule = ladder(scheme, tier);
@@ -348,9 +334,10 @@ function splitNext(scheme: SupportSchemeRule, c: SimCounts, basis: SlabBasis, cu
 
 export function supportEarning(scheme: SupportSchemeRule, eligible: number | SimCounts, ssoBonus = 0): SupportEarning {
   const c = counts(eligible);
-  const basis: SlabBasis = scheme.basis === "OWN" ? "OWN" : "TOTAL";
+  // v203: a split day is always read ladder by ladder (see `SlabBasis`).
+  const basis: SlabBasis = "OWN";
   if (isSplit(scheme)) {
-    const ladders = splitAmount(scheme, c, basis);
+    const ladders = splitAmount(scheme, c);
     const base = ladders.reduce((a, l) => a + l.amount, 0);
     return {
       sims: c.total,
@@ -364,7 +351,7 @@ export function supportEarning(scheme: SupportSchemeRule, eligible: number | Sim
       ssoBonus,
       total: base + ssoBonus,
       next: null,
-      nextSplit: splitNext(scheme, c, basis, base),
+      nextSplit: splitNext(scheme, c),
     };
   }
   const single = ladder(scheme, "ALL");
@@ -418,8 +405,8 @@ const n = (v: number) => v.toLocaleString("en-US");
 /**
  * Every sentence the RSO's screen should show under the figure.
  *
- * A single-ladder day has at most one (`supportNudge`). A split `OWN` day can
- * have one per SIM type; a split `TOTAL` day has one shared step. The same rule
+ * A single-ladder day has at most one (`supportNudge`). A split day can have
+ * one per SIM type, each counting its own SIMs (v203). The same rule
  * as `supportNudge` holds for all of them: the total named includes the SSO
  * bonus, and the gain is what the extra SIMs are actually worth.
  */
@@ -430,24 +417,10 @@ export function supportNudges(earning: SupportEarning): string[] {
   }
   const out: string[] = [];
   for (const step of earning.nextSplit) {
-    if (step.gain <= 0 && step.tier !== null) continue;
-    const total = step.amount + earning.ssoBonus;
-    if (step.tier === null) {
-      const rates = SPLIT_TIERS.filter((t) => step.rates[t] !== undefined)
-        .map((t) => `${SUPPORT_TIER_LABEL[t]} ৳${n(step.rates[t]!)}`)
-        .join(", ");
-      const done = earning.ga170 + earning.ga300;
-      out.push(
-        `${n(step.moreSims)} more GA — ${n(step.atSims)} in total — reaches the ${n(step.atSims)} GA step (${rates} each).` +
-          (done > 0 && step.gain > 0
-            ? ` The ${n(done)} SIM${done === 1 ? "" : "s"} already done then pay ৳${n(total)}, ৳${n(step.gain)} more — before the new SIMs' own support.`
-            : ""),
-      );
-    } else {
-      out.push(
-        `${n(step.moreSims)} more ${SUPPORT_TIER_LABEL[step.tier]}${step.moreSims === 1 ? "" : "s"} — ${n(step.atSims)} in total — takes your ${SUPPORT_TIER_LABEL[step.tier]} support to ৳${n(step.amount)}, ৳${n(step.gain)} more.`,
-      );
-    }
+    if (step.gain <= 0) continue;
+    out.push(
+      `${n(step.moreSims)} more ${SUPPORT_TIER_LABEL[step.tier]}${step.moreSims === 1 ? "" : "s"} — ${n(step.atSims)} in total — takes your ${SUPPORT_TIER_LABEL[step.tier]} support to ৳${n(step.amount)}, ৳${n(step.gain)} more.`,
+    );
   }
   return out;
 }
@@ -506,7 +479,8 @@ export function offerMessage(
   if (isSplit(scheme)) {
     block("GA_300", "💸 300৳ SIM Bonus");
     block("GA_170", "💸 170৳ SIM Bonus");
-    if (scheme.basis === "OWN") lines.push("(প্রতিটি SIM-এর GA আলাদা ভাবে গণনা হবে)");
+    // v203: always — each SIM type's own count decides its own bonus.
+    lines.push("(প্রতিটি SIM-এর GA আলাদা ভাবে গণনা হবে)");
   } else {
     block("ALL", "💸 SIM Bonus");
   }

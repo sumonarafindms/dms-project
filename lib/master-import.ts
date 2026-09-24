@@ -5,6 +5,7 @@ import type { AuditActor } from "./audit";
 import { normalizeHeader } from "./sheet-headers";
 import { buildEmployeeIndex, linkEmployee } from "./rso-link";
 import * as XLSX from "xlsx";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 type ExcelRow = Record<string, unknown>;
@@ -46,6 +47,48 @@ function rowsFromWorkbook(buffer: Buffer, requiredHeaders: string[], preferredSh
   throw new Error(
     `Required headings missing: ${missing.join(", ")}. ${best ? `Best matching sheet: ${best.sheetName}. Found headings: ${[...best.keys].join(", ")}.` : "No readable worksheet with data was found."}`,
   );
+}
+
+/**
+ * Write the rows in 100-row transactions, and on a failure part-way record what
+ * DID land before saying so (v200).
+ *
+ * Each chunk commits on its own (one transaction for a whole master file runs
+ * past a hosted database's time limit). A failure in chunk 12 of 22 used to
+ * leave 1,100 rows updated, the batch PROCESSING for ever, and no assignment
+ * history for the RSO moves that had committed — so re-uploading the file,
+ * which is how it gets finished, no longer saw those moves at all. Now the
+ * history of the committed chunks is written, the batch is marked FAILED, and
+ * the message says how far it got. The rows are upserts, so uploading the
+ * same file again completes it.
+ */
+async function writeInChunks(
+  ops: Prisma.PrismaPromise<unknown>[],
+  opOf: number[],
+  reassignments: AssignmentChange[],
+  actor: AuditActor | null,
+  source: string,
+  batchId: string,
+) {
+  let committed = 0;
+  try {
+    for (let i = 0; i < ops.length; i += 100) {
+      await prisma.$transaction(ops.slice(i, i + 100));
+      committed = Math.min(ops.length, i + 100);
+    }
+  } catch (error) {
+    await recordAssignmentChanges(
+      actor,
+      reassignments.filter((_, k) => opOf[k] < committed),
+      source,
+    ).catch(() => 0);
+    await prisma.importBatch
+      .update({ where: { id: batchId }, data: { status: "FAILED", successRows: committed } })
+      .catch(() => undefined);
+    throw new Error(
+      `The import stopped after ${committed} of ${ops.length} rows were saved. Upload the same file again to finish — rows already saved are simply updated. (${error instanceof Error ? error.message : "database error"})`,
+    );
+  }
 }
 
 export async function importEmployees(buffer: Buffer, fileName: string, actor: AuditActor | null = null) {
@@ -163,10 +206,13 @@ export async function importEmployees(buffer: Buffer, fileName: string, actor: A
 
   const ops = [];
   const reassignments: AssignmentChange[] = [];
+  /** The op each reassignment rides on, so a partial write can record exactly its own (v200). */
+  const opOf: number[] = [];
   for (const row of valid) {
     const existing = employeeByPhoneKey.get(phoneKey(row.rsoMsisdn)),
       supervisorId = row.supervisorName ? supervisorByName.get(row.supervisorName) || null : null;
-    if (existing && existing.supervisorId !== supervisorId)
+    if (existing && existing.supervisorId !== supervisorId) {
+      opOf.push(ops.length);
       reassignments.push({
         kind: "RSO_SUPERVISOR",
         entityId: existing.id,
@@ -176,6 +222,7 @@ export async function importEmployees(buffer: Buffer, fileName: string, actor: A
         toId: supervisorId,
         toName: supervisorId ? (supervisorName.get(supervisorId) ?? null) : null,
       });
+    }
     if (existing)
       ops.push(
         prisma.employee.update({
@@ -196,7 +243,7 @@ export async function importEmployees(buffer: Buffer, fileName: string, actor: A
         }),
       );
   }
-  for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100));
+  await writeInChunks(ops, opOf, reassignments, actor, `employee master: ${fileName}`, batch.id);
   await recordAssignmentChanges(actor, reassignments, `employee master: ${fileName}`);
   if (errors.length) await prisma.importError.createMany({ data: errors });
 
@@ -306,6 +353,8 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
   // Every retailer whose RSO this upload moves. Without this the previous
   // owner is overwritten and gone — see lib/assignment-history.ts.
   const reassignments: AssignmentChange[] = [];
+  /** The op each reassignment rides on, so a partial write can record exactly its own (v200). */
+  const opOf: number[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i],
@@ -365,7 +414,8 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
       newRows++;
       // A brand-new retailer's first owner is the opening of its history, and
       // a later backfill needs that start point as much as any move.
-      if (employeeId)
+      if (employeeId) {
+        opOf.push(ops.length);
         reassignments.push({
           kind: "RETAILER_RSO",
           entityId: retailerCode,
@@ -375,6 +425,7 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
           toId: employeeId,
           toName: employeeName.get(employeeId) ?? null,
         });
+      }
     } else {
       const changed =
         old.retailerName !== next.retailerName ||
@@ -389,7 +440,8 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
         old.employeeId !== next.employeeId;
       if (changed) updatedRows++;
       else unchangedRows++;
-      if (old.employeeId !== next.employeeId)
+      if (old.employeeId !== next.employeeId) {
+        opOf.push(ops.length);
         reassignments.push({
           kind: "RETAILER_RSO",
           entityId: retailerCode,
@@ -399,6 +451,7 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
           toId: employeeId,
           toName: employeeId ? (employeeName.get(employeeId) ?? null) : null,
         });
+      }
     }
     ops.push(prisma.retailer.upsert({ where: { retailerCode }, update: next, create: { retailerCode, ...next } }));
   }
@@ -413,7 +466,7 @@ export async function importRetailers(buffer: Buffer, fileName: string, actor: A
       `Retailer data validation failed: ${errors.length} invalid row(s). ${preview}${errors.length > 8 ? " …" : ""}`,
     );
   }
-  for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100));
+  await writeInChunks(ops, opOf, reassignments, actor, `retailer master: ${fileName}`, batch.id);
   // After the writes land, never before: history must not claim a move that
   // the transaction then failed to make.
   const historyRows = await recordAssignmentChanges(actor, reassignments, `retailer master: ${fileName}`);

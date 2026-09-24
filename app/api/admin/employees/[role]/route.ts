@@ -4,18 +4,50 @@ import { prisma } from "../../../../../lib/prisma";
 import { getCurrentUser, hashCredential } from "../../../../../lib/auth";
 import { recordAssignmentChanges } from "../../../../../lib/assignment-history";
 import { phoneKey } from "../../../../../lib/phone";
-import { dhakaTodayYmd } from "../../../../../lib/business-time";
+import { dhakaTodayYmd, isYmd } from "../../../../../lib/business-time";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { PIN_REQUIREMENT, validatePin } from "@/lib/credential-policy";
+import { audit } from "@/lib/audit";
+import { readJson } from "@/lib/request-body";
 
-const clean = (v: unknown) => String(v ?? "").trim();
+/*
+ * v200: every create and edit here is audited. These routes create logins,
+ * reset PINs and switch people off, and none of it was recorded — so IT could
+ * reset an RSO's PIN, sign in as them, and put a PIN back with no trace.
+ * The PIN itself is never written to the log, only that one was set.
+ */
+async function logSave(
+  actor: { id: string; role: string; displayName?: string | null },
+  kind: "CREATE" | "EDIT",
+  role: string,
+  id: string | undefined,
+  b: Record<string, unknown>,
+) {
+  await audit(actor as never, `${kind}_${String(role).toUpperCase()}`, "employees", {
+    targetType: String(role).toUpperCase(),
+    targetId: id,
+    targetName: String(b?.name ?? b?.displayName ?? b?.bpName ?? "") || undefined,
+    metadata: { pinSet: Boolean(String(b?.pin ?? "").trim()), active: b?.active !== false },
+  });
+}
+
+/*
+ * v202: only text is text. `String(v)` turned `true`, `0` and `{}` into the
+ * names "true", "0" and "[object Object]" — a hand-made request created
+ * supervisors called exactly that. A number is still read (a code typed into a
+ * spreadsheet arrives as one), anything else is empty and refused as missing.
+ */
+const clean = (v: unknown) =>
+  typeof v === "string" ? v.trim().slice(0, 200) : typeof v === "number" && Number.isFinite(v) ? String(v) : "";
+/** A person's name is text — a bare number (0, -1) is not a name (v202). */
+const nameOf = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 200) : "");
 const nullable = (v: unknown) => {
   const x = clean(v);
   return x || null;
 };
 function day(v: unknown) {
   const s = clean(v);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  if (!isYmd(s)) return null;
   const d = new Date(`${s}T00:00:00.000Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -36,11 +68,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
     return NextResponse.json(r.body, r.init);
   }
   const { role } = await params,
-    b = await req.json(),
+    b = await readJson(req),
     r = role.toLowerCase();
   try {
     if (r === "managers") {
-      const name = clean(b.name),
+      const name = nameOf(b.name),
         mobile = clean(b.mobile),
         pin = clean(b.pin);
       if (!name || !mobile) return NextResponse.json({ error: "Name and mobile are required." }, { status: 400 });
@@ -55,10 +87,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
           active: b.active !== false,
         },
       });
+      await logSave(actor, "CREATE", role, user.id, b);
       return NextResponse.json({ ok: true, id: user.id });
     }
     if (r === "supervisors") {
-      const name = clean(b.name),
+      const name = nameOf(b.name),
         mobile = clean(b.mobile),
         pin = clean(b.pin);
       if (!name) return NextResponse.json({ error: "Supervisor name is required." }, { status: 400 });
@@ -82,10 +115,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
           });
         return supervisor;
       });
+      await logSave(actor, "CREATE", role, result.id, b);
       return NextResponse.json({ ok: true, id: result.id });
     }
     if (r === "rsos") {
-      const name = clean(b.name),
+      const name = nameOf(b.name),
         rsoMsisdn = clean(b.rsoMsisdn),
         employeeCode = nullable(b.employeeCode),
         supervisorId = nullable(b.supervisorId),
@@ -118,6 +152,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
           });
         return employee;
       });
+      await logSave(actor, "CREATE", role, result.id, b);
       return NextResponse.json({ ok: true, id: result.id });
     }
     if (r === "bps") {
@@ -125,7 +160,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
         retailerId = clean(b.retailerId),
         startDate = day(b.startDate),
         gaTarget = Math.max(0, Math.trunc(Number(b.gaTarget) || 0)),
-        name = clean(b.name),
+        name = nameOf(b.name),
         mobile = clean(b.mobile),
         pin = clean(b.pin);
       if (!employeeId || !retailerId || !startDate)
@@ -194,6 +229,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ role: s
         // No login transfer: nothing was ended, so there is no login to move.
         return assignment;
       });
+      await logSave(actor, "CREATE", role, result.id, b);
       return NextResponse.json({ ok: true, id: result.id });
     }
     return NextResponse.json({ error: "Unsupported employee role" }, { status: 404 });
@@ -220,7 +256,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
     return NextResponse.json(r.body, r.init);
   }
   const { role } = await params,
-    b = await req.json(),
+    b = await readJson(req),
     r = role.toLowerCase(),
     id = clean(b.id);
   if (!id) return NextResponse.json({ error: "Record id is required." }, { status: 400 });
@@ -228,7 +264,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
     if (r === "managers") {
       const user = await prisma.user.findUnique({ where: { id } });
       if (!user || user.role !== "MANAGER") return NextResponse.json({ error: "Manager not found." }, { status: 404 });
-      const data: any = { displayName: clean(b.name) || user.displayName, active: b.active !== false };
+      const data: any = { displayName: nameOf(b.name) || user.displayName, active: b.active !== false };
       if (clean(b.mobile)) data.mobileNumber = clean(b.mobile);
       if (clean(b.pin)) {
         if (validatePin(clean(b.pin))) return NextResponse.json({ error: PIN_REQUIREMENT }, { status: 400 });
@@ -236,12 +272,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
       }
       await prisma.user.update({ where: { id }, data });
       if (clean(b.pin) || b.active === false) await prisma.session.deleteMany({ where: { userId: id } });
+      await logSave(actor, "EDIT", role, id, b);
       return NextResponse.json({ ok: true });
     }
     if (r === "supervisors") {
       const supervisor = await prisma.supervisor.findUnique({ where: { id }, include: { user: true } });
       if (!supervisor) return NextResponse.json({ error: "Supervisor not found." }, { status: 404 });
-      const name = clean(b.name) || supervisor.name,
+      const name = nameOf(b.name) || supervisor.name,
         active = b.active !== false,
         mobile = clean(b.mobile),
         pin = clean(b.pin);
@@ -278,12 +315,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
           });
         }
       });
+      await logSave(actor, "EDIT", role, id, b);
       return NextResponse.json({ ok: true });
     }
     if (r === "rsos") {
       const employee = await prisma.employee.findUnique({ where: { id }, include: { user: true } });
       if (!employee) return NextResponse.json({ error: "RSO not found." }, { status: 404 });
-      const name = clean(b.name) || employee.name,
+      const name = nameOf(b.name) || employee.name,
         rsoMsisdn = clean(b.rsoMsisdn) || employee.rsoMsisdn,
         employeeCode = nullable(b.employeeCode),
         supervisorId = nullable(b.supervisorId),
@@ -365,6 +403,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
           "RSO edit",
         );
       }
+      await logSave(actor, "EDIT", role, id, b);
       return NextResponse.json({ ok: true });
     }
     if (r === "bps") {
@@ -415,6 +454,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ role: 
           });
         }
       });
+      await logSave(actor, "EDIT", role, id, b);
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ error: "Unsupported employee role" }, { status: 404 });

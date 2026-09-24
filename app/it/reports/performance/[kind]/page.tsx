@@ -61,7 +61,8 @@ export default async function Performance({
             key: "target",
             label: "Target",
             align: "right",
-            render: (r: PerformanceRow) => r.target.toLocaleString("en-US"),
+            // v200: a target nobody set is "—", not 0 (the v175 rule).
+            render: (r: PerformanceRow) => (r.target ? r.target.toLocaleString("en-US") : "—"),
           },
           {
             key: "pct",
@@ -92,12 +93,27 @@ export default async function Performance({
    * An RSO row is that RSO's own credit with the BP share held aside, so
    * adding them drops it; a supervisor row counts a shared outlet once per
    * team, so adding the teams counts it twice. `companyTotals` does neither.
-   * For `bp` and `retailer` the rows ARE the things themselves — nothing is
-   * held aside and nothing is shared — so the sum is the right total there.
+   * For `retailer` the rows ARE the things themselves, so the sum is the
+   * right total there; for `bp`, see below.
    */
   const company = built.totals;
-  const totalAchieved = company ? company.ga : rows.reduce((a, r) => a + r.achieved, 0);
-  const totalTarget = company ? company.gaTarget : rows.reduce((a, r) => a + r.target, 0);
+  /*
+   * v200: for `bp`, one outlet once. Since v142 an outlet can be held by two
+   * RSOs at the same time, and there is a row per ASSIGNMENT — each counting
+   * the whole outlet — so adding the rows showed an outlet of 40 GA as 80.
+   * Rows are summed per BP code, taking each outlet's figure once.
+   */
+  const perOutlet = (pick: (r: (typeof rows)[number]) => number) => {
+    if (kind !== "bp") return rows.reduce((a, r) => a + pick(r), 0);
+    const seen = new Map<string, number>();
+    for (const r of rows) {
+      const k = r.code && r.code !== "—" ? r.code : r.id;
+      seen.set(k, Math.max(seen.get(k) ?? 0, pick(r)));
+    }
+    return [...seen.values()].reduce((a, v) => a + v, 0);
+  };
+  const totalAchieved = company ? company.ga : perOutlet((r) => r.achieved);
+  const totalTarget = company ? company.gaTarget : perOutlet((r) => r.target);
   const behind = hasTargets
     ? rows.filter((r) => r.target > 0 && targetPercent(r.achieved, r.target) < 80).length
     : rows.filter((r) => r.achieved === 0).length;
@@ -119,13 +135,14 @@ export default async function Performance({
       paging={{
         page: sp.page,
         noun: kind === "retailer" ? "retailer" : kind === "bp" ? "BP" : kind,
-        hrefFor: (p) => reportPageHref(`/it/reports/performance/${kind}`, { from: range.from, to: range.to }, p),
+        hrefFor: (p) =>
+          reportPageHref(`/it/reports/performance/${kind}`, { from: range.from, to: range.to, q: sp.q }, p),
       }}
       summaryItems={[
         { label: "Total GA", value: totalAchieved.toLocaleString("en-US"), tone: "brand" },
         ...(hasTargets
           ? [
-              { label: "Total Target", value: totalTarget.toLocaleString("en-US") },
+              { label: "Total Target", value: totalTarget ? totalTarget.toLocaleString("en-US") : "—" },
               { label: "Achievement", value: totalTarget ? `${targetPercent(totalAchieved, totalTarget)}%` : "—" },
               { label: "Behind Target", value: behind.toLocaleString("en-US"), tone: "amber" as const },
             ]

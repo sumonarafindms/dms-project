@@ -1425,3 +1425,303 @@ A separate read-only review of the whole stock-and-money module, then each findi
 - `.scratch/probe199.ts` — 42 checks through the real API and browser, all pass; every earlier probe re-run (v192–v198 audits, write probes, price-lock, exports, nav, stock read, the Accounts-day walk, stale state) — **0 failed**.
 - **1,252 unit tests across 82 files**, including behavioural tests for each finding; build clean; eslint at the 27-warning baseline.
 - No schema change.
+
+## v200 — Every module reviewed; 42 defects fixed
+
+> *"Sob code check koro and bug fix koro"*
+
+The whole codebase was read by five independent reviewers, one per area:
+- security and APIs;
+- importers;
+- reports and dashboards;
+- field pages and incentives;
+- a second pass on Accounts after v199.
+
+Each finding was checked against the code, or reproduced, before anything was changed. What follows is what was wrong and is now fixed. Findings that turned out to be intended design are listed at the end.
+
+### Security and sign-in
+- **The five-strike lock could be beaten with parallel guesses.**
+  - The failure count was read, incremented in JavaScript and written back after the ~50 ms PIN check. So 500 simultaneous guesses all read 0 and all wrote 1.
+  - Each attempt now **reserves** itself with an atomic increment *before* it is checked. A correct PIN can reset only an account that is still unlocked.
+  - Measured: 60 parallel wrong PINs → exactly 5 were checked, 55 were refused, and the right PIN was then refused too.
+- **One address could lock the whole staff list** by trying 5 wrong PINs on each mobile number. The existing limit was per number, not per address.
+  - A new limit applies per address across every account. Measured: blocked at the 26th number, while other addresses were unaffected.
+- **IT could change the administrator's account** through the users API, e.g. set its password to a 6-digit PIN and sign in as ADMIN. That API now refuses the admin account.
+- **Campaign and Sim Support APIs checked only the role**, not the person's own add/edit permission, which the pages do check. They now check both.
+  - An offer save needs *edit* if the day already has an offer, *add* if not.
+- **A manager could change the support codes (and so the money) of RSOs outside their team.** The codes page and API are now limited to the manager's own team.
+- **PIN resets, logins created, people switched off, and BP assignments started or ended are now audited.** Before, none of this was recorded.
+- **Bad input returned 500 errors instead of a clear refusal:** month 13, 31 Feb, a line break in an export name, targets or rates too large for their column, overrides for unknown employees. Each is now refused or cleaned. A raw database error message is no longer shown on BP assignment.
+
+### Imports
+- **A failed or timed-out import locked its file out for good.** Every later upload of the same file was told "already imported, nothing counted twice", although nothing had been stored.
+  - A FAILED batch, or one left PROCESSING for more than 15 minutes, now gives up its claim on the file. The batch is kept for history.
+  - OB had no duplicate check and crashed; it now says the file was already imported.
+- **Rejected C2C/C2S/OB files still created retailers.** They were created before the row errors were checked; a file that is going to be refused now creates nothing.
+- **Date headers could land a day early on a server running in Dhaka time.** C2 and OB header cells, and GA dates written as text, were read with UTC getters. A month-to-date file was then refused for "spanning two months".
+- **GA text exports (CSV/TSV) read "05/09/2026" as 9 May**, while the same file saved as .xlsx gave 5 September. Text files are now read raw and parsed day-first. A date with a time on it ("01/09/2026 10:00") also keeps its day-first reading.
+- **A GA file of about 125,000 rows crashed** on `Math.min(...dates)`, although the row limit is 250,000.
+- **A master import failing part-way** left rows half-written, the batch stuck at PROCESSING, and no history for the RSO moves that had already committed. It now records those moves, marks the batch FAILED, and says how far it got; uploading the file again finishes it.
+- **Bengali digits** (১২০) in number cells are now read as numbers instead of failing the row.
+
+### Reports and dashboards
+- **SSO was double-counted or lost when a BP started mid-month.** SSO is one fact per retailer-month, but it was tested separately on the RSO part and the BP part: 3 GA + 3 GA gave two SSOs, and 1 + 1 gave none.
+  - It is now tested on the whole month and credited once, to whoever sold the SIM that completed it — the same rule Sim Support pays on.
+  - Company SSO now equals the independent SQL count: 1,336 for 1–15 Sep and 75 for August.
+- **The dashboard credited a BP's GA to whoever held it on the 1st.** An assignment starting on the 12th credited the owner instead of the holder. Each day now goes to that day's holder.
+- **Managers and supervisors with an empty team saw company-wide comparisons.** An empty team now means no one, not everyone.
+- **"By BP" totals counted an outlet held by two RSOs twice** (40 GA shown as 80). Each outlet is now counted once.
+- **SSO Pending on a one-day range tested SSO on that day's GA alone.** A retailer with 10 GA this month and none yesterday showed as "pending". It now uses month-to-date GA.
+- **LSO "Needs Amount" used the range's C2S while "Needs Trx" used the month's transactions.** Both now use the month.
+- **Paging dropped the search:** page 2 of a search showed rows from the unfiltered list. Every report now keeps the search term across pages.
+- **RSOs with no supervisor vanished from every "by supervisor" view**, while the company totals above still counted them. They now appear under "Unassigned".
+- **The 170/300 split on RSO pages and drill-downs ignored the learned 170 price.** It now uses the same learned tariff as the dashboard.
+- **Targets nobody set showed as 0.** They now show as "—" on screen and as blank cells in exports.
+
+### Field pages, Sim Support, campaigns
+- **A BP held by two RSOs was paid its Sim Support slab twice**; the same happened on a hand-over day. Each outlet is now paid once.
+- **The combined-ladder nudge added the SSO bonus into "the SIMs already done then pay…".** That figure is now the SIM bonus alone.
+- **Campaign "whole distribution" progress for a supervisor or manager** compared the company's SIMs against the target of their own team only ("3,000 of 250 · complete"). Both sides are now company-wide.
+- **A BP had no campaign number of its own and saw its holder RSOs' rows.** It now sees its outlet's figure only.
+- **A BP's Live GA was doubled when two RSOs held the outlet.** It is now counted once.
+- **Supervisor drill-down in Live GA went by name**, which can be shared by two supervisors. It now goes by ID.
+- **Switching month quickly on the Targets page could save one month's numbers into another** when an older response arrived last. A late answer for a month you have already left is now ignored.
+- **Editing a Sim Support offer's date** left the old day's offer live and silently replaced the new day's. An offer's day is now fixed once it is saved.
+- **The BP activity lists labelled 170/300 without the learned tariff.** They now use it.
+
+### Accounts (second pass after v199)
+- **A return on the same day as a new delivery** left a due with no stock behind it. A day's return now comes out of the stock held before that day's delivery.
+- **An opening dated after earlier entries skewed the carry price.** An opening is now always where a person's ledger starts, whatever its date.
+- **The return-price ceiling ignored the prices a person was actually charged**, so deleting a mistaken price row could block a genuine return. A return already saved is no longer re-judged.
+- **Supervisor team totals summed money across people**, breaking the rule written into the stock code ("there is no team total and there must never be one"), and netted overpaid people against owing ones. A supervisor's team now shows **counts**: people, how many owe, and how many have had no money in for 7+ days. People who have left count under their supervisor.
+- **A retired product still in someone's hands had no row to return it on.** It now stays on Daily Entry while anyone holds it.
+- **The margin export's godown columns came from the date range**, which could show a negative godown. They are now the current all-time figures, as on screen.
+- **The Opening form**:
+  - silently raised a typed total that was below the stock value; it now says why it cannot switch modes;
+  - priced products at today's date while saving at the opening's date; both now use the opening's date.
+- **"No money in 7+ days" listed people first given stock today**, and dues of a paisa left over from rounding. Someone new now gets a week before appearing, and dues under ৳1 are ignored.
+- **Pages given an impossible date** (`?date=2026-02-31`) loaded the wrong day or returned a 500. They now fall back to today.
+
+### Looked at, and left as designed
+- **Re-importing GA** updates SIM by SIM rather than wiping the days the file covers. The Upload Center describes GA files as multi-date merges, so a SIM left out of a corrected file is not deleted.
+- **A blank C2S transaction count** reads as 0, as before.
+- **Target files** are read from the cell's displayed text, as before.
+- **The Daily report's "Monthly GA Target"** over a range that crosses two months adds both months' targets, as before.
+- **Unfamiliar non-swap product codes count as standard GA**, as before. This is deliberate since v172 and was confirmed against the September file.
+
+### Checked
+- `.scratch/probe200.ts`: sign-in, permissions, scope, bad input and imports, all run against the live app — **all pass**.
+- Company SSO equals independent SQL for two months.
+- Every earlier probe re-run: v192–v199 audits, the write and price-lock probes, the Accounts-day walk, exports, nav and stock read — **0 failed**.
+- **1,280 unit tests across 83 files**, including the new `tests/v200-review.smoke.test.ts`.
+- Build clean; eslint at 26 warnings (down from 27).
+- No schema change.
+
+## v201 — Your own product and expense kinds; search anyone by phone
+
+> *"ami jodi oi jagai ono product add korte chai .. jamon smart watch.. tahole ki vabe korbo kono option rakho nai ... same expanse a o add kore dio"*
+> *"RSO wallet .. jaita mobile number ace oita diye search ar option rakho ... bp der account a jai phone number ace oita diye search"*
+
+### Products: add a kind that is not in the list
+- The **Kind** menu on Products now ends with **"+ A new kind…"**. Choose it and type the name, e.g. *Smart watch*, *Power bank* or *Earphone*.
+  - After the first product, the kind appears in the menu like any other.
+- One kind keeps one spelling: typing "smart watch" joins an existing "Smart watch", and extra spaces are removed.
+- The new kind shows on every screen by its own name: Products (its own section), Daily entry, Opening, Lifting, Day report, the export, and the Accounts home. The Accounts home has a new **"Other products"** shelf.
+- **Fixed while testing:** typing a new name that starts like a saved one made the box disappear mid-word. For example, with "Watch" saved, typing "Watch band" stopped at "Watch". Typing a new kind is now its own state.
+- **Migration:** one new kind value (`OTHER`) and a nullable name column. Nothing existing changes.
+
+### Expenses: add a new kind of expense
+- The **What for** menu ends with **"+ A new kind…"** in the same way, for costs such as *Internet*, *Rent* or *Printing*.
+  - The kind is kept for next time.
+  - Each kind is its own line in "By kind", on the Profit page and in the export.
+- An old "Other" entry with only a note still saves as before.
+- **Fixed:** an expense saved for today "disappeared", because the list opens on yesterday. The note now says *"Saved for 2026-09-24 — outside the dates shown below"* and links to **Show that day**.
+
+### Search by phone number, everywhere people are listed
+The numbers a person is known by:
+- an RSO's **wallet** number;
+- a BP outlet's **iTopUp** and **transaction** numbers;
+- the **number each person logs in with**.
+
+These now find that person in:
+- Daily entry and Opening (the person picker);
+- the Accounts home;
+- Stock & Cash, which gains a search box;
+- the BP activation lists;
+- the admin RSO and BP lists and the Users list;
+- Targets, the Sim Support code picker and the Campaign form.
+
+How it works:
+- Everything that was searchable before still is. The phone number is added on top.
+- A number matches however it is typed: `+8801712345678`, `8801712345678`, `01712345678`, `1712345678`, `01712-345678` or in Bengali digits.
+- Numbers that are not shown on screen are searched only when **four or more digits** are typed. Otherwise "RSO 1" would find everybody, since nearly every number has a 1 in it.
+- The person picker shows one phone number beside the name. A number shared by two people, such as an RSO's login that is another RSO's wallet, lists both.
+- On the Accounts home, searching on one tab shows how many matches each tab has. A BP's number typed on the RSO tab says *"Found in BPs — tap that tab"*.
+
+### Verified
+- `.scratch/probe201.ts`, run in a real browser at 390 px (touch) and 1440 px: **79 checks, all passed, twice**. It adds kinds through the screens, types every phone format into every list above, and checks for sideways scroll and page/console errors.
+- Earlier probes re-run after updating them for the new placeholder and saved-note text: accountsday (0 failed), probe198 (three clean runs), stalestate.
+  - audit194's stored total of dues was out of date because of later probe data. The app's sum of all dues matches independent SQL exactly (৳12,878,225).
+- **1,298 unit tests across 84 files**, including the new `tests/v201-kinds-and-phone-search.smoke.test.ts`. Build clean; eslint at 26 warnings.
+- **Deploy needs** `prisma migrate deploy` for `20260924100000_custom_product_kinds_and_expense_types`.
+
+## v202 — Error check: every route and page fed bad input, every crash fixed
+
+> *"Error check koro and oi gula fix koro"*
+
+The normal checks were already clean: build, type check, 1,298 tests, 0 npm vulnerabilities, and the all-role sweep. So this version went looking for errors on purpose:
+- **Every API route** was sent about 21,000 bad requests: empty or broken bodies, wrong types in every field, huge numbers, impossible dates, and names like `constructor`.
+- **A second pass** started from a *valid* request for each of the 24 write actions and broke one field at a time, including fields inside lists (4,153 requests). This reaches the code behind the id checks.
+- **Every page, as every role**, was opened with bad months and dates, repeated parameters, bad ids and very long searches (13,208 requests).
+- A separate code review looked for crash paths.
+
+Nothing below happens during normal use of the app's own screens, except the expense delete message. All of it is reachable through an edited link, an old bookmark, a double tap or a bad connection.
+
+### Pages that showed the error screen
+- **An impossible month in the link** (`?month=2026-13`, `2026-00`, `9999-12`) crashed about 30 pages: retailer, RSO, supervisor, BP, dashboard and performance pages.
+  - The month check only looked at the shape, so "13" passed. "9999-12" also passed, but its month ends in the year 10000, which the database cannot store.
+  - Months and days must now be real and between 1900 and 2999. A bad month falls back to the current month, as a missing month always did.
+- **A repeated parameter** (`?q=a&q=b`) crashed every IT report and the Audit log, because the page received a list where it expected text. Such links are now redirected to the same address with one value per parameter.
+- **`/it/reports/performance/constructor`** and **`?report=constructor`** on the export matched built-in JavaScript names, got past the "unknown report" check and crashed. They now give a normal "not found". The same fix is on the sample download.
+
+### Save and delete actions that returned a server error (500)
+- **Every write action read the request body without a guard.** An empty body, text that is not JSON, or `null` crashed the handler. All 19 routes now read the body through one shared reader, and a bad body gets the route's usual "please fill this in" answer.
+- **A list with an empty item crashed the save** in Daily entry, Opening, Targets and permissions. Items that are not real entries are now skipped.
+- **Numbers too large for the database** (a target of 10²⁰, a price of 10¹⁷) crashed the save.
+  - Money is now capped at ৳1 lakh crore and counts at 1 billion, with a clear message.
+  - The Targets Excel import has the same caps.
+- **Tiny amounts rounded to zero were saved.** A price or expense of ৳0.004 passed the "more than zero" check, was rounded to ৳0.00 and saved; Daily entry then said the product had "no price". Amounts are now checked after rounding.
+- **Two people deleting the same expense or lifting** at the same moment gave the second person a server error. They now see "already gone".
+- **Two first saves of the same day's Sim Support offer** at the same moment crashed. The second person is now told someone just saved it.
+- **A manager's team with a supervisor id that does not exist** crashed on the database link. It is now refused.
+
+### Bad data that was accepted
+- **Supervisors could be created with the name `true`, `0` or `[object Object]`** when a request sent a non-text name. Names must now be text. A BP name that is not text is ignored.
+- **Resetting permissions for a user who does not exist** answered "ok" and wrote an audit entry about nobody. It is now "User not found".
+
+### Screen
+- **A failed expense delete said nothing.** With no signal or an expired session, the row simply stayed. It now shows the reason, as Lifting does.
+
+### Verified
+- **Fuzzers, re-run on the final build:**
+  - API bad-input fuzz: 17,357 write and upload requests plus 12,896 read requests — **0 server errors**.
+  - Valid-then-broken fuzz: 4,153 requests, every base request accepted — **0 server errors**.
+  - Page fuzz: 13,208 requests across 7 roles — **0 error screens**.
+- **Scripts** (in `.scratch/`): `fuzz202.ts`, `deepfuzz202.ts`, `pagefuzz202.ts`.
+- **Earlier probes re-run: all passed.** These were probe201 (79 checks), accountsday, probe198, probe199, probe200, stalestate, stockwrite, bookswrite, pricelock, exportprobe and accountsscope.
+- **Tests:** **1,338 across 85 files**, including the new `tests/v202-error-hardening.smoke.test.ts` (40 tests).
+- Build clean; eslint at 25 warnings (down from 26); no schema change.
+
+## v203 — WhatsApp receipt, month statement, Quick search, Notice Board, outlet search on Support Codes
+
+> *"Next new kicu features add kore dou...jate aro user friendly hoi"*. From the list offered, the owner picked: WhatsApp receipt, person statement, Quick search and Notice board.
+> *"Ai jagai problem amake code scroll kore khuje nite hoi...ai jagai search option add kore dou..jate code search kore mark kore dite pari"*, with a screenshot of Support Codes.
+
+### Support Codes: find an outlet and tick it
+- **Outlet search inside each RSO.** An RSO can have 124 outlets; finding two meant scrolling a box of checkboxes. Each open RSO now has its own **"Find an outlet: code, name or number"** box.
+  - Type the code, then press **Enter** or tap to pick it. The box clears, ready for the next one.
+- **The top search also finds outlets.** Type an outlet code and it finds the RSO who holds it and opens straight onto that outlet. The RSO stays open when the search is cleared.
+- **Picked codes show as chips** above the list, so they stay visible while searching. Tap a chip to un-pick it. Nothing is saved until **Save**, as before.
+
+### WhatsApp receipt after Daily entry
+- After a day is saved, a **Receipt** card offers **Send on WhatsApp** (with the text already written) and **Copy**. The message lists what was given, returned and sold, the cash and bank deposits, the due before, and the due now.
+- It goes to the number the person signs in with, or else any number on file. With no number, WhatsApp asks whom to send it to.
+- **It only sends what is saved.** If anything on the form has changed, the button is hidden and the card says "Save first".
+
+### Month statement for any person
+- The ledger page has a new **Statement** button. It shows, for the chosen month:
+  - brought forward;
+  - one line per day: given (with items), returned, deposited, and the due after that day;
+  - a by-product count;
+  - carried forward.
+- Month arrows move between months. The current month runs to today.
+- **Print** (or save as PDF) adds signature lines. **Export Excel** downloads the same rows.
+- Accounts also gets a **statement message** to send on WhatsApp.
+- It uses the ledger's own arithmetic, and a sale never reduces the due. It is scoped exactly like the ledger: an RSO opens their own statement and is sent away from anyone else's.
+
+### Quick search
+- **Where:** a search box at the top of the sidebar on desktop, and a 🔍 in the phone's top bar.
+- **Keyboard:** **Ctrl K** (or **/**) opens it, **↑ ↓** move, **Enter** opens.
+- **What it finds:** people, outlets and pages, by name, code or phone number in any format.
+- **Every result opens the page that role already has:**
+  - Accounts → the person's ledger;
+  - a Manager → their RSO and supervisor pages;
+  - Admin/IT → the performance pages.
+- **Scope is the page's scope:**
+  - a manager finds only their own teams;
+  - a supervisor finds their team;
+  - an RSO finds their own outlets and BPs;
+  - a BP gets pages only.
+
+### Notice Board
+- **Who posts:** Admin, IT, a Manager and Accounts post notices (a meeting, a price change, a rule). Each notice has:
+  - who it is for (RSOs, BPs, Supervisors, Managers, Accounts);
+  - an optional last day, up to 90 days ahead;
+  - an **Important** flag, which shows it first, in red.
+- **Where readers see it:** at the top of their home screen. **×** hides it on that phone; it stays on the Notice Board page.
+- **Managers:** a manager's notice reaches only their own teams, and a manager can only take down their own.
+- **Taking one down** removes it from every home screen at once.
+- **Migration:** one new table (`Notice`). Deploy with `prisma migrate deploy`.
+
+### Found while testing: tables were blank on phones
+- On phones narrower than 640 px, every Stock & Cash table was hidden. This covered:
+  - the Daily entry product rows;
+  - Stock & Cash;
+  - the ledger;
+  - Expenses, Lifting and Products;
+  - the Daily report, SIM Check and Profit.
+- The cause was a shared rule that hides a table wrapper on phones because its usual partner is a separate card list. These tables make their own cards, so there was nothing on screen at all.
+- The earlier checks read the page's text, which still exists in hidden elements, so they never noticed. The new probe caught it by trying to *type into* a Daily entry row at 390 px.
+- These tables now show on every phone. Long lines wrap inside the card (a statement day was 929 px wide), and a cell's second line sits under its own value.
+
+### Verified
+- **Browser probe** `.scratch/probe203.ts`: **119 checks, all passed, on two runs**, in a real browser at 390 px (touch) and 1440 px. It covers:
+  - Support Codes search, Enter and chips;
+  - the receipt: link, number, text, and the unsaved guard;
+  - the statement against independent SQL, its export, and its scope;
+  - Quick search across four roles and their scopes, with the keyboard and a tap;
+  - notices: posting rules, manager team scope, home strip, hide, and take down;
+  - no sideways scroll and no page errors.
+- **Earlier probes re-run:** all passed.
+- **All-role page sweep:** 0 problems.
+- **Page fuzz:** 14,300 hostile URLs, including the new pages — 0 error screens.
+- **API fuzz:** 31,243 bad requests, including `/api/notices` and `/api/search` — 0 server errors, and no garbage notice accepted.
+- **Tests:** **1,362 across 86 files**, including the new `tests/v203-friendly-features.smoke.test.ts`. Build clean; eslint at 25 warnings.
+
+## v204 — Sim Support: each SIM type is paid on its own count
+
+> *"ai jagai hisab a vul ace ... jokhon alada alada offer diya hobe jamon 150 takar sim 5ta korle 20 taka and 300 takar sim 5 ta korle 50 .. jokhon 150 takar sorto milbe tokhon 150 takar offer pabe ... 150 takar sim korce 4ta and 300 takar sim korce 5 ta tahole sudu 300 takar sim ar offer pabe .. 5ta sim ar jono 250 taka .. but tumi akhon total hisab kore tar por offer ar taka dou .. but aita alada hobe"*
+
+This also answers the question left open since v198: TOTAL or OWN.
+
+### The mistake
+- An offer with separate 300৳ and 170৳ ladders let the day's **total** GA decide the step.
+- In the screenshot, a BP with 3 × 300৳ and 4 × 170৳ SIMs (7 in total) was put on both "7+" steps. It was paid 3 × ৳65 + 4 × ৳30 = **৳315**, although neither SIM type had reached 7.
+
+### The rule now
+- **Each SIM type climbs its own ladder on its own count.** The 300৳ SIMs alone decide the 300৳ bonus, and the 170৳ SIMs alone decide the 170৳ bonus.
+  - The owner's example: 4 × 170৳ and 5 × 300৳ with "5 → ৳20 / 5 → ৳50" pays the 300৳ offer only: **5 × ৳50 = ৳250**.
+  - The screenshot's BP (3 + 4 on 7+ steps) now earns **৳0**.
+- The "Which GA count picks the step?" choice is gone from the offer form. A note explains the rule there instead, and the day's page says the same.
+- The WhatsApp offer message always carries "(প্রতিটি SIM-এর GA আলাদা ভাবে গণনা হবে)".
+- The next-step hints are one per SIM type, each on its own count. The old shared "N more GA" hint is removed.
+- Single-ladder offers ("every SIM") are unchanged.
+
+### Migration `20260926100000_support_ladders_own_count`
+- New offers default to `OWN`. Every saved offer is moved to `OWN`, so past days in the reports now read the owner's way as well.
+- The code reads a split offer ladder by ladder whatever an old row says.
+- Deploy with `prisma migrate deploy`.
+
+### Verified
+- New tests pin:
+  - the owner's example (৳250);
+  - the screenshot's row (৳0);
+  - an offer saved as TOTAL, which is read as OWN;
+  - per-ladder next steps;
+  - the form having no choice;
+  - the API storing OWN;
+  - the migration.
+- **Browser probe** `.scratch/probe203b.ts`: a split offer posted with `TOTAL` is stored as `OWN`. All **50 people** on a real day, 16 of them with both SIM types, are paid exactly the own-count rule. The day page and the offer form say it at 390 px and 1440 px, with no page errors.
+- probe198, probe200 and probe203 all passed. probe198's "basis TOTAL" check now expects OWN.
+- All-role page sweep: 0 problems.
+- **1,364 tests**, build clean, eslint at 25 warnings.

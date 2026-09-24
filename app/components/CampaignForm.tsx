@@ -21,12 +21,15 @@ import { useRouter } from "next/navigation";
 import { Btn, Card, Field, NumberInput, SectionHead } from "./Kit";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
+import { matchesTokens } from "@/lib/text-search";
 import { CAMPAIGN_SCOPES, CAMPAIGN_SCOPE_HINT, CAMPAIGN_SCOPE_LABEL, type CampaignScope } from "../../lib/campaign";
 
 export type CampaignFormEmployee = {
   id: string;
   name: string;
   code: string | null;
+  /** v201: the RSO's wallet number, so the search finds them by phone. */
+  wallet?: string | null;
   supervisor: string;
   /** The stored override, or "" for none. */
   override: string;
@@ -72,7 +75,9 @@ export function CampaignForm({
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return employees;
-    return employees.filter((e) => [e.name, e.code || "", e.supervisor].some((v) => v.toLowerCase().includes(q)));
+    return employees.filter((e) =>
+      matchesTokens(`${e.name} ${e.code || ""} ${e.supervisor}`.toLowerCase(), q, e.wallet || ""),
+    );
   }, [employees, search]);
 
   const exceptions = Object.entries(overrides).filter(([, v]) => v.trim() !== "").length;
@@ -204,7 +209,7 @@ export function CampaignForm({
               className="kit-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search RSO, code or supervisor"
+              placeholder="Search RSO, code, wallet or supervisor"
               aria-label="Search the list"
             />
             <div className="cmp-override-list">

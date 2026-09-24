@@ -1,9 +1,11 @@
+import { foldDigits } from "@/lib/format";
 import crypto from "crypto";
 import { assertRowLimit, looksLikeWorkbook } from "./upload-safety";
 import { createMissingRetailers, describeCreatedRetailers } from "./retailer-autocreate";
 import { IMPORT_TX_OPTIONS } from "./c2-import-core";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
+import { priorImport } from "./import-batch";
 import { prisma } from "@/lib/prisma";
 import { phoneKey } from "./phone";
 
@@ -18,7 +20,8 @@ function header(value: Cell) {
 }
 function numberValue(value: Cell): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  const raw = text(value).replace(/,/g, "");
+  // v200: Bengali digits (১২০) read as the number they are.
+  const raw = foldDigits(text(value)).replace(/,/g, "");
   if (!raw) return 0;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
@@ -42,7 +45,8 @@ const MONTHS: Record<string, number> = {
 };
 function parseDateHeader(value: Cell): Date | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+    // v200: local getters — see parseHeaderDate in lib/c2-import-core.ts.
+    return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()));
   }
   if (typeof value === "number" && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value);
@@ -272,6 +276,17 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
    * that was correct. The report names the outlet and its RSO, so it is created
    * here instead. See lib/retailer-autocreate.ts.
    */
+  // v200: a file that will be refused for bad rows creates no retailers first.
+  if (errors.length) {
+    const preview = errors
+      .slice(0, 5)
+      .map((e) => `Row ${e.rowNumber}: ${e.message}`)
+      .join("; ");
+    throw new Error(
+      `OB import stopped: ${errors.length} invalid row(s). Fix the file before replacing the current snapshot. ${preview}`,
+    );
+  }
+
   const known = new Set(retailers.map((r) => r.retailerCode.toUpperCase()));
   const autoCreated = await createMissingRetailers(
     parsed.map((r) => ({
@@ -328,6 +343,15 @@ export async function importObWorkbook(fileName: string, bytes: Buffer) {
   if (!mapped.length) throw new Error("OB import stopped: no mapped retailer rows are available.");
 
   const hash = crypto.createHash("sha256").update(bytes).digest("hex");
+  /*
+   * v200: the same file twice is said plainly. OB had no duplicate check and
+   * crashed on the unique hash with a raw database error.
+   */
+  const prior = await priorImport(hash);
+  if (prior)
+    throw new Error(
+      `This exact OB file was already imported (${prior.fileName}). Nothing was changed — the current snapshot stands.`,
+    );
   const batch = await prisma.importBatch.create({
     data: {
       type: ImportType.OB,

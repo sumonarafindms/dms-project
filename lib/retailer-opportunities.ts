@@ -35,6 +35,14 @@ export type RetailerOpportunity = {
   c2c: number;
   c2s: number;
   c2sTransactions: number;
+  /**
+   * v200: the LSO month's own amount and transactions — the month closest to
+   * completing. LSO is a whole-month rule, so what is still needed is measured
+   * from these, never from the report range's C2S (which on the default
+   * "yesterday" range said a ৳600 month still "needs ৳450").
+   */
+  lsoMonthAmount: number;
+  lsoMonthTrx: number;
   openingBalance: number | null;
   ssoComplete: boolean;
   lsoComplete: boolean;
@@ -76,10 +84,17 @@ export async function retailerOpportunities(
         employee: { select: { name: true, rsoMsisdn: true, supervisor: { select: { name: true } } } },
       },
     }),
+    /*
+     * v200: from the START OF THE MONTH, not the start of the range. SSO is a
+     * month-to-date fact, and a "yesterday" report used to test it on
+     * yesterday's GA alone — a retailer with 10 GA this month and none
+     * yesterday was listed as "SSO pending, 2 to go". The range's own GA is
+     * still what the GA column shows; see the loop below.
+     */
     prisma.gaActivation.groupBy({
       by: ["retailerId", "activationDate", "productCode", "sellingPrice"],
       where: {
-        activationDate: { gte: rangeStart, lt: rangeEnd },
+        activationDate: { gte: targetStart < rangeStart ? targetStart : rangeStart, lt: rangeEnd },
         ...(employeeIds ? { retailer: { employeeId: { in: employeeIds } } } : {}),
       },
       _count: { _all: true },
@@ -145,6 +160,8 @@ export async function retailerOpportunities(
       mk = x.activationDate.toISOString().slice(0, 7),
       key = `${x.retailerId}|${mk}`;
     gaByMonth.set(key, (gaByMonth.get(key) || 0) + count);
+    // The GA column is the RANGE's; the month-to-date rows above it only feed SSO.
+    if (x.activationDate < rangeStart) continue;
     const tiers = gaTotal.get(x.retailerId) ?? noTiers();
     addTier(tiers, classifyGaActivation(x, tariff), count);
     gaTotal.set(x.retailerId, tiers);
@@ -220,6 +237,8 @@ export async function retailerOpportunities(
       c2c: c2cAmount,
       c2s: c2sAmount,
       c2sTransactions,
+      lsoMonthAmount: bestLso.amount,
+      lsoMonthTrx: bestLso.trx,
       openingBalance: obMap.has(r.id) ? obMap.get(r.id)! : null,
       ssoComplete,
       lsoComplete,

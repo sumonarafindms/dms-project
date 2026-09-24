@@ -12,16 +12,24 @@
  */
 
 import { useRef, useState } from "react";
-import { Btn } from "./Kit";
+import { Btn, LinkBtn } from "./Kit";
+import { whatsappLink } from "@/lib/receipt";
 import { Icon } from "./icons";
 
 export function SupportOfferMessage({
   text,
   title = "Offer message",
   collapsed,
+  whatsappTo,
 }: {
   text: string;
   title?: string;
+  /**
+   * v203: send it straight to one person on WhatsApp. A string is their
+   * number; null means "no number on file" and WhatsApp asks whom to send to.
+   * Absent: copy only, as the offer message has always been.
+   */
+  whatsappTo?: string | null;
   /** On the day's page the message is a tool, not the content: folded until asked for. */
   collapsed?: boolean;
 }) {
@@ -48,9 +56,17 @@ export function SupportOfferMessage({
     <div className="sup-msg">
       <div className="sup-msg-head">
         <span className="kit-label">{title}</span>
-        <Btn type="button" variant="secondary" size="sm" onClick={copy}>
-          <Icon name={copied ? "check" : "file"} /> {copied ? "Copied" : "Copy for WhatsApp"}
-        </Btn>
+        <span className="sup-msg-acts">
+          {whatsappTo !== undefined ? (
+            <LinkBtn external href={whatsappLink(whatsappTo, text)} target="_blank" rel="noopener noreferrer" size="sm">
+              <Icon name="phone" /> Send on WhatsApp
+            </LinkBtn>
+          ) : null}
+          <Btn type="button" variant="secondary" size="sm" onClick={copy}>
+            <Icon name={copied ? "check" : "file"} />{" "}
+            {copied ? "Copied" : whatsappTo !== undefined ? "Copy" : "Copy for WhatsApp"}
+          </Btn>
+        </span>
       </div>
       <pre ref={pre} className="sup-msg-text" aria-label={title}>
         {text}

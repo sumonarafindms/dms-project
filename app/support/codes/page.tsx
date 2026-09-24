@@ -13,6 +13,7 @@
 import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { AppLink as Link } from "../../components/AppLink";
+import { managerScope } from "../../../lib/manager-scope";
 import { Card, EmptyState, PageHeader } from "../../components/Kit";
 import { Icon } from "../../components/icons";
 import { SupportCodePicker, type CodePickerRso } from "../../components/SupportCodePicker";
@@ -20,17 +21,24 @@ import { SupportCodePicker, type CodePickerRso } from "../../components/SupportC
 export const dynamic = "force-dynamic";
 
 export default async function SupportCodes() {
-  await requirePagePermission(["ADMIN", "IT", "MANAGER"], "support", "edit");
+  const user = await requirePagePermission(["ADMIN", "IT", "MANAGER"], "support", "edit");
+  /*
+   * v200: a manager picks codes for THEIR team only — the same scope every
+   * other manager screen uses. Listing every RSO let a manager change the
+   * support money of RSOs outside their team.
+   */
+  const team = user.role === "MANAGER" ? (await managerScope(user.id)).employeeIds : null;
   const employees = await prisma.employee.findMany({
-    where: { active: true },
+    where: { active: true, ...(team ? { id: { in: team } } : {}) },
     select: {
       id: true,
       name: true,
       employeeCode: true,
+      rsoMsisdn: true,
       supervisor: { select: { name: true } },
       retailers: {
         where: { active: true },
-        select: { id: true, retailerCode: true, retailerName: true, supportEligible: true },
+        select: { id: true, retailerCode: true, retailerName: true, iTopUpNumber: true, supportEligible: true },
         orderBy: { retailerCode: "asc" },
       },
     },
@@ -41,11 +49,13 @@ export default async function SupportCodes() {
     employeeId: e.id,
     name: e.name,
     code: e.employeeCode,
+    wallet: e.rsoMsisdn,
     supervisor: e.supervisor?.name || "Unassigned",
     retailers: e.retailers.map((r) => ({
       id: r.id,
       retailerCode: r.retailerCode,
       retailerName: r.retailerName,
+      wallet: r.iTopUpNumber,
       selected: r.supportEligible,
     })),
   }));

@@ -27,7 +27,10 @@ describe("which shelf a product sits on", () => {
     expect(shelfOf({ category: "ITOPUP", subType: "iTopup", activationType: null })).toBe("ITOPUP");
     expect(shelfOf({ category: "ROUTER", subType: "4G", activationType: null })).toBe("DEVICE");
     expect(shelfOf({ category: "HANDSET", subType: "Basic", activationType: null })).toBe("DEVICE");
-    expect(Object.keys(SHELF_LABEL)).toHaveLength(5);
+    // v201: a kind the owner names himself — a smart watch — has its own shelf.
+    expect(shelfOf({ category: "OTHER", subType: "Series 5", activationType: null })).toBe("OTHER");
+    expect(SHELF_LABEL.OTHER).toBe("Other products");
+    expect(Object.keys(SHELF_LABEL)).toHaveLength(6);
   });
 });
 

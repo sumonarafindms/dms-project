@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { MAX_LINE_QTY, isYmd } from "../../../../lib/business-time";
+import { MAX_LINE_QTY, MAX_MONEY, isYmd } from "../../../../lib/business-time";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
 import { audit } from "../../../../lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { BOOKS_WRITE_ROLES } from "../../../../lib/lifting-data";
 import { paisa } from "../../../../lib/stock";
+import { readJson } from "@/lib/request-body";
 
 /**
  * What we bought from the company.
@@ -23,7 +24,8 @@ import { paisa } from "../../../../lib/stock";
 
 function positive(raw: unknown): number | null {
   const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return null;
+  // v202: capped — past Decimal(18,2) the database refused it with a 500.
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_MONEY) return null;
   return n;
 }
 
@@ -36,7 +38,7 @@ export async function POST(req: Request) {
     return NextResponse.json(r.body, r.init);
   }
 
-  const b = (await req.json()) as Record<string, unknown>;
+  const b = (await readJson(req)) as Record<string, unknown>;
   const date = String(b.date || "");
   const productId = String(b.productId || "");
   const kind = String(b.kind || "PURCHASE");
@@ -50,7 +52,9 @@ export async function POST(req: Request) {
   // v199: a lifting of 0.4 rounded to 0 and was stored; boxes come whole.
   if (!Number.isInteger(qty) || qty > MAX_LINE_QTY)
     return NextResponse.json({ error: "A quantity is a whole number of units." }, { status: 400 });
-  if (unitCost === null) return NextResponse.json({ error: "A cost must be more than zero." }, { status: 400 });
+  // v202: judged after rounding to paisa, as it is stored.
+  if (unitCost === null || !(paisa(unitCost) > 0))
+    return NextResponse.json({ error: "A cost must be more than zero." }, { status: 400 });
 
   const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true, subType: true } });
   if (!product) return NextResponse.json({ error: "Unknown product." }, { status: 400 });
@@ -93,7 +97,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json(r.body, r.init);
   }
 
-  const b = (await req.json()) as Record<string, unknown>;
+  const b = (await readJson(req)) as Record<string, unknown>;
   const id = String(b.id || "");
   if (!id) return NextResponse.json({ error: "Which lifting?" }, { status: 400 });
 
@@ -103,7 +107,9 @@ export async function DELETE(req: Request) {
   });
   if (!row) return NextResponse.json({ error: "That lifting is already gone." }, { status: 404 });
 
-  await prisma.lifting.delete({ where: { id } });
+  // v202: deleteMany + count — two people removing the same row at once made the second a 500.
+  const gone = await prisma.lifting.deleteMany({ where: { id } });
+  if (!gone.count) return NextResponse.json({ error: "That lifting is already gone." }, { status: 404 });
   await audit(me, "DELETE_LIFTING", "stock", {
     targetType: "Lifting",
     targetId: id,

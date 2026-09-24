@@ -32,7 +32,7 @@
  * it — because the identity columns do not fit a phone.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCan } from "../components/PermissionContext";
 import { dhakaMonth } from "../../lib/business-time";
 import {
@@ -50,6 +50,7 @@ import {
 } from "../components/Kit";
 import { Icon } from "../components/icons";
 import { apiFetch, apiSend, apiUpload } from "@/lib/api-client";
+import { matchesTokens } from "@/lib/text-search";
 
 type TargetRow = {
   employeeId: string;
@@ -152,9 +153,18 @@ export default function TargetsPage() {
   >(null);
   const [draft, setDraft] = useState<Record<string, number>>({});
 
+  /*
+   * v200: only the LATEST request may fill the table. Stepping the month
+   * input from Aug to Sep sent two requests; if August's answered last, the
+   * table held August under a September heading and Save wrote August's
+   * numbers into September.
+   */
+  const loadSeq = useRef(0);
   async function load() {
+    const seq = ++loadSeq.current;
     setLoading(true);
     const r = await apiFetch<TargetsPayload>(`/api/targets?month=${month}`, { cache: "no-store" });
+    if (seq !== loadSeq.current) return;
     if (r.ok) {
       setRows(r.data.rows || []);
       setSupRows(r.data.supRows || []);
@@ -258,7 +268,7 @@ export default function TargetsPage() {
   const visible = useMemo(() => {
     const q = search.toLowerCase().trim();
     return rows.filter(
-      (r) => !q || `${r.name} ${r.rsoMsisdn} ${r.employeeCode || ""} ${r.supervisor}`.toLowerCase().includes(q),
+      (r) => !q || matchesTokens(`${r.name} ${r.rsoMsisdn} ${r.employeeCode || ""} ${r.supervisor}`.toLowerCase(), q),
     );
   }, [rows, search]);
 
@@ -554,7 +564,7 @@ export default function TargetsPage() {
             className="kit-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search RSO, code or supervisor"
+            placeholder="Search RSO, code, wallet or supervisor"
             autoComplete="off"
             aria-label="Search RSO targets"
           />

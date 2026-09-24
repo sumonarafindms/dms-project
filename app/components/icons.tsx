@@ -110,6 +110,7 @@ export function Icon({ name, className = "nav-icon" }: { name: string; className
         <path {...p} d="M14 2.5V7h4M9 12h6M9 16h6" />
       </>
     ),
+    close: <path {...p} d="M7 7l10 10M17 7 7 17" />,
     check: (
       <>
         <circle {...p} cx="12" cy="12" r="9" />

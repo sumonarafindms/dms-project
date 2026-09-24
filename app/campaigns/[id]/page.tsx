@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 import { requirePagePermission } from "../../../lib/auth";
 import { prisma } from "../../../lib/prisma";
 import { dhakaTodayYmd } from "../../../lib/business-time";
-import { campaignLineFor, campaignReport } from "../../../lib/campaign-data";
+import { campaignLineFor, campaignOutletLine, campaignReport } from "../../../lib/campaign-data";
 import { scopeFilter, viewerScope } from "../../../lib/feature-scope";
 import { CAMPAIGN_SCOPE_LABEL } from "../../../lib/campaign";
 import { AppLink as Link } from "../../components/AppLink";
@@ -50,7 +50,12 @@ export default async function CampaignDetail({ params }: { params: Promise<{ id:
 
   const scope = await viewerScope(user);
   const report = await campaignReport(row, scopeFilter(scope), dhakaTodayYmd());
-  const mine = scope.selfEmployeeId ? campaignLineFor(report, scope.selfEmployeeId) : null;
+  // v200: a BP reads its OUTLET's figure; it is not an employee and has no row of its own.
+  const mine = scope.selfEmployeeId
+    ? campaignLineFor(report, scope.selfEmployeeId)
+    : user.role === "BP" && scope.selfRetailerId
+      ? campaignOutletLine(report, scope.selfRetailerId)
+      : null;
   const isField = user.role === "RSO" || user.role === "BP";
 
   return (
@@ -116,7 +121,7 @@ export default async function CampaignDetail({ params }: { params: Promise<{ id:
             icon={<Icon name="users" />}
           />
         </Card>
-      ) : (
+      ) : user.role === "BP" ? null : (
         <CampaignLevels
           supervisors={report.supervisors}
           employees={report.employees}

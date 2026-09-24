@@ -8,7 +8,8 @@
  * the input, so the parsed date is read back and compared field by field.
  */
 export function parseYmd(value?: string | null) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  // v202: years 1900–2999 only — "9999-12-31" ends in the year 10000, which the database cannot take.
+  if (!value || !/^(19|2\d)\d{2}-\d{2}-\d{2}$/.test(value)) return null;
   const [y, m, d] = value.split("-").map(Number);
   const date = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return null;

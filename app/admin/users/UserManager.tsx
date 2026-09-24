@@ -28,6 +28,7 @@ import {
   SummaryStrip,
 } from "../../components/Kit";
 import { apiSend } from "@/lib/api-client";
+import { matchesTokens } from "@/lib/text-search";
 import { Picker } from "../../components/Picker";
 import { fmtDateTime } from "../../../lib/format";
 
@@ -140,9 +141,11 @@ export default function UserManager({
     }
   }
 
-  const needle = q.toLowerCase();
+  const needle = q.trim().toLowerCase();
+  // v201: every word anywhere, and a phone number however it is typed.
   const filtered = users.filter(
-    (u) => !q || `${u.displayName} ${u.mobileNumber || ""} ${u.role} ${u.link}`.toLowerCase().includes(needle),
+    (u) =>
+      !needle || matchesTokens(`${u.displayName} ${u.mobileNumber || ""} ${u.role} ${u.link}`.toLowerCase(), needle),
   );
   const editRole = editing?.role || "";
   const activeCount = users.filter((u) => u.active).length;

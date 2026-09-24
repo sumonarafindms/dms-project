@@ -47,14 +47,16 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Btn, Card, EmptyState, Field, NumberInput, SectionHead, type BadgeTone } from "./Kit";
-import { Picker } from "./Picker";
+import { Picker, type PickerOption } from "./Picker";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
+import { dayReceipt } from "@/lib/receipt";
+import { SupportOfferMessage } from "./SupportOfferMessage";
 import { fmtMoney } from "@/lib/format";
 import {
   DUE_TONE_LABEL,
   MOVE_KIND_LABEL,
-  PRODUCT_CATEGORY_LABEL,
+  kindLabel,
   dueOf,
   dueTone,
   isMoneyProduct,
@@ -89,7 +91,7 @@ const TABS: { key: EntryTab; label: string; hint: string }[] = [
 export type EntryProduct = ProductRow & { price: number | null; retired?: boolean };
 
 export type StockDayEntryProps = {
-  holders: { id: string; label: string; meta?: string }[];
+  holders: PickerOption[];
   holderKey: string;
   date: string;
   products: EntryProduct[];
@@ -119,6 +121,8 @@ export type StockDayEntryProps = {
    */
   godown: Record<string, number>;
   basePath: string;
+  /** v203: who this day is for, for the WhatsApp receipt. */
+  person?: { name: string; code: string | null; phone: string | null };
 };
 
 type Qty = Record<string, string>;
@@ -141,6 +145,7 @@ export function StockDayEntry({
   carryPrice,
   godown,
   basePath,
+  person,
 }: StockDayEntryProps) {
   const router = useRouter();
   const [tab, setTab] = useState<EntryTab>("GIVEN");
@@ -230,6 +235,54 @@ export function StockDayEntry({
     bank: num(bank),
   });
 
+  /*
+   * v203 — the receipt. It is sent only for what is SAVED: while the form
+   * differs from the saved day the button waits, so nobody is sent a figure
+   * that is not in the books. "Saved" compares the typed figures with the
+   * saved ones (the page re-reads the day after every save).
+   */
+  const unsaved =
+    products.some((p) => {
+      const r = num(returned[p.id]);
+      return (
+        num(given[p.id]) !== (initial.given[p.id] || 0) ||
+        num(sold[p.id]) !== (initial.sold[p.id] || 0) ||
+        r !== (initial.returned[p.id] || 0) ||
+        (r > 0 && initial.returnPrice[p.id] !== undefined && num(retPrice[p.id]) !== initial.returnPrice[p.id])
+      );
+    }) ||
+    num(cash) !== (initial.cash || 0) ||
+    num(bank) !== (initial.bank || 0);
+  const savedSomething =
+    Object.values(initial.given).some(Boolean) ||
+    Object.values(initial.sold).some(Boolean) ||
+    Object.values(initial.returned).some(Boolean) ||
+    initial.cash > 0 ||
+    initial.bank > 0;
+  const receipt = useMemo(() => {
+    if (!person) return "";
+    const rows = (qtys: Qty, price: (p: EntryProduct) => number) =>
+      products.map((p) => ({
+        name: p.subType,
+        qty: num(qtys[p.id]),
+        value: lineValue(num(qtys[p.id]), price(p)),
+        money: isMoneyProduct(p.category),
+      }));
+    return dayReceipt({
+      name: person.name,
+      code: person.code,
+      dateYmd: date,
+      given: rows(given, (p) => initial.givenPrice[p.id] ?? p.price ?? 0),
+      sold: rows(sold, (p) => initial.soldPrice[p.id] ?? p.price ?? 0),
+      returned: rows(returned, (p) => num(retPrice[p.id]) || p.price || 0),
+      cash: num(cash),
+      bank: num(bank),
+      bankRef,
+      dueBefore,
+      dueAfter: after.due,
+    });
+  }, [person, products, given, sold, returned, retPrice, cash, bank, bankRef, dueBefore, after.due, date, initial]);
+
   function setQty(kind: Exclude<EntryTab, "COLLECT">, productId: string, value: string) {
     const [current, set] = table[kind];
     set({ ...current, [productId]: value });
@@ -297,13 +350,13 @@ export function StockDayEntry({
               onChange={(e) => e.target.value && go(holderKey, e.target.value)}
             />
           </Field>
-          <Field label="Person" hint="RSO, supervisor or BP code">
+          <Field label="Person" hint="Name, code or phone number">
             <Picker
               name="holder"
               options={holders}
               value={holderKey}
               onChange={(id) => id && go(id, date)}
-              placeholder="Type a name or code"
+              placeholder="Type a name, code or phone"
             />
           </Field>
         </div>
@@ -397,7 +450,7 @@ export function StockDayEntry({
                       <td role="cell" data-label="Product">
                         <strong>{p.subType}</strong>
                         <span className="kit-cell-sub">
-                          {PRODUCT_CATEGORY_LABEL[p.category]}
+                          {kindLabel(p)}
                           {p.retired ? " · retired" : ""}
                         </span>
                       </td>
@@ -514,6 +567,22 @@ export function StockDayEntry({
       <Btn onClick={save} disabled={busy || unpriced.length > 0 || fractional.length > 0} block>
         {busy ? "Saving…" : "Save this day"}
       </Btn>
+
+      {person && savedSomething ? (
+        <Card className="kit-card-p kit-mt-20">
+          <SectionHead
+            title="Receipt"
+            sub={
+              unsaved
+                ? "The figures above are not saved yet. Save first — the receipt only ever shows what is in the books."
+                : person.phone
+                  ? `Send ${person.name} what was saved for this day, on WhatsApp to ${person.phone}.`
+                  : `No phone number on file for ${person.name} — WhatsApp will ask whom to send it to.`
+            }
+          />
+          {unsaved ? null : <SupportOfferMessage text={receipt} title="Message" whatsappTo={person.phone} />}
+        </Card>
+      ) : null}
     </>
   );
 }

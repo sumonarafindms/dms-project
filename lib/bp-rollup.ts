@@ -355,16 +355,20 @@ export function groupTotals<T extends RollupRow, K>(
   // type (`supervisorId`, and so on) rather than on the structural minimum
   // this module needs.
   key: (row: T) => K | null | undefined,
-): Map<K, RollupTotals> {
-  const grouped = new Map<K, T[]>();
+): Map<K | null, RollupTotals> {
+  /*
+   * v200: rows with NO key form their own group under `null` — "Unassigned".
+   * They used to be skipped, so an RSO with no supervisor was in the company
+   * strip and in no supervisor row: the strip was bigger than its rows.
+   */
+  const grouped = new Map<K | null, T[]>();
   for (const row of rows) {
-    const k = key(row);
-    if (k === null || k === undefined) continue;
+    const k = key(row) ?? null;
     const list = grouped.get(k);
     if (list) list.push(row);
     else grouped.set(k, [row]);
   }
-  const out = new Map<K, RollupTotals>();
+  const out = new Map<K | null, RollupTotals>();
   for (const [k, list] of grouped) out.set(k, teamTotals(list));
   return out;
 }
@@ -373,11 +377,10 @@ export function groupTotals<T extends RollupRow, K>(
  * How many RSO rows are in each group, which the totals above deliberately do
  * not carry — `retailerCount` counts outlets, not people.
  */
-export function groupSizes<T, K>(rows: T[], key: (row: T) => K | null | undefined): Map<K, number> {
-  const out = new Map<K, number>();
+export function groupSizes<T, K>(rows: T[], key: (row: T) => K | null | undefined): Map<K | null, number> {
+  const out = new Map<K | null, number>();
   for (const row of rows) {
-    const k = key(row);
-    if (k === null || k === undefined) continue;
+    const k = key(row) ?? null;
     out.set(k, (out.get(k) ?? 0) + 1);
   }
   return out;

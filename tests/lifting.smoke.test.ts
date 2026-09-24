@@ -16,6 +16,7 @@ import { join } from "node:path";
 import {
   CHECKED_CATEGORY,
   EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABEL,
   bySuspicion,
   costBasis,
   expenseTotals,
@@ -276,8 +277,8 @@ describe("expenses", () => {
     expect(t.cash).toBe(500);
     expect(t.bank).toBe(9000);
     expect(t.byCategory).toEqual([
-      { category: "TRANSPORT", amount: 500 },
-      { category: "SALARY", amount: 9000 },
+      { category: "TRANSPORT", label: EXPENSE_CATEGORY_LABEL.TRANSPORT, amount: 500 },
+      { category: "SALARY", label: EXPENSE_CATEGORY_LABEL.SALARY, amount: 9000 },
     ]);
   });
 
@@ -289,7 +290,9 @@ describe("expenses", () => {
   it("'Other' must say what it was for", () => {
     // Otherwise it is an entry nobody can explain next month.
     expect(EXPENSE_CATEGORIES).toContain("OTHER");
-    expect(read("app/api/stock/expenses/route.ts")).toContain('category === "OTHER" && !note.trim()');
+    const api = read("app/api/stock/expenses/route.ts");
+    expect(api).toContain("if (!typed && !note.trim())");
+    expect(api).toContain("Name the new kind of expense");
   });
 });
 

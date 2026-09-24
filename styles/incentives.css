@@ -657,53 +657,8 @@
     color: var(--text-muted);
   }
 
-  .sup-basis {
-    display: grid;
-    gap: 0.5rem;
+  .sup-basis-note {
     margin: 0 0 0.875rem;
-    padding: 0;
-    border: 0;
-    min-width: 0;
-  }
-  @media (min-width: 640px) {
-    .sup-basis {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .sup-basis > legend {
-      grid-column: 1 / -1;
-    }
-  }
-  .sup-basis > legend {
-    margin-bottom: 0.25rem;
-  }
-  .sup-basis-opt {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.625rem 0.75rem;
-    min-height: 2.75rem;
-    border-radius: var(--radius-control);
-    border: 1px solid var(--border-hairline);
-    cursor: pointer;
-  }
-  .sup-basis-opt.is-on {
-    border-color: var(--color-brand-500);
-    background: var(--color-brand-50);
-  }
-  .sup-basis-opt > input {
-    margin-top: 0.2rem;
-    accent-color: var(--color-brand-700);
-  }
-  .sup-basis-opt strong {
-    display: block;
-    font-size: 0.82rem;
-    color: var(--color-neutral-900);
-  }
-  .sup-basis-opt em {
-    display: block;
-    font-size: 0.72rem;
-    font-style: normal;
-    color: var(--text-muted);
   }
   /* Inside a ladder a step is one line even on a phone — count, rate, remove.
      Stacked, a six-step ladder was three screens tall. */
@@ -846,5 +801,52 @@
     margin-bottom: 0.2rem;
     font-size: 0.72rem;
     color: var(--color-neutral-700);
+  }
+}
+
+/* v203: finding and seeing the picked outlets of one RSO. */
+@layer components {
+  .sup-msg-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .sup-code-find {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+  }
+  .sup-code-picked {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.625rem;
+  }
+  .sup-code-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.25rem;
+    max-width: 100%;
+    padding: 0.25rem 0.5rem 0.25rem 0.625rem;
+    border: 1px solid var(--color-brand-500);
+    border-radius: 999px;
+    background: var(--surface-brand-tint, var(--color-brand-50));
+    color: var(--color-neutral-800);
+    font: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .sup-code-chip span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 12rem;
+    color: var(--text-muted);
+  }
+  .sup-code-chip svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
   }
 }

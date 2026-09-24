@@ -79,7 +79,8 @@ export default async function TargetReport({
       paging={{
         page: sp.page,
         noun: group === "supervisor" ? "supervisor" : "RSO",
-        hrefFor: (p) => reportPageHref("/it/reports/target", { from: range.from, to: range.to, group: groupParam }, p),
+        hrefFor: (p) =>
+          reportPageHref("/it/reports/target", { from: range.from, to: range.to, q: sp.q, group: groupParam }, p),
       }}
       summaryItems={[
         { label: "GA", value: againstTarget(t.ga, t.gaTarget), tone: "brand" },

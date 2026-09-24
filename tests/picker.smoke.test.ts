@@ -118,11 +118,14 @@ describe("no long list is left in a native menu", () => {
       ROLES: "the seven roles, fixed in code",
     },
     [path.join("app", "components", "ProductMaster.tsx")]: {
-      PRODUCT_CATEGORIES: "the five product kinds, fixed in code — an enum, not a list of people or outlets",
+      KIND_OPTIONS: "the built-in product kinds, fixed in code — an enum, not a list of people or outlets",
+      customKinds:
+        "the owner's own product kinds (v201) — a handful of names like 'Smart watch', never a list of people or outlets",
       ACTIVATION_OPTIONS: "the three activation kinds and 'not linked', fixed in code — an enum (v198)",
     },
     [path.join("app", "components", "ExpenseViews.tsx")]: {
-      EXPENSE_CATEGORIES: "the eight expense kinds, fixed in code — an enum, not a list of people or outlets",
+      BUILT_IN: "the built-in expense kinds, fixed in code — an enum, not a list of people or outlets",
+      kinds: "the owner's own expense kinds (v201) — a handful of names like 'Internet', never people or outlets",
     },
     [path.join("app", "components", "ServerSearchBar.tsx")]: {
       options:

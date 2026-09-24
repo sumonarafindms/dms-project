@@ -202,7 +202,7 @@ export default async function BP() {
         {recent.length ? (
           <div className="kit-rows">
             {recent.map((x) => {
-              const category = classifyGaActivation(x);
+              const category = classifyGaActivation(x, tariff);
               return (
                 <Row
                   key={x.simNo}

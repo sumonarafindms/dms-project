@@ -114,7 +114,7 @@ export async function houseBooks(range?: { from: string; to: string }): Promise<
   const dateFilter = range ? { gte: at(range.from), lte: at(range.to) } : undefined;
 
   const [products, liftRows, costRows, issuedRows, expenseRows] = await Promise.all([
-    prisma.product.findMany({ select: { id: true, category: true, subType: true, unitLabel: true } }),
+    prisma.product.findMany({ select: { id: true, category: true, subType: true, unitLabel: true, kindName: true } }),
     /*
      * v199: for a RANGE, "lifted" means bought from the company in it —
      * PURCHASE only. An opening count is where the godown started, not a
@@ -162,7 +162,7 @@ export async function houseBooks(range?: { from: string; to: string }): Promise<
        GROUP BY 1`,
     prisma.expense.findMany({
       where: dateFilter ? { date: dateFilter } : undefined,
-      select: { category: true, amount: true, paidFrom: true },
+      select: { category: true, label: true, amount: true, paidFrom: true },
     }),
   ]);
 
@@ -191,6 +191,7 @@ export async function houseBooks(range?: { from: string; to: string }): Promise<
   const expenses = expenseTotals(
     expenseRows.map((e) => ({
       category: e.category as ExpenseCategory,
+      label: e.label,
       amount: Number(e.amount),
       paidFrom: e.paidFrom as PaidFrom,
     })),
@@ -225,6 +226,8 @@ export type ExpenseEntry = {
   id: string;
   date: string;
   category: ExpenseCategory;
+  /** v201: the owner's own kind name when category is OTHER. */
+  label: string | null;
   amount: number;
   paidFrom: PaidFrom;
   payee: string | null;
@@ -235,12 +238,22 @@ export async function expensesIn(range: { from: string; to: string }): Promise<E
   const rows = await prisma.expense.findMany({
     where: { date: { gte: at(range.from), lte: at(range.to) } },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    select: { id: true, date: true, category: true, amount: true, paidFrom: true, payee: true, note: true },
+    select: {
+      id: true,
+      date: true,
+      category: true,
+      label: true,
+      amount: true,
+      paidFrom: true,
+      payee: true,
+      note: true,
+    },
   });
   return rows.map((r) => ({
     id: r.id,
     date: ymd(r.date),
     category: r.category as ExpenseCategory,
+    label: r.label,
     amount: Number(r.amount),
     paidFrom: r.paidFrom as PaidFrom,
     payee: r.payee,

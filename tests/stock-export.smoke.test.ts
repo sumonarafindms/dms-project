@@ -92,7 +92,8 @@ describe("an unknown figure is a blank cell, never 0", () => {
     const src = code("lib/stock-export.ts");
     expect(src).toContain('"Avg cost": l.hasCost ? l.avgCost : ""');
     expect(src).toContain('"Margin sold": l.hasCost ? l.marginSold : ""');
-    expect(src).toContain('"Godown value": l.hasCost ? l.godownValue : ""');
+    // v200: the godown columns are all-time (as the screen), still blank when uncosted.
+    expect(src).toContain('"Godown value now": g.hasCost ? g.godownValue : ""');
   });
 
   it("an unpriced SIM gap is blank", () => {

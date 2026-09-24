@@ -63,7 +63,8 @@ export default async function LowC2s({
       paging={{
         page: sp.page,
         noun: "retailer",
-        hrefFor: (p) => reportPageHref("/it/reports/low-c2s", { from: range.from, to: range.to, view: viewParam }, p),
+        hrefFor: (p) =>
+          reportPageHref("/it/reports/low-c2s", { from: range.from, to: range.to, q: sp.q, view: viewParam }, p),
       }}
       summaryItems={[
         { label: "Total Retailers", value: total.toLocaleString("en-US") },

@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { matchesTokens } from "../../lib/text-search";
 import { Icon } from "./icons";
 import { Badge, Card, EmptyState, LinkBtn, Row, SectionHead } from "./Kit";
 
@@ -21,13 +22,17 @@ export type AdminEmployeeRow = {
   meta: string;
   detail: string;
   editHref: string;
+  /** v201: more numbers to find this person by — an RSO's wallet, an outlet's numbers. Searched, not shown. */
+  keywords?: string;
 };
 
 export function EmployeeList({ title, rows, addHref }: { title: string; rows: AdminEmployeeRow[]; addHref: string }) {
   const [q, setQ] = useState("");
-  const needle = q.toLowerCase();
+  const needle = q.trim().toLowerCase();
+  // Every word anywhere, and a phone number however it is typed (v201).
   const filtered = rows.filter(
-    (x) => !q || `${x.name} ${x.mobile} ${x.meta} ${x.detail}`.toLowerCase().includes(needle),
+    (x) =>
+      !needle || matchesTokens(`${x.name} ${x.mobile} ${x.meta} ${x.detail}`.toLowerCase(), needle, x.keywords ?? ""),
   );
   const active = rows.filter((x) => x.active).length;
 
@@ -50,7 +55,7 @@ export function EmployeeList({ title, rows, addHref }: { title: string; rows: Ad
             className="kit-input"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Name, mobile, code or assignment"
+            placeholder="Name, phone, code or assignment"
             autoComplete="off"
             aria-label={`Search ${title}`}
           />

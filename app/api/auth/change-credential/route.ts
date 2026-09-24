@@ -4,6 +4,7 @@ import { createSession, getCurrentUser, hashCredential, verifyCredential } from 
 import { audit } from "../../../../lib/audit";
 import { credentialNoun, validateCredentialChange } from "../../../../lib/credential-change";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { readJson } from "@/lib/request-body";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
 
   let body: Record<string, unknown>;
   try {
-    body = await req.json();
+    body = await readJson(req);
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }

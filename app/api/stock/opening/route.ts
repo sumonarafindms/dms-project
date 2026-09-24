@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MAX_LINE_QTY, isYmd } from "../../../../lib/business-time";
+import { MAX_LINE_QTY, MAX_MONEY, isYmd } from "../../../../lib/business-time";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../../lib/auth";
@@ -7,6 +7,7 @@ import { audit } from "../../../../lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../lib/rate-limit";
 import { STOCK_WRITE_ROLES, findHolder } from "../../../../lib/stock-data";
 import { paisa, priceOn, type HolderType } from "../../../../lib/stock";
+import { readJson } from "@/lib/request-body";
 
 /**
  * Where a holder stood on the day this module went live.
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
     return NextResponse.json(r.body, r.init);
   }
 
-  const b = (await req.json()) as Record<string, unknown>;
+  const b = (await readJson(req)) as Record<string, unknown>;
   const holderType = String(b.holderType || "");
   const holderId = String(b.holderId || "");
   const asOfDate = String(b.asOfDate || "");
@@ -48,9 +49,14 @@ export async function POST(req: Request) {
 
   const openingDue = Number(b.openingDue);
   if (!Number.isFinite(openingDue)) return NextResponse.json({ error: "How much is outstanding?" }, { status: 400 });
+  if (Math.abs(openingDue) > MAX_MONEY)
+    return NextResponse.json({ error: "That amount is too large." }, { status: 400 });
   const due = paisa(openingDue);
 
-  const lines = (Array.isArray(b.lines) ? b.lines : []) as { productId?: unknown; qty?: unknown }[];
+  // v202: a list item that is not an object (null, a number) is skipped — it crashed the save.
+  const lines = (Array.isArray(b.lines) ? b.lines : []).filter(
+    (l: unknown) => !!l && typeof l === "object" && !Array.isArray(l),
+  ) as { productId?: unknown; qty?: unknown }[];
   const wanted = [...new Set(lines.map((l) => String(l.productId || "")))].filter(Boolean);
   const known = wanted.length
     ? await prisma.product.findMany({

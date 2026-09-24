@@ -57,7 +57,7 @@ export default async function OpeningBalance({
       paging={{
         page: sp.page,
         noun: "retailer",
-        hrefFor: (p) => reportPageHref("/it/reports/ob", { from: range.from, to: range.to }, p),
+        hrefFor: (p) => reportPageHref("/it/reports/ob", { from: range.from, to: range.to, q: sp.q }, p),
       }}
       summaryItems={[
         { label: "Retailers", value: total.toLocaleString("en-US") },

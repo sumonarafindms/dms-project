@@ -133,10 +133,11 @@ export async function accountsOverview(scope: StockScope, today = dhakaTodayYmd(
     newest,
     lastMoney,
     pricedToday,
+    firstMove,
   ] = await Promise.all([
     prisma.product.findMany({
       orderBy: [{ category: "asc" }, { subType: "asc" }],
-      select: { id: true, category: true, subType: true, activationType: true, status: true },
+      select: { id: true, category: true, subType: true, kindName: true, activationType: true, status: true },
     }),
     holdersP,
     holdersP.then((h) => holderDues(scope, h)),
@@ -168,12 +169,15 @@ export async function accountsOverview(scope: StockScope, today = dhakaTodayYmd(
       distinct: ["productId"],
       select: { productId: true },
     }),
+    // When each person first got anything — "never paid" only counts once they have had a week to (v200).
+    prisma.stockMovement.groupBy({ by: ["holderType", "holderId"], _min: { date: true } }),
   ]);
 
   const products: OverviewProduct[] = productRows.map((p) => ({
     id: p.id,
     category: p.category as ProductCategory,
     subType: p.subType,
+    kindName: p.kindName,
     activationType: (p.activationType as ActivationType | null) ?? null,
     active: p.status === "ACTIVE",
   }));
@@ -282,9 +286,24 @@ export async function accountsOverview(scope: StockScope, today = dhakaTodayYmd(
   const daysSince = (ymd: string) => Math.round((asDate(today).getTime() - asDate(ymd).getTime()) / 86400000);
   const priced = new Set(pricedToday.map((p) => p.productId));
   const nameOf = (id: string) => byId.get(id)?.subType || "A product";
+  const firstOf = new Map(
+    firstMove.map((m) => [key(m.holderType, m.holderId), m._min.date ? m._min.date.toISOString().slice(0, 10) : null]),
+  );
+  /*
+   * v200: a due under one Taka is rounding, not money owed — returning three
+   * units carried at ৳100.33 credits ৳300.99 and leaves a penny for ever. And
+   * someone first given stock today has not "never paid"; they get the same
+   * week anyone else gets before the list asks about them.
+   */
+  const OWING = 1;
+  const quietSince = (h: HolderStock) => {
+    if (h.lastDeposit) return daysSince(h.lastDeposit);
+    const first = firstOf.get(key(h.type, h.id));
+    return first ? daysSince(first) : null;
+  };
   const attention: Attention = {
     quietDues: holderRows
-      .filter((h) => h.due > 0 && (h.lastDeposit === null || daysSince(h.lastDeposit) >= QUIET_DAYS))
+      .filter((h) => h.due >= OWING && (quietSince(h) ?? QUIET_DAYS) >= QUIET_DAYS)
       .map((h) => ({
         type: h.type,
         id: h.id,
@@ -308,7 +327,7 @@ export async function accountsOverview(scope: StockScope, today = dhakaTodayYmd(
     unpriced: products.filter((p) => p.active && !priced.has(p.id)).map((p) => p.subType),
     unlinkedSims: products.filter((p) => p.active && p.category === "SIM" && !p.activationType).map((p) => p.subType),
     leftWithBalance: holderRows
-      .filter((h) => h.inactive && (h.due !== 0 || h.lines.some((l) => l.inHand !== 0)))
+      .filter((h) => h.inactive && (Math.abs(h.due) >= OWING || h.lines.some((l) => l.inHand !== 0)))
       .map((h) => ({ type: h.type, id: h.id, name: h.name, due: h.due })),
   };
 

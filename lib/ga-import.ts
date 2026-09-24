@@ -1,7 +1,9 @@
+import { foldDigits } from "@/lib/format";
 import crypto from "crypto";
 import { assertRowLimit } from "./upload-safety";
 import * as XLSX from "xlsx";
 import { ImportStatus, ImportType, Prisma } from "@prisma/client";
+import { priorImport } from "./import-batch";
 import { prisma } from "@/lib/prisma";
 import { IMPORT_CHUNK, IMPORT_TX_OPTIONS } from "./c2-import-core";
 import { classifyGaActivation, ga170Tariff, isStandardGaProduct, isSimSwapProduct } from "./business-rules";
@@ -37,7 +39,8 @@ function normalizeSimNo(value: Cell) {
 
 function asNumber(value: Cell): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  const cleaned = asText(value).replace(/,/g, "");
+  // v200: Bengali digits (১২০) read as the number they are.
+  const cleaned = foldDigits(asText(value)).replace(/,/g, "");
   if (!cleaned) return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
@@ -60,7 +63,11 @@ function parseDate(value: Cell): Date | null {
   const text = asText(value);
   if (!text) return null;
 
-  const dmy = text.match(/^(\d{1,2})[-\/]([A-Za-z]{3}|\d{1,2})[-\/](\d{4})$/);
+  // v200: a trailing time ("01/09/2026 10:00") no longer drops the day-first
+  // reading and falls through to `new Date`, which read it as 9 January.
+  const dmy = text.match(
+    /^(\d{1,2})[-\/]([A-Za-z]{3}|\d{1,2})[-\/](\d{4})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AaPp][Mm])?)?$/,
+  );
   if (dmy) {
     const day = Number(dmy[1]);
     const monthToken = dmy[2];
@@ -92,7 +99,9 @@ function parseDate(value: Cell): Date | null {
 
   const parsed = new Date(text);
   if (!Number.isNaN(parsed.getTime())) {
-    return dateOnlyUtc(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+    // v200: local getters. A non-ISO string ("2026/09/01", "1 Sep 2026") is
+    // parsed as LOCAL midnight; the UTC getters read the day before in Dhaka.
+    return dateOnlyUtc(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
   }
   return null;
 }
@@ -128,7 +137,14 @@ function normalizeTime(value: Cell): string | null {
  * moved and every upload started failing.
  */
 export function parseGaWorkbook(bytes: Buffer) {
-  const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true });
+  /*
+   * v200: a TEXT export (CSV/TSV) is read raw. Otherwise SheetJS turns
+   * "05/09/2026" into a date itself, month first — 9 May — before parseDate
+   * can read it day first as the carrier writes it; the same file saved as
+   * .xlsx gave 5 September. Spreadsheets are read as before.
+   */
+  const isText = !(bytes[0] === 0x50 && bytes[1] === 0x4b) && !(bytes[0] === 0xd0 && bytes[1] === 0xcf);
+  const workbook = XLSX.read(bytes, { type: "buffer", cellDates: true, ...(isText ? { raw: true } : {}) });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("No worksheet found in Excel file.");
 
@@ -447,12 +463,23 @@ export function gaShape(rows: readonly ParsedActivation[]) {
 export async function importGaActivationWorkbook(fileName: string, bytes: Buffer) {
   const { parsedRows, sourceRows, sheetName, preErrors } = parseGaWorkbook(bytes);
 
-  const activationDates = parsedRows.map((row) => row.activationDate.getTime());
-  const reportStartDate = new Date(Math.min(...activationDates));
-  const reportEndDate = new Date(Math.max(...activationDates));
+  /*
+   * v200: a loop, not `Math.min(...dates)`. Spreading ~125,000 arguments
+   * overflows the call stack, and the row limit is 250,000.
+   */
+  let minMs = Infinity,
+    maxMs = -Infinity;
+  for (const row of parsedRows) {
+    const t = row.activationDate.getTime();
+    if (t < minMs) minMs = t;
+    if (t > maxMs) maxMs = t;
+  }
+  const reportStartDate = new Date(minMs);
+  const reportEndDate = new Date(maxMs);
 
   const hash = crypto.createHash("sha256").update(bytes).digest("hex");
-  const duplicateFile = await prisma.importBatch.findUnique({ where: { hash } });
+  // v200: a FAILED or abandoned batch does not block the same file again.
+  const duplicateFile = await priorImport(hash);
   if (duplicateFile) {
     return {
       duplicate: true,

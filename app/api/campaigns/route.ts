@@ -1,9 +1,12 @@
+import { isYmd } from "@/lib/business-time";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { getCurrentUser } from "../../../lib/auth";
+import { hasPermission } from "../../../lib/permissions";
 import { audit } from "../../../lib/audit";
 import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../lib/rate-limit";
 import { CAMPAIGN_SCOPES, type CampaignScope } from "../../../lib/campaign";
+import { readJson } from "@/lib/request-body";
 
 /**
  * Campaign create, edit and archive.
@@ -16,7 +19,7 @@ const CAN_WRITE = ["ADMIN", "IT", "MANAGER"];
 
 function parseDay(value: unknown) {
   const s = String(value || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  if (!isYmd(s)) return null;
   const d = new Date(`${s}T00:00:00.000Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -25,8 +28,11 @@ function parseDay(value: unknown) {
 function parseTarget(value: unknown): number | null {
   if (value === null || value === undefined || String(value).trim() === "") return null;
   const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
+  // v200: capped well inside the Int column — a larger number was a 500.
+  return Number.isFinite(n) && n >= 0 && n <= MAX_TARGET ? Math.trunc(n) : null;
 }
+
+const MAX_TARGET = 10_000_000;
 
 type Body = {
   id?: unknown;
@@ -92,7 +98,7 @@ function parseOverrides(raw: unknown) {
     }
     const n = Number(value);
     // Zero is kept. "This RSO is out of this campaign" is a decision.
-    if (Number.isFinite(n) && n >= 0) set.push({ employeeId, target: Math.trunc(n) });
+    if (Number.isFinite(n) && n >= 0 && n <= MAX_TARGET) set.push({ employeeId, target: Math.trunc(n) });
   }
   return { set, clear };
 }
@@ -106,9 +112,16 @@ function parseOverrides(raw: unknown) {
  * body, so a limiter one call deeper would leave that guard unable to see it.
  * A security control a test cannot find is one nobody notices losing.
  */
-async function writer() {
+async function writer(action: "add" | "edit") {
   const me = await getCurrentUser();
-  return me && CAN_WRITE.includes(me.role) ? me : null;
+  if (!me || !CAN_WRITE.includes(me.role)) return null;
+  /*
+   * v200: the role AND the person's own permission. The pages check
+   * requirePagePermission(..., "campaigns", action); the API checked only the role,
+   * so a manager whose add/edit was switched off in Permissions could still
+   * post straight to this route.
+   */
+  return (await hasPermission(me.id, me.role, "campaigns", action)) ? me : null;
 }
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -119,11 +132,11 @@ const tooMany = (retryAfterSeconds: number) => {
 };
 
 export async function POST(req: Request) {
-  const me = await writer();
+  const me = await writer("add");
   if (!me) return unauthorized();
   const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
   if (!rl.allowed) return tooMany(rl.retryAfterSeconds);
-  const b = (await req.json()) as Body;
+  const b = (await readJson(req)) as Body;
   const v = validate(b);
   if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
   const created = await prisma.campaign.create({ data: { ...v.data!, createdById: me.id } });
@@ -137,11 +150,11 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const me = await writer();
+  const me = await writer("edit");
   if (!me) return unauthorized();
   const rl = await consumeRateLimit(RATE_LIMITS.mutation, me.id);
   if (!rl.allowed) return tooMany(rl.retryAfterSeconds);
-  const b = (await req.json()) as Body;
+  const b = (await readJson(req)) as Body;
   const id = String(b.id || "");
   if (!id) return NextResponse.json({ error: "Which campaign?" }, { status: 400 });
   const existing = await prisma.campaign.findUnique({ where: { id }, select: { id: true, name: true } });
@@ -161,7 +174,22 @@ export async function PATCH(req: Request) {
 
   const v = validate(b);
   if (v.error) return NextResponse.json({ error: v.error }, { status: 400 });
-  const { set, clear } = parseOverrides(b.targets);
+  const parsed = parseOverrides(b.targets);
+  /*
+   * v200: an override for an id that is not an employee failed the foreign
+   * key inside the transaction — a 500 and the whole edit lost. Unknown ids
+   * are dropped instead.
+   */
+  const real = new Set(
+    (
+      await prisma.employee.findMany({
+        where: { id: { in: parsed.set.map((r) => r.employeeId) } },
+        select: { id: true },
+      })
+    ).map((e) => e.id),
+  );
+  const set = parsed.set.filter((r) => real.has(r.employeeId));
+  const clear = parsed.clear;
   await prisma.$transaction(async (tx) => {
     await tx.campaign.update({
       where: { id },

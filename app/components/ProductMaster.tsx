@@ -29,9 +29,12 @@ import { Badge, Btn, Card, EmptyState, Field, NumberInput, SectionHead } from ".
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
 import { fmtMoney } from "@/lib/format";
-import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABEL, type ProductCategory } from "@/lib/stock";
+import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABEL, kindLabel, type ProductCategory } from "@/lib/stock";
 
 export type ActivationType = "GA_170" | "GA_300" | "SIM_SWAP";
+
+/** The built-in kinds in the Kind menu. OTHER is not one of them — it is "+ A new kind…". */
+const KIND_OPTIONS = PRODUCT_CATEGORIES.filter((c) => c !== "OTHER");
 
 /** What a SIM product shows up as in the company's activation feed (v198). */
 export const ACTIVATION_LABEL: Record<ActivationType, string> = {
@@ -52,6 +55,7 @@ export type MasterProduct = {
   subType: string;
   unitLabel: string | null;
   status: "ACTIVE" | "INACTIVE";
+  kindName: string | null;
   activationType: ActivationType | null;
   movements: number;
   /** Newest first. */
@@ -70,6 +74,8 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
 
   const [add, setAdd] = useState({
     category: "SIM" as ProductCategory,
+    /** v201: the kind's own name when category is OTHER — an existing one or a new one. */
+    kindName: "",
     subType: "",
     unitLabel: "",
     price: "",
@@ -82,18 +88,52 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter(
-      (p) =>
-        (showRetired || p.status === "ACTIVE") &&
-        (!q || `${p.subType} ${PRODUCT_CATEGORY_LABEL[p.category]}`.toLowerCase().includes(q)),
+      (p) => (showRetired || p.status === "ACTIVE") && (!q || `${p.subType} ${kindLabel(p)}`.toLowerCase().includes(q)),
     );
   }, [products, search, showRetired]);
 
+  /*
+   * v201: the owner's own kinds — "Smart watch" — already in use, so the Kind
+   * menu offers them again instead of asking for the name to be retyped (and
+   * spelt differently) every time.
+   */
+  const customKinds = useMemo(
+    () =>
+      [...new Set(products.filter((p) => p.category === "OTHER" && p.kindName).map((p) => p.kindName!.trim()))].sort(
+        (a, b) => a.localeCompare(b),
+      ),
+    [products],
+  );
+  /** The Kind menu's value: a built-in kind, `OTHER:<name>`, or `NEW` while a new name is typed. */
+  /*
+   * Typing a new kind is its own state, not inferred from the text: with a
+   * "Watch" kind already saved, typing "Watch band" passed through "Watch", the
+   * menu decided that was the existing kind and the box being typed into
+   * vanished under the finger. Once saved, the menu shows the kind as the
+   * server spelled it ("smart watch" joins "Smart watch").
+   */
+  const [typingKind, setTypingKind] = useState(false);
+  const savedKind =
+    add.category === "OTHER" && !typingKind
+      ? customKinds.find((k) => k.toLowerCase() === add.kindName.trim().toLowerCase())
+      : undefined;
+  const kindValue = add.category !== "OTHER" ? add.category : savedKind ? `OTHER:${savedKind}` : "NEW";
+
   /* Grouped by kind, because a catalogue of SIMs, cards, routers and handsets
-     read as one flat list is a list nobody scans. */
+     read as one flat list is a list nobody scans. The owner's own kinds each
+     get their own group, after the built-in ones. */
   const groups = useMemo(() => {
-    const by = new Map<ProductCategory, MasterProduct[]>();
-    for (const p of shown) by.set(p.category, [...(by.get(p.category) || []), p]);
-    return PRODUCT_CATEGORIES.filter((c) => by.has(c)).map((c) => [c, by.get(c)!] as const);
+    const by = new Map<string, MasterProduct[]>();
+    for (const p of shown) {
+      const k = kindLabel(p);
+      by.set(k, [...(by.get(k) || []), p]);
+    }
+    const builtIn = PRODUCT_CATEGORIES.filter((c) => c !== "OTHER").map((c) => PRODUCT_CATEGORY_LABEL[c]);
+    const order = [
+      ...builtIn,
+      ...[...by.keys()].filter((k) => !builtIn.includes(k)).sort((a, b) => a.localeCompare(b)),
+    ];
+    return order.filter((k) => by.has(k)).map((k) => [k, by.get(k)!] as const);
   }, [shown]);
 
   async function send(body: unknown, method: string, okText: string) {
@@ -124,16 +164,43 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
           <Field label="Kind">
             <select
               className="kit-input"
-              value={add.category}
-              onChange={(e) => setAdd({ ...add, category: e.target.value as ProductCategory })}
+              value={kindValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                setTypingKind(v === "NEW");
+                if (v === "NEW") setAdd({ ...add, category: "OTHER", kindName: "" });
+                else if (v.startsWith("OTHER:")) setAdd({ ...add, category: "OTHER", kindName: v.slice(6) });
+                else setAdd({ ...add, category: v as ProductCategory, kindName: "" });
+              }}
             >
-              {PRODUCT_CATEGORIES.map((c) => (
+              {KIND_OPTIONS.map((c) => (
                 <option key={c} value={c}>
                   {PRODUCT_CATEGORY_LABEL[c]}
                 </option>
               ))}
+              {customKinds.map((k) => (
+                <option key={`OTHER:${k}`} value={`OTHER:${k}`}>
+                  {k}
+                </option>
+              ))}
+              <option value="NEW">+ A new kind…</option>
             </select>
           </Field>
+          {kindValue === "NEW" && (
+            <Field label="New kind" hint="e.g. Smart watch, Power bank, Earphone">
+              <input
+                className="kit-input"
+                value={add.kindName}
+                onChange={(e) => {
+                  setTypingKind(true);
+                  setAdd({ ...add, kindName: e.target.value });
+                }}
+                maxLength={40}
+                placeholder="Name the kind"
+                autoFocus
+              />
+            </Field>
+          )}
           <Field label="Name" hint="e.g. Normal 150, Swap SIM, E-SIM">
             <input
               className="kit-input"
@@ -175,10 +242,20 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
         </div>
         <Btn
           onClick={async () => {
-            if (await send(add, "POST", "Product added."))
-              setAdd({ ...add, subType: "", unitLabel: "", price: "", activationType: "" });
+            if (await send(add, "POST", "Product added.")) {
+              setAdd({
+                ...add,
+                kindName: add.kindName.trim(),
+                subType: "",
+                unitLabel: "",
+                price: "",
+                activationType: "",
+              });
+              setTypingKind(false);
+            }
+            // A new kind, once saved, is one of the kinds in the menu — the menu keeps it selected.
           }}
-          disabled={busy || !add.subType || add.price === ""}
+          disabled={busy || !add.subType || add.price === "" || (add.category === "OTHER" && !add.kindName.trim())}
         >
           {busy ? "Saving…" : "Add product"}
         </Btn>
@@ -214,12 +291,9 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
           icon={<Icon name="shop" />}
         />
       ) : (
-        groups.map(([category, rows]) => (
-          <section key={category} className="kit-mb-20">
-            <SectionHead
-              title={PRODUCT_CATEGORY_LABEL[category]}
-              sub={`${rows.length} ${rows.length === 1 ? "product" : "products"}`}
-            />
+        groups.map(([kind, rows]) => (
+          <section key={kind} className="kit-mb-20">
+            <SectionHead title={kind} sub={`${rows.length} ${rows.length === 1 ? "product" : "products"}`} />
             <div className="kit-table-wrap">
               <table className="kit-report-table" role="table">
                 <thead>

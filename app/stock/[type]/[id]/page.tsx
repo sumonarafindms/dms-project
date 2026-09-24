@@ -53,11 +53,17 @@ export default async function HolderLedger({ params }: { params: Promise<{ type:
           holder.supervisorName ? ` · ${holder.supervisorName}` : ""
         }`}
         action={
-          scope.canWrite ? (
-            <LinkBtn href={`/stock/daily?holder=${holder.type}:${holder.id}`}>
-              <Icon name="upload" /> Enter a day
+          <span className="kit-rowacts">
+            {/* v203: the month statement, to print or send. */}
+            <LinkBtn href={`/stock/${holder.type}/${holder.id}/statement`} variant="ghost">
+              <Icon name="file" /> Statement
             </LinkBtn>
-          ) : undefined
+            {scope.canWrite ? (
+              <LinkBtn href={`/stock/daily?holder=${holder.type}:${holder.id}`}>
+                <Icon name="upload" /> Enter a day
+              </LinkBtn>
+            ) : null}
+          </span>
         }
       />
 

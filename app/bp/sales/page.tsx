@@ -141,7 +141,7 @@ export default async function Page({
 
       <SimActivationList
         rows={rows.map((x) => {
-          const category = classifyGaActivation(x);
+          const category = classifyGaActivation(x, tariff);
           return {
             simNo: x.simNo,
             date: x.activationDate.toISOString().slice(0, 10),
