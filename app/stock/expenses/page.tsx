@@ -6,6 +6,7 @@
  * may see the buying side applies here too.
  */
 
+import { closedMonths } from "../../../lib/month-close";
 import { requireUser } from "../../../lib/auth";
 import { dhakaTodayYmd } from "../../../lib/business-time";
 import { resolveRange } from "../../../lib/report-range";
@@ -33,7 +34,7 @@ export default async function ExpensesPage({
 
   const sp = await searchParams;
   const range = resolveRange(sp.from, sp.to);
-  const [rows, kindRows] = await Promise.all([
+  const [rows, kindRows, closed] = await Promise.all([
     expensesIn(range),
     // v201: the owner's own kinds used so far, offered again in the menu.
     prisma.expense.findMany({
@@ -42,6 +43,7 @@ export default async function ExpensesPage({
       select: { label: true },
       orderBy: { label: "asc" },
     }),
+    closedMonths(),
   ]);
   const kinds = kindRows.map((k) => k.label!).filter(Boolean);
   const totals = expenseTotals(rows);
@@ -68,7 +70,12 @@ export default async function ExpensesPage({
       />
 
       {canWrite && (
-        <ExpenseEntryForm today={dhakaTodayYmd()} kinds={kinds} shown={{ from: range.from, to: range.to }} />
+        <ExpenseEntryForm
+          today={dhakaTodayYmd()}
+          kinds={kinds}
+          shown={{ from: range.from, to: range.to }}
+          closed={closed}
+        />
       )}
 
       {totals.byCategory.length > 0 && (
@@ -79,7 +86,7 @@ export default async function ExpensesPage({
       )}
 
       <SectionHead title="Entries" sub="Newest first." />
-      <ExpenseList rows={rows} canWrite={canWrite} />
+      <ExpenseList rows={rows} canWrite={canWrite} closed={closed} />
     </main>
   );
 }

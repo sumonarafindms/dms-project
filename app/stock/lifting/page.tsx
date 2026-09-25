@@ -5,6 +5,7 @@
  * the owner's ruling on who may know the buying side.
  */
 
+import { closedMonths } from "../../../lib/month-close";
 import { requireUser } from "../../../lib/auth";
 import { dhakaTodayYmd } from "../../../lib/business-time";
 import { prisma } from "../../../lib/prisma";
@@ -25,12 +26,13 @@ export default async function LiftingPage() {
   const me = await requireUser(["ACCOUNTS", "ADMIN", "IT"]);
   const canWrite = BOOKS_WRITE_ROLES.includes(me.role);
 
-  const [products, liftings, lines, liftingCount] = await Promise.all([
+  const [products, liftings, lines, liftingCount, closed] = await Promise.all([
     activeProducts(),
     recentLiftings(60),
     godown(),
     // The real count. The list below shows the latest 60; the figure must not stop there (v199).
     prisma.lifting.count(),
+    closedMonths(),
   ]);
 
   /* The last cost paid for each product, so a repeat purchase is one tap. */
@@ -75,7 +77,9 @@ export default async function LiftingPage() {
         ]}
       />
 
-      {canWrite && <LiftingEntryForm products={products} today={dhakaTodayYmd()} suggested={suggested} />}
+      {canWrite && (
+        <LiftingEntryForm products={products} today={dhakaTodayYmd()} suggested={suggested} closed={closed} />
+      )}
 
       <SectionHead
         title="In the godown"
@@ -92,7 +96,7 @@ export default async function LiftingPage() {
       )}
 
       <SectionHead title="Recent liftings" sub="Newest first." />
-      <LiftingList rows={liftings} canWrite={canWrite} />
+      <LiftingList rows={liftings} canWrite={canWrite} closed={closed} />
     </main>
   );
 }

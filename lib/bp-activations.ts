@@ -42,7 +42,8 @@ export type BpAssignmentListRow = {
   employee: {
     name: string;
     employeeCode: string | null;
-    supervisor: { name: string } | null;
+    /** `id` since v205, for the leaderboard's team rows. */
+    supervisor: { id?: string; name: string } | null;
   };
 };
 
@@ -155,7 +156,7 @@ export async function listBpAssignments(
           bpUser: { select: { mobileNumber: true } },
         },
       },
-      employee: { select: { name: true, employeeCode: true, supervisor: { select: { name: true } } } },
+      employee: { select: { name: true, employeeCode: true, supervisor: { select: { id: true, name: true } } } },
       monthlyTargets: true,
     },
     orderBy: [{ active: "desc" }, { startDate: "desc" }],

@@ -133,6 +133,14 @@ export const EXPECTED: Record<string, string[] | "PUBLIC"> = {
   "/stock/[type]/[id]/statement": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   // v203: every role reads the notice board; four post on it.
   "/notices": ["ACCOUNTS", "ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
+  // v205: who owes and a WhatsApp reminder — those who chase money, in scope.
+  "/stock/reminders": ["ACCOUNTS", "ADMIN", "IT", "MANAGER", "SUPERVISOR"],
+  // v206: the Collection dashboard is scoped like the ledger; the cash box and month close are the house's books.
+  "/stock/collections": ["ACCOUNTS", "ADMIN", "IT", "MANAGER", "SUPERVISOR"],
+  "/stock/cash-book": ["ACCOUNTS", "ADMIN", "IT"],
+  "/stock/month-close": ["ACCOUNTS", "ADMIN", "IT"],
+  // v205: the GA leaderboard — the whole company, for everyone in the field.
+  "/leaderboard": ["ADMIN", "BP", "IT", "MANAGER", "RSO", "SUPERVISOR"],
   "/stock/daily": ["ACCOUNTS"],
   "/stock/opening": ["ACCOUNTS"],
   "/stock/products": ["ACCOUNTS"],

@@ -12,6 +12,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "../../components/Feedback";
 import { SaveNotice } from "../../components/AdminEmployeesUI";
 import { Icon } from "../../components/icons";
 import { Btn, Card, EmptyState, Field, NumberInput, Row, SectionHead, Table } from "../../components/Kit";
@@ -56,6 +57,7 @@ export default function BpManager({
   history: Hist[];
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [employeeId, setEmployeeId] = useState("");
   const [retailerId, setRetailerId] = useState("");
   const [message, setMessage] = useState("");
@@ -98,7 +100,15 @@ export default function BpManager({
   }
 
   async function endAssignment(id: string) {
-    if (!window.confirm("End this BP assignment?")) return;
+    if (
+      !(await confirm({
+        title: "End this BP assignment?",
+        body: "The outlet stops counting for this RSO from today. Its history stays.",
+        confirmLabel: "End assignment",
+        danger: true,
+      }))
+    )
+      return;
     setMessage("");
     setOk(false);
     const r = await apiSend("/api/admin/bp-assignments", "PATCH", { id, active: false });

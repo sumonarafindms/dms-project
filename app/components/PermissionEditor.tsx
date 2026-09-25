@@ -16,12 +16,14 @@ import { AppLink as Link } from "./AppLink";
 import { Btn, Card, Check, EmptyState, PageHeader, Skeleton } from "./Kit";
 import { Icon } from "./icons";
 import { apiFetch, apiSend } from "@/lib/api-client";
+import { useConfirm } from "./Feedback";
 
 type Perm = "view" | "add" | "edit" | "update";
 type Row = { key: string; label: string; group: string } & Record<Perm, boolean>;
 const PERMS: Perm[] = ["view", "add", "edit", "update"];
 
 export default function PermissionEditor({ userId, name, role }: { userId: string; name: string; role: string }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<Row[]>([]),
     [busy, setBusy] = useState(true),
     [loaded, setLoaded] = useState(false),
@@ -81,7 +83,15 @@ export default function PermissionEditor({ userId, name, role }: { userId: strin
   }
 
   async function reset() {
-    if (!confirm("Reset this user to role-default permissions?")) return;
+    if (
+      !(await confirm({
+        title: `Reset ${name}'s permissions?`,
+        body: "Every module goes back to what their role allows by default.",
+        confirmLabel: "Reset",
+        danger: true,
+      }))
+    )
+      return;
     setBusy(true);
     const r = await apiFetch(`/api/admin/permissions/${userId}`, { method: "DELETE" });
     if (!r.ok) {

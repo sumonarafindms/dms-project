@@ -21,6 +21,7 @@ import {
 import { AppLink } from "./AppLink";
 import { Badge, Btn, Card, EmptyState, Field, SectionHead } from "./Kit";
 import { Icon } from "./icons";
+import { useConfirm, useToast } from "./Feedback";
 
 const HIDDEN_KEY = "dms_notices_hidden";
 
@@ -91,6 +92,7 @@ export function NoticeStrip({ notices }: { notices: NoticeView[] }) {
 /** A poster's form. */
 export function NoticeForm({ role, today }: { role: string; today: string }) {
   const router = useRouter();
+  const toast = useToast();
   const options = audiencesFor(role);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -113,8 +115,9 @@ export function NoticeForm({ role, today }: { role: string; today: string }) {
     const r = await apiSend("/api/notices", "POST", { title, body, audience, urgent, expiresOn: expiresOn || null });
     setBusy(false);
     setOk(r.ok);
-    setMessage(r.ok ? "Posted. It is on their home screens now." : r.message);
+    setMessage(r.ok ? "" : r.message);
     if (r.ok) {
+      toast("Notice posted — it is on their home screens now");
       setTitle("");
       setBody("");
       setUrgent(false);
@@ -196,15 +199,29 @@ export type ManagedNoticeRow = NoticeView & { audience: string[]; active: boolea
 /** What a poster has posted, with Take down / Put back. */
 export function NoticeManager({ rows }: { rows: ManagedNoticeRow[] }) {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   async function setActive(id: string, active: boolean) {
+    const n = rows.find((x) => x.id === id);
+    if (
+      !active &&
+      !(await confirm({
+        title: `Take down “${n?.title ?? "this notice"}”?`,
+        body: "It disappears from every home screen at once. You can put it back later.",
+        confirmLabel: "Take down",
+        danger: true,
+      }))
+    )
+      return;
     setBusy(id);
     setError("");
     const r = await apiSend("/api/notices", "PATCH", { id, active });
     setBusy(null);
     if (!r.ok) return setError(r.message);
+    toast(active ? "Notice back up" : "Notice taken down");
     router.refresh();
   }
 

@@ -77,6 +77,9 @@ export default async function StockHome({ searchParams }: { searchParams: Promis
               <LinkBtn href="/stock/daily">
                 <Icon name="upload" /> Daily entry
               </LinkBtn>
+              <LinkBtn href="/stock/reminders" variant="secondary">
+                <Icon name="alert" /> Due reminders
+              </LinkBtn>
               <LinkBtn href="/stock/products" variant="ghost">
                 <Icon name="shop" /> Products
               </LinkBtn>

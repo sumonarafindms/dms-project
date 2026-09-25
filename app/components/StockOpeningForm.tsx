@@ -28,6 +28,7 @@ import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
 import { fmtMoney } from "@/lib/format";
 import { isMoneyProduct, kindLabel, lineValue, paisa, type ProductRow } from "@/lib/stock";
+import { useToast } from "./Feedback";
 
 /** A product with the price in force on the opening date. Null: none yet. */
 export type OpeningProduct = ProductRow & { price: number | null };
@@ -48,6 +49,7 @@ export function StockOpeningForm({
   basePath: string;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const asOfDate = initial.asOfDate || today;
   const [qty, setQty] = useState<Record<string, string>>(
     Object.fromEntries(Object.entries(initial.lines).map(([k, v]) => [k, String(v)])),
@@ -92,8 +94,11 @@ export function StockOpeningForm({
     });
     setBusy(false);
     setOk(r.ok);
-    setMessage(r.ok ? "Opening position saved." : r.message);
-    if (r.ok) router.refresh();
+    setMessage(r.ok ? "" : r.message);
+    if (r.ok) {
+      toast("Opening position saved");
+      router.refresh();
+    }
   }
 
   return (

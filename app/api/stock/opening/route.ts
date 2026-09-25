@@ -8,6 +8,7 @@ import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../li
 import { STOCK_WRITE_ROLES, findHolder } from "../../../../lib/stock-data";
 import { paisa, priceOn, type HolderType } from "../../../../lib/stock";
 import { readJson } from "@/lib/request-body";
+import { openingLockedFor } from "../../../../lib/month-close";
 
 /**
  * Where a holder stood on the day this module went live.
@@ -46,6 +47,17 @@ export async function POST(req: Request) {
 
   const holder = await findHolder(holderType, holderId);
   if (!holder) return NextResponse.json({ error: "That person no longer exists." }, { status: 404 });
+
+  /*
+   * v206: an opening is part of every figure after its date, so it cannot be
+   * set — or moved from where it was — once a month from that date on is closed.
+   */
+  const existing = await prisma.stockOpening.findUnique({
+    where: { holderType_holderId: { holderType, holderId } },
+    select: { asOfDate: true },
+  });
+  const locked = await openingLockedFor([asOfDate, existing?.asOfDate]);
+  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
 
   const openingDue = Number(b.openingDue);
   if (!Number.isFinite(openingDue)) return NextResponse.json({ error: "How much is outstanding?" }, { status: 400 });

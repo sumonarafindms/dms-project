@@ -7,6 +7,7 @@ import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../li
 import { BOOKS_WRITE_ROLES } from "../../../../lib/lifting-data";
 import { paisa } from "../../../../lib/stock";
 import { readJson } from "@/lib/request-body";
+import { lockedFor } from "../../../../lib/month-close";
 
 /**
  * What we bought from the company.
@@ -46,6 +47,9 @@ export async function POST(req: Request) {
   const unitCost = positive(b.unitCost);
 
   if (!isYmd(date)) return NextResponse.json({ error: "Which date?" }, { status: 400 });
+  // v206: a closed month is closed for everyone, Accounts included.
+  const locked = await lockedFor([date]);
+  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
   if (kind !== "PURCHASE" && kind !== "OPENING")
     return NextResponse.json({ error: "Unknown kind of lifting." }, { status: 400 });
   if (qty === null) return NextResponse.json({ error: "A quantity must be more than zero." }, { status: 400 });
@@ -106,6 +110,9 @@ export async function DELETE(req: Request) {
     select: { id: true, qty: true, unitCost: true, date: true, product: { select: { subType: true } } },
   });
   if (!row) return NextResponse.json({ error: "That lifting is already gone." }, { status: 404 });
+  // v206: a closed month is closed for everyone, Accounts included.
+  const lockedRow = await lockedFor([row.date]);
+  if (lockedRow) return NextResponse.json({ error: lockedRow }, { status: 423 });
 
   // v202: deleteMany + count — two people removing the same row at once made the second a 500.
   const gone = await prisma.lifting.deleteMany({ where: { id } });

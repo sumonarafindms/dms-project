@@ -13,6 +13,7 @@
  */
 
 import { useState } from "react";
+import { closedMessage, isClosedDate, monthOfYmd } from "@/lib/month-close-rules";
 import { useRouter } from "next/navigation";
 import { Badge, Btn, Card, EmptyState, Field, NumberInput, SectionHead } from "./Kit";
 import { Icon } from "./icons";
@@ -31,18 +32,23 @@ import {
 /** The built-in kinds in the menu. OTHER is not one of them — it is the owner's own kinds and "+ A new kind…". */
 const BUILT_IN = EXPENSE_CATEGORIES.filter((c) => c !== "OTHER");
 import type { ExpenseEntry } from "@/lib/lifting-data";
+import { useConfirm, useToast } from "./Feedback";
 
 export function ExpenseEntryForm({
   today,
   kinds,
   shown,
+  closed = [],
 }: {
   today: string;
   kinds: string[];
+  /** v206: closed months — a date in one cannot be saved. */
+  closed?: readonly string[];
   /** The dates the list below covers — so a save outside them can say where it went. */
   shown?: { from: string; to: string };
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [form, setForm] = useState({
     date: today,
     category: "TRANSPORT" as ExpenseCategory,
@@ -78,6 +84,7 @@ export function ExpenseEntryForm({
     // thing on the same day, and retyping them twelve times is the friction
     // that makes somebody stop recording the small ones.
     if (r.ok) {
+      toast(`Expense saved — ৳${Number(form.amount).toLocaleString("en-US")}`);
       setForm({ ...form, label: form.label.trim(), amount: "", payee: "", note: "" });
       setTypingKind(false);
       router.refresh();
@@ -187,7 +194,12 @@ export function ExpenseEntryForm({
           )}
         </p>
       )}
-      <Btn onClick={save} disabled={busy || !form.amount || needsName}>
+      {isClosedDate(closed, form.date) && (
+        <p className="kit-note is-bad">
+          <Icon name="alert" /> {closedMessage(monthOfYmd(form.date))}
+        </p>
+      )}
+      <Btn onClick={save} disabled={busy || !form.amount || needsName || isClosedDate(closed, form.date)}>
         {busy ? "Saving…" : "Add expense"}
       </Btn>
       <p className="kit-note">
@@ -198,8 +210,19 @@ export function ExpenseEntryForm({
   );
 }
 
-export function ExpenseList({ rows, canWrite }: { rows: ExpenseEntry[]; canWrite: boolean }) {
+export function ExpenseList({
+  rows,
+  canWrite,
+  closed = [],
+}: {
+  rows: ExpenseEntry[];
+  canWrite: boolean;
+  /** v206: a row in a closed month shows "Closed" where Remove would be. */
+  closed?: readonly string[];
+}) {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -209,11 +232,23 @@ export function ExpenseList({ rows, canWrite }: { rows: ExpenseEntry[]; canWrite
    * out loud now, the way Lifting does it.
    */
   async function remove(id: string) {
+    // v205: asked first — this was removed on a single tap.
+    const row = rows.find((x) => x.id === id);
+    if (
+      !(await confirm({
+        title: "Remove this expense?",
+        body: row ? `${expenseLabel(row)} — ${fmtMoney(row.amount)} on ${row.date}.` : undefined,
+        confirmLabel: "Remove",
+        danger: true,
+      }))
+    )
+      return;
     setBusy(id);
     setError("");
     const r = await apiSend("/api/stock/expenses", "DELETE", { id });
     setBusy(null);
     if (!r.ok) return setError(r.message);
+    toast("Expense removed");
     router.refresh();
   }
 
@@ -272,9 +307,13 @@ export function ExpenseList({ rows, canWrite }: { rows: ExpenseEntry[]; canWrite
                 </td>
                 {canWrite && (
                   <td role="cell" data-label="Action" className="is-right">
-                    <Btn size="sm" variant="ghost" disabled={busy === r.id} onClick={() => remove(r.id)}>
-                      Remove
-                    </Btn>
+                    {isClosedDate(closed, r.date) ? (
+                      <Badge tone="neutral">Month closed</Badge>
+                    ) : (
+                      <Btn size="sm" variant="ghost" disabled={busy === r.id} onClick={() => remove(r.id)}>
+                        Remove
+                      </Btn>
+                    )}
                   </td>
                 )}
               </tr>

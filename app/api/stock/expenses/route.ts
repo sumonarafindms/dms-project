@@ -8,6 +8,7 @@ import { BOOKS_WRITE_ROLES } from "../../../../lib/lifting-data";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "../../../../lib/lifting";
 import { paisa } from "../../../../lib/stock";
 import { readJson } from "@/lib/request-body";
+import { lockedFor } from "../../../../lib/month-close";
 
 /**
  * The house's running costs.
@@ -36,6 +37,9 @@ export async function POST(req: Request) {
   const note = String(b.note || "").slice(0, 400);
 
   if (!isYmd(date)) return NextResponse.json({ error: "Which date?" }, { status: 400 });
+  // v206: a closed month is closed for everyone, Accounts included.
+  const locked = await lockedFor([date]);
+  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
   if (!isCategory(category)) return NextResponse.json({ error: "What was it spent on?" }, { status: 400 });
   if (paidFrom !== "CASH" && paidFrom !== "BANK")
     return NextResponse.json({ error: "Paid from cash or bank?" }, { status: 400 });
@@ -108,6 +112,9 @@ export async function DELETE(req: Request) {
     select: { id: true, category: true, amount: true, date: true },
   });
   if (!row) return NextResponse.json({ error: "That expense is already gone." }, { status: 404 });
+  // v206: a closed month is closed for everyone, Accounts included.
+  const lockedRow = await lockedFor([row.date]);
+  if (lockedRow) return NextResponse.json({ error: lockedRow }, { status: 423 });
 
   // v202: deleteMany + count — two people removing the same row at once made the second a 500.
   const gone = await prisma.expense.deleteMany({ where: { id } });

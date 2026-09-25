@@ -22,6 +22,7 @@ import { Badge, Btn, Card, EmptyState } from "./Kit";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
 import { matchesTokens } from "@/lib/text-search";
+import { useToast } from "./Feedback";
 
 /** An outlet matches by its code or name, or by its iTopUp number however it is typed. */
 function outletMatches(x: CodePickerRso["retailers"][number], q: string) {
@@ -50,6 +51,7 @@ export type CodePickerRso = {
 
 export function SupportCodePicker({ rsos }: { rsos: CodePickerRso[] }) {
   const router = useRouter();
+  const toast = useToast();
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   /*
@@ -116,8 +118,12 @@ export function SupportCodePicker({ rsos }: { rsos: CodePickerRso[] }) {
     });
     setBusy(null);
     setOk(r.ok);
-    setMessage(r.ok ? "Codes saved." : r.message);
-    if (r.ok) router.refresh();
+    setMessage(r.ok ? "" : r.message);
+    if (r.ok) {
+      const who = rsos.find((x) => x.employeeId === employeeId)?.name;
+      toast(`Codes saved${who ? ` for ${who}` : ""}`);
+      router.refresh();
+    }
   }
 
   return (

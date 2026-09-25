@@ -927,6 +927,51 @@ export function KpiCard({
  * Printing "Today" over that would be a false claim; printing the real dates
  * costs one line and is true.
  */
+/**
+ * v205 — a small line of the last 14 days, drawn in plain SVG (no chart
+ * library, no client code). The last day is dotted: it is the day the figure
+ * above ends on. Its label names the best day, so it is not decoration only.
+ */
+export function Sparkline({
+  points,
+  unit = "",
+  label,
+}: {
+  points: { date: string; value: number }[];
+  unit?: string;
+  label: string;
+}) {
+  const W = 140,
+    H = 32,
+    pad = 3;
+  // Scaled between the period's own low and high, as a sparkline is read: the
+  // SHAPE is the point. Money that moves ৳3,000 on ৳120,000 would otherwise
+  // draw as a flat line. A flat period draws flat, through the middle.
+  const values = points.map((p) => p.value);
+  const lo = Math.min(...values),
+    hi = Math.max(...values);
+  const step = points.length > 1 ? (W - pad * 2) / (points.length - 1) : 0;
+  const yOf = (v: number) => (hi === lo ? H / 2 : H - pad - ((v - lo) / (hi - lo)) * (H - pad * 2));
+  const xy = points.map((p, i) => [pad + i * step, yOf(p.value)] as const);
+  const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = `${pad},${H - pad} ${line} ${(pad + (points.length - 1) * step).toFixed(1)},${H - pad}`;
+  const best = points.reduce((a, b) => (b.value > a.value ? b : a), points[0]);
+  const last = xy[xy.length - 1];
+  const bestText = `${unit}${fmt(Math.round(best.value))} on ${best.date.slice(8, 10)}/${best.date.slice(5, 7)}`;
+  return (
+    <figure className="kit-spark" aria-label={`${label}, last ${points.length} days. Best day ${bestText}.`}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+        <polygon className="kit-spark-area" points={area} />
+        <polyline className="kit-spark-line" points={line} />
+        {last ? <circle className="kit-spark-dot" cx={last[0]} cy={last[1]} r="2.4" /> : null}
+      </svg>
+      <figcaption>
+        {points.length} days · best {bestText}
+      </figcaption>
+    </figure>
+  );
+}
+
 export function ComparisonCard({ item }: { item: MetricComparison }) {
   const c = item.comparison;
   const tone = changeTone(c);
@@ -938,8 +983,14 @@ export function ComparisonCard({ item }: { item: MetricComparison }) {
         <>
           <div className="kit-compare-top">
             <strong>{money(c.current)}</strong>
-            <span className={`kit-delta tone-${tone}`}>{changeLabel(c)}</span>
+            <span className={`kit-delta tone-${tone}`}>
+              {c.direction === "up" ? "▲ " : c.direction === "down" ? "▼ " : ""}
+              {changeLabel(c)}
+            </span>
           </div>
+          {item.series && item.series.some((p) => p.value > 0) ? (
+            <Sparkline points={item.series} unit={item.unit} label={item.label} />
+          ) : null}
           <p className="kit-compare-foot">
             {item.windows.current.label} vs {item.windows.previous.label} ({money(c.previous)})
           </p>

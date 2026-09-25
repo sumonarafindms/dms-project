@@ -36,6 +36,12 @@ export type MetricComparison = {
   /** Null when this metric has no data at all yet. */
   windows: ComparisonWindows | null;
   comparison: Comparison;
+  /**
+   * v205: the last 14 days up to this metric's own latest date, one value per
+   * day (zeros included), same scope and same rule as the figure above — so
+   * the sparkline and the number cannot tell different stories.
+   */
+  series?: { date: string; value: number }[];
 };
 
 /*
@@ -108,20 +114,68 @@ export async function performanceComparison(kind: ComparisonKind, employeeIds?: 
       : prisma.c2sRecord.aggregate({ where: { ...scope(employeeIds), date }, _sum: { amount: true } });
   };
 
-  const [gaNow, gaPrev, c2cNow, c2cPrev, c2sNow, c2sPrev] = await Promise.all([
+  const SPARK_DAYS = 14;
+  const since = (anchor: string) => new Date(Date.parse(`${anchor}T00:00:00Z`) - (SPARK_DAYS - 1) * 86_400_000);
+  const until = (anchor: string) => new Date(Date.parse(`${anchor}T00:00:00Z`) + 86_400_000);
+  const spread = (anchor: string, rows: { date: Date; value: number }[]) => {
+    // Summed per day: a timestamp column can hold more than one instant a day.
+    const by = new Map<string, number>();
+    for (const r of rows) {
+      const d = r.date.toISOString().slice(0, 10);
+      by.set(d, (by.get(d) ?? 0) + r.value);
+    }
+    return Array.from({ length: SPARK_DAYS }, (_, i) => {
+      const d = new Date(since(anchor).getTime() + i * 86_400_000).toISOString().slice(0, 10);
+      return { date: d, value: by.get(d) ?? 0 };
+    });
+  };
+  const c2Series = (table: "c2cRecord" | "c2sRecord", anchor: string) => {
+    const where = { ...scope(employeeIds), date: { gte: since(anchor), lt: until(anchor) } };
+    return (
+      table === "c2cRecord"
+        ? prisma.c2cRecord.groupBy({ by: ["date"], where, _sum: { amount: true } })
+        : prisma.c2sRecord.groupBy({ by: ["date"], where, _sum: { amount: true } })
+    ).then((rows) =>
+      spread(
+        anchor,
+        rows.map((r) => ({ date: r.date, value: Number(r._sum.amount ?? 0) })),
+      ),
+    );
+  };
+
+  const [gaNow, gaPrev, c2cNow, c2cPrev, c2sNow, c2sPrev, gaSpark, c2cSpark, c2sSpark] = await Promise.all([
     gaWindows ? gaCount(gaWindows.current) : Promise.resolve(0),
     gaWindows ? gaCount(gaWindows.previous) : Promise.resolve(0),
     c2cWindows ? c2Sum("c2cRecord", c2cWindows.current) : Promise.resolve(null),
     c2cWindows ? c2Sum("c2cRecord", c2cWindows.previous) : Promise.resolve(null),
     c2sWindows ? c2Sum("c2sRecord", c2sWindows.current) : Promise.resolve(null),
     c2sWindows ? c2Sum("c2sRecord", c2sWindows.previous) : Promise.resolve(null),
+    gaAnchor
+      ? prisma.gaActivation
+          .groupBy({
+            by: ["activationDate"],
+            where: withStandardGa({
+              ...scope(employeeIds),
+              activationDate: { gte: since(gaAnchor), lt: until(gaAnchor) },
+            }),
+            _count: { _all: true },
+          })
+          .then((rows) =>
+            spread(
+              gaAnchor,
+              rows.map((r) => ({ date: r.activationDate, value: r._count._all })),
+            ),
+          )
+      : Promise.resolve(undefined),
+    c2cAnchor ? c2Series("c2cRecord", c2cAnchor) : Promise.resolve(undefined),
+    c2sAnchor ? c2Series("c2sRecord", c2sAnchor) : Promise.resolve(undefined),
   ]);
 
   const amount = (r: { _sum: { amount: Prisma.Decimal | null } } | null) => Number(r?._sum.amount ?? 0);
 
   const metrics: MetricComparison[] = [
     gaWindows
-      ? { metric: "GA", label: "GA", unit: "", windows: gaWindows, comparison: compare(gaNow, gaPrev) }
+      ? { metric: "GA", label: "GA", unit: "", windows: gaWindows, comparison: compare(gaNow, gaPrev), series: gaSpark }
       : empty("GA", "GA", ""),
     c2cWindows
       ? {
@@ -130,6 +184,7 @@ export async function performanceComparison(kind: ComparisonKind, employeeIds?: 
           unit: "৳",
           windows: c2cWindows,
           comparison: compare(amount(c2cNow), amount(c2cPrev)),
+          series: c2cSpark,
         }
       : empty("C2C", "C2C", "৳"),
     c2sWindows
@@ -139,6 +194,7 @@ export async function performanceComparison(kind: ComparisonKind, employeeIds?: 
           unit: "৳",
           windows: c2sWindows,
           comparison: compare(amount(c2sNow), amount(c2sPrev)),
+          series: c2sSpark,
         }
       : empty("C2S", "C2S", "৳"),
   ];

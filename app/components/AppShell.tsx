@@ -3,6 +3,7 @@ import { AppLink as Link } from "./AppLink";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "./icons";
 import { QuickSearch } from "./QuickSearch";
+import { FeedbackProvider } from "./Feedback";
 import { NoticeStrip } from "./NoticeViews";
 import type { NoticeView } from "@/lib/notice-rules";
 import { useEffect, useRef, useState } from "react";
@@ -78,6 +79,15 @@ type RoleConfig = { name: string; title: string; initials: string; home: string;
 const adminNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "home", module: "dashboard", group: "Overview" },
   { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", group: "Overview", live: true },
+  // v205: who sold the most, for motivation.
+  {
+    href: "/leaderboard",
+    label: "Leaderboard",
+    short: "Leaders",
+    icon: "target",
+    module: "performance",
+    group: "Performance",
+  },
   // Reports were IT-only in the demos, but the routes have always allowed
   // ADMIN too, and an admin who cannot reach the Reporting Center from the
   // menu has to know the URL. Both roles get the group.
@@ -139,6 +149,43 @@ const adminNav: NavItem[] = [
    * this is the distribution house's own money. One entry reaches the rest.
    */
   { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "wallet", module: "stock", group: "Stock & Cash" },
+  // v205: who owes, and a WhatsApp reminder one tap away.
+  {
+    href: "/stock/reminders",
+    label: "Due Reminders",
+    short: "Dues",
+    icon: "alert",
+    module: "stock",
+    group: "Stock & Cash",
+  },
+  // v206: goods out against money in, by day and by person.
+  {
+    href: "/stock/collections",
+    label: "Collections",
+    short: "Collect",
+    icon: "chart",
+    module: "stock",
+    group: "Stock & Cash",
+  },
+  // v206: the cash box and the closed months — the house's own books, so booksOnly.
+  {
+    href: "/stock/cash-book",
+    label: "Cash Book",
+    short: "Cash",
+    icon: "wallet",
+    module: "stock",
+    group: "Stock & Cash",
+    booksOnly: true,
+  },
+  {
+    href: "/stock/month-close",
+    label: "Month Close",
+    short: "Close",
+    icon: "shield",
+    module: "stock",
+    group: "Stock & Cash",
+    booksOnly: true,
+  },
   /*
    * v195. The evening report. First in the group after the landing page,
    * because it is the one screen Accounts opens every single day.
@@ -252,8 +299,11 @@ const configs: Record<string, RoleConfig> = {
       { href: "/manager/retailers", label: "Retailers", icon: "shop", module: "retailers" },
       { href: "/manager/bp-activations", label: "BP Activations", short: "BP Activ.", icon: "sim", module: "bp" },
       { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/leaderboard", label: "Leaderboard", short: "Leaders", icon: "target", module: "dashboard" },
       { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
       { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
+      { href: "/stock/reminders", label: "Due Reminders", short: "Dues", icon: "alert", module: "stock" },
+      { href: "/stock/collections", label: "Collections", short: "Collect", icon: "chart", module: "stock" },
       { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock" },
     ],
     bottom: [],
@@ -271,8 +321,11 @@ const configs: Record<string, RoleConfig> = {
       { href: "/supervisor/retailers", label: "Retailers", icon: "shop", module: "retailers" },
       { href: "/supervisor/bp-activations", label: "BP Activations", short: "BP Activ.", icon: "sim", module: "bp" },
       { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/leaderboard", label: "Leaderboard", short: "Leaders", icon: "target", module: "dashboard" },
       { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
       { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
+      { href: "/stock/reminders", label: "Due Reminders", short: "Dues", icon: "alert", module: "stock" },
+      { href: "/stock/collections", label: "Collections", short: "Collect", icon: "chart", module: "stock" },
       { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock" },
     ],
     bottom: [],
@@ -299,12 +352,17 @@ const configs: Record<string, RoleConfig> = {
       { href: "/stock/daily", label: "Daily Entry", short: "Entry", icon: "upload", module: "stock" },
       { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
       { href: "/stock/day-report", label: "Daily Report", short: "Report", icon: "file", module: "stock" },
+      { href: "/stock/reminders", label: "Due Reminders", short: "Dues", icon: "alert", module: "stock" },
+      // v206: the cash box, counted and closed each evening; and the month's collections.
+      { href: "/stock/cash-book", label: "Cash Book", short: "Cash", icon: "wallet", module: "stock" },
+      { href: "/stock/collections", label: "Collections", short: "Collect", icon: "chart", module: "stock" },
       { href: "/stock/lifting", label: "Lifting", icon: "upload", module: "stock" },
       { href: "/stock/expenses", label: "Expenses", icon: "balance", module: "stock" },
       { href: "/stock/profit", label: "Profit & Loss", short: "Profit", icon: "chart", module: "stock" },
       { href: "/stock/sim-check", label: "SIM Check", short: "SIM", icon: "sim", module: "stock" },
       { href: "/stock/products", label: "Products", icon: "shop", module: "stock" },
       { href: "/stock/opening", label: "Opening Balance", short: "Opening", icon: "balance", module: "stock" },
+      { href: "/stock/month-close", label: "Month Close", short: "Close", icon: "shield", module: "stock" },
       { href: "/accounts/people", label: "RSO & BP", icon: "users", module: "employees" },
       { href: "/accounts/retailers", label: "Retailer Search", short: "Search", icon: "search", module: "retailers" },
       { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
@@ -346,6 +404,7 @@ const configs: Record<string, RoleConfig> = {
        * what an RSO opens twenty times.
        */
       { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/leaderboard", label: "Leaderboard", short: "Leaders", icon: "target", module: "dashboard" },
       { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
       { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
     ],
@@ -361,6 +420,7 @@ const configs: Record<string, RoleConfig> = {
       { href: "/live-ga", label: "Live GA", icon: "sim", module: "dashboard", live: true },
       { href: "/bp/sales", label: "Sales", icon: "sim", module: "ga" },
       { href: "/campaigns", label: "Campaigns", icon: "target", module: "campaigns" },
+      { href: "/leaderboard", label: "Leaderboard", short: "Leaders", icon: "target", module: "dashboard" },
       { href: "/support", label: "Sim Support", short: "Support", icon: "wallet", module: "support" },
       { href: "/stock", label: "Stock & Cash", short: "Stock", icon: "balance", module: "stock" },
     ],
@@ -467,7 +527,11 @@ export default function AppShell({
     for (const href of new Set(warm)) router.prefetch(href);
   }, [path, router, warmKey]);
   if (path === "/login" || path === "/setup" || path === "/sacool")
-    return <PermissionProvider permissions={permissions}>{children}</PermissionProvider>;
+    return (
+      <PermissionProvider permissions={permissions}>
+        <FeedbackProvider>{children}</FeedbackProvider>
+      </PermissionProvider>
+    );
   const roleKey = user?.role.toLowerCase() || path.split("/").filter(Boolean)[0] || "admin",
     role = user ? configs[roleKey] || roleFor(path) : roleFor(path),
     profileName = user?.displayName || role.name;
@@ -492,138 +556,140 @@ export default function AppShell({
   const bar = bottomSlots(visibleBottom, path, isActive);
   return (
     <PermissionProvider permissions={permissions}>
-      <div className={`app-root ${isAdmin ? "admin-app" : `${roleKey}-app`}`}>
-        <aside ref={sidebarRef} className={`desktop-sidebar ${navPending ? "nav-is-pending" : ""}`}>
-          <div className="sidebar-brand">
-            <Brand href={role.home} />
-          </div>
-          {/* v203: one box for any person, outlet or page — Ctrl K from anywhere. */}
-          {user ? <QuickSearch variant="sidebar" pages={searchPages} /> : null}
-          <div className="sidebar-section">{role.title}</div>
-          {isAdmin ? (
-            <AdminNav
-              nav={role.nav}
-              path={path}
-              permissions={permissions}
-              onNavigate={setNavPending}
-              role={roleName}
-              isActive={isActive}
-            />
-          ) : (
-            visibleNav.map((i) => (
-              <NavLink key={i.href} item={i} path={path} onNavigate={setNavPending} isActive={isActive} />
-            ))
-          )}
-          <div className="sidebar-spacer" />
-          {/* Sign out used to be a button of its own here and nowhere else —
+      <FeedbackProvider>
+        <div className={`app-root ${isAdmin ? "admin-app" : `${roleKey}-app`}`}>
+          <aside ref={sidebarRef} className={`desktop-sidebar ${navPending ? "nav-is-pending" : ""}`}>
+            <div className="sidebar-brand">
+              <Brand href={role.home} />
+            </div>
+            {/* v203: one box for any person, outlet or page — Ctrl K from anywhere. */}
+            {user ? <QuickSearch variant="sidebar" pages={searchPages} /> : null}
+            <div className="sidebar-section">{role.title}</div>
+            {isAdmin ? (
+              <AdminNav
+                nav={role.nav}
+                path={path}
+                permissions={permissions}
+                onNavigate={setNavPending}
+                role={roleName}
+                isActive={isActive}
+              />
+            ) : (
+              visibleNav.map((i) => (
+                <NavLink key={i.href} item={i} path={path} onNavigate={setNavPending} isActive={isActive} />
+              ))
+            )}
+            <div className="sidebar-spacer" />
+            {/* Sign out used to be a button of its own here and nowhere else —
               so below 900px, where this sidebar is display:none, there was no
               way to sign out at all and no way to change a PIN on any width.
               Both now live behind the profile block, which is the thing people
               already reach for, and the same sheet opens from the phone's
               avatar. */}
-          <AccountMenu
-            variant="profile"
-            name={profileName}
-            roleTitle={role.title}
-            role={user?.role || ""}
-            initials={role.initials}
-          />
-        </aside>
-        <a className="skip-link" href="#main-content">
-          Skip to main content
-        </a>
-        <div className="app-main" id="main-content">
-          <header className="mobile-topbar">
-            <div className="mobile-context">
-              <Brand href={role.home} />
-              <span>{currentLabel(path, visibleNav, role.home)}</span>
-            </div>
-            <div className="mobile-top-acts">
-              {user ? <QuickSearch variant="icon" pages={searchPages} /> : null}
-              <AccountMenu
-                variant="avatar"
-                name={profileName}
-                roleTitle={role.title}
-                role={user?.role || ""}
-                initials={role.initials}
-              />
-            </div>
-          </header>
-          {path === role.home && notices.length ? (
-            <div className="notice-home">
-              <NoticeStrip notices={notices} />
-            </div>
-          ) : null}
-          {children}
-          {visibleBottom.length > 0 && (
-            /*
-             * INSIDE `.app-main`, and that placement is load-bearing.
-             *
-             * It used to be a sibling of `.app-main`, directly under
-             * `.app-root` — which is `display: flex` in the ROW direction. So
-             * the nav was a second flex item on that row: it claimed the full
-             * 390px, and `.app-main` (flex: 1, min-width: 0) was squeezed to
-             * ZERO width. Every page rendered as a blank white column with the
-             * nav's icons stranded at the top and the active item's highlight
-             * stretched down the whole document, because a row flex item
-             * stretches to the line's height.
-             *
-             * Desktop never showed it: at >=900px the nav is `display: none`,
-             * so it stops being a flex item and `.app-main` gets the row back.
-             * The app was unusable on a phone and perfect on the machine it
-             * was being checked on.
-             *
-             * Here it is the last child of the column that holds the page, so
-             * `position: sticky; bottom: 0` pins it to the bottom of the
-             * viewport the way it was always meant to.
-             *
-             * The count is whatever the signed-in role can see; the classes for
-             * 2..6 are in kit.css, and anything outside that keeps the
-             * stylesheet's own default rather than falling back to an inline
-             * style.
-             */
-            <nav className={`bottom-nav is-cols-${bar.shown.length + (bar.hasMore ? 1 : 0)}`}>
-              {bar.shown.map((i) => (
-                <Link
-                  key={i.href}
-                  href={i.href}
-                  prefetch={true}
-                  onPointerEnter={() => router.prefetch(i.href)}
-                  onClick={() => setNavPending(i.href)}
-                  className={`bottom-link ${isActive(path, i.href) ? "active" : ""}${i.live ? " is-live" : ""}`}
-                >
-                  <Icon name={i.icon} />
-                  {/*
+            <AccountMenu
+              variant="profile"
+              name={profileName}
+              roleTitle={role.title}
+              role={user?.role || ""}
+              initials={role.initials}
+            />
+          </aside>
+          <a className="skip-link" href="#main-content">
+            Skip to main content
+          </a>
+          <div className="app-main" id="main-content">
+            <header className="mobile-topbar">
+              <div className="mobile-context">
+                <Brand href={role.home} />
+                <span>{currentLabel(path, visibleNav, role.home)}</span>
+              </div>
+              <div className="mobile-top-acts">
+                {user ? <QuickSearch variant="icon" pages={searchPages} /> : null}
+                <AccountMenu
+                  variant="avatar"
+                  name={profileName}
+                  roleTitle={role.title}
+                  role={user?.role || ""}
+                  initials={role.initials}
+                />
+              </div>
+            </header>
+            {path === role.home && notices.length ? (
+              <div className="notice-home">
+                <NoticeStrip notices={notices} />
+              </div>
+            ) : null}
+            {children}
+            {visibleBottom.length > 0 && (
+              /*
+               * INSIDE `.app-main`, and that placement is load-bearing.
+               *
+               * It used to be a sibling of `.app-main`, directly under
+               * `.app-root` — which is `display: flex` in the ROW direction. So
+               * the nav was a second flex item on that row: it claimed the full
+               * 390px, and `.app-main` (flex: 1, min-width: 0) was squeezed to
+               * ZERO width. Every page rendered as a blank white column with the
+               * nav's icons stranded at the top and the active item's highlight
+               * stretched down the whole document, because a row flex item
+               * stretches to the line's height.
+               *
+               * Desktop never showed it: at >=900px the nav is `display: none`,
+               * so it stops being a flex item and `.app-main` gets the row back.
+               * The app was unusable on a phone and perfect on the machine it
+               * was being checked on.
+               *
+               * Here it is the last child of the column that holds the page, so
+               * `position: sticky; bottom: 0` pins it to the bottom of the
+               * viewport the way it was always meant to.
+               *
+               * The count is whatever the signed-in role can see; the classes for
+               * 2..6 are in kit.css, and anything outside that keeps the
+               * stylesheet's own default rather than falling back to an inline
+               * style.
+               */
+              <nav className={`bottom-nav is-cols-${bar.shown.length + (bar.hasMore ? 1 : 0)}`}>
+                {bar.shown.map((i) => (
+                  <Link
+                    key={i.href}
+                    href={i.href}
+                    prefetch={true}
+                    onPointerEnter={() => router.prefetch(i.href)}
+                    onClick={() => setNavPending(i.href)}
+                    className={`bottom-link ${isActive(path, i.href) ? "active" : ""}${i.live ? " is-live" : ""}`}
+                  >
+                    <Icon name={i.icon} />
+                    {/*
                     The bottom bar needs the dot more than the sidebar does.
                     Below 900px the sidebar is `display: none`, so on the phones
                     that nine in ten of this app's users hold, this bar IS the
                     navigation — an indicator that lived only in the sidebar
                     would be invisible to exactly the people it is for.
                   */}
-                  {i.live ? <span className="nav-live-dot is-corner" aria-hidden="true" /> : null}
-                  <span>{barLabel(i)}</span>
-                </Link>
-              ))}
-              {bar.hasMore && (
-                <NavMore
-                  items={visibleBottom}
-                  path={path}
-                  isActive={isActive}
-                  onNavigate={setNavPending}
-                  /*
-                   * `bar.overflow`, not "is the current page missing from the
-                   * bar": the swap above means the page you are on is almost
-                   * never in the overflow, so this lights up only in the case
-                   * it is meant for — a route with no bar entry of its own,
-                   * such as a detail page opened from a list.
-                   */
-                  highlight={!bar.shown.some((i) => isActive(path, i.href))}
-                />
-              )}
-            </nav>
-          )}
+                    {i.live ? <span className="nav-live-dot is-corner" aria-hidden="true" /> : null}
+                    <span>{barLabel(i)}</span>
+                  </Link>
+                ))}
+                {bar.hasMore && (
+                  <NavMore
+                    items={visibleBottom}
+                    path={path}
+                    isActive={isActive}
+                    onNavigate={setNavPending}
+                    /*
+                     * `bar.overflow`, not "is the current page missing from the
+                     * bar": the swap above means the page you are on is almost
+                     * never in the overflow, so this lights up only in the case
+                     * it is meant for — a route with no bar entry of its own,
+                     * such as a detail page opened from a list.
+                     */
+                    highlight={!bar.shown.some((i) => isActive(path, i.href))}
+                  />
+                )}
+              </nav>
+            )}
+          </div>
         </div>
-      </div>
+      </FeedbackProvider>
     </PermissionProvider>
   );
 }

@@ -13,6 +13,7 @@
 
 import type { ReactNode } from "react";
 import { Btn } from "./Kit";
+import { useConfirm } from "./Feedback";
 
 export default function ConfirmActionButton({
   children,
@@ -29,6 +30,8 @@ export default function ConfirmActionButton({
   size?: "sm" | "md" | "lg";
   disabled?: boolean;
 }) {
+  // v205: the kit's own dialog, not the browser's grey `window.confirm`.
+  const confirm = useConfirm();
   return (
     <Btn
       type="button"
@@ -36,7 +39,8 @@ export default function ConfirmActionButton({
       size={size}
       disabled={disabled}
       onClick={async () => {
-        if (window.confirm(message)) await onConfirm();
+        if (await confirm({ title: message, confirmLabel: "Yes, go ahead", danger: variant === "danger" }))
+          await onConfirm();
       }}
     >
       {children}

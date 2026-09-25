@@ -30,6 +30,7 @@ import { Icon } from "../../components/icons";
 import { AppLink } from "../../components/AppLink";
 import { StockDayEntry } from "../../components/StockDayEntry";
 import { godown } from "../../../lib/lifting-data";
+import { lockedFor } from "../../../lib/month-close";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,12 @@ export default async function DailyEntry({
     );
   const holder = chosen || holders[0];
   const key = holderKey(holder.type, holder.id);
+  /* v206: the people either side in the list, so a day's work is a walk down it. */
+  const at_ = holders.indexOf(holder);
+  const neighbour = (step: number) => {
+    const h = holders[at_ + step];
+    return h ? { key: holderKey(h.type, h.id), name: h.name } : null;
+  };
 
   const entry = await dayEntry(holder.type, holder.id, date);
 
@@ -222,6 +229,9 @@ export default async function DailyEntry({
           // v203: the receipt goes to the number they sign in with, else any number on file.
           phone: holder.loginPhone ?? holder.phones?.[0] ?? null,
         }}
+        locked={await lockedFor([date])}
+        prev={neighbour(-1)}
+        next={neighbour(1)}
       />
     </main>
   );

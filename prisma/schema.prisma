@@ -935,3 +935,80 @@ model Notice {
 
   @@index([active, expiresOn])
 }
+
+/**
+ * ==================================================================
+ * v206 — the cash box and the closed books
+ * ==================================================================
+ * The owner picked these from the Accounts list: *"Cash Book & Day Close"*
+ * and *"Month close / lock"*.
+ */
+
+/**
+ * Cash that went into or out of the house's cash box OTHER than a holder's
+ * deposit (CashDeposit.cash) and an expense paid from cash (Expense). Those
+ * two are already recorded; entering them here as well would count them
+ * twice. What is left is the owner's own money moving: cash taken to the
+ * bank, cash paid to the company, cash the owner took or put in.
+ */
+enum CashMoveKind {
+  BANK_DEPOSIT
+  COMPANY_PAYMENT
+  OWNER_TAKEN
+  OTHER_OUT
+  OWNER_ADDED
+  OTHER_IN
+}
+
+model CashMove {
+  id          String       @id @default(cuid())
+  date        DateTime     @db.Date
+  kind        CashMoveKind
+  amount      Decimal      @db.Decimal(18, 2)
+  note        String?
+  createdById String?
+  createdAt   DateTime     @default(now())
+
+  @@index([date])
+}
+
+/**
+ * One day's cash count. The figures are the ones on screen when Accounts
+ * pressed Close — kept, so that an entry changed afterwards shows as a
+ * difference ("changed after closing") instead of silently rewriting a count
+ * somebody signed off.
+ * `openingTyped`: the first close has no earlier count to start from, so its
+ * opening cash is typed; every later one carries the last count forward.
+ */
+model DayClose {
+  date          DateTime @id @db.Date
+  openingCash   Decimal  @db.Decimal(18, 2)
+  openingTyped  Boolean  @default(false)
+  cashIn        Decimal  @db.Decimal(18, 2)
+  cashOut       Decimal  @db.Decimal(18, 2)
+  expected      Decimal  @db.Decimal(18, 2)
+  counted       Decimal  @db.Decimal(18, 2)
+  /// Notes and coins counted: { "1000": 3, "500": 2, … }.
+  denominations Json
+  note          String?
+  closedById    String
+  closedByName  String
+  closedAt      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/**
+ * A closed month. While this row exists nothing dated in that month — a
+ * day's stock and money, an expense, a lifting, an opening, a cash move or a
+ * cash count — can be written or removed, by anyone. Admin reopens it by
+ * deleting the row (audited, with a reason); Accounts closes it again.
+ * `snapshot` is the month's figures at the moment of closing.
+ */
+model MonthClose {
+  month        String   @id
+  closedById   String
+  closedByName String
+  closedAt     DateTime @default(now())
+  note         String?
+  snapshot     Json
+}

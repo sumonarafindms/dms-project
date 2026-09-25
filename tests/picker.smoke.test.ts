@@ -114,6 +114,12 @@ describe("no long list is left in a native menu", () => {
     [path.join("app", "components", "ListControls.tsx")]: {
       sort: "a handful of sort orders, fixed in code",
     },
+    [path.join("app", "components", "ReminderList.tsx")]: {
+      SORTS: "three sort orders, fixed in code",
+    },
+    [path.join("app", "components", "CollectionsView.tsx")]: {
+      SORTS: "four sort orders, fixed in code",
+    },
     [path.join("app", "admin", "users", "UserManager.tsx")]: {
       ROLES: "the seven roles, fixed in code",
     },

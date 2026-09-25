@@ -116,8 +116,10 @@ describe("the godown and Daily Entry work as one system", () => {
     const ui = read("app/components/StockDayEntry.tsx");
     expect(ui).toContain("More than the godown holds");
     // The save button is disabled only for a missing price or a fractional
-    // quantity (v199), never for this.
-    expect(ui).toContain("disabled={busy || unpriced.length > 0 || fractional.length > 0}");
+    // quantity (v199) — and, v206, a closed month — never for this.
+    expect(ui).toContain("const canSave = !locked && !busy && unpriced.length === 0 && fractional.length === 0;");
+    expect(ui).toContain("<Btn onClick={save} disabled={!canSave}>");
     expect(ui).not.toMatch(/disabled=\{[^}]*overGodown/);
+    expect(ui).not.toMatch(/canSave = [^;]*overGodown/);
   });
 });

@@ -1725,3 +1725,189 @@ This also answers the question left open since v198: TOTAL or OWN.
 - probe198, probe200 and probe203 all passed. probe198's "basis TOTAL" check now expects OWN.
 - All-role page sweep: 0 problems.
 - **1,364 tests**, build clean, eslint at 25 warnings.
+
+## v205 — Leaderboard, Due reminders, toasts & confirm dialogs, 14-day sparklines
+
+> *"add more new features and improve ui/ux and make more professional"*. From the list offered, the owner picked: Leaderboard, Due reminders, Toasts & confirm dialogs, and Pro dashboard cards.
+
+### Leaderboard (new page, `/leaderboard`)
+- **Who can open it:** Admin, IT, Manager, Supervisor, RSO and BP. It is in the nav as **Leaderboard**, shown as **Leaders** on the phone bar.
+- **Three boards:**
+  - **RSOs:** their own GA. A BP's SIMs are the BP's, as on every screen.
+  - **BPs:** one row per outlet, even when two RSOs held it during the period.
+  - **Teams:** a supervisor's RSOs and BPs together.
+- **What it counts:** standard GA, split into 300 and 170, taken from the same functions the performance pages use. A rank here never disagrees with a figure there.
+- **Periods:** This month, Latest day (the latest day the GA file covers), and Last month.
+- **What you see:**
+  - a podium for the top three;
+  - a **"You are #N of M"** card that says how many more GA takes you past the one ahead;
+  - for a supervisor, **"Your team is #N"**, with their team marked;
+  - for a manager, their teams marked.
+- **What it never shows:** money or phone numbers. Everyone sees the whole company, but only names, codes, GA and target %.
+- **Target %:**
+  - None on a one-day board, because a target is monthly.
+  - A team's % appears only when every RSO in it has a target. One RSO's target against a whole team's GA gave figures like "7,966%".
+  - When nobody on a board has a target, the % column is left off.
+
+### Due reminders (new page, `/stock/reminders`)
+- **Who can open it:** Accounts, Admin, IT, Manager and Supervisor, each within their own scope. It is in the nav as **Due Reminders** ("Dues"), and there is a button on the Stock and Accounts headers.
+- **What it lists:** everyone who owes, straight from the ledger's own dues. Each row shows the due, when they last paid (with the amount and how many days ago), and whether they were reminded, when, and by whom.
+- **Remind on WhatsApp:** opens WhatsApp with a polite Bangla message: the total due, the last payment, and thanks.
+  - Sending is recorded (audit `REMIND_DUE`), so the row says "Reminded today by …" for everyone.
+- **Finding people:** tabs for RSOs, BPs and Supervisors; a search by name, code or phone; a sort (biggest due, longest without paying, not reminded lately); and a **"Nothing paid for 7+ days"** filter.
+- **Company total:** the Outstanding tile shows only to someone whose scope is the whole company. A team's sum is not money anybody owes.
+
+### Toasts and confirm dialogs
+- **The browser's grey `confirm()` box is gone everywhere.** Every destructive action now asks in the app's own dialog, names what it will remove, and puts **Cancel** first. Escape closes it and changes nothing.
+  - Covered: removing an expense or a lifting; retiring a product or removing a price; taking a notice down; ending a BP assignment; resetting permissions; every `ConfirmActionButton`.
+- **Toasts:** a short message at the bottom (above the phone bar) confirms saves and removals: the day entry, opening, expense, lifting, support codes, notices and products. Where an inline note carried real information, it stays.
+
+### Pro dashboard cards
+- The "Compared with the previous period" cards on the Admin dashboard and the Manager, Supervisor and RSO homes now show a **14-day sparkline** under the figure. The caption names the best day ("14 days · best ৳120 on 02/09").
+- The change also shows a ▲/▼ arrow.
+- Same scope and same GA rule as the card's own figure. The line is scaled between the period's low and high, so the shape of the fortnight shows.
+
+### No migration
+- v205 adds no schema change.
+- If v201, v203 or v204 has not been deployed yet, run `prisma migrate deploy` once.
+
+### Found while testing, fixed
+- The ▲/▼ arrow made the change badge on a half-width phone card ("৳4,813,805 ▼ 0%") too wide, and the Admin dashboard scrolled 11 px sideways at 390 px. The badge now drops under the figure when there is no room.
+- Names in the Due reminders list were 23 px tap targets. They are now 44 px.
+- The team with a missing RSO target gave "7,966%". Fixed by the rule above.
+
+### Verified
+- **Tests:** a new file, `tests/v205-reminders-leaderboard-feedback.smoke.test.ts`, with 25 tests. The full suite is **1,389 tests** in 87 files. tsc is clean, prettier is clean, and eslint is at 25 warnings.
+- **probe205:** 52 browser checks at 390 and 1440, all passing. They cover:
+  - the reminder list equals the ledger's dues;
+  - the WhatsApp text carries the amount;
+  - a sent reminder is recorded and toasted;
+  - an RSO is refused;
+  - the leaderboard's #1 equals the top of `employeePerformance`;
+  - a supervisor sees "Your team is #N";
+  - the day board has no %;
+  - the confirm dialog's Cancel, Escape and Remove;
+  - toasts sit above the phone bar;
+  - sparklines appear on the home pages.
+- **Earlier probes still pass:** probe198–203, accountsday, stalestate, stockwrite, bookswrite, pricelock, exportprobe and accountsscope. Two of them now wait for the toast instead of the old inline "Posted." and "Recorded.".
+- **All-role page sweep** (every route, every role, 390 and 1440): 0 problems after the two fixes above.
+- **Page fuzz:** 14,586 requests, 0 failures.
+- **Reminders API:** 13 malformed bodies, none of them a 500.
+- **Scope:** a supervisor reminding someone outside their team is refused.
+
+
+## v206 — Accounts: Cash Book & Day Close, Month close, Collections, Today's work, premium home
+
+> *"accounts role ar jono aro use full features add koro.. tumi world ar ono high lavale software gular data check kore dekho kivabe accounts ar kaj aro shohoze maintains … and must user friendly hobe. and ui/ux ar professional and premium koro"*
+
+**Where the list came from.** We looked at what accounting and distributor software offers the accounts desk: Tally, BUSY (FMCG), Vyapar and Khatabook, Distributo's collection module, and the standard receivables-ageing practice. Then we checked which of those features the DMS was missing. From the list offered, the owner picked:
+- Cash Book & Day Close;
+- Collection dashboard;
+- Month close / lock;
+- Today's work (checklist);
+- a premium Accounts home.
+
+### Cash Book & Day Close (new, `/stock/cash-book`)
+The house's cash box, day by day.
+
+- **What should be in hand:** opening + cash deposited by people (from Daily Entry) + other cash in − expenses paid from cash − other cash out.
+- **Other cash in and out** can be added in one line each:
+  - taken to the bank;
+  - paid to the company;
+  - owner took;
+  - owner added;
+  - other.
+
+  None of these touch anybody's due.
+- **Closing the day:** count the notes and coins (৳1000 down to ৳1). The screen shows the difference: *Matches*, *Short ৳…* or *Over ৳…*.
+  - A difference needs a short reason before the day can be closed.
+  - The server works out the expected figure from the books itself. It never takes that figure from the form.
+- **The count carries forward.** The next day starts from what was **counted**, not from what was expected. Only the very first count asks for the opening cash.
+- **Changed after closing.** If an entry on a closed day changes later, that day is marked **"Changed after closing"**. It shows the figure that was signed off and the figure the books give now, so you can count again. A count is never quietly rewritten.
+- **Other details:**
+  - A list of the last two weeks, with each day's status.
+  - Money that went straight to the bank is shown for reference, outside the cash box.
+  - Long deposit lists fold after 8 names.
+- **Who can use it:** Accounts counts. Admin and IT can read it.
+
+### Month close / lock (new, `/stock/month-close`)
+- **Closing:** Accounts can close a month once it is over. Its figures are saved at the moment of closing: goods given out and returned, money collected (cash and bank), expenses, lifting, outstanding at month end, and the cash days counted.
+- **Warnings before closing:** days whose cash was never counted, or changed after counting, are listed first. You can still close with **Close anyway**.
+- **What a closed month locks:** nothing dated in it can be written or removed, by anyone. That covers:
+  - the day's stock and money;
+  - expenses;
+  - liftings;
+  - cash in/out;
+  - cash counts;
+  - openings dated in the month or before it.
+
+  Each refusal says the same sentence: *"August 2026 is closed — nothing dated in it can be changed. Admin can reopen it."*
+- **The screens say so before you type:**
+  - Daily Entry shows the notice and its Save becomes *Month closed*.
+  - Expense and Lifting rows show *Month closed* instead of Remove.
+- **Reopening:** only **Admin** can reopen a month, and must give a reason. The reason goes in the activity log (`REOPEN_MONTH`).
+
+### Collections (new, `/stock/collections`)
+- **Month summary:** for any month, the goods given out, the money collected (cash and bank), and the **collection rate** (money in ÷ goods out, net of returns).
+- **Day-by-day chart:** goods out and money in, one pair of columns per day.
+  - Point at a day or tap it to see its figures. The same figures are also in a "Show as a table" view.
+  - The two colours were checked to stay distinct for colour-blind readers.
+- **Lists:** Top collectors, and **Took goods, paid nothing**.
+- **Everyone:** one row per person with brought forward, given, returned, collected, rate, and the due at the end. It has search and four sort orders.
+- **Scope:** it follows the same scope as the ledger. A supervisor or manager sees their own team, and never a team "outstanding" total.
+
+### Today's work and the Accounts home
+- **The home screen opens with:**
+  - a greeting and the day's date;
+  - four money figures: Outstanding, Collected today, Cash in hand, and this month's Collection rate;
+  - **Today's work**;
+  - this month's goods-out/money-in chart;
+  - then v198's product and holder sections, unchanged.
+- **What Today's work can list:**
+  - cash counts that changed after closing;
+  - products with no price today;
+  - days whose cash has not been counted;
+  - last month still open;
+  - people who owe, paid nothing for 7+ days, and have not been reminded in the last 3 days;
+  - RSOs with more SIMs activated than reported sold.
+
+  Each item opens the page that deals with it. What is already in order is listed underneath with a tick.
+
+### Daily Entry
+- **Ctrl + S** (⌘S on a Mac) saves from any box on the form.
+- The people either side of the current one sit under the Person box. After saving, a **Next: …** button appears.
+- The **save bar** stays on screen as you scroll. It holds the due after saving and the Save button, sits above the phone's bottom bar, and fits on one row on a phone.
+
+### Menu
+- **Accounts:** Cash Book, Collections and Month Close. The phone's bottom bar is unchanged.
+- **Admin / IT (Stock & Cash):** Collections, Cash Book and Month Close.
+- **Manager and Supervisor:** Collections.
+
+### Migration `20260927100000_cash_book_and_month_close`
+- **Additive only:** three new tables (`CashMove`, `DayClose`, `MonthClose`) and one enum.
+- **Deploy:** run `prisma migrate deploy`.
+
+### Found while testing, fixed
+- **Collections chart labels.** They were drawn in a scaled viewBox, so the day labels shrank on narrow cards. The chart is now drawn at its real pixel width and scrolls sideways only when a day would be narrower than 16 px.
+- **Small tap targets.** Row links in the Cash Book history and the Collections table were 18 px tall. They are now 44 px.
+- **Cash Book on a phone.** The count sits under the long deposit list. A **Count the cash ↓** button in the summary card now takes you straight to it, and the deposit list folds after 8 names.
+
+### Verified
+- **Tests:** a new file, `tests/v206-accounts-cash-book-month-close.smoke.test.ts`, adds 35 tests. The whole suite is **1,424 tests** in 88 files, all passing. tsc and prettier are clean, and eslint is at 25 warnings.
+- **Browser check probe206:** **90 checks** at 390 px and 1440 px, all passing. They include:
+  - every Cash Book figure matches the database;
+  - a short count needs a reason;
+  - the count carries forward to the next day;
+  - "changed after closing" is flagged, then cleared once fixed;
+  - a month closes, and all seven kinds of write in it are refused with 423;
+  - Admin reopens with a reason, and the reason is in the log;
+  - Collections figures match the database, including each day's tooltip;
+  - the Accounts home and Today's work show the right items;
+  - Ctrl+S saves and clears;
+  - the save bar sits above the phone's bottom bar;
+  - no page scrolls sideways, and there are no page errors.
+- **Totals agree:** the Collections totals, the company due and the month snapshot give the same outstanding figure, ৳12,872,675.
+- **API fuzz:** 132 malformed requests to the three new APIs; none returned a 500.
+- **Earlier browser checks still pass:** probe198–205, bookswrite, accountsday, stalestate, stockwrite, pricelock, exportprobe and accountsscope.
+- **All-role page sweep:** 0 problems after the fixes above.
+- **Page fuzz:** 14,872 requests, 0 failures.

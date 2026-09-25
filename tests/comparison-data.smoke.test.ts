@@ -61,8 +61,9 @@ describe("query cost", () => {
     const many = calls.length;
 
     expect(many).toBe(one);
-    // Three latest-date lookups plus two reads per metric.
-    expect(one).toBe(9);
+    // Three latest-date lookups, two reads per metric, and (v205) one 14-day
+    // series per metric for the sparkline — still flat in the number of RSOs.
+    expect(one).toBe(12);
   });
 
   it("costs the same for a week and a month as for a day", async () => {

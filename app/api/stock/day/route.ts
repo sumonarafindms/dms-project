@@ -7,6 +7,7 @@ import { RATE_LIMITS, consumeRateLimit, rateLimitResponse } from "../../../../li
 import { STOCK_WRITE_ROLES, findHolder } from "../../../../lib/stock-data";
 import { paisa, priceOn, type HolderType, type MoveKind } from "../../../../lib/stock";
 import { readJson } from "@/lib/request-body";
+import { lockedFor } from "../../../../lib/month-close";
 
 /**
  * One holder's whole day, saved in one request.
@@ -81,6 +82,9 @@ export async function POST(req: Request) {
   const date = String(b.date || "");
   if (!isHolderType(holderType) || !holderId) return NextResponse.json({ error: "Which person?" }, { status: 400 });
   if (!isYmd(date)) return NextResponse.json({ error: "Which date?" }, { status: 400 });
+  // v206: a closed month is closed for everyone, Accounts included.
+  const locked = await lockedFor([date]);
+  if (locked) return NextResponse.json({ error: locked }, { status: 423 });
 
   const holder = await findHolder(holderType, holderId);
   if (!holder) return NextResponse.json({ error: "That person no longer exists." }, { status: 404 });

@@ -12,8 +12,9 @@
  */
 
 import { useState } from "react";
+import { closedMessage, isClosedDate, monthOfYmd } from "@/lib/month-close-rules";
 import { useRouter } from "next/navigation";
-import { Btn, Card, EmptyState, Field, NumberInput, SectionHead } from "./Kit";
+import { Badge, Btn, Card, EmptyState, Field, NumberInput, SectionHead } from "./Kit";
 import { Picker } from "./Picker";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
@@ -21,18 +22,23 @@ import { fmtMoney, fmtNumber } from "@/lib/format";
 import { isMoneyProduct, type ProductRow, kindLabel } from "@/lib/stock";
 import { LIFTING_KIND_LABEL, type HouseLine, type LiftingKind } from "@/lib/lifting";
 import type { LiftingEntry } from "@/lib/lifting-data";
+import { useConfirm, useToast } from "./Feedback";
 
 export function LiftingEntryForm({
   products,
   today,
   suggested,
+  closed = [],
 }: {
   products: ProductRow[];
   today: string;
+  /** v206: closed months — a date in one cannot be saved. */
+  closed?: readonly string[];
   /** The last cost paid for each product, so a repeat purchase is one tap. */
   suggested: Record<string, number>;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [form, setForm] = useState({
     date: today,
     productId: products[0]?.id || "",
@@ -56,8 +62,10 @@ export function LiftingEntryForm({
     const r = await apiSend("/api/stock/lifting", "POST", form);
     setBusy(false);
     setOk(r.ok);
-    setMessage(r.ok ? "Recorded." : r.message);
+    // v205: success is a toast; a refusal stays by the form.
+    setMessage(r.ok ? "" : r.message);
     if (r.ok) {
+      toast("Lifting recorded");
       setForm({ ...form, qty: "", unitCost: "", invoiceRef: "", note: "" });
       router.refresh();
     }
@@ -139,15 +147,34 @@ export function LiftingEntryForm({
       )}
 
       {message && <p className={ok ? "kit-note is-ok" : "kit-note is-bad"}>{message}</p>}
-      <Btn onClick={save} disabled={busy || !form.productId || !form.qty || !form.unitCost}>
+      {isClosedDate(closed, form.date) && (
+        <p className="kit-note is-bad">
+          <Icon name="alert" /> {closedMessage(monthOfYmd(form.date))}
+        </p>
+      )}
+      <Btn
+        onClick={save}
+        disabled={busy || !form.productId || !form.qty || !form.unitCost || isClosedDate(closed, form.date)}
+      >
         {busy ? "Saving…" : "Record lifting"}
       </Btn>
     </Card>
   );
 }
 
-export function LiftingList({ rows, canWrite }: { rows: LiftingEntry[]; canWrite: boolean }) {
+export function LiftingList({
+  rows,
+  canWrite,
+  closed = [],
+}: {
+  rows: LiftingEntry[];
+  canWrite: boolean;
+  /** v206: a row in a closed month shows "Closed" where Remove would be. */
+  closed?: readonly string[];
+}) {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -157,11 +184,25 @@ export function LiftingList({ rows, canWrite }: { rows: LiftingEntry[]; canWrite
    * A failure is now said out loud.
    */
   async function remove(id: string) {
+    // v205: a lifting moves the godown and the profit — it is asked about first.
+    const row = rows.find((x) => x.id === id);
+    if (
+      !(await confirm({
+        title: "Remove this lifting?",
+        body: row
+          ? `${row.productName} × ${row.qty.toLocaleString("en-US")} on ${row.date}. The godown and profit change with it.`
+          : undefined,
+        confirmLabel: "Remove",
+        danger: true,
+      }))
+    )
+      return;
     setBusy(id);
     setError("");
     const r = await apiSend("/api/stock/lifting", "DELETE", { id });
     setBusy(null);
     if (!r.ok) return setError(r.message);
+    toast("Lifting removed");
     router.refresh();
   }
 
@@ -224,9 +265,13 @@ export function LiftingList({ rows, canWrite }: { rows: LiftingEntry[]; canWrite
               </td>
               {canWrite && (
                 <td role="cell" data-label="Action" className="is-right">
-                  <Btn size="sm" variant="ghost" disabled={busy === r.id} onClick={() => remove(r.id)}>
-                    Remove
-                  </Btn>
+                  {isClosedDate(closed, r.date) ? (
+                    <Badge tone="neutral">Month closed</Badge>
+                  ) : (
+                    <Btn size="sm" variant="ghost" disabled={busy === r.id} onClick={() => remove(r.id)}>
+                      Remove
+                    </Btn>
+                  )}
                 </td>
               )}
             </tr>

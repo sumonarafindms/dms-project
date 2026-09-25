@@ -44,9 +44,9 @@
  * because a default nobody can see is how a wrong number survives.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Btn, Card, EmptyState, Field, NumberInput, SectionHead, type BadgeTone } from "./Kit";
+import { Badge, Btn, Card, EmptyState, Field, LinkBtn, NumberInput, SectionHead, type BadgeTone } from "./Kit";
 import { Picker, type PickerOption } from "./Picker";
 import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
@@ -66,6 +66,7 @@ import {
   type MoveKind,
   type ProductRow,
 } from "@/lib/stock";
+import { useToast } from "./Feedback";
 
 type EntryTab = "GIVEN" | "SOLD" | "RETURNED" | "COLLECT";
 
@@ -123,6 +124,11 @@ export type StockDayEntryProps = {
   basePath: string;
   /** v203: who this day is for, for the WhatsApp receipt. */
   person?: { name: string; code: string | null; phone: string | null };
+  /** v206: set when this day is in a closed month — the form is read-only and says why. */
+  locked?: string | null;
+  /** v206: the people either side of this one in the list, for moving through the day's work. */
+  prev?: { key: string; name: string } | null;
+  next?: { key: string; name: string } | null;
 };
 
 type Qty = Record<string, string>;
@@ -146,8 +152,12 @@ export function StockDayEntry({
   godown,
   basePath,
   person,
+  locked = null,
+  prev = null,
+  next = null,
 }: StockDayEntryProps) {
   const router = useRouter();
+  const toast = useToast();
   const [tab, setTab] = useState<EntryTab>("GIVEN");
   const [given, setGiven] = useState<Qty>(toQty(initial.given));
   const [sold, setSold] = useState<Qty>(toQty(initial.sold));
@@ -288,6 +298,27 @@ export function StockDayEntry({
     set({ ...current, [productId]: value });
   }
 
+  /*
+   * v206: Ctrl+S (⌘S on a Mac) saves, from any box on the form — the way every
+   * accounts program the owner's staff have used works. The ref keeps the
+   * listener pointed at this render's figures without re-binding per keystroke.
+   */
+  const saveRef = useRef<() => void>(() => {});
+  const canSave = !locked && !busy && unpriced.length === 0 && fractional.length === 0;
+  saveRef.current = () => {
+    if (canSave) void save();
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   function go(nextHolder: string, nextDate: string) {
     router.push(`${basePath}?holder=${encodeURIComponent(nextHolder)}&date=${nextDate}`);
   }
@@ -323,8 +354,13 @@ export function StockDayEntry({
     });
     setBusy(false);
     setOk(r.ok);
+    // v205: "Saved." stays under the button (the receipt below keys off it and
+    // people look there), and a toast says so wherever the screen is scrolled to.
     setMessage(r.ok ? "Saved." : r.message);
-    if (r.ok) router.refresh();
+    if (r.ok) {
+      toast(`Saved — ${person?.name ?? "this person"}, ${date}`);
+      router.refresh();
+    }
   }
 
   if (!products.length)
@@ -360,7 +396,37 @@ export function StockDayEntry({
             />
           </Field>
         </div>
+        {prev || next ? (
+          <div className="kit-entry-steps">
+            {prev ? (
+              <LinkBtn
+                href={`${basePath}?holder=${encodeURIComponent(prev.key)}&date=${date}`}
+                variant="ghost"
+                size="sm"
+              >
+                ← {prev.name}
+              </LinkBtn>
+            ) : (
+              <span />
+            )}
+            {next ? (
+              <LinkBtn
+                href={`${basePath}?holder=${encodeURIComponent(next.key)}&date=${date}`}
+                variant="ghost"
+                size="sm"
+              >
+                {next.name} →
+              </LinkBtn>
+            ) : null}
+          </div>
+        ) : null}
       </Card>
+
+      {locked ? (
+        <p className="kit-note is-bad kit-mb-16" role="status">
+          <Icon name="alert" /> {locked} This day can be read, not changed.
+        </p>
+      ) : null}
 
       <div className="kit-tabs kit-mb-16" role="tablist" aria-label="What to enter">
         {TABS.map((t) => (
@@ -564,9 +630,32 @@ export function StockDayEntry({
           <Icon name="alert" /> {fractional.map((p) => p.subType).join(", ")}: quantities are whole units.
         </p>
       )}
-      <Btn onClick={save} disabled={busy || unpriced.length > 0 || fractional.length > 0} block>
-        {busy ? "Saving…" : "Save this day"}
-      </Btn>
+      {/*
+       * v206: the save bar stays on screen while the form scrolls — the due it
+       * lands on and the button, together — so a long product list never
+       * hides the one thing the operator came to press.
+       */}
+      <div className="kit-savebar">
+        <div className="kit-savebar-due">
+          <span>Due after saving</span>
+          <strong className={`kit-due is-${tone}`}>{fmtMoney(Math.abs(after.due))}</strong>
+        </div>
+        {!unsaved && savedSomething && next && !locked ? (
+          <LinkBtn
+            href={`${basePath}?holder=${encodeURIComponent(next.key)}&date=${date}`}
+            variant="secondary"
+            className="kit-savebar-next"
+          >
+            Next: {next.name} →
+          </LinkBtn>
+        ) : null}
+        <Btn onClick={save} disabled={!canSave}>
+          {locked ? "Month closed" : busy ? "Saving…" : "Save this day"}
+        </Btn>
+        <span className="kit-savebar-hint" aria-hidden="true">
+          Ctrl + S
+        </span>
+      </div>
 
       {person && savedSomething ? (
         <Card className="kit-card-p kit-mt-20">

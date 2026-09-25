@@ -30,6 +30,7 @@ import { Icon } from "./icons";
 import { apiSend } from "@/lib/api-client";
 import { fmtMoney } from "@/lib/format";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_LABEL, kindLabel, type ProductCategory } from "@/lib/stock";
+import { useConfirm, useToast } from "./Feedback";
 
 export type ActivationType = "GA_170" | "GA_300" | "SIM_SWAP";
 
@@ -65,6 +66,8 @@ export type MasterProduct = {
 
 export function ProductMaster({ products, today }: { products: MasterProduct[]; today: string }) {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [ok, setOk] = useState(false);
@@ -144,10 +147,12 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
     setOk(r.ok);
     if (!r.ok) return setMessage(r.message);
     const n = r.data?.entriesOnOrAfter;
+    // v205: the "done" is a toast; the note stays only when there is more to say.
+    toast(okText);
     setMessage(
       n
-        ? `${okText} ${n} ${n === 1 ? "entry" : "entries"} already recorded on or after that date keep the price they were entered at.`
-        : okText,
+        ? `${n} ${n === 1 ? "entry" : "entries"} already recorded on or after that date keep the price they were entered at.`
+        : "",
     );
     router.refresh();
     return true;
@@ -242,7 +247,7 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
         </div>
         <Btn
           onClick={async () => {
-            if (await send(add, "POST", "Product added.")) {
+            if (await send(add, "POST", `${add.subType.trim()} added`)) {
               setAdd({
                 ...add,
                 kindName: add.kindName.trim(),
@@ -360,13 +365,23 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
                             size="sm"
                             variant="ghost"
                             disabled={busy}
-                            onClick={() =>
+                            onClick={async () => {
+                              if (
+                                p.status === "ACTIVE" &&
+                                !(await confirm({
+                                  title: `Retire ${p.subType}?`,
+                                  body: "It leaves the entry screens. Everything already recorded stays, and you can use it again later.",
+                                  confirmLabel: "Retire",
+                                  danger: true,
+                                }))
+                              )
+                                return;
                               send(
                                 { id: p.id, status: p.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" },
                                 "PATCH",
-                                p.status === "ACTIVE" ? "Retired." : "Back in use.",
-                              )
-                            }
+                                p.status === "ACTIVE" ? `${p.subType} retired` : `${p.subType} back in use`,
+                              );
+                            }}
                           >
                             {p.status === "ACTIVE" ? "Retire" : "Use again"}
                           </Btn>
@@ -400,9 +415,18 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
                             size="sm"
                             variant="ghost"
                             disabled={busy}
-                            onClick={() =>
-                              send({ productId: p.id, effectiveFrom: pr.effectiveFrom }, "DELETE", "Price removed.")
-                            }
+                            onClick={async () => {
+                              if (
+                                !(await confirm({
+                                  title: `Remove the ${fmtMoney(pr.price)} price from ${pr.effectiveFrom}?`,
+                                  body: "Entries already recorded keep the price they were entered at.",
+                                  confirmLabel: "Remove price",
+                                  danger: true,
+                                }))
+                              )
+                                return;
+                              send({ productId: p.id, effectiveFrom: pr.effectiveFrom }, "DELETE", "Price removed");
+                            }}
                           >
                             Remove
                           </Btn>
@@ -438,7 +462,7 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
                           value={p.activationType ?? ""}
                           disabled={busy}
                           onChange={(e) =>
-                            send({ id: p.id, activationType: e.target.value }, "PATCH", "Activation link saved.")
+                            send({ id: p.id, activationType: e.target.value }, "PATCH", "Activation link saved")
                           }
                         >
                           {ACTIVATION_OPTIONS.map(([v, label]) => (
@@ -453,14 +477,14 @@ export function ProductMaster({ products, today }: { products: MasterProduct[]; 
                   <span className="kit-rowacts">
                     <Btn
                       disabled={busy || newPrice.price === ""}
-                      onClick={() => send({ id: p.id, ...newPrice }, "PATCH", "Price saved.")}
+                      onClick={() => send({ id: p.id, ...newPrice }, "PATCH", "Price saved")}
                     >
                       Save price
                     </Btn>
                     <Btn
                       variant="ghost"
                       disabled={busy || !rename.trim() || rename === p.subType}
-                      onClick={() => send({ id: p.id, subType: rename }, "PATCH", "Renamed.")}
+                      onClick={() => send({ id: p.id, subType: rename }, "PATCH", "Renamed")}
                     >
                       Rename
                     </Btn>
